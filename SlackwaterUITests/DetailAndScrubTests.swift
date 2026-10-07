@@ -20,6 +20,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let row = app.buttons["day-sun-d1"].firstMatch
         XCTAssertTrue(row.appears(within: 5))
         scrollTo(row, in: app)
+        XCTAssertTrue(row.label.contains("Solar noon"))
         save(app, "sun-schedule-expanded.png")
         row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))

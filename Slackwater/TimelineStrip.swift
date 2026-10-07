@@ -181,6 +181,7 @@ struct TimelineDay {
     let start: Date          // local midnight
     let sunrise: Date?
     let sunset: Date?
+    var solarNoon: Date? = nil
     /// A lunar day runs 24h50m, so a calendar day can lack either one.
     let moonrise: Date?
     let moonset: Date?
@@ -402,6 +403,7 @@ struct TimelineData {
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .rise }?.time,
                                sunset: sun.first { $0.kind == .set }?.time,
+                               solarNoon: sun.first { $0.kind == .transit }?.time,
                                moonrise: moon.first { $0.kind == .rise }?.time,
                                moonset: moon.first { $0.kind == .set }?.time)
         }
@@ -1265,7 +1267,7 @@ struct MultiDaySchedule: View {
                         }
                         Spacer(minLength: 0)
                         if !expanded, let day = days.first(where: { $0.offset == group.offset }) {
-                            sunTimes(day, horizontal: false)
+                            sunTimes(day)
                         }
                         Image(systemName: "chevron.down")
                             .font(.caption2.weight(.semibold))
@@ -1289,13 +1291,7 @@ struct MultiDaySchedule: View {
                     if expanded {
                         VStack(spacing: 0) {
                             if let day = days.first(where: { $0.offset == group.offset }), sunLocation != nil {
-                                HStack(spacing: 12) {
-                                    sunTimes(day, horizontal: true)
-                                    Spacer(minLength: 0)
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(SN.foam.opacity(0.55))
-                                }
+                                expandedSunTimes(day)
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 44)
                                 .contentShape(Rectangle())
@@ -1361,10 +1357,8 @@ struct MultiDaySchedule: View {
         let id: Date
     }
 
-    private func sunTimes(_ day: TimelineDay, horizontal: Bool) -> some View {
-        let layout = horizontal && !dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(HStackLayout(spacing: 16)) : AnyLayout(VStackLayout(alignment: .trailing, spacing: 1))
-        return layout {
+    private func sunTimes(_ day: TimelineDay) -> some View {
+        VStack(alignment: .trailing, spacing: 1) {
             Label(day.sunrise.map { chartTime($0, tz) } ?? "—", systemImage: "sunrise")
                 .foregroundStyle(SN.sunrise)
                 .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
@@ -1375,6 +1369,28 @@ struct MultiDaySchedule: View {
         .font(.caption2.monospacedDigit())
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("day-sun-d\(day.offset)")
+    }
+
+    private func expandedSunTimes(_ day: TimelineDay) -> some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        let layout = large ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
+            Label(day.sunrise.map { chartTime($0, tz) } ?? "—", systemImage: "sunrise")
+                .foregroundStyle(SN.sunrise)
+                .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Label(day.solarNoon.map { chartTime($0, tz) } ?? "—", systemImage: "sun.max")
+                .foregroundStyle(SN.sun)
+                .accessibilityLabel(Text("Solar noon"))
+                .accessibilityValue(day.solarNoon.map { chartTime($0, tz) } ?? "—")
+                .frame(maxWidth: .infinity, alignment: large ? .leading : .center)
+            Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
+                .foregroundStyle(SN.sunset)
+                .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
+                .frame(maxWidth: .infinity, alignment: large ? .leading : .trailing)
+        }
+        .font(.caption2.monospacedDigit())
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
