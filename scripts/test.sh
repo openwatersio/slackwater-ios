@@ -233,6 +233,13 @@ for i in {1..$#sims}; do
   (( workers < 2 )) && workers=2
   (( workers > 4 )) && workers=4
   workers=${SLACKWATER_WORKERS:-$workers}
+  parallel=(-parallel-testing-worker-count "$workers")
+  # SLACKWATER_NO_CLONE runs on the named device itself, which the caller has
+  # already booted. Every xcodebuild clone boots cold, and a cold iPad clone
+  # on a 3-core hosted runner kept the first test's launch from drawing a
+  # frame for 90 s; the timeout rerun got a fresh cold clone and failed the
+  # same way. CI only: locally that device may be the one you use by hand.
+  [[ -n "${SLACKWATER_NO_CLONE:-}" ]] && parallel=(-parallel-testing-enabled NO)
   if [[ -n "${SLACKWATER_XCTESTRUN:-}" ]]; then
     action=(test-without-building -xctestrun "$SLACKWATER_XCTESTRUN")
   else
@@ -244,7 +251,7 @@ for i in {1..$#sims}; do
   # XCTest must bound a blocked launch, including in downloaded test products (#580).
   set +e
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
-    -parallel-testing-worker-count "$workers" \
+    "${parallel[@]}" \
     -collect-test-diagnostics "$diagnostics" \
     -test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 \
     "${selection[@]}" \

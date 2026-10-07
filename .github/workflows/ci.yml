@@ -298,7 +298,20 @@ jobs:
       # green, which is what makes this worth writing down: it works only
       # because switching Xcode re-enumerates the devices, so it treats the
       # symptom and leaves a version to maintain forever.
-      - run: xcrun simctl list > /dev/null
+      #
+      # Then boot the device the tests run on (SLACKWATER_NO_CLONE below), so
+      # its first boot is paid here and not by the first test's launch. On a
+      # cold clone that launch took 26–34 s, the app never went idle, and the
+      # accessibility query timed out: a different first test in each iPad
+      # lane failed that way, rerun included, on three pushes in a row.
+      # tail: runtimes list oldest first, and `-destination name=` takes the newest.
+      - run: |
+          udid=$(xcrun simctl list devices available | grep -F "$DEVICE (" | tail -1 \
+            | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
+          xcrun simctl bootstatus "$udid" -b
+        env:
+          DEVICE: ${{ matrix.device }}
 
       # SLACKWATER_SIMS must name ONE device — it overrides the script's
       # fast/full device list outright.
@@ -322,6 +335,7 @@ jobs:
         env:
           SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1
+          SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
           SLACKWATER_ONLY: ${{ matrix.shard.only }}
           SLACKWATER_SKIP: ${{ matrix.shard.skip }}
@@ -370,6 +384,7 @@ jobs:
         env:
           SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1
+          SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
           SLACKWATER_ONLY: ${{ steps.failures.outputs.failed }}
 
