@@ -42,7 +42,7 @@ settings:
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
-    from: 0.4.2
+    from: 0.7.0
   slackwater:
     # Exact-commit pin: the stack is in prerelease (slackwater#338 stage 4),
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
@@ -296,6 +296,7 @@ targets:
       # reads them. The tour itself (TourCoach, TourOverlay) is phone-only.
       - Slackwater/TourAnchor.swift
       - Slackwater/MoonDetailSheet.swift
+      - Slackwater/SunDetailSheet.swift
       - Slackwater/MoonMarks.swift
       - Slackwater/ScrubReading.swift
     dependencies:

@@ -1224,7 +1224,10 @@ struct MultiDaySchedule: View {
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
+    var sunLocation: StationItem? = nil
     @State private var expandedOffset: Int? = 0
+    @State private var sunDay: SunDaySelection?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1259,31 +1262,11 @@ struct MultiDaySchedule: View {
                             Text(monthDay(group.start, tz))
                                 .font(.caption2)
                                 .foregroundStyle(SN.foam.opacity(0.55))
-                            if let day = days.first(where: { $0.offset == group.offset }) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    if let rise = day.sunrise {
-                                        HStack(spacing: 3) {
-                                            Image(systemName: "sunrise")
-                                            Text(chartTime(rise, tz))
-                                        }
-                                            .foregroundStyle(SN.sunrise)
-                                            .accessibilityLabel("Sunrise \(chartTime(rise, tz))")
-                                    }
-                                    if let set = day.sunset {
-                                        HStack(spacing: 3) {
-                                            Image(systemName: "sunset")
-                                            Text(chartTime(set, tz))
-                                        }
-                                            .foregroundStyle(SN.sunset)
-                                            .accessibilityLabel("Sunset \(chartTime(set, tz))")
-                                    }
-                                }
-                                .font(.caption2.monospaced())
-                                .accessibilityElement(children: .combine)
-                                .accessibilityIdentifier("day-sun-d\(group.offset)")
-                            }
                         }
                         Spacer(minLength: 0)
+                        if !expanded, let day = days.first(where: { $0.offset == group.offset }) {
+                            sunTimes(day, horizontal: false)
+                        }
                         Image(systemName: "chevron.down")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.55))
@@ -1305,6 +1288,23 @@ struct MultiDaySchedule: View {
 
                     if expanded {
                         VStack(spacing: 0) {
+                            if let day = days.first(where: { $0.offset == group.offset }), sunLocation != nil {
+                                HStack(spacing: 12) {
+                                    sunTimes(day, horizontal: true)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(SN.foam.opacity(0.55))
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                                .onTapGesture { sunDay = SunDaySelection(id: day.start) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
+                                Divider().overlay(Color.white.opacity(0.055))
+                            }
                             ForEach(group.items) { e in
                                 let on = e.id == nearestID
                                 // A tap gesture, not a Button: Button press tracking
@@ -1349,6 +1349,32 @@ struct MultiDaySchedule: View {
             }
         }
         .padding(.vertical, 6)
+        .sheet(item: $sunDay) { day in
+            if let sunLocation {
+                SunDetailSheet(at: day.id, latitude: sunLocation.latitude,
+                               longitude: sunLocation.longitude, tz: tz)
+            }
+        }
+    }
+
+    private struct SunDaySelection: Identifiable {
+        let id: Date
+    }
+
+    private func sunTimes(_ day: TimelineDay, horizontal: Bool) -> some View {
+        let layout = horizontal && !dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(spacing: 16)) : AnyLayout(VStackLayout(alignment: .trailing, spacing: 1))
+        return layout {
+            Label(day.sunrise.map { chartTime($0, tz) } ?? "—", systemImage: "sunrise")
+                .foregroundStyle(SN.sunrise)
+                .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
+            Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
+                .foregroundStyle(SN.sunset)
+                .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
+        }
+        .font(.caption2.monospacedDigit())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("day-sun-d\(day.offset)")
     }
 
     @ViewBuilder
