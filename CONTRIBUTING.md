@@ -188,7 +188,11 @@ Anything meaning _a day_ goes through `Calendar` with its `timeZone` set. `addin
 
 ### Yearly tidal claims
 
-Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@slackwater/database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `ChsFitter.basis`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
+Gate yearly and absolute claims about water **level** (LAT/HAT, "the lowest low of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@slackwater/database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `ChsFitter.basis`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
+
+**The same gate is wrong for a claim about range**, and applying it there is a mistake this app has already made and reverted (#640, then #641, which hid the Range sheet's year section at every CHS station and the fifth of NOAA references without bounds). The physics, the measurements and the rule for both kinds of claim live with the engine that does the ranking — [slackwater `docs/CONTRACT.md`, "What a ranking window can claim"](https://github.com/openwatersio/slackwater/blob/main/docs/CONTRACT.md). Read it before gating anything seasonal.
+
+What is this repo's own: `YearFigureTests.testTheSeasonalShapeDoesNotNeedAnAnnualConstituent` pins the counter-example — Chignik, which has no bounds, varies more across the year than Portland, which has them — so reintroducing the gate on the Sa/Ssa theory fails here with the evidence in hand. `docs/detail.md` §6.4 and §6.5 record which sections are gated and which are not.
 
 A subordinate's reduced LAT/HAT is the floor of a prediction, not a datum. It belongs in `latDatum`/`hatDatum`, never in `datums`, where tide-database's datum-ordering gate rejects it.
 
