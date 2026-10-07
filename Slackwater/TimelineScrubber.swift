@@ -146,6 +146,9 @@ struct TimelineScrubber: UIViewRepresentable {
             sv.addGestureRecognizer(press)
         }
         sv.addGestureRecognizer(tap)
+        // The iOS 27.1 SDK's UIKit, the first with `UIHingeInteraction`. CI builds
+        // with an older Xcode, where the type does not exist to name.
+        #if canImport(UIKit, _version: 9127.0.85)
         if #available(iOS 27.1, *), stationID != nil {
             sv.addInteraction(UIHingeInteraction { [weak coordinator = context.coordinator] _, update in
                 guard let hinge = update.hinge else { return }
@@ -154,6 +157,7 @@ struct TimelineScrubber: UIViewRepresentable {
                                             angle: Double(hinge.angle))
             })
         }
+        #endif
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
