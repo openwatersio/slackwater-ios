@@ -298,7 +298,31 @@ jobs:
       # green, which is what makes this worth writing down: it works only
       # because switching Xcode re-enumerates the devices, so it treats the
       # symptom and leaves a version to maintain forever.
-      - run: xcrun simctl list > /dev/null
+      #
+      # Then boot the device the tests run on (SLACKWATER_NO_CLONE below), so
+      # its first boot is paid here and not by the first test's launch. On a
+      # cold clone that launch took 26–34 s, the app never went idle, and the
+      # accessibility query timed out: a different first test in each iPad
+      # lane failed that way, rerun included, on three pushes in a row.
+      # tail: runtimes list oldest first, and `-destination name=` takes the newest.
+      #
+      # A booted device still left the app's first launch slow: 37–62 s to
+      # ready against ~10 s for every later test. So launch the app once here,
+      # with the suite's no-network flags, then uninstall it so the tests
+      # start from an empty container as they did on a fresh clone.
+      # ponytail: fixed 45 s settle; poll for the app going idle if it proves short.
+      - run: |
+          udid=$(xcrun simctl list devices available | grep -F "$DEVICE (" | tail -1 \
+            | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
+          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch
+          sleep 45
+          xcrun simctl terminate "$udid" io.openwaters.slackwater || true
+          xcrun simctl uninstall "$udid" io.openwaters.slackwater
+        env:
+          DEVICE: ${{ matrix.device }}
 
       # SLACKWATER_SIMS must name ONE device — it overrides the script's
       # fast/full device list outright.
@@ -314,14 +338,24 @@ jobs:
       # identical code failed three different UI tests — see #331.
       # continue-on-error: the verdict is the "Test result" step below, after
       # the one bounded rerun that a service timeout earns.
+      #
+      # xcodebuild can list no simulators at all while the device's first boot
+      # still loads the runner: exit 70, "Unable to find a device matching",
+      # no test run. That one error gets a second try here.
       - id: tests
         continue-on-error: true
         run: |
-          SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \
-            ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }}
+          SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun)
+          export SLACKWATER_XCTESTRUN
+          ./scripts/test.sh ${MODE:+"$MODE"} && exit 0
+          grep -q 'Unable to find a device matching' build/results-*.log || exit 1
+          echo "::warning::xcodebuild found no simulator; retrying once"
+          ./scripts/test.sh ${MODE:+"$MODE"}
         env:
+          MODE: ${{ github.event_name == 'push' && '--full' || '' }}
           SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1
+          SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
           SLACKWATER_ONLY: ${{ matrix.shard.only }}
           SLACKWATER_SKIP: ${{ matrix.shard.skip }}
@@ -370,6 +404,7 @@ jobs:
         env:
           SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1
+          SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
           SLACKWATER_ONLY: ${{ steps.failures.outputs.failed }}
 
