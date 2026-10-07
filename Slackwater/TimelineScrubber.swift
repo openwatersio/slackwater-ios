@@ -20,6 +20,31 @@ private var landsInstantly: Bool {
     UIAccessibility.isReduceMotionEnabled || uiTestQuiet
 }
 
+/// The moment a detail's strip was on when the iPhone Duo's hinge moved.
+/// Folding swaps the phone stack for the split view (or back) and SwiftUI
+/// rebuilds the detail with it, so the strip that comes back would open on
+/// now. One slot: a phone shows one detail.
+enum FoldHandoff {
+    struct Moment {
+        let stationID: String
+        let time: Date
+        /// The strip was on now, so the new one lands on now too.
+        let live: Bool
+        /// Last seen closed: the cover screen takes over, with no opening to follow.
+        let closing: Bool
+        let at: TimeInterval
+    }
+    static var slot: Moment?
+    /// The rebuild lands well within this of the hinge update before it; anything older is a different visit.
+    static let freshFor: TimeInterval = 2
+
+    static func take(_ stationID: String, at now: TimeInterval) -> Moment? {
+        defer { slot = nil }
+        guard let m = slot, m.stationID == stationID, now - m.at <= freshFor else { return nil }
+        return m
+    }
+}
+
 struct TimelineScrubber: UIViewRepresentable {
     let data: TimelineData
     let geo: TimelineGeo
@@ -44,6 +69,9 @@ struct TimelineScrubber: UIViewRepresentable {
     /// host has nothing to open — a list card's strip — and then the strip carries neither the
     /// press recognizer nor the matching VoiceOver action.
     var onLongPress: (() -> Void)? = nil
+    /// The detail's station. Nil on a list card, which neither follows the
+    /// Duo's hinge nor hands its moment across a fold.
+    var stationID: String? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -95,6 +123,8 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.showsHorizontalScrollIndicator = false
         sv.alwaysBounceVertical = false
         sv.contentInsetAdjustmentBehavior = .never
+        // The strip's SwiftUI mask clips instead, so it can reach into a trailing bleed.
+        sv.clipsToBounds = false
         sv.delegate = context.coordinator
         // Nothing mounted until the first update with a real width — the
         // opening data can already span two chunks, and mounting every tile
@@ -116,6 +146,18 @@ struct TimelineScrubber: UIViewRepresentable {
             sv.addGestureRecognizer(press)
         }
         sv.addGestureRecognizer(tap)
+        // The iOS 27.1 SDK's UIKit, the first with `UIHingeInteraction`. CI builds
+        // with an older Xcode, where the type does not exist to name.
+        #if canImport(UIKit, _version: 9127.0.85)
+        if #available(iOS 27.1, *), stationID != nil {
+            sv.addInteraction(UIHingeInteraction { [weak coordinator = context.coordinator] _, update in
+                guard let hinge = update.hinge else { return }
+                coordinator?.hingeDidChange(closed: hinge.status == .closed,
+                                            fullyOpen: hinge.status == .fullyOpen,
+                                            angle: Double(hinge.angle))
+            })
+        }
+        #endif
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -238,6 +280,24 @@ struct TimelineScrubber: UIViewRepresentable {
         var introStartedAt: CFTimeInterval?
         var introRange: (start: Date, destination: Date)?
         weak var introScrollView: UIScrollView?
+        /// The Duo is opening under this strip: the moment it lands on, and
+        /// how far the hinge has come.
+        struct HingeFollow {
+            let moment: Date
+            let live: Bool
+            /// `Timeline.hingeLead`, shortened where the window ends first.
+            let lead: TimeInterval
+            var startAngle: Double?
+            var progress = 0.0
+            /// The hinge has opened past where this strip first saw it.
+            var moved = false
+            var shown: Date
+            var lastUpdate: TimeInterval
+            var lastFrame: TimeInterval?
+        }
+        var hingeFollow: HingeFollow?
+        var hingeDisplayLink: CADisplayLink?
+        weak var hingeScrollView: UIScrollView?
         /// Where the animated scroll — the magnet's snap or a pill's jump — is
         /// headed; parked on exactly when the animation ends.
         var magnetTarget: Date?
@@ -418,6 +478,21 @@ struct TimelineScrubber: UIViewRepresentable {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
             defer { didInitialCenter = true }
             ScrubTrace.record("center", sv)
+            // Rebuilt by a fold: come back on the moment the strip was folded on,
+            // not on now. A picked week the rebuilt detail no longer shows opens as usual.
+            if let id = parent.stationID, let fold = FoldHandoff.take(id, at: CACurrentMediaTime()) {
+                let moment = fold.live ? parent.now : fold.time
+                if moment >= parent.data.start, moment <= parent.data.end {
+                    laidOutWidth = sv.bounds.width
+                    if fold.closing || !animated {
+                        sv.contentOffset = CGPoint(x: parent.data.x(moment) - sv.bounds.width / 2, y: 0)
+                        Task { @MainActor [weak self] in self?.parent.scrubTime = moment }
+                    } else {
+                        startHingeFollow(sv, moment: moment, live: fold.live)
+                    }
+                    return
+                }
+            }
             let start = parent.scrubTime
             let isIntro = abs(start.timeIntervalSince(Timeline.introStart(for: parent.now))) < 2
             let destination = isIntro ? parent.now : start
@@ -462,13 +537,79 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
+        /// Stops the hinge follow too: anything that interrupts one opening
+        /// animation interrupts the other.
         func stopIntro() {
             introDisplayLink?.invalidate()
             introDisplayLink = nil
             introStartedAt = nil
             introRange = nil
             introScrollView = nil
+            hingeDisplayLink?.invalidate()
+            hingeDisplayLink = nil
+            hingeFollow = nil
+            hingeScrollView = nil
             nudging = false
+        }
+
+        /// Every hinge update. A moving hinge leaves this strip's moment for the
+        /// strip the fold is about to rebuild, and an opening one drives the follow.
+        func hingeDidChange(closed: Bool, fullyOpen: Bool, angle: Double) {
+            guard let id = parent.stationID else { return }
+            let t = CACurrentMediaTime()
+            if var f = hingeFollow {
+                let start = f.startAngle ?? angle
+                f.startAngle = start
+                // Never backwards: a settled follow stays settled.
+                let progress = fullyOpen ? 1 : max(f.progress, Timeline.hingeProgress(angle: angle, from: start))
+                f.moved = f.moved || progress > f.progress
+                f.progress = progress
+                f.lastUpdate = t
+                hingeFollow = f
+            }
+            guard !fullyOpen else { return }
+            FoldHandoff.slot = .init(stationID: id,
+                                     time: hingeFollow?.moment ?? parent.scrubTime,
+                                     live: hingeFollow?.live ?? !scrubbedAway(parent.scrubTime, from: parent.now),
+                                     closing: closed, at: t)
+        }
+
+        private func startHingeFollow(_ sv: UIScrollView, moment: Date, live: Bool) {
+            let room = parent.data.end.timeIntervalSince(moment) - Timeline.centerPad * 3600
+            let lead = max(0, min(Timeline.hingeLead, room))
+            let shown = moment.addingTimeInterval(lead)
+            hingeFollow = HingeFollow(moment: moment, live: live, lead: lead,
+                                      shown: shown, lastUpdate: CACurrentMediaTime())
+            sv.contentOffset = CGPoint(x: parent.data.x(shown) - sv.bounds.width / 2, y: 0)
+            nudging = true
+            parent.scrollGate?.isQuiet = false
+            hingeScrollView = sv
+            let link = CADisplayLink(target: self, selector: #selector(advanceHinge))
+            hingeDisplayLink = link
+            link.add(to: .main, forMode: .common)
+        }
+
+        @objc private func advanceHinge(_ link: CADisplayLink) {
+            guard let sv = hingeScrollView, var f = hingeFollow else {
+                stopIntro()
+                return
+            }
+            if Timeline.hingeSettled(moved: f.moved, idle: link.timestamp - f.lastUpdate) { f.progress = 1 }
+            let target = f.moment.addingTimeInterval(f.lead * (1 - f.progress))
+            // Eased toward the hinge, not set from it: updates arrive at about
+            // 30 Hz, and the simulator's fold control jumps between postures.
+            let dt = f.lastFrame.map { link.timestamp - $0 } ?? 0
+            f.lastFrame = link.timestamp
+            f.shown = f.shown.addingTimeInterval(target.timeIntervalSince(f.shown) * (1 - exp(-dt / 0.1)))
+            hingeFollow = f
+            guard f.progress >= 1, abs(f.shown.timeIntervalSince(f.moment)) < 60 else {
+                sv.contentOffset = CGPoint(x: parent.data.x(f.shown) - sv.bounds.width / 2, y: 0)
+                return
+            }
+            sv.contentOffset = CGPoint(x: parent.data.x(f.moment) - sv.bounds.width / 2, y: 0)
+            parent.scrubTime = f.moment
+            stopIntro()
+            parent.scrollGate?.isQuiet = true
         }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
@@ -665,6 +806,8 @@ struct TimelineScrubStrip: View {
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
+    @Environment(\.stripTrailingBleed) private var trailingBleed
+    @Environment(\.stripStationID) private var stationID
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openAlertPopup) private var openAlertPopup
@@ -677,8 +820,13 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker, onLongPress: openAlertPopup)
+                         onPickDate: openWeekPicker, onLongPress: openAlertPopup,
+                         stationID: stationID)
             .frame(height: geo.height)
+            // Stretched, not widened: the scroll view keeps its bounds, so the
+            // centerline stays at the visible center while the drawing runs
+            // on under the iPhone Duo's status rail.
+            .mask { Rectangle().padding(.trailing, -trailingBleed) }
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
             // and writing the caller's state there is "Modifying state during

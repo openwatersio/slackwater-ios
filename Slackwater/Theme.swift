@@ -129,9 +129,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         }
                     }
                     .padding(.bottom, 42)
+                    // The iPhone Duo's status rail is a trailing-only
+                    // inset: the sky bleeds under it, the content stays clear.
+                    .padding(.leading, geo.safeAreaInsets.leading)
+                    .padding(.trailing, geo.safeAreaInsets.trailing)
                 }
+                // The ScrollView ignoring the inset is not enough: in a split
+                // view it still sizes its content short of the rail.
+                .ignoresSafeArea(edges: .horizontal)
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: [.top, .horizontal])
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
                 // A dedicated GeometryReader, not the outer `geo`: `geo` sits
                 // inside the safe area, but this ScrollView ignores the top
@@ -149,6 +156,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
+            .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
+            .environment(\.stripStationID, favoriteId)
             .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
@@ -400,6 +409,29 @@ extension EnvironmentValues {
     var openWeekPicker: () -> Void {
         get { self[OpenWeekPickerKey.self] }
         set { self[OpenWeekPickerKey.self] = newValue }
+    }
+    /// How far the strip may draw past its trailing edge: the iPhone
+    /// Duo's status rail, which the scaffold pads its content clear of.
+    var stripTrailingBleed: CGFloat {
+        get { self[StripTrailingBleedKey.self] }
+        set { self[StripTrailingBleedKey.self] = newValue }
+    }
+}
+
+private struct StripTrailingBleedKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+/// The station a detail's strip belongs to, so a fold hands its moment only
+/// to the same station's rebuilt strip. Nil outside a detail.
+private struct StripStationIDKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var stripStationID: String? {
+        get { self[StripStationIDKey.self] }
+        set { self[StripStationIDKey.self] = newValue }
     }
 }
 
