@@ -23,9 +23,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "sun-schedule-expanded.png")
         row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))
-        for id in ["sun-event-civilDawn", "sun-event-nauticalDawn", "sun-horizon-dip"] {
-            XCTAssertTrue(app.descendants(matching: .any)[id].firstMatch.exists, id)
+        XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any)["sun-horizon-dip"].firstMatch.exists)
+        var previousY = -Double.infinity
+        for kind in ["astroDawn", "nauticalDawn", "civilDawn", "rise", "transit", "set", "civilDusk", "nauticalDusk", "astroDusk"] {
+            let event = app.descendants(matching: .any)["sun-event-\(kind)"].firstMatch
+            XCTAssertTrue(event.exists, kind)
+            XCTAssertGreaterThan(event.frame.minY, previousY, kind)
+            previousY = event.frame.minY
         }
+        let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
+        XCTAssertGreaterThan(daylight.frame.minY, previousY)
         save(app, "sun-details.png")
         app.buttons["Done"].tap()
         XCTAssertTrue(row.appears(within: 5))

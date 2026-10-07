@@ -225,9 +225,9 @@ Only one day is open at a time. The anchor day starts open. Tapping an open day 
 
 #### Sun activity sheet
 
-The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. A morning/evening table lists sunrise/set and civil, nautical, and astronomical dawn/dusk. Solar noon, daylight duration, and apparent horizon dip follow. Daylight is the elapsed time above the horizon between that day’s rise/set crossings; it displays “—” when either crossing is absent. At accessibility text sizes the table stacks each pair with explicit morning/evening labels.
+The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
 
-Eye height above water starts at 0 m and can be adjusted in meters. Almanac 0.7 supplies the horizon dip and height-adjusted rise/set events for an unobstructed sea horizon, with observer elevation equal to eye height. This adjustment affects only the sheet: twilight definitions and the schedule’s sea-level times stay unchanged. Calculations run off the main actor; failures show an unavailable message rather than missing-event dashes.
+Daylight duration totals the elapsed time above the horizon between that day’s rise/set crossings at the bottom of the table; it displays “—” when either crossing is absent. Almanac supplies sea-level times for an unobstructed horizon. Calculations run off the main actor; failures show an unavailable message rather than missing-event dashes.
 
 ### 8.4 Rows
 

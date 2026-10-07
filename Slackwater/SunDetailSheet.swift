@@ -4,24 +4,26 @@ import SwiftUI
 struct SunDayFacts: Sendable {
     let interval: DateInterval
     let events: [SunEvent]
-    let dip: Double
 
-    init(at: Date, tz: TimeZone, latitude: Double, longitude: Double, eyeHeight: Double) throws {
+    init(at: Date, tz: TimeZone, latitude: Double, longitude: Double) throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = tz
         guard let interval = calendar.dateInterval(of: .day, for: at) else {
             throw AlmanacError.invalidArgument("Invalid calendar day")
         }
-        // The sea surface is at zero elevation; Almanac separates eye elevation from height above it.
-        let observer = try Observer(latitudeDeg: latitude, longitudeDeg: longitude, elevationM: eyeHeight)
+        let observer = try Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         self.interval = interval
-        dip = try horizonDip(observer: observer, heightAboveGroundM: eyeHeight)
-        events = try sunEvents(from: interval.start, to: interval.end,
-                               observer: observer, heightAboveGroundM: eyeHeight)
+        events = try sunEvents(from: interval.start, to: interval.end, observer: observer)
     }
 
     func time(_ kind: SunEventKind) -> Date? {
         events.first { $0.kind == kind }?.time
+    }
+
+    var orderedKinds: [SunEventKind] {
+        let kinds: [SunEventKind] = [.astroDawn, .nauticalDawn, .civilDawn, .rise, .transit,
+                                    .set, .civilDusk, .nauticalDusk, .astroDusk]
+        return kinds.sorted { (time($0) ?? interval.end) < (time($1) ?? interval.end) }
     }
 
     var daylight: TimeInterval? {
@@ -38,7 +40,7 @@ struct SunDetailSheet: View {
     let tz: TimeZone
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var eyeHeight = 0.0
+    @ScaledMetric(relativeTo: .subheadline) private var iconWidth = 24
     @State private var facts: SunDayFacts?
     @State private var failed = false
 
@@ -50,34 +52,11 @@ struct SunDetailSheet: View {
                         .font(.headline)
                     if let facts {
                         table(facts)
-                        VStack(spacing: 14) {
-                            LabeledContent("Solar noon", value: when(facts, .transit))
-                            LabeledContent("Daylight", value: facts.daylight.map {
-                                Duration.seconds($0.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-                            } ?? "—")
-                            LabeledContent("Horizon dip", value: Measurement(value: facts.dip, unit: UnitAngle.degrees)
-                                .formatted(.measurement(width: .narrow, numberFormatStyle: .number.precision(.fractionLength(2)))))
-                                .accessibilityIdentifier("sun-horizon-dip")
-                        }
-                        .font(.subheadline.monospacedDigit())
                     } else if failed {
                         Text("Sun times unavailable.")
                     } else {
                         ProgressView().frame(maxWidth: .infinity)
                     }
-                    Stepper(value: $eyeHeight, in: 0...10_000, step: 1) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Eye height above water")
-                            Text(Measurement(value: eyeHeight, unit: UnitLength.meters),
-                                 format: .measurement(width: .abbreviated, usage: .asProvided))
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(SN.foam.opacity(0.7))
-                        }
-                    }
-                    .accessibilityIdentifier("sun-eye-height")
-                    Text("For an unobstructed sea horizon. Height adjusts this table only.")
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.7))
                 }
                 .padding(20)
             }
@@ -86,12 +65,11 @@ struct SunDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .task(id: eyeHeight) {
+        .task {
             facts = nil
             failed = false
-            let height = eyeHeight
             let result = await Task.detached {
-                try? SunDayFacts(at: at, tz: tz, latitude: latitude, longitude: longitude, eyeHeight: height)
+                try? SunDayFacts(at: at, tz: tz, latitude: latitude, longitude: longitude)
             }.value
             guard !Task.isCancelled else { return }
             facts = result
@@ -104,47 +82,54 @@ struct SunDetailSheet: View {
     }
 
     private func table(_ facts: SunDayFacts) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 14) {
-            if !dynamicTypeSize.isAccessibilitySize {
-                GridRow {
-                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                    Text("Morning").foregroundStyle(SN.sunrise)
-                    Text("Evening").foregroundStyle(SN.sunset)
-                }
+        VStack(spacing: 18) {
+            ForEach(facts.orderedKinds, id: \.rawValue) { kind in
+                eventRow(facts, kind)
             }
-            eventRow("Sunrise / sunset", facts, .rise, .set)
-            eventRow("Civil twilight", facts, .civilDawn, .civilDusk)
-            eventRow("Nautical twilight", facts, .nauticalDawn, .nauticalDusk)
-            eventRow("Astronomical twilight", facts, .astroDawn, .astroDusk)
+            Divider()
+            LabeledContent("Daylight", value: facts.daylight.map {
+                Duration.seconds($0.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+            } ?? "—")
+            .fontWeight(.semibold)
+            .accessibilityIdentifier("sun-daylight")
         }
-        .font(.subheadline)
+        .font(.subheadline.monospacedDigit())
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(16)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18))
     }
 
-    @ViewBuilder
-    private func eventRow(_ label: LocalizedStringKey, _ facts: SunDayFacts,
-                          _ morning: SunEventKind, _ evening: SunEventKind) -> some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(label)
-                LabeledContent("Morning", value: when(facts, morning)).foregroundStyle(SN.sunrise)
-                LabeledContent("Evening", value: when(facts, evening)).foregroundStyle(SN.sunset)
-            }
-            .monospacedDigit()
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("sun-event-\(morning.rawValue)")
-        } else {
-            GridRow {
-                Text(label).fixedSize(horizontal: false, vertical: true)
-                Text(when(facts, morning)).foregroundStyle(SN.sunrise).monospacedDigit()
-                    .fixedSize()
-                Text(when(facts, evening)).foregroundStyle(SN.sunset).monospacedDigit()
-                    .fixedSize()
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("sun-event-\(morning.rawValue)")
+    private func eventRow(_ facts: SunDayFacts, _ kind: SunEventKind) -> some View {
+        let label: LocalizedStringKey
+        let symbol: String
+        let color: Color
+        switch kind {
+        case .astroDawn: (label, symbol, color) = ("Astronomical dawn", "sparkles", SN.sunrise)
+        case .nauticalDawn: (label, symbol, color) = ("Nautical dawn", "moon.stars", SN.sunrise)
+        case .civilDawn: (label, symbol, color) = ("Civil dawn", "sun.horizon", SN.sunrise)
+        case .rise: (label, symbol, color) = ("Sunrise", "sunrise", SN.sunrise)
+        case .transit: (label, symbol, color) = ("Solar noon", "sun.max", SN.sun)
+        case .set: (label, symbol, color) = ("Sunset", "sunset", SN.sunset)
+        case .civilDusk: (label, symbol, color) = ("Civil dusk", "sun.horizon", SN.sunset)
+        case .nauticalDusk: (label, symbol, color) = ("Nautical dusk", "moon.stars", SN.sunset)
+        case .astroDusk: (label, symbol, color) = ("Astronomical dusk", "sparkles", SN.sunset)
         }
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .foregroundStyle(color)
+                    .frame(width: iconWidth)
+                    .accessibilityHidden(true)
+                Text(label).fixedSize(horizontal: false, vertical: true)
+            }
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+            Text(when(facts, kind)).foregroundStyle(color).fixedSize()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sun-event-\(kind.rawValue)")
     }
 }
