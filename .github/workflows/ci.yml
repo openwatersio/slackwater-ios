@@ -305,11 +305,22 @@ jobs:
       # accessibility query timed out: a different first test in each iPad
       # lane failed that way, rerun included, on three pushes in a row.
       # tail: runtimes list oldest first, and `-destination name=` takes the newest.
+      #
+      # A booted device still left the app's first launch slow: 37–62 s to
+      # ready against ~10 s for every later test. So launch the app once here,
+      # with the suite's no-network flags, then uninstall it so the tests
+      # start from an empty container as they did on a fresh clone.
+      # ponytail: fixed 45 s settle; poll for the app going idle if it proves short.
       - run: |
           udid=$(xcrun simctl list devices available | grep -F "$DEVICE (" | tail -1 \
             | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
           [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
           xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
+          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet
+          sleep 45
+          xcrun simctl terminate "$udid" io.openwaters.slackwater || true
+          xcrun simctl uninstall "$udid" io.openwaters.slackwater
         env:
           DEVICE: ${{ matrix.device }}
 
