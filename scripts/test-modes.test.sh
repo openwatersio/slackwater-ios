@@ -187,6 +187,13 @@ SLACKWATER_WORKERS=1 run_mode --unit
 assert_has "-parallel-testing-worker-count 1 "
 run_mode --unit
 grep -Eq -- '-parallel-testing-worker-count [234] ' "$log" || { print -u2 -- "default workers outside 2–4"; cat "$log"; exit 1; }
+assert_lacks "-parallel-testing-enabled NO"
+
+# CI tests on the device it booted and warmed, never a cold clone of it.
+SLACKWATER_NO_CLONE=1 SLACKWATER_SIMS='Mine' SLACKWATER_WORKERS=1 \
+  SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode --full
+assert_has "-parallel-testing-enabled NO"
+assert_lacks "-parallel-testing-worker-count"
 
 # The wait scale defaults to 2 locally; CI's explicit value is taken as given.
 run_mode --unit

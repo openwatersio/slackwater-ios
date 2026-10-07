@@ -317,7 +317,7 @@ jobs:
           [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
-          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet
+          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch
           sleep 45
           xcrun simctl terminate "$udid" io.openwaters.slackwater || true
           xcrun simctl uninstall "$udid" io.openwaters.slackwater
