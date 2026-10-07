@@ -35,6 +35,16 @@ Run the `SlackwaterWatch` scheme on a watch simulator; the phone schemes cannot 
 
 The watch targets do not extract strings (`SWIFT_EMIT_LOC_STRINGS: NO` in `project.yml`), because extracting from the watch alone would drop the translator comments that only the phone's code supplies for shared keys. Building the watch scheme therefore leaves `Slackwater/Localizable.xcstrings` untouched, and a new watch string goes into the catalog by hand.
 
+## Running on the iPhone Duo
+
+The `iPhone Duo` simulator (iOS 27.1 and later) boots folded, on its cover screen. Only Xcode's device view can fold, half-fold, or unfold it. `simctl` has no fold control, and powering the panels on and off with `simctl io <udid> screenConfig` crashes SpringBoard. XCUITest has no fold API either, so fold behavior has no UI test; check it by hand in Xcode.
+
+- The status bar sits in a rail on the right edge in every posture, which gives the app a trailing-only safe-area inset. Unfolded, the app runs landscape in the split layout, with the sidebar as a leading inset.
+- `simctl io <udid> screenshot --display=1` captures the cover screen and `--display=3` the inner screen. The inner screen's captures are the panel's portrait framebuffer, so rotate them (`ffmpeg -vf transpose=1`) before reading them.
+- `recordVideo` records one display per device at a time, so record the inner screen while someone folds it in Xcode. The recording is variable-frame-rate and writes no frames while that panel is dark, so find the folds from packet times (`ffprobe -show_entries packet=pts_time`) rather than by scrubbing through it.
+- The simulator does report the hinge through `UIHingeInteraction`: the angle runs from 0 (closed) to π (flat) at about 30 Hz. Its fold control jumps between postures, though, and goes quiet for about 0.67 s at the switch to the inner screen, so judge how anything that follows the hinge feels on a device.
+- `xcrun simctl launch --console-pty <udid> io.openwaters.slackwater` streams the app's `print` output while you fold.
+
 ## Screenshotting a deep-linked screen
 
 `xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens Settings at Premium) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
