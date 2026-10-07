@@ -259,7 +259,7 @@ struct TideDetailView: View {
     /// swing, so the tile's mark ranks a swing: a station can have a big range
     /// on a day whose low is unremarkable, and ranking the level on a tile
     /// whose value is a range read as a conflation on screen.
-    private var swingStanding: SwingStanding? {
+    private var swingStanding: PeakStanding? {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
         return standings.swing(abs(next.height - prev.height), time: next.time)
     }

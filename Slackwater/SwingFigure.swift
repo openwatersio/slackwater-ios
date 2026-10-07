@@ -22,7 +22,7 @@ struct SwingFigure: View {
         let isNextBigger: Bool
     }
 
-    let standing: SwingStanding
+    let standing: PeakStanding
     /// The station's own zone: the days this aggregates are the station's,
     /// never the device's.
     var tz: TimeZone = .current
@@ -44,27 +44,27 @@ struct SwingFigure: View {
     /// One scale for every bar: the biggest day fills the box and the rest are
     /// their true fraction of it. Auto-fitting each bar to itself is exactly
     /// the defect #97 found in the strip.
-    static func bars(_ standing: SwingStanding, tz: TimeZone, size: CGSize) -> [Bar] {
+    static func bars(_ standing: PeakStanding, tz: TimeZone, size: CGSize) -> [Bar] {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
-        var biggestOfDay: [Date: TideRange] = [:]
+        var biggestOfDay: [Date: Peak] = [:]
         for r in standing.all {
             let day = cal.startOfDay(for: r.time)
             guard day >= standing.window.start,
                   let next = cal.date(byAdding: .day, value: 1, to: day), next <= standing.window.end
             else { continue }
-            if r.height > (biggestOfDay[day]?.height ?? -.infinity) { biggestOfDay[day] = r }
+            if r.magnitude > (biggestOfDay[day]?.magnitude ?? -.infinity) { biggestOfDay[day] = r }
         }
         let days = biggestOfDay.keys.sorted()
-        guard let biggest = biggestOfDay.values.map(\.height).max(), biggest > 0,
+        guard let biggest = biggestOfDay.values.map(\.magnitude).max(), biggest > 0,
               days.count > 1 else { return [] }
-        let selectedDay = cal.startOfDay(for: standing.selectedTime)
+        let selectedDay = cal.startOfDay(for: standing.selected.time)
         let nextDay = standing.nextBigger.map { cal.startOfDay(for: $0.time) }
         // Half a bar's margin at each end so neither is clipped by the edge.
         let step = size.width / CGFloat(days.count)
         return days.enumerated().map { i, day in
             Bar(x: step * (CGFloat(i) + 0.5),
-                height: size.height * CGFloat(biggestOfDay[day]!.height / biggest),
+                height: size.height * CGFloat(biggestOfDay[day]!.magnitude / biggest),
                 isSelected: day == selectedDay,
                 isNextBigger: day == nextDay && day != selectedDay)
         }
@@ -102,7 +102,7 @@ struct SwingFigure: View {
 
     /// The shape is unavailable to VoiceOver, so the ranking is said outright.
     private var spoken: String {
-        let bigger = standing.all.filter { $0.height > standing.selectedHeight }.count
+        let bigger = standing.all.filter { $0.magnitude > standing.selected.magnitude }.count
         return bigger == 0
             ? String(localized: "The biggest swing of the fortnight.",
                      comment: "VoiceOver for the swing figure.")

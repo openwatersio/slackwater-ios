@@ -106,12 +106,12 @@ final class TideStandingTests: XCTestCase {
                 TideStanding.at(lows[lows.count / 2], among: all)!)
     }
 
-    private func swingStandings() -> (marked: SwingStanding, plain: SwingStanding) {
+    private func swingStandings() -> (marked: PeakStanding, plain: PeakStanding) {
         let all = windowExtremes(at)
         let sorted = all.ranges().sorted { $0.height < $1.height }
         let big = sorted.last!, mid = sorted[sorted.count / 2]
-        return (SwingStanding.at(big.height, time: big.time, among: all, window: window())!,
-                SwingStanding.at(mid.height, time: mid.time, among: all, window: window())!)
+        return (PeakStanding.at(big.height, time: big.time, among: PeakStanding.swings(all), window: window())!,
+                PeakStanding.at(mid.height, time: mid.time, among: PeakStanding.swings(all), window: window())!)
     }
 
     /// Three claimants, one line. Seasonal wins: at a lake, "this number is
@@ -148,7 +148,7 @@ final class TideStandingTests: XCTestCase {
     func testTheFortnightsBiggestSwingMarks() {
         let all = windowExtremes(at)
         let biggest = all.ranges().max { $0.height < $1.height }!
-        let standing = SwingStanding.at(biggest.height, time: biggest.time, among: all, window: window())!
+        let standing = PeakStanding.at(biggest.height, time: biggest.time, among: PeakStanding.swings(all), window: window())!
         XCTAssertTrue(standing.marks)
         XCTAssertNil(standing.nextBigger, "nothing in the window swings further")
     }
@@ -157,7 +157,7 @@ final class TideStandingTests: XCTestCase {
         let all = windowExtremes(at)
         let sorted = all.ranges().sorted { $0.height < $1.height }
         let middling = sorted[sorted.count / 2]
-        XCTAssertFalse(SwingStanding.at(middling.height, time: middling.time, among: all, window: window())!.marks)
+        XCTAssertFalse(PeakStanding.at(middling.height, time: middling.time, among: PeakStanding.swings(all), window: window())!.marks)
     }
 
     /// The tile ranks the quantity it prints. A station can have a big swing on
@@ -166,7 +166,7 @@ final class TideStandingTests: XCTestCase {
     func testSwingRankAndLevelRankAreNotTheSameJudgement() {
         let all = windowExtremes(at)
         let disagreements = all.ranges().filter { r in
-            let swing = SwingStanding.at(r.height, time: r.time, among: all, window: window())?.marks ?? false
+            let swing = PeakStanding.at(r.height, time: r.time, among: PeakStanding.swings(all), window: window())?.marks ?? false
             let level = TideStanding.at(r.low, among: all)?.marks ?? false
             return swing != level
         }
@@ -177,13 +177,13 @@ final class TideStandingTests: XCTestCase {
         let all = windowExtremes(at)
         let sorted = all.ranges().sorted { $0.height < $1.height }
         let small = sorted[sorted.count / 3]
-        let next = SwingStanding.at(small.height, time: small.time, among: all, window: window())?.nextBigger
+        let next = PeakStanding.at(small.height, time: small.time, among: PeakStanding.swings(all), window: window())?.nextBigger
         XCTAssertGreaterThan(try XCTUnwrap(next).time, small.time)
-        XCTAssertGreaterThan(try XCTUnwrap(next).height, small.height)
+        XCTAssertGreaterThan(try XCTUnwrap(next).magnitude, small.height)
     }
 
     func testTooFewSwingsRanksNothing() {
-        XCTAssertNil(SwingStanding.at(2.0, time: at, among: [], window: window()))
+        XCTAssertNil(PeakStanding.at(2.0, time: at, among: [], window: window()))
     }
 
     // MARK: - The sheet's facts

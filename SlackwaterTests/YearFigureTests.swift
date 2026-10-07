@@ -25,7 +25,8 @@ final class YearFigureTests: XCTestCase {
     private func months() -> [YearFigure.Month] {
         let w = TideStanding.yearWindow(around: at, tz: station.tz)
         let extremes = station.engineStation.extremes(from: w.start, to: w.end)
-        return YearFigure.months(extremes, tz: station.tz, window: w)
+        return YearFigure.months(extremes.map { Peak(time: $0.time, magnitude: $0.height) },
+                                 tz: station.tz, window: w)
     }
 
     /// Whole calendar months only. Six months either side of a date lands
@@ -77,7 +78,8 @@ final class YearFigureTests: XCTestCase {
         func spread(_ id: String) throws -> Double {
             let r = try XCTUnwrap(TideStationRecord.record(id: id))
             let w = TideStanding.yearWindow(around: at, tz: r.tz)
-            let m = YearFigure.months(r.engineStation.extremes(from: w.start, to: w.end),
+            let m = YearFigure.months(r.engineStation.extremes(from: w.start, to: w.end)
+                                          .map { Peak(time: $0.time, magnitude: $0.height) },
                                       tz: r.tz, window: w)
             let spans = m.map(\.span)
             return try XCTUnwrap(spans.max()) / XCTUnwrap(spans.min())

@@ -102,33 +102,53 @@ struct TideStanding {
 /// different quantities, and a station can have a big swing on a day whose low
 /// is unremarkable. The Range tile prints a swing, so the Range tile ranks a
 /// swing; the levels question belongs to its own section of the sheet.
-struct SwingStanding {
-    /// Every swing in the window, in time order — the figure draws all of them.
-    let all: [TideRange]
-    /// The swing being judged, carried so the figure can mark it without being
+/// One magnitude at one moment: a tide swing's height, or a current maximum's
+/// speed. The ranking and the figure care about size over time and nothing
+/// else, so what produced a peak stays with whoever produced it.
+struct Peak: Equatable {
+    let time: Date
+    let magnitude: Double
+}
+
+/// Where one peak sits among the peaks around it.
+///
+/// Separate from `TideStanding` because they are different judgements about
+/// different quantities: a station can have a big swing on a day whose low is
+/// unremarkable. The Range tile prints a swing, so it ranks a swing; the Next
+/// max tile prints a speed, so it ranks a speed. The levels question belongs to
+/// its own section of the sheet.
+struct PeakStanding {
+    /// Every peak in the window, in time order — the figure draws all of them.
+    let all: [Peak]
+    /// The peak being judged, carried so the figure can mark it without being
     /// handed the same two values a second time.
-    let selectedHeight: Double
-    let selectedTime: Date
-    /// This swing's position among them, 0…1.
+    let selected: Peak
+    /// Its position among them, 0…1.
     let rank: Double
-    /// The next swing, after this one, that goes further.
-    let nextBigger: TideRange?
-    /// The window these swings came from. The figure needs it to tell a whole
+    /// The next peak, after this one, that goes further.
+    let nextBigger: Peak?
+    /// The window these peaks came from. The figure needs it to tell a whole
     /// local day from the fragment after the window's last midnight.
     let window: (start: Date, end: Date)
 
     var marks: Bool { rank >= TideStanding.markThreshold }
     var isWindowBiggest: Bool { nextBigger == nil && rank >= 1 }
 
-    /// `nil` when the window holds too few swings to rank one against.
-    static func at(_ height: Double, time: Date, among extremes: [TideExtreme],
-                   window: (start: Date, end: Date)) -> SwingStanding? {
-        let all = extremes.ranges()
-        guard all.count > 1, let rank = all.map(\.height).percentileRank(of: height) else { return nil }
-        return SwingStanding(
-            all: all, selectedHeight: height, selectedTime: time, rank: rank,
-            nextBigger: all.filter { $0.time > time && $0.height > height }.min { $0.time < $1.time },
+    /// `nil` when the window holds too few peaks to rank one against.
+    static func at(_ magnitude: Double, time: Date, among all: [Peak],
+                   window: (start: Date, end: Date)) -> PeakStanding? {
+        guard all.count > 1,
+              let rank = all.map(\.magnitude).percentileRank(of: magnitude) else { return nil }
+        return PeakStanding(
+            all: all, selected: Peak(time: time, magnitude: magnitude), rank: rank,
+            nextBigger: all.filter { $0.time > time && $0.magnitude > magnitude }
+                .min { $0.time < $1.time },
             window: window)
+    }
+
+    /// Every swing in the window — each rise and each fall.
+    static func swings(_ extremes: [TideExtreme]) -> [Peak] {
+        extremes.ranges().map { Peak(time: $0.time, magnitude: $0.height) }
     }
 }
 
@@ -207,7 +227,7 @@ private func gapSentence(_ gap: Double, low: Bool, imperial: Bool, unit: String)
 /// big", and a reader who does not know the first will misread the second.
 /// Then the standing, the rarer and more useful fact. Then the direction, which
 /// is the lesser fact — the curve and the schedule both already show it.
-func rangeCaption(record: TideStationRecord, swing: SwingStanding?, direction: String) -> String {
+func rangeCaption(record: TideStationRecord, swing: PeakStanding?, direction: String) -> String {
     if let ratio = record.seasonalRatio { return seasonalCaption(ratio) }
     guard let swing, swing.marks else { return direction }
     return swing.isWindowBiggest
