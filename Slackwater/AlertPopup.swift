@@ -48,7 +48,7 @@ struct AlertPopup: View {
         }
         .frame(width: 280)
         .background(SN.cardFill)
-        .sheet(isPresented: $showPremium) { SettingsView(opensPremium: true) }
+        .sheet(isPresented: $showPremium) { PremiumView() }
     }
 
     /// A way out that isn't a row: a press landed by accident must not have to set an alert to

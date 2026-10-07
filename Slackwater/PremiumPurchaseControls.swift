@@ -76,7 +76,7 @@ struct PremiumPurchaseControls: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .tint(SN.leaf)
         .foregroundStyle(SN.foam.opacity(0.85))
-        .accessibilityIdentifier("settings-premium-purchases")
+        .accessibilityIdentifier("premium-purchases")
         .task { await loadProducts() }
     }
 

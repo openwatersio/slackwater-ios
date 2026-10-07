@@ -43,8 +43,13 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         let tideSwitch = app.switches["calendar-station-\(tide)"]
         tideSwitch.tap()
 
-        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
         XCTAssert(app.buttons["Restore purchase"].isHittable)
+        XCTAssertFalse(app.buttons["settings-calendar-row"].exists)
+        app.buttons["premium-done"].tap()
+        XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
+        XCTAssertEqual(tideSwitch.value as? String, "0")
+        save(app, "calendar-after-premium.png")
     }
 
     /// The calendar prompt is a system alert and only appears on the first run of a fresh sim.

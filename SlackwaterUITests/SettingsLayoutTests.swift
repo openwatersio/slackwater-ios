@@ -125,7 +125,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["Lock screen — Premium"].exists)
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
-        XCTAssert(app.buttons["Restore purchase"].exists)
+        XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "settings-mac-policy.png")
     }
 
@@ -142,7 +142,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             XCTAssert(app.staticTexts[desktopTitle].exists)
             let about = app.buttons["settings-about-row"].firstMatch
             scrollTo(about, in: app)
-            XCTAssert(app.staticTexts[supportTitle].exists)
+            XCTAssertFalse(app.staticTexts[supportTitle].exists)
             save(app, "settings-mac-\(language).png")
             app.terminate()
         }
@@ -156,7 +156,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["Lock screen — Premium"].exists)
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
-        XCTAssert(app.buttons["Restore purchase"].exists)
+        XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "settings-tv-policy.png")
     }
 
@@ -197,7 +197,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
         let restore = app.buttons[restoreTitle].firstMatch
-        XCTAssert(restore.exists)
+        XCTAssertFalse(restore.exists)
         save(app, "settings-after-\(language).png")
         about.tap()
         XCTAssert(app.navigationBars[aboutTitle].appears(within: 5))
@@ -216,10 +216,29 @@ final class SettingsLayoutTests: ScreenshotTestCase {
 
     func testPremiumSupporterSeesTheirEntitlementInline() {
         let app = launch("-seedGate", "-locDenied", "-seedPremium")
-        openSettings(app)
-        let about = app.buttons["settings-about-row"].firstMatch
-        scrollTo(about, in: app)
+        let support = app.buttons["support-slackwater"]
+        scrollTo(support, in: app)
+        XCTAssertTrue(support.label.contains("Slackwater supporter"))
+        save(app, "supporter-footer.png")
+        support.tap()
+        XCTAssert(app.navigationBars["Slackwater supporter"].appears(within: 5))
         XCTAssert(app.staticTexts["You have Premium — thank you."].exists)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
+        save(app, "supporter-sheet.png")
+    }
+
+    func testSupportSheetOpensAndClosesFromTheFooter() {
+        let app = launch("-seedGate", "-locDenied")
+        let support = app.buttons["support-slackwater"]
+        scrollTo(support, in: app)
+        XCTAssertTrue(support.label.contains("Support Slackwater"))
+        save(app, "support-footer.png")
+        support.tap()
+        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.buttons["Restore purchase"].isHittable)
+        save(app, "support-sheet.png")
+        app.buttons["premium-done"].tap()
+        XCTAssert(support.appears(within: 5))
+        XCTAssertFalse(app.navigationBars["Settings"].exists)
     }
 }

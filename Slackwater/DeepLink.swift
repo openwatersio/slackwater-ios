@@ -33,7 +33,7 @@ let idPathCharacters = CharacterSet(charactersIn:
 /// percent-encoded; the receiving `.onOpenURL` reads the id back decoded via
 /// `url.pathComponents`.
 ///
-/// With no id to resolve (M2) a PREMIUM_ENABLED build opens Settings at Premium.
+/// With no id to resolve (M2) a PREMIUM_ENABLED build opens the dedicated Support Slackwater sheet.
 /// Without Premium that route does not exist, so the widget
 /// gets no URL and a tap opens the app wherever it was.
 func deepLink(forStationID id: String?) -> URL? {

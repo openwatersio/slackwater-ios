@@ -32,7 +32,8 @@ struct StationListView: View {
     @State private var query = ""
     @State private var showSettings = false
     @State private var showDownloads = false
-    @State private var showPremiumSettings = false
+    @ObservedObject private var premium = PremiumStore.shared
+    @State private var showPremium = false
     @State private var searching = false
     @State private var results: [StationItem] = []
     @State private var completedSearch: SearchInput?
@@ -211,8 +212,8 @@ struct StationListView: View {
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
-        .sheet(isPresented: $showPremiumSettings) {
-            SettingsView(onReplayTour: replayTour, opensPremium: true)
+        .sheet(isPresented: $showPremium) {
+            PremiumView()
         }
         .onOpenURL(perform: handleDeepLink)
         .onContinueUserActivity(stationActivityType) { activity in
@@ -643,7 +644,7 @@ struct StationListView: View {
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         #if PREMIUM_ENABLED
-        case "premium": showPremiumSettings = true
+        case "premium": showPremium = true
         #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
@@ -655,7 +656,7 @@ struct StationListView: View {
                 showMap = false
                 showSettings = false
                 showDownloads = false
-                showPremiumSettings = false
+                showPremium = false
                 searching = false
                 chooser = nil
                 linkedRemovedStationID = id
@@ -1032,6 +1033,30 @@ struct StationListView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                #if PREMIUM_ENABLED
+                    Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
+                    Button {
+                        showPremium = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sparkles").frame(width: 28)
+                            Text(premium.isPremium
+                                 ? String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter.")
+                                 : String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
+                            if premium.isPremium {
+                                Text(verbatim: "❇").accessibilityHidden(true)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SN.foam.opacity(0.4))
+                        }
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("support-slackwater")
+                #endif
             }
             .font(.body)
             .foregroundStyle(SN.foam)

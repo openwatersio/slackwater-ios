@@ -5,7 +5,6 @@ struct SettingsView: View {
     /// Opens the tour's station directly — see `StationListView.replayTour`
     /// for why this cannot just arm-and-dismiss.
     var onReplayTour: (() -> Void)? = nil
-    var opensPremium = false
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
@@ -29,143 +28,139 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 26) {
-                        section(String(localized: "Tide height", comment: "Settings section heading.")) {
-                            Picker(
-                                "Tide height units",
-                                selection: Binding(
-                                    get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })
-                            ) {
-                                Text("Feet").tag("imperial")
-                                Text("Meters").tag("metric")
-                            }
-                            .pickerStyle(.segmented)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    section(String(localized: "Tide height", comment: "Settings section heading.")) {
+                        Picker(
+                            "Tide height units",
+                            selection: Binding(
+                                get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })
+                        ) {
+                            Text("Feet").tag("imperial")
+                            Text("Meters").tag("metric")
                         }
+                        .pickerStyle(.segmented)
+                    }
 
-                        section(String(localized: "Current speed", comment: "Settings section heading.")) {
-                            Picker(
-                                "Current speed units",
-                                selection: Binding(
-                                    get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })
-                            ) {
-                                Text("Knots").tag("kn")
-                                Text(verbatim: "km/h").tag("kmh")
-                                Text(verbatim: "m/s").tag("ms")
-                            }
-                            .pickerStyle(.segmented)
+                    section(String(localized: "Current speed", comment: "Settings section heading.")) {
+                        Picker(
+                            "Current speed units",
+                            selection: Binding(
+                                get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })
+                        ) {
+                            Text("Knots").tag("kn")
+                            Text(verbatim: "km/h").tag("kmh")
+                            Text(verbatim: "m/s").tag("ms")
                         }
+                        .pickerStyle(.segmented)
+                    }
 
-                        section(String(localized: "Slack window", comment: "Settings section heading.")) {
-                            Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
-                                HStack {
-                                    Text("Comfort current")
-                                    Spacer()
-                                    Text(
-                                        slackWindowSpeedBinding.wrappedValue,
-                                        format: .number.precision(.fractionLength(1))
-                                    )
-                                    .monospacedDigit()
-                                    Text(verbatim: "kn")
-                                }
-                            }
-                            SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
-                            Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
-                        }
-
-                        section(String(localized: "Alerts", comment: "Settings section heading.")) {
-                            NavigationLink {
-                                AlertsView()
-                                    .navigationTitle("Alerts")
-                                    .navigationBarTitleDisplayMode(.inline)
-                                    .toolbarBackground(SN.canvas, for: .navigationBar)
-                            } label: {
-                                HStack {
-                                    Text(
-                                        alerts.rules.isEmpty
-                                            ? "Press and hold any station's timeline to set an alert"
-                                            : "\(alerts.rules.count) alerts")
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.footnote.weight(.semibold))
-                                }
-                                .foregroundStyle(SN.leaf)
+                    section(String(localized: "Slack window", comment: "Settings section heading.")) {
+                        Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
+                            HStack {
+                                Text("Comfort current")
+                                Spacer()
+                                Text(
+                                    slackWindowSpeedBinding.wrappedValue,
+                                    format: .number.precision(.fractionLength(1))
+                                )
+                                .monospacedDigit()
+                                Text(verbatim: "kn")
                             }
                         }
+                        SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
+                        Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
+                    }
 
-                        section(String(localized: "Calendar", comment: "Settings section heading.")) {
-                            NavigationLink {
-                                CalendarStationsView()
-                                    .navigationTitle("Favourites calendars")
-                                    .navigationBarTitleDisplayMode(.inline)
-                                    .toolbarBackground(SN.canvas, for: .navigationBar)
-                            } label: {
-                                HStack {
-                                    Text(calendarSummary)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.footnote.weight(.semibold))
-                                }
-                                .foregroundStyle(SN.leaf)
-                            }
-                            .accessibilityIdentifier("settings-calendar-row")
-                        }
-
-                        if let onReplayTour {
-                            section(String(localized: "How to read a station", comment: "Settings section heading.")) {
-                                Button {
-                                    dismiss()
-                                    onReplayTour()
-                                } label: {
-                                    HStack {
-                                        Text(
-                                            "Show the tour again",
-                                            comment: "Settings row that replays the first-run tour.")
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                    }
-                                }
-                                .accessibilityIdentifier("settings-replay-tour")
-                            }
-
-                        }
-
-                        WidgetSettingsContent(showsPreviews: !opensPremium)
-
+                    section(String(localized: "Alerts", comment: "Settings section heading.")) {
                         NavigationLink {
-                            AboutView()
+                            AlertsView()
+                                .navigationTitle("Alerts")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
                         } label: {
                             HStack {
-                                Text("About")
+                                Text(
+                                    alerts.rules.isEmpty
+                                        ? "Press and hold any station's timeline to set an alert"
+                                        : "\(alerts.rules.count) alerts")
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
                             }
                             .foregroundStyle(SN.leaf)
-                            .padding(16)
-                            .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
-                        .accessibilityIdentifier("settings-about-row")
+                    }
+
+                    section(String(localized: "Calendar", comment: "Settings section heading.")) {
+                        NavigationLink {
+                            CalendarStationsView()
+                                .navigationTitle("Favourites calendars")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text(calendarSummary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
+                        .accessibilityIdentifier("settings-calendar-row")
+                    }
+
+                    if let onReplayTour {
+                        section(String(localized: "How to read a station", comment: "Settings section heading.")) {
+                            Button {
+                                dismiss()
+                                onReplayTour()
+                            } label: {
+                                HStack {
+                                    Text(
+                                        "Show the tour again",
+                                        comment: "Settings row that replays the first-run tour.")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                }
+                            }
+                            .accessibilityIdentifier("settings-replay-tour")
+                        }
 
                     }
-                    .padding(20)
-                    .padding(.bottom, 30)
-                }
-                .background(CanvasBackground())
-                .navigationTitle("Settings")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(SN.canvas, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                            .foregroundStyle(SN.leaf)
+
+                    WidgetSettingsContent()
+
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        HStack {
+                            Text("About")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                        }
+                        .foregroundStyle(SN.leaf)
+                        .padding(16)
+                        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
+                    .accessibilityIdentifier("settings-about-row")
+
                 }
-                .onAppear {
-                    if opensPremium { proxy.scrollTo("settings-premium", anchor: .top) }
+                .padding(20)
+                .padding(.bottom, 30)
+            }
+            .background(CanvasBackground())
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(SN.canvas, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(SN.leaf)
                 }
             }
+
 
         }
     }
