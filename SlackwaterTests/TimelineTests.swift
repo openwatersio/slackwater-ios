@@ -190,6 +190,68 @@ final class TimelineTests: XCTestCase {
                                           elapsed: Timeline.introDuration), now)
     }
 
+    func testHingeProgressRunsFromTheFirstAngleToFlat() {
+        XCTAssertEqual(Timeline.hingeProgress(angle: 0.5, from: 0.5), 0)
+        XCTAssertEqual(Timeline.hingeProgress(angle: (0.5 + .pi) / 2, from: 0.5), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.hingeProgress(angle: .pi, from: 0.5), 1)
+        XCTAssertEqual(Timeline.hingeProgress(angle: 0.2, from: 0.5), 0, "closing past the start stays at the start")
+        XCTAssertEqual(Timeline.hingeProgress(angle: .pi, from: .pi), 1, "already flat is done")
+    }
+
+    func testAHingeThatHasNotMovedYetGetsLongerToStart() {
+        XCTAssertFalse(Timeline.hingeSettled(moved: false, idle: 0.67), "the simulator's pause at the posture switch")
+        XCTAssertTrue(Timeline.hingeSettled(moved: false, idle: Timeline.hingeFirstMove + 0.1))
+        XCTAssertFalse(Timeline.hingeSettled(moved: true, idle: Timeline.hingeSettle / 2))
+        XCTAssertTrue(Timeline.hingeSettled(moved: true, idle: Timeline.hingeSettle + 0.05), "propped half-open")
+    }
+
+    func testFoldHandoffGoesOnlyToTheSameStationWhileFresh() {
+        defer { FoldHandoff.slot = nil }
+        let moment = FoldHandoff.Moment(stationID: "a", time: Date(), live: false, closing: false, at: 100)
+        FoldHandoff.slot = moment
+        XCTAssertNil(FoldHandoff.take("b", at: 100.5), "another station's strip")
+        XCTAssertNil(FoldHandoff.slot, "a take clears the slot either way")
+        FoldHandoff.slot = moment
+        XCTAssertNil(FoldHandoff.take("a", at: 100 + FoldHandoff.freshFor + 1), "a different visit")
+        FoldHandoff.slot = moment
+        XCTAssertEqual(FoldHandoff.take("a", at: 100.5)?.time, moment.time)
+    }
+
+    /// A fold rebuilds the detail. Closing lands the cover screen's strip on the
+    /// folded moment; opening starts ahead of it and the hinge brings it back.
+    @MainActor func testAFoldHandsTheMomentToTheRebuiltStrip() async {
+        defer { FoldHandoff.slot = nil }
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let moment = now.addingTimeInterval(3 * 3600)
+        for closing in [true, false] {
+            var scrub = Timeline.introStart(for: now)
+            let landed = expectation(description: "lands on the folded moment, closing: \(closing)")
+            landed.assertForOverFulfill = false  // the scroll callback and the final park both write it
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: {
+                                            scrub = $0
+                                            if $0 == moment { landed.fulfill() }
+                                        }), stationID: "fh")
+            let co = TimelineScrubber.Coordinator(strip)
+            defer { co.stopIntro() }
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            FoldHandoff.slot = .init(stationID: "fh", time: moment, live: false, closing: closing,
+                                     at: CACurrentMediaTime())
+            co.centerIfNeeded(sv, animated: true)
+            let centered = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(centered.timeIntervalSince(moment), closing ? 0 : Timeline.hingeLead, accuracy: 300)
+            if !closing {
+                co.hingeDidChange(closed: false, fullyOpen: false, angle: 0.5)
+                co.hingeDidChange(closed: false, fullyOpen: true, angle: .pi)
+            }
+            await fulfillment(of: [landed], timeout: 3)
+        }
+    }
+
     /// The current lead speaks plain language, and both current surfaces get
     /// it from the same view. `CurrentScrubCard` is the shared anatomy —
     /// strip, lead, commentary — so a redesign cannot land on a harmonic

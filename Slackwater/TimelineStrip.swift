@@ -55,6 +55,27 @@ enum Timeline {
         let progress = max(0, min(1, elapsed / introDuration))
         return start.addingTimeInterval(now.timeIntervalSince(start) * progress)
     }
+    /// Opening an iPhone Duo scrubs the strip back from this far past the
+    /// moment it was folded on, landing on that moment as the hinge reaches
+    /// flat: about half a tide, so a high or low sweeps by.
+    static let hingeLead: TimeInterval = 6 * 3600
+    /// No hinge update for this long is a hinge at rest. Short of flat, the
+    /// strip finishes on the moment rather than sit on a future reading.
+    static let hingeSettle: TimeInterval = 0.25
+    /// The rebuilt strip arrives near the posture switch, before the opening
+    /// really gets going: the simulator's fold control goes quiet for 0.67 s
+    /// there. Until the hinge moves past where the strip first saw it, give it
+    /// this long instead.
+    static let hingeFirstMove: TimeInterval = 1
+    static func hingeSettled(moved: Bool, idle: TimeInterval) -> Bool {
+        idle > (moved ? hingeSettle : hingeFirstMove)
+    }
+    /// How far through the opening the hinge is: 0 at the angle the strip
+    /// first saw, 1 at flat (π radians).
+    static func hingeProgress(angle: Double, from start: Double) -> Double {
+        guard start < .pi else { return 1 }
+        return max(0, min(1, (angle - start) / (.pi - start)))
+    }
 
     /// How much an online gate fetches in one go. Four times the strip it
     /// needs, so ordinary paging lands in cache instead of on the network —
