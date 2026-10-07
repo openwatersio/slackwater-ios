@@ -129,11 +129,14 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         }
                     }
                     .padding(.bottom, 42)
-                    // The folded iPhone Duo's status rail is a trailing-only
+                    // The iPhone Duo's status rail is a trailing-only
                     // inset: the sky bleeds under it, the content stays clear.
                     .padding(.leading, geo.safeAreaInsets.leading)
                     .padding(.trailing, geo.safeAreaInsets.trailing)
                 }
+                // The ScrollView ignoring the inset is not enough: in a split
+                // view it still sizes its content short of the rail.
+                .ignoresSafeArea(edges: .horizontal)
             }
             .ignoresSafeArea(edges: [.top, .horizontal])
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
@@ -153,6 +156,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
+            .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
@@ -405,6 +409,16 @@ extension EnvironmentValues {
         get { self[OpenWeekPickerKey.self] }
         set { self[OpenWeekPickerKey.self] = newValue }
     }
+    /// How far the strip may draw past its trailing edge: the iPhone
+    /// Duo's status rail, which the scaffold pads its content clear of.
+    var stripTrailingBleed: CGFloat {
+        get { self[StripTrailingBleedKey.self] }
+        set { self[StripTrailingBleedKey.self] = newValue }
+    }
+}
+
+private struct StripTrailingBleedKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
 }
 
 /// How the strip tells the scaffold it was pressed and held. Same reasoning as

@@ -95,6 +95,8 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.showsHorizontalScrollIndicator = false
         sv.alwaysBounceVertical = false
         sv.contentInsetAdjustmentBehavior = .never
+        // The strip's SwiftUI mask clips instead, so it can reach into a trailing bleed.
+        sv.clipsToBounds = false
         sv.delegate = context.coordinator
         // Nothing mounted until the first update with a real width — the
         // opening data can already span two chunks, and mounting every tile
@@ -665,6 +667,7 @@ struct TimelineScrubStrip: View {
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
+    @Environment(\.stripTrailingBleed) private var trailingBleed
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openAlertPopup) private var openAlertPopup
@@ -679,6 +682,10 @@ struct TimelineScrubStrip: View {
                          jumpToken: jumpToken, scrollGate: scrollGate,
                          onPickDate: openWeekPicker, onLongPress: openAlertPopup)
             .frame(height: geo.height)
+            // Stretched, not widened: the scroll view keeps its bounds, so the
+            // centerline stays at the visible center while the drawing runs
+            // on under the iPhone Duo's status rail.
+            .mask { Rectangle().padding(.trailing, -trailingBleed) }
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
             // and writing the caller's state there is "Modifying state during
