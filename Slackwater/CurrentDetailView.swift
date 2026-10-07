@@ -45,6 +45,9 @@ struct CurrentDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    /// The fortnight of maxima the Next max tile's mark and its sheet read.
+    /// One scan per station, off the main actor — see `CurrentStandingStore`.
+    @State private var standings = CurrentStandingStore()
     /// The local midnight the schedule week hangs from. `returnToNow`, the
     /// picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
@@ -70,9 +73,14 @@ struct CurrentDetailView: View {
     /// Engine-exact velocity under the centerline, the same call the
     /// committed readout has always made.
     private func lead(_ tl: TimelineData, ink: Color = .white) -> CurrentLead {
-        CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
-                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                    speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
+        var l = CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
+                            floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                            speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
+        // The tile ranks the maximum it prints, against its own direction's.
+        l.standing = l.nextMaxEvent.flatMap {
+            standings.standing(speed: $0.speed, time: $0.time, kind: $0.kind)
+        }
+        return l
     }
 
     var body: some View {
@@ -112,6 +120,8 @@ struct CurrentDetailView: View {
                                         ChsDownloadNotice(stationID: gate.id, tz: tz, gate: gate)
                                     }
                                     SummaryTiles(primary: lead(tl).nextMax,
+                                                 primaryDetail: maxDetail(tl, jump: jump),
+                                                 primarySymbol: maxSymbol(tl),
                                                  primaryValueColor: provisionalGate != nil ? SN.amber : .white,
                                                  moon: sky.illumination,
                                                  at: scrubTime,
@@ -173,6 +183,14 @@ struct CurrentDetailView: View {
                 if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
             }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
+            // After the strip, never before it: the scan only feeds a tile
+            // caption and the sheet behind it, and the curve is what the
+            // reader is waiting for.
+            .task(id: record.id) {
+                await standings.load(record: record, around: live)
+                // The year costs about a second and only the sheet shows it.
+                await standings.loadYear(record: record, around: live)
+            }
     }
 
     // MARK: - Colour
@@ -261,6 +279,31 @@ struct CurrentDetailView: View {
 
     /// One place the store is created from, so the record and the slack
     /// threshold can never be applied by two different code paths. `focus`
+    /// The Next max tile's sheet, where there is a fortnight to rank against.
+    /// An online gate never has one, so its tile stays inert as before.
+    private func maxDetail(_ tl: TimelineData, jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
+        let l = lead(tl)
+        guard let standing = l.standing, let e = l.nextMaxEvent, let value = l.nextMax?.value
+        else { return nil }
+        let place = record.name, months = standings.months(e.kind), tz = tz, now = live
+        let windows = tl.slackWindows
+        let direction = e.kind == .maxFlood
+            ? String(localized: "Flood", comment: "Current direction, used in a sentence.")
+            : String(localized: "Ebb", comment: "Current direction, used in a sentence.")
+        return {
+            AnyView(MaxDetailSheet(value: value, direction: direction, place: place,
+                                   standing: standing, months: months,
+                                   slackWindows: windows, maximumAt: e.time,
+                                   tz: tz, now: now, onJump: jump))
+        }
+    }
+
+    /// A span glyph on a marked tile, the same sense the Range tile uses: the
+    /// mark is about size, not about which way the water is going.
+    private func maxSymbol(_ tl: TimelineData) -> String? {
+        lead(tl).standing?.marks == true ? "arrow.up.and.down" : nil
+    }
+
     /// nil opens around now (the intro); a focus keeps a parked scrub parked.
     private func resetStore(focus: Date?) {
         let s = TimelineWindowStore(source: .current(record, threshold: normalizedSlackThresholdKn(slackWindowSpeed)))

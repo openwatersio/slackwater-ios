@@ -26,7 +26,7 @@ struct RangeDetailSheet: View {
     var standing: TideStanding? = nil
     /// Where this swing sits among the fortnight's swings — section 1's
     /// subject, and a different judgement from `standing`'s.
-    var swing: SwingStanding? = nil
+    var swing: PeakStanding? = nil
     /// Twelve months of monthly extremes — section 3. Empty until the sheet's
     /// own scan lands, and empty for good where the station has no bounds.
     var months: [YearFigure.Month] = []
@@ -134,7 +134,7 @@ struct RangeDetailSheet: View {
     /// 58" is a fact a reader can picture, and "the 95th percentile" is not.
     private var swingFact: StandingFact? {
         guard let swing else { return nil }
-        let bigger = swing.all.filter { $0.height > swing.selectedHeight }.count
+        let bigger = swing.all.filter { $0.magnitude > swing.selected.magnitude }.count
         if bigger == 0 {
             return StandingFact(text: String(localized: "The biggest swing of the fortnight.",
                                              comment: "Range sheet caption."))

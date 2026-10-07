@@ -29,18 +29,22 @@ struct YearFigure: View {
 
     /// One entry per whole calendar month inside `window`, carrying the
     /// highest high and lowest low that month reaches.
-    static func months(_ extremes: [TideExtreme], tz: TimeZone,
+    /// `series` is signed values over time: tide heights above chart datum, or
+    /// current speeds with flood positive and ebb negative. Either way the
+    /// month's envelope is its largest value and its smallest, and the shape
+    /// the year traces is the same question.
+    static func months(_ series: [Peak], tz: TimeZone,
                        window: (start: Date, end: Date),
                        calendar: Calendar = .current) -> [Month] {
         var cal = calendar
         cal.timeZone = tz
         var highs: [Date: Double] = [:], lows: [Date: Double] = [:]
-        for e in extremes {
+        for e in series {
             guard e.time >= window.start, e.time < window.end,
                   let month = cal.date(from: cal.dateComponents([.year, .month], from: e.time))
             else { continue }
-            highs[month] = Swift.max(highs[month] ?? -.infinity, e.height)
-            lows[month] = Swift.min(lows[month] ?? .infinity, e.height)
+            highs[month] = Swift.max(highs[month] ?? -.infinity, e.magnitude)
+            lows[month] = Swift.min(lows[month] ?? .infinity, e.magnitude)
         }
         return highs.keys.sorted().compactMap { m in
             guard let hi = highs[m], let lo = lows[m], hi > lo else { return nil }

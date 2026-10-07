@@ -10,12 +10,12 @@ final class SwingFigureTests: XCTestCase {
     private let at = Date(timeIntervalSince1970: 1_780_000_000)
     private let size = CGSize(width: 320, height: 120)
 
-    private func standing(pick: (([TideRange]) -> TideRange)? = nil) -> SwingStanding {
+    private func standing(pick: (([TideRange]) -> TideRange)? = nil) -> PeakStanding {
         let w = TideStanding.window(around: at, tz: station.tz)
         let all = station.engineStation.extremes(from: w.start, to: w.end)
         let ranges = all.ranges()
         let chosen = pick?(ranges) ?? ranges.sorted { $0.height < $1.height }[ranges.count / 2]
-        return SwingStanding.at(chosen.height, time: chosen.time, among: all, window: w)!
+        return PeakStanding.at(chosen.height, time: chosen.time, among: PeakStanding.swings(all), window: w)!
     }
 
     /// One bar per station-local day, not per swing. Every swing buries the

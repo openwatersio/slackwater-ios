@@ -60,7 +60,8 @@ import SlackwaterKit
         let w = TideStanding.yearWindow(around: date, tz: record.tz)
         let station = record.engineStation, tz = record.tz
         months = await Task.detached(priority: .userInitiated) {
-            YearFigure.months(station.extremes(from: w.start, to: w.end), tz: tz, window: w)
+            YearFigure.months(station.extremes(from: w.start, to: w.end)
+                .map { Peak(time: $0.time, magnitude: $0.height) }, tz: tz, window: w)
         }.value
         loadedYear = record.id
     }
@@ -69,7 +70,7 @@ import SlackwaterKit
         TideStanding.at(extreme, among: extremes)
     }
 
-    func swing(_ height: Double, time: Date) -> SwingStanding? {
-        SwingStanding.at(height, time: time, among: extremes, window: window)
+    func swing(_ height: Double, time: Date) -> PeakStanding? {
+        PeakStanding.at(height, time: time, among: PeakStanding.swings(extremes), window: window)
     }
 }
