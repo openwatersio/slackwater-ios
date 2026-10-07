@@ -39,7 +39,7 @@ final class TimelineChunkTests: XCTestCase {
     /// window; over the overlap of their spans the two must agree — samples
     /// exactly (the engine grid is epoch-aligned, so both sample the same
     /// instants), events to bisection tolerance.
-    func testMergedTideChunksMatchMonolithicBuild() {
+    func testMergedTideChunksMatchMonolithicBuild() throws {
         let anchor = vancouverMidnight(2026, 8, 11)
         let now = anchor.addingTimeInterval(15 * 3600)
         let mono = TimelineData.build(tide: friday, current: nil, now: now, anchor: anchor)
@@ -47,6 +47,14 @@ final class TimelineChunkTests: XCTestCase {
         let m = merged(.tide(friday), origin: anchor, indices: -1...1, anchor: anchor, today: anchor)
         XCTAssertLessThanOrEqual(m.start, mono.start)
         XCTAssertGreaterThanOrEqual(m.end, mono.end)
+        for day in mono.days {
+            let noon = try XCTUnwrap(day.solarNoon)
+            let mergedNoon = try XCTUnwrap(m.days.first { $0.start == day.start }?.solarNoon)
+            XCTAssertEqual(mergedNoon.timeIntervalSince(noon), 0, accuracy: 1)
+            XCTAssertGreaterThan(noon, try XCTUnwrap(day.sunrise))
+            XCTAssertLessThan(noon, try XCTUnwrap(day.sunset))
+        }
+
 
         let monoPoints = mono.tidePoints
         let overlap = m.tidePoints.filter { $0.time >= mono.start && $0.time <= monoPoints.last!.time }

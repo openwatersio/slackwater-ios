@@ -7,6 +7,39 @@ import UIKit
 import XCTest
 
 final class DetailAndScrubTests: ScreenshotTestCase {
+    func testScheduleSunDetails() {
+        let app = launch("-seedGate", "-locDenied")
+        openFridayHarbor(app)
+        let tomorrow = app.buttons["schedule-day-d1"].firstMatch
+        scrollTo(tomorrow, in: app)
+        save(app, "sun-schedule-collapsed.png")
+        let sun = tomorrow.descendants(matching: .any)["day-sun-d1"].firstMatch
+        XCTAssertTrue(sun.exists)
+        XCTAssertGreaterThan(sun.frame.minX, tomorrow.frame.midX)
+        tomorrow.tap()
+        let row = app.buttons["day-sun-d1"].firstMatch
+        XCTAssertTrue(row.appears(within: 5))
+        scrollTo(row, in: app)
+        XCTAssertTrue(row.label.contains("Solar noon"))
+        save(app, "sun-schedule-expanded.png")
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any)["sun-horizon-dip"].firstMatch.exists)
+        var previousY = -Double.infinity
+        for kind in ["astroDawn", "nauticalDawn", "civilDawn", "rise", "transit", "set", "civilDusk", "nauticalDusk", "astroDusk"] {
+            let event = app.descendants(matching: .any)["sun-event-\(kind)"].firstMatch
+            XCTAssertTrue(event.exists, kind)
+            XCTAssertGreaterThan(event.frame.minY, previousY, kind)
+            previousY = event.frame.minY
+        }
+        let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
+        XCTAssertGreaterThan(daylight.frame.minY, previousY)
+        save(app, "sun-details.png")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(row.appears(within: 5))
+    }
+
     func testM1Walkthrough() throws {
         // The app launches on the list — when located it ranks by distance, so
         // reach Friday Harbor through search (deterministic either way).

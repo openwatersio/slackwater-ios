@@ -107,6 +107,7 @@ struct TimelineChunk {
             days.append(TimelineDay(offset: off, start: dayStart,
                                     sunrise: sun.first { $0.kind == .rise }?.time,
                                     sunset: sun.first { $0.kind == .set }?.time,
+                                    solarNoon: sun.first { $0.kind == .transit }?.time,
                                     moonrise: moon.first { $0.kind == .rise }?.time,
                                     moonset: moon.first { $0.kind == .set }?.time))
             dayStart = dayEnd
@@ -191,7 +192,7 @@ extension TimelineData {
             .filter { seen.insert($0.start).inserted }
             .map { d in
                 TimelineDay(offset: cal.dateComponents([.day], from: anchor, to: d.start).day ?? 0,
-                            start: d.start, sunrise: d.sunrise, sunset: d.sunset,
+                            start: d.start, sunrise: d.sunrise, sunset: d.sunset, solarNoon: d.solarNoon,
                             moonrise: d.moonrise, moonset: d.moonset)
             }
 

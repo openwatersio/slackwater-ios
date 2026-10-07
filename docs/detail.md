@@ -217,10 +217,17 @@ Every kind also lists lunar and solar eclipses visible from the station, timed a
 
 Each day with at least one event gets a header. A day with no events gets none.
 
-- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday. A localized short date sits beneath the label. Beneath the date, the sunrise time in sunrise ink (`#F0D890`) and the sunset time in sunset ink (`#C8A86A`), each when the sun rises or sets that day.
-- **Right:** a chevron that turns over when the day is open.
+- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday, with a localized short date beneath.
+- **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, in sunrise ink (`#F0D890`) and sunset ink (`#C8A86A`). They share the day/date header height.
+- **When expanded:** a full-width tappable row above the water events places sunrise left, solar noon centered, and sunset right. Each shows only its native symbol and local time, with a descriptive VoiceOver label. At accessibility text sizes these stack. The entire row opens Sun activity. Missing events display “—”.
 
 Only one day is open at a time. The anchor day starts open. Tapping an open day closes it; tapping another day opens it and closes the first.
+
+#### Sun activity sheet
+
+The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
+
+Daylight duration totals the elapsed time above the horizon between that day’s rise/set crossings at the bottom of the table; it displays “—” when either crossing is absent. Almanac supplies sea-level times for an unobstructed horizon. Calculations run off the main actor; failures show an unavailable message rather than missing-event dashes.
 
 ### 8.4 Rows
 
@@ -375,7 +382,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 ## 16. Accessibility
 
 - The header's three buttons have labels "Back", "Share", and "Add favorite" / "Remove favorite", and stay 44 units at every text size.
-- A day header is one button whose value is "Expanded" or "Collapsed". Its sunrise and sunset read "Sunrise <time>" and "Sunset <time>".
+- A day header is one button whose value is "Expanded" or "Collapsed". The collapsed header’s sunrise and sunset read "Sunrise <time>" and "Sunset <time>"; when expanded, these labels belong to the Sun activity button.
 - A schedule row is one button whose value is its time; the pill's glyphs are hidden.
 - The week-range bar reads "Showing <range>. Tap to choose a date."
 - Each tile is one element; it is a button only when it has a sheet.
