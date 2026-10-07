@@ -188,6 +188,8 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
   ```
 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
+
+  The iPhone Duo set is optional and takes either screen's size: the cover (1398×2034) or the inner screen (2853×2007). The inner screen is the one worth showing, unfolded in landscape with the sidebar beside the detail. Unfold the simulator in Xcode's device view first and leave it open; the `scripts/screenshots.sh` header has both commands.
 - [ ] Mac screenshots uploaded if distributing on Mac. Apple accepts 1280×800, 1440×900, 2560×1600, or 2880×1800 ([specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)). Run the installed Mac app, then use the guided capture session:
 
   ```sh
