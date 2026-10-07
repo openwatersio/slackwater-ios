@@ -36,9 +36,16 @@ final class RangeSheetTests: ScreenshotTestCase {
     /// §6.4 case 17. Ten bundled stations have no astronomical bounds, because
     /// the database withholds LAT and HAT where Sa and Ssa are both zero — the
     /// same state every CHS fit is in, and the reason CHS cannot be reached
-    /// offline in this target. The two absolute sections must be ABSENT, not
-    /// empty and not zeroed.
-    func testAStationWithoutBoundsShowsTheFortnightSectionAlone() throws {
+    /// offline in this target.
+    ///
+    /// Only the ABSOLUTE section goes: with no LAT and no HAT there is no floor
+    /// or ceiling to measure against. The year section stays. Its claim is
+    /// about the RANGE's seasonal shape, which the solar and declinational
+    /// terms carry in every constituent set — across this bundle Chignik's
+    /// monthly span varies 1.24× over the year against Portland's 1.16×, and
+    /// Portland is a station that HAS the annual constituent. Gating the year
+    /// on Sa/Ssa hid a stronger signal than it showed.
+    func testAStationWithoutBoundsKeepsEverythingButTheAbsoluteSection() throws {
         let app = launch("-seedGate")
         // Chignik rather than the nearer Winterport: Winterport also has a
         // current station on the Penobscot, and the bare name matches that row
@@ -58,8 +65,8 @@ final class RangeSheetTests: ScreenshotTestCase {
                   "the fortnight section works everywhere and must still be here")
         XCTAssertFalse(app.descendants(matching: .any)["range-section-ends"].exists,
                        "a station with no bounds must not claim a floor or a ceiling")
-        XCTAssertFalse(app.descendants(matching: .any)["range-section-year"].exists,
-                       "a station with no annual constituent must not claim a season")
+        XCTAssert(app.descendants(matching: .any)["range-section-year"].appears(within: 15),
+                  "the year section is a claim about range, not level — it does not need bounds")
         save(app, "range-sheet-no-bounds.png")
     }
 

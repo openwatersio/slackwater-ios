@@ -12,6 +12,16 @@ final class YearFigureTests: XCTestCase {
     private let station = TideStationRecord.record(id: TideStationRecord.fridayHarborID)!
     private let at = Date(timeIntervalSince1970: 1_780_000_000)  // 2026-05-29
 
+    /// A bounds-less station still yields twelve months: the store must not
+    /// refuse to scan one. Pins the gate itself, not just the arithmetic.
+    func testABoundsLessStationStillGetsItsYear() async throws {
+        let chignik = try XCTUnwrap(TideStationRecord.record(id: "noaa/9458917"))
+        XCTAssertNil(chignik.latDatum, "fixture station gained bounds")
+        let store = TideStandingStore()
+        await store.loadYear(record: chignik, around: at)
+        XCTAssertEqual(store.months.count, 12, "the year was skipped for want of a datum")
+    }
+
     private func months() -> [YearFigure.Month] {
         let w = TideStanding.yearWindow(around: at, tz: station.tz)
         let extremes = station.engineStation.extremes(from: w.start, to: w.end)
@@ -52,6 +62,33 @@ final class YearFigureTests: XCTestCase {
         let spans = m.map { $0.highest - $0.lowest }
         XCTAssertGreaterThan(spans.max()! / spans.min()!, 1.05,
                              "a flat envelope means the window or the grouping is wrong")
+    }
+
+    /// The reason this section is not gated on the annual constituent.
+    ///
+    /// Sa and Ssa raise and lower MEAN LEVEL seasonally. Inside one month that
+    /// offset applies to the month's highest high and its lowest low alike, so
+    /// it cancels out of the span. What widens the range across a year is the
+    /// solar and declinational structure, which every constituent set carries —
+    /// so a station with no Sa or Ssa shows the same seasonal shape, and
+    /// sometimes a stronger one. Chignik has no astronomical bounds and varies
+    /// more across the year than Portland, which has them.
+    func testTheSeasonalShapeDoesNotNeedAnAnnualConstituent() throws {
+        func spread(_ id: String) throws -> Double {
+            let r = try XCTUnwrap(TideStationRecord.record(id: id))
+            let w = TideStanding.yearWindow(around: at, tz: r.tz)
+            let m = YearFigure.months(r.engineStation.extremes(from: w.start, to: w.end),
+                                      tz: r.tz, window: w)
+            let spans = m.map(\.span)
+            return try XCTUnwrap(spans.max()) / XCTUnwrap(spans.min())
+        }
+        let chignik = try spread("noaa/9458917")   // no bounds
+        let portland = try spread("noaa/8418150")  // has bounds
+        XCTAssertNil(TideStationRecord.record(id: "noaa/9458917")?.latDatum)
+        XCTAssertNotNil(TideStationRecord.record(id: "noaa/8418150")?.latDatum)
+        XCTAssertGreaterThan(chignik, 1.1, "a bounds-less station still has a seasonal shape")
+        XCTAssertGreaterThan(chignik, portland,
+                             "and here a stronger one than a station that has the constituent")
     }
 
     func testWithoutExtremesThereAreNoMonths() {

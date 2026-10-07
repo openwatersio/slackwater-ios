@@ -139,7 +139,9 @@ Beneath that it answers three questions, each in its own titled section with its
 
 **"Against this station's own ends"** is a section drawing rather than a chart. On one vertical scale: the station's HAT and LAT, the fortnight's highest high and lowest low, and the selected turn. Each line carries its own height; extension lines run back to a chain of differences, with an outer chain for the station's whole range. The caption's number is one of those drawn dimensions rather than a separate calculation beside them. Two levels closer on screen than the minimum separation draw as one line keeping the surviving level's name, because the shared scale is the premise and nudging either apart would break it. The whole section is absent where the station has no astronomical bounds.
 
-**"When this station runs biggest"** is twelve whole calendar months around the selection, drawn as the envelope the monthly highest high and lowest low trace, with the widest months marked and the reader's own month ruled. Whole months because a window cut mid-month leaves a shallower half-month at each end, which draws as a season that is really an artefact of the cut. Captioned "Widest around <month>." Absent on the same gate as the section above.
+**"When this station runs biggest"** is twelve whole calendar months around the selection, drawn as the envelope the monthly highest high and lowest low trace, with the widest months marked and the reader's own month ruled. Whole months because a window cut mid-month leaves a shallower half-month at each end, which draws as a season that is really an artefact of the cut. Captioned "Widest around <month>."
+
+This section is **not** gated on the station's astronomical bounds, unlike the one above it. The rule that a yearly claim needs a non-zero `SA` or `SSA` governs claims about *level* — the gap to a datum, "the lowest low of the year" — because those depend on where the season puts mean water level. This claim is about *range*. Sa and Ssa move mean level, and within a month that offset lifts the month's highest high and its lowest low together, so it cancels out of the span; what widens the range across a year is the solar and declinational structure, which every constituent set carries. Measured across the bundle, Chignik has no bounds and varies 1.24× across the year while Portland has them and varies 1.16×.
 
 At a seasonally dominated station the sheet then adds a "Yearly change" row: "about the same as the daily tide" when the ratio rounds to 1, or "about N× the daily tide", rounded to tens from 10 and to tenths below.
 
@@ -439,7 +441,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 16. **Seasonal station:** a seasonally dominated station's Range tile reads "mostly seasonal" or "partly seasonal" and carries a calendar glyph, whatever its swing ranks.
 17. **A marked swing:** a swing in the top tenth of its fortnight captions "beyond normal here", or "the fortnight's biggest" when nothing in the window goes further, and carries the span glyph. An ordinary swing carries neither.
 18. **The sheet opens anywhere:** an ordinary station's Range tile is a button and its sheet leads with the three sections.
-19. **A station with no bounds:** a CHS station's sheet shows the fortnight section alone; the other two are absent rather than empty or zeroed.
+19. **A station with no bounds:** a CHS station's sheet keeps the fortnight and the year, and drops only the section measured against the station's own ends — absent rather than empty or zeroed.
 20. **The next bigger swing:** tapping the first section's caption moves the scrubber to that swing and closes the sheet.
 21. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
 22. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
