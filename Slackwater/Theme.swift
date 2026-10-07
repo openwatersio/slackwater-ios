@@ -129,9 +129,13 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         }
                     }
                     .padding(.bottom, 42)
+                    // The folded iPhone Duo's status rail is a trailing-only
+                    // inset: the sky bleeds under it, the content stays clear.
+                    .padding(.leading, geo.safeAreaInsets.leading)
+                    .padding(.trailing, geo.safeAreaInsets.trailing)
                 }
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: [.top, .horizontal])
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
                 // A dedicated GeometryReader, not the outer `geo`: `geo` sits
                 // inside the safe area, but this ScrollView ignores the top
