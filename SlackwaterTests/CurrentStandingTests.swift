@@ -90,6 +90,38 @@ final class CurrentStandingTests: XCTestCase {
                        String(localized: "Flood at 1:09 PM"))
     }
 
+    // MARK: - What the maximum costs at slack
+
+    private func window(_ slack: TimeInterval, _ minutes: Double) -> (slack: Date, start: Date, end: Date) {
+        let t = at.addingTimeInterval(slack)
+        return (slack: t, start: t.addingTimeInterval(-minutes * 30), end: t.addingTimeInterval(minutes * 30))
+    }
+
+    func testAShortWindowAroundTheMaximumIsWorthSaying() throws {
+        let ws = [window(0, 40), window(3_600, 38), window(7_200, 42), window(10_800, 18)]
+        let fact = try XCTUnwrap(slackFact(windows: ws, around: at.addingTimeInterval(10_800)))
+        XCTAssertTrue(fact.text.contains("18"), fact.text)
+        XCTAssertTrue(fact.text.contains("40"), "and the station's usual, for comparison")
+    }
+
+    /// Most maxima sit near the usual, and saying so every time is noise.
+    func testAnOrdinaryWindowSaysNothing() {
+        let ws = [window(0, 40), window(3_600, 38), window(7_200, 42), window(10_800, 41)]
+        XCTAssertNil(slackFact(windows: ws, around: at.addingTimeInterval(10_800)))
+    }
+
+    func testTooFewWindowsToKnowWhatIsUsual() {
+        XCTAssertNil(slackFact(windows: [window(0, 40), window(3_600, 12)], around: at))
+    }
+
+    /// A window longer than usual is worth saying too — it reads as a gift
+    /// rather than a warning, and a reader planning a transit wants both.
+    func testALongerWindowAlsoReads() throws {
+        let ws = [window(0, 20), window(3_600, 22), window(7_200, 19), window(10_800, 44)]
+        let fact = try XCTUnwrap(slackFact(windows: ws, around: at.addingTimeInterval(10_800)))
+        XCTAssertTrue(fact.text.contains("longer"), fact.text)
+    }
+
     func testSlackEventsAreNotPeaks() throws {
         let (_, all, _) = try events()
         XCTAssertFalse(all.isEmpty)

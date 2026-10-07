@@ -12,7 +12,13 @@ import SlackwaterKit
     private(set) var floods: [Peak] = []
     private(set) var ebbs: [Peak] = []
     private(set) var window: (start: Date, end: Date) = (.distantPast, .distantPast)
-    private(set) var months: [YearFigure.Month] = []
+    /// Kept per direction. A band drawn from the hardest ebb to the hardest
+    /// flood is centred on zero, which makes a tenth's seasonal variation a
+    /// twentieth of the drawn height and the year reads as a flat ribbon. One
+    /// direction's own spread — its weakest monthly maximum to its strongest —
+    /// is the question the sheet is asking anyway.
+    private(set) var floodMonths: [YearFigure.Month] = []
+    private(set) var ebbMonths: [YearFigure.Month] = []
     private var loaded: String?
     private var loadedYear: String?
 
@@ -35,12 +41,16 @@ import SlackwaterKit
         guard loadedYear != record.id else { return }
         let w = TideStanding.yearWindow(around: date, tz: record.tz)
         let station = record.engineStation, tz = record.tz
-        months = await Task.detached(priority: .userInitiated) {
-            YearFigure.months(station.events(from: w.start, to: w.end)
-                .filter { $0.kind != .slack }
-                .map { Peak(time: $0.time, magnitude: $0.speed) }, tz: tz, window: w)
+        let events = await Task.detached(priority: .userInitiated) {
+            station.events(from: w.start, to: w.end)
         }.value
+        floodMonths = YearFigure.months(CurrentStanding.peaks(events, kind: .maxFlood), tz: tz, window: w)
+        ebbMonths = YearFigure.months(CurrentStanding.peaks(events, kind: .maxEbb), tz: tz, window: w)
         loadedYear = record.id
+    }
+
+    func months(_ kind: CurrentEventKind) -> [YearFigure.Month] {
+        kind == .maxFlood ? floodMonths : ebbMonths
     }
 
     /// Where one maximum stands among its own direction's.

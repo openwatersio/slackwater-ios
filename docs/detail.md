@@ -123,7 +123,13 @@ The tile opens the Range sheet wherever there is something behind the number —
 
 - **Value:** the speed of the next maximum after the selection, with "~" in front and attention amber ink while the model is provisional.
 - **Caption:** "Flood at <time>" or "Ebb at <time>".
-- **Inert.** Absent when no maximum follows.
+- **Absent** when no maximum follows.
+
+At a harmonic current station the tile ranks that maximum against the fifteen calendar days either side, **within its own direction**: floods against floods and ebbs against ebbs. Most gates are not symmetric, so one combined ranking would mean the weaker direction never marked at all, however remarkable a maximum is for that direction — and a reader waiting on the flood is not helped by being told the ebbs are bigger.
+
+A maximum in the top tenth of its direction's window marks, on the same threshold the Range tile uses. The caption keeps its time in every state, because the time is the half a reader acts on: the direction word carries the standing instead, reading "Hardest flood · <time>" where nothing in the window runs harder, "Strong flood · <time>" where it merely marks, and "Flood at <time>" otherwise. A marked tile gains the vertical span glyph and opens the Next max sheet (§6.5).
+
+**Inert on an online gate and on a derived gate**, and that is the data rather than a choice: an online gate's detail is bounded by `Timeline.window(anchor:)` — 228 elapsed hours, about nine and a half days — where a fortnight either side needs thirty, and a derived gate has no speed at all.
 
 ### 6.3 Shape only (derived gate)
 
@@ -152,7 +158,21 @@ The explanation depends on the ratio:
 - **3 or more:** "The water at <place> rises and falls far more across a year than it does across a day. Rivers, lakes and lagoons behave this way: the level follows the seasons — runoff, rainfall, wind — and the daily tide is a ripple on top of it." and "The highs and lows below are still computed the same way and are still correct. They are just a small movement inside a much larger seasonal one, so a whole day can sit above or below what the same day looks like six months from now."
 - **Below 3:** "The water at <place> has a real tide, and a yearly cycle of about the same size. The times below are unaffected — high and low arrive when they arrive — but the heights drift across the year as the seasonal level rises and falls underneath them."
 
-### 6.5 Moon (every kind)
+### 6.5 Next max sheet
+
+Title "Next max", with Done. It opens with the speed and "The hardest the water runs before it turns, at <place>." Then two sections, each with its own figure.
+
+**"Is this beyond normal?"** One bar per whole station-local day across the fortnight, each carrying that day's hardest maximum *in the selected direction*, on one scale. The selected day is marked and the next harder day flagged ahead of it. Labelled "Each bar is one day's hardest flood" or "…hardest ebb". Captioned "The hardest flood of the fortnight." or "Harder than all but N of this fortnight's M.", the latter tapping through to that maximum.
+
+Beneath it, what the maximum costs: **"Slack runs N minutes around it, against about M here usually."** A slack window is a threshold crossing, so a harder maximum drives the water through that band faster and the window closes sooner. Both figures are measured from the loaded timeline against the reader's own slack-speed setting, which the fortnight scan does not carry. The sentence is omitted when the window is within a tenth of this station's usual, which is most maxima.
+
+**"When this gate runs hardest"** is twelve whole calendar months, drawn as the envelope that direction's monthly maxima trace — its strongest and its weakest — with the strongest months marked and the reader's own month ruled. Captioned "Hardest around <month>."
+
+Per direction rather than flood-to-ebb: a band drawn from the hardest ebb to the hardest flood is centred on zero, which makes a tenth's seasonal variation a twentieth of the drawn height and the year reads as a flat ribbon. One direction's own spread is the question the sheet is asking anyway.
+
+There is deliberately **no section measured against the station's own ends**, as the Range sheet has. LAT and HAT are hydrographic datums for water *level*; no equivalent astronomical floor and ceiling is published for current *speed*, and `CurrentStationRecord` carries no datum fields at all. Nothing to measure against is not the same as a value we happen to lack.
+
+### 6.6 Moon (every kind)
 
 - **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant.
 - **Value:** an eclipse in progress ("Solar Eclipse", "Total Eclipse", "Partial Eclipse", "Penumbral Eclipse"), otherwise the phase: "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous", "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent". New and full span 1.7 days either side; the quarters span 1.4.
@@ -443,15 +463,18 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 18. **The sheet opens anywhere:** an ordinary station's Range tile is a button and its sheet leads with the three sections.
 19. **A station with no bounds:** a CHS station's sheet keeps the fortnight and the year, and drops only the section measured against the station's own ends — absent rather than empty or zeroed.
 20. **The next bigger swing:** tapping the first section's caption moves the scrubber to that swing and closes the sheet.
-21. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
-22. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
+21. **A marked maximum:** a current maximum in the top tenth of its own direction's fortnight captions "Strong flood · <time>", or "Hardest flood · <time>" when nothing in the window runs harder, and keeps its time in both.
+22. **The Next max sheet:** a harmonic current station's marked tile opens a sheet with the fortnight and the year sections, and no section measured against the station's ends.
+23. **An online gate stays inert:** its Next max tile is not a button — nine and a half days is not a fortnight to rank against.
+24. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
+25. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
 
 ### Waiting and sharing
 
-23. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
-24. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
-25. **Share at now:** sharing an untouched page shares the bare station link.
-26. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
+26. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
+27. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
+28. **Share at now:** sharing an untouched page shares the bare station link.
+29. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
 
 ## 19. Known iOS deviations from the intended contract
 
@@ -471,6 +494,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Shared page composition, schedule card, week bar and picker, footer, station details, station links | `Slackwater/Theme.swift` |
 | Header, share link | `Slackwater/DetailHeader.swift`, `Slackwater/DeepLink.swift` |
 | Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/TideStation.swift` |
+| Next max tile and sheet | `Slackwater/CurrentLead.swift`, `Slackwater/CurrentDetailView.swift`, `Slackwater/MaxDetailSheet.swift`, `Slackwater/CurrentStanding.swift`, `Slackwater/CurrentStandingStore.swift` |
 | Range sheet's three sections | `Slackwater/TideStanding.swift`, `Slackwater/TideStandingStore.swift`, `Slackwater/SwingFigure.swift`, `Slackwater/StandingFigure.swift`, `Slackwater/YearFigure.swift` |
 | Current page, Next max | `Slackwater/CurrentDetailView.swift`, `Slackwater/CurrentLead.swift` |
 | Derived gate | `Slackwater/DerivedGateDetailView.swift` |

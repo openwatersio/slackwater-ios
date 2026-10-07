@@ -27,6 +27,36 @@ enum CurrentStanding {
     }
 }
 
+/// What the maximum costs at slack.
+///
+/// The reason to open this sheet rather than read the number on the tile. A
+/// slack window is a threshold crossing — the span either side of the turn
+/// where the water is under the usable speed — so a harder maximum drives the
+/// water through that band faster and the window closes sooner. The tile says
+/// how hard; this says what it costs you.
+///
+/// Both figures come from the loaded timeline rather than the fortnight scan:
+/// windows are measured against the reader's own slack threshold, and that is
+/// a setting the scan does not carry.
+func slackFact(windows: [(slack: Date, start: Date, end: Date)], around maximum: Date) -> StandingFact? {
+    let minutes = { (w: (slack: Date, start: Date, end: Date)) in w.end.timeIntervalSince(w.start) / 60 }
+    let durations = windows.map(minutes).filter { $0 > 0 }.sorted()
+    guard durations.count >= 3,
+          let nearest = windows.min(by: {
+              abs($0.slack.timeIntervalSince(maximum)) < abs($1.slack.timeIntervalSince(maximum))
+          }), minutes(nearest) > 0 else { return nil }
+    let typical = durations[durations.count / 2]
+    let here = minutes(nearest)
+    // Within a tenth of usual is not worth a sentence; saying so anyway would
+    // make the fact noise on the majority of maxima.
+    guard abs(here - typical) / typical > 0.1 else { return nil }
+    return StandingFact(text: here < typical
+        ? String(localized: "Slack runs \(Int(here.rounded())) minutes around it, against about \(Int(typical.rounded())) here usually.",
+                 comment: "Current sheet fact. Both integers are counts of minutes; vary by plural.")
+        : String(localized: "Slack runs \(Int(here.rounded())) minutes around it, longer than the \(Int(typical.rounded())) usual here.",
+                 comment: "Current sheet fact. Both integers are counts of minutes; vary by plural."))
+}
+
 /// The Next max tile's caption.
 ///
 /// Unlike the Range tile's, this one cannot give its text up to the mark: the
