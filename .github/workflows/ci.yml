@@ -123,7 +123,7 @@ jobs:
           node --test scripts/asc.test.mjs
 
       - name: Fixture tooling
-        run: node --test scripts/iwls-fixtures.test.mjs
+        run: node --test scripts/iwls-fixtures.test.mjs scripts/appstore.test.mjs
 
       # Every generator reads local files only, which means CI can regenerate
       # them and prove the committed bundles still match — a generator edited

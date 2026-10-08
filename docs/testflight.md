@@ -167,6 +167,8 @@ Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/ski
   result with `node scripts/asc.mjs builds`.
 - App record ("Slackwater — Tides & Currents") + tester management stay in the App Store
   Connect UI — records can't be created via the public API.
+- The App Store step after Beta — listing, screenshots, review submission, release — is
+  [App Store releases](appstore.md).
 - Export-only variant (signed .ipa, no upload): `build/exportOptions.plist` with
   `destination: export` — what the first proof run used.
 - **Fill bundle refit is a release-time decision, not a sync** (`fill-salish.bin`,

@@ -10,7 +10,8 @@
 #
 # The App Store sets (SlackwaterUITests/AppStoreScreenshots.swift, #4) — five
 # numbered frames on each of the two sizes App Store Connect requires, which
-# upload as they come out. Run both, then upload each directory to its size:
+# upload as they come out. Run both; `asc.mjs screenshots` uploads each
+# directory to its size (docs/appstore.md):
 #
 #   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 \
 #     ./scripts/screenshots.sh                                   # 1320×2868
