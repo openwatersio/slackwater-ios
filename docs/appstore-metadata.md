@@ -116,26 +116,87 @@ Re-answer this section whenever a new host appears in the app. `grep -rhoE "http
 
 ## Accessibility Nutrition Labels
 
-`accessibility` in the listing file holds one flag per label, true only for the rows answered yes below; `asc.mjs accessibility --yes` publishes them for iPhone and iPad. Claim only what the app does today. These labels appear on the product page and a wrong one is a support burden and a trust cost, not a marketing win — an omitted label costs nothing but the label itself.
+App Store Connect answers these per device. Mac shows the iPhone and iPad answers and needs none of its own; Apple Watch is answered separately. `accessibility` in the listing file holds the iPhone and iPad column, one flag per label, true only where it says Yes, and `asc.mjs accessibility --yes` publishes it for both. The Apple Watch column is entered in the App Store Connect UI. A label can be published only for a device with a live version, so nothing publishes before the first version is approved; after that, changes take effect without review.
 
-Verify each answer against Apple's current published criteria before submitting; the summary below is what the code supports, not a reading of the criteria.
+Apple's [criteria](https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels) allow a label only if every common task can be completed with the feature: for Slackwater, the first-run gate, finding a station, reading and scrubbing a detail, favouriting, Downloads, Settings, and the purchase sheet. Claim only what the app does today. A wrong label is a support burden and a trust cost, and App Review can ask for it to be corrected (guideline 2.3). An omitted label costs nothing but the label itself.
 
-| Label                        | Answer today   | Evidence                                                                                                                                                                  |
-| ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dark Interface               | Yes            | The app is dark-only (`UIUserInterfaceStyle: Dark` in `project.yml`).                                                                                                     |
-| Captions, Audio Descriptions | Not applicable | No audio or video.                                                                                                                                                        |
-| Larger Text                  | Not yet        | The lead, its pad and the pills scale, and chart labels stay fixed by contract (`docs/scrubber.md` § 5). The platform audit reports partial support on station names, distances, sun times and the `MonoLabel` eyebrows, and clipping on "MY LOCATION" and the moon tile; card-layout work, tracked in #500. |
-| VoiceOver                    | Yes            | Labels, traits and values cover cards, lists, headers and downloads; the scrubber is one adjustable control with a dated spoken value and next/previous-event actions.    |
-| Reduced Motion               | Yes            | Honoured for the sky's stars, every scrubber landing and the pill settle fade (`TimelineTests` tripwires).                                                                 |
-| Sufficient Contrast          | Not yet        | `AccessibilityAuditTests` measures rendered contrast on the list and both details; secondary text clears 4.5:1 on the dark grounds. Caption text over the sky (the header's region line, the lead's time) cannot reach 4.5:1 on the twilight-to-day band with any single ink (`ColourAndFormTests.testLeadInkClearsLargeTextContrastOnEverySky`); a design change, tracked in #499. |
-| Differentiate Without Color  | Yes            | Every state has a carrier besides its colour — distinct high/low glyphs, a set arrow with a compass word, slack named in words, speeds printed at maxima — and `ColourAndFormTests.testEveryStateHasANonColourCarrier` pins each one (`docs/scrubber.md` § 25). |
-| Voice Control                | Yes            | Every control has a name: the platform audit's element-description check passes on the list and both details (`AccessibilityAuditTests`).                                 |
+| Label                        | iPhone and iPad | Apple Watch    | Evidence |
+| ---------------------------- | --------------- | -------------- | -------- |
+| Dark Interface               | Yes             | Yes            | The phone is dark-only (`UIUserInterfaceStyle: Dark` in `project.yml`, `.preferredColorScheme(.dark)` on the root and sheets). Every watch surface draws on the dark canvas. |
+| Captions, Audio Descriptions | Not applicable  | Not applicable | No audio or video. |
+| Larger Text                  | Not yet         | Not yet        | The lead, its pad and the pills scale, and chart labels stay fixed by contract (`docs/scrubber.md` § 5). Station names, Downloads rows and the eyebrows clip, the pills stop at the first accessibility size, and the iPad sidebar is a fixed 320 points; #500. On the watch, list rows are a fixed height, the reading card shrinks its text, and the detail never scrolls. |
+| VoiceOver                    | Yes             | Not yet        | The scrubber is one adjustable control with a dated spoken value and Next event, Previous event and Set an alert actions; icon buttons are named and section labels are headings, and the list and search reach every station the map shows. The audit covers three screens (#674), so the rest is a hand check on a device before publishing (#610). Known gaps: #498, #671, #673. The watch's complications and reading card are unlabelled; #672. |
+| Reduced Motion               | Yes             | Yes            | Honoured for the sky's stars, every scrubber landing, the scale glide and the pill settle fade (`TimelineTests` and `ReduceMotionTests` tripwires); the watch's two animations and its stars check it too. A map pin recentres with a plain pan; #673. |
+| Sufficient Contrast          | Not yet         | Not yet        | `AccessibilityAuditTests` measures rendered contrast on the list and both details; secondary text clears 4.5:1 on the dark grounds. Caption text over the sky (the header's region line, the lead's time) cannot reach 4.5:1 on the twilight-to-day band with any single ink (`ColourAndFormTests.testLeadInkClearsLargeTextContrastOnEverySky`); a design change, tracked in #499. Nothing measures the watch. |
+| Differentiate Without Color  | Yes             | Yes            | Every state has a carrier besides its colour — distinct high/low glyphs, a set arrow with a compass word, slack named in words, speeds printed at maxima — and `ColourAndFormTests.testEveryStateHasANonColourCarrier` pins each one (`docs/scrubber.md` § 25). Stars, bells and checkboxes change shape and carry `.isSelected`. Watch complications read by shape on single-tint faces. Minor colour-only states (filter chips, the Downloads warning, map slack pins) are in #673. |
+| Voice Control                | Yes             | Not applicable | Every control has a name: the platform audit's element-description check passes on the list and both details (`AccessibilityAuditTests`), and the hand check covers the rest (#610). Three names differ from their visible text; #673. watchOS has no Voice Control. |
 
-Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) § 18 lists the scrubber's own remaining deviations. `AccessibilityAuditTests` runs the platform audit over the station list and both detail kinds on every CI run, so a regression in a claimed row fails the build. Re-check this table whenever one of those issues lands — the labels are editable without a full review, so shipping honest labels now and upgrading them later costs nothing.
+Each "not yet" names the issue that closes it; [`scrubber.md`](scrubber.md) § 18 lists the scrubber's own remaining deviations. `AccessibilityAuditTests` runs on iPhone for every pull request and on iPad for pushes to `main`. Re-check this table whenever one of those issues lands, and every release: Apple asks for a re-evaluation with each update.
 
 ## Review notes
 
 `reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, where the app is marked not for navigation, that location is optional, that no account is needed, and that Canadian stations download their data once for offline use. While Premium is on sale they also say what it unlocks and how to reach the purchase sheet, so the reviewer can test the purchase. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
+
+## In-app purchases
+
+Two products, entered by hand in App Store Connect; `asc.mjs` does not push them. `Slackwater.storekit` mirrors them for Debug runs.
+
+| Product          | Product ID                                     | Type                                                           | Family Sharing |
+| ---------------- | ---------------------------------------------- | -------------------------------------------------------------- | -------------- |
+| Premium Yearly   | `io.openwaters.slackwater.premium.yearly`      | Auto-renewable, 1 year, in the subscription group "Slackwater Premium" | Yes            |
+| Premium Lifetime | `io.openwaters.slackwater.premium.lifetime.v2` | Non-consumable                                                 | No             |
+
+### Localizations
+
+Each display name is at most 30 characters and each description at most 45, and a change to either goes through review. The purchase sheet shows the display name beside the price in the device's language, so every app language has a row; a language without one shows the English name. The descriptions name what Premium adds in the app's own terms for each feature ("Alerts", "Favourites calendars", "Lock screen"), so the store and the sheet agree. Spanish and Dutch leave out the Watch to fit.
+
+| App Store Connect locale | Premium Yearly        | Premium Lifetime       | Description (both products)                   |
+| ------------------------ | --------------------- | ---------------------- | --------------------------------------------- |
+| `en-US`                  | Premium Yearly        | Premium Lifetime       | Alerts, calendars, lock screen and Watch      |
+| `da`                     | Premium årligt        | Premium livstid        | Varsler, kalendere, låseskærm og Apple Watch  |
+| `de-DE`                  | Premium jährlich      | Premium auf Lebenszeit | Meldungen, Kalender, Sperrbildschirm, Watch   |
+| `es-ES`                  | Premium anual         | Premium de por vida    | Alertas, calendarios y pantalla de bloqueo    |
+| `fi`                     | Premium-vuositilaus   | Elinikäinen Premium    | Hälytykset, kalenterit, lukitusnäyttö, Watch  |
+| `fr-CA`                  | Premium annuel        | Premium à vie          | Alertes, calendriers, écran verrouillé, Watch |
+| `it`                     | Premium annuale       | Premium a vita         | Avvisi, calendari, schermata di blocco, Watch |
+| `ja`                     | Premium 年間プラン    | Premium 買い切り       | アラート、カレンダー、ロック画面、Apple Watch |
+| `ko`                     | Premium 연간 구독     | Premium 평생 이용권    | 알림, 캘린더, 잠금 화면, Apple Watch          |
+| `no`                     | Premium årlig         | Premium livstid        | Varsler, kalendere, låst skjerm og Watch      |
+| `nl-NL`                  | Premium jaarlijks     | Premium levenslang     | Waarschuwingen, kalenders en toegangsscherm   |
+| `pt-BR`                  | Premium anual         | Premium vitalício      | Alertas, calendários, Tela Bloqueada e Watch  |
+| `pt-PT`                  | Premium anual         | Premium vitalício      | Alertas, calendários, ecrã bloqueado e Watch  |
+| `sv`                     | Premium årsabonnemang | Premium livstid        | Aviseringar, kalendrar, låsskärm och Watch    |
+
+The subscription group's display name is "Slackwater Premium" in every locale, a brand name that needs no translation; Apple refuses special characters in it. The group shows the app's own name above it on the Manage Subscriptions page.
+
+### Review information
+
+The same screenshot serves both products: the purchase sheet with both products, their prices and the yearly term, Restore purchase, and the Privacy Policy and Terms of Use links. Shoot it on a 6.9" iPhone, the size of the listing's own screenshots. `SLACKWATER_SIMS` must name a simulator no other device shares:
+
+```sh
+xcrun simctl create "Slackwater IAP review shot" "iPhone 18 Pro Max"
+SLACKWATER_SIMS="Slackwater IAP review shot" \
+  SLACKWATER_ONLY=SlackwaterUITests/SettingsLayoutTests/testSupportSheetOpensAndClosesFromTheFooter \
+  ./scripts/test.sh
+```
+
+It saves `support-sheet.png` in `/tmp/slackwater-shots`. Shoot it again whenever the purchase sheet changes, and delete the simulator afterwards.
+
+Review notes for Premium Yearly:
+
+> Premium Yearly is a one-year auto-renewable subscription in the Slackwater Premium group. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars. Every tide and current prediction, the Watch app and the home screen widgets stay free.
+>
+> To buy: scroll to the bottom of the station list and tap Support Slackwater. Alerts and Calendar in Settings open the same sheet. It shows both Premium products with their prices and the yearly term, Restore purchase, and links to the Privacy Policy and Terms of Use.
+>
+> To see it unlocked: in Settings → Calendar, turn on a saved station, or press and hold a station's curve to set an alert. No account is needed.
+
+Review notes for Premium Lifetime:
+
+> Premium Lifetime is a one-time, non-consumable purchase. It unlocks the same features as Premium Yearly permanently, with no renewal: lock screen widgets, Apple Watch complications, alerts and station calendars. It is not shared through Family Sharing. Every tide and current prediction, the Watch app and the home screen widgets stay free.
+>
+> To buy: scroll to the bottom of the station list and tap Support Slackwater. Alerts and Calendar in Settings open the same sheet. It shows both Premium products with their prices, Restore purchase, and links to the Privacy Policy and Terms of Use.
+>
+> To see it unlocked: in Settings → Calendar, turn on a saved station, or press and hold a station's curve to set an alert. No account is needed.
 
 ## Before submission
 
@@ -150,4 +211,5 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
 - [ ] Station counts re-derived and rounded down.
 - [ ] Both Premium products attached to the version while the build sells them. A first in-app purchase goes to App Review with a version, and a purchase sheet whose products App Review cannot load is rejected under 2.1. `asc.mjs submit` stops on a submission holding an in-app purchase, so that submission goes through the App Store Connect UI.
-- [ ] Accessibility Nutrition Labels answered against Apple's current criteria, claiming only the rows that are yes.
+- [ ] Each product's localizations, review notes and review screenshot entered from [In-app purchases](#in-app-purchases), and the subscription group's display name in every locale.
+- [ ] After approval: the hand check in #610 done, then the Accessibility Nutrition Labels published, iPhone and iPad with `asc.mjs accessibility --yes` and Apple Watch in the UI, claiming only the cells that say Yes.
