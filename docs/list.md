@@ -247,10 +247,14 @@ Results use the station card (§6) without a distance and without swipe actions,
 Canadian predictions download to the device in tiers: the stations in view, then those within 25 km, then those within 150 km. The download strip reports that work at the top of the list.
 
 - **Working:** "Downloading" with "N of M" and a progress bar. Tapping opens the Downloads sheet.
-- **Offering the next tier:** "Download N more?" with a decline button ("Not now") and an accept button ("Download N more"). Declining lasts for the session.
+- **Offering the next tier:** "Download N more?" opens the Downloads sheet when tapped. A decline button ("Not now") dismisses the offer for the session, and an accept button ("Download N more") adds the next tier directly.
 - **Neither:** the strip takes no space.
 
 The footer is a rounded card with three rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), "Settings", and "Support Slackwater" ("Slackwater supporter ❇" when Premium is active), each at least 48 units tall. The support row opens a dedicated sheet with Premium benefits, purchase options, and restore. Settings retains widget setup instructions but no purchase controls. Below the card are "Slackwater" and "by Open Waters".
+
+Downloads begins with "Canadian tides and currents" and explains that Canadian data requirements mean predictions must be downloaded individually. Its checklist offers Nearby (the stations on the list, selected automatically), Within 25 km, Within 150 km, and All current stations. Each row shows an estimated remaining download time or "Available offline". Selecting a row adds its work to the queue and requests continued background processing; selected rows stay checked. The 150 km choice covers both smaller sets, and All current stations includes fitted and online Canadian currents across the country. Choices persist across launches, and overlapping selections never download the same station twice. Explicit choices include the whole selected set even in Low Data Mode.
+
+The offline explanation and download progress follow the checklist, then individual Canadian downloads in activity order. Other Canadian stations download when opened. The map's Charts card follows the Canadian section. Background execution depends on iOS availability; interrupted downloads resume when Slackwater is reopened.
 
 ## 9. Opening a station
 

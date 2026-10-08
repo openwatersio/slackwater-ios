@@ -32,9 +32,11 @@ enum BackgroundDownloads {
     /// belongs at the tap and not in the App's init. A fresh id per call is
     /// required: registering the same identifier twice in one session is a
     /// fatal exception, not an error.
-    @MainActor static func submitIfPossible(queue: ChsQueue) {
-        let remaining = queue.total - queue.ready
-        guard remaining > 0 else { return }
+    @MainActor static func submitIfPossible() {
+        let service = ChsFitService.shared
+        let queue = service.queue
+        let online = service.onlineDownloads
+        guard queue.active || online.active else { return }
         let id = pattern.replacingOccurrences(of: "*", with: UUID().uuidString)
 
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: id,
@@ -61,7 +63,7 @@ enum BackgroundDownloads {
         let request = BGContinuedProcessingTaskRequest(
             identifier: id,
             title: String(localized: "Downloading", comment: "Compact download status."),
-            subtitle: String(localized: "\(queue.ready) of \(queue.total)", comment: "Completed and total station downloads."))
+            subtitle: String(localized: "\(queue.ready + online.ready) of \(queue.total + online.total)", comment: "Completed and total station downloads."))
         request.strategy = .queue
         do {
             try BGTaskScheduler.shared.submit(request)
@@ -141,10 +143,12 @@ enum BackgroundDownloads {
                 // uses, and `ChsFitService.shared` is @MainActor-isolated.
                 let service = ChsFitService.shared
                 service.resumeForBackground()
-                while !Task.isCancelled, service.queue.active {
+                while !Task.isCancelled {
+                    let online = service.onlineDownloads
+                    guard service.queue.active || online.active else { break }
                     let progress = service.queue.requestProgress
-                    task.progress.totalUnitCount = Int64(progress.total.rounded())
-                    task.progress.completedUnitCount = Int64(progress.completed.rounded())
+                    task.progress.totalUnitCount = Int64((progress.total + online.requestsCompleted + online.requestsRemaining).rounded())
+                    task.progress.completedUnitCount = Int64((progress.completed + online.requestsCompleted).rounded())
                     // A deferred job is sitting out `ChsQueue.backoff`, which
                     // reads as a stall with no explanation — up to 15 minutes,
                     // on an API that kills tasks showing no progress first.
@@ -155,10 +159,14 @@ enum BackgroundDownloads {
                     // written for is the one case it does NOT catch: IWLS's 429
                     // wait happens inside `IwlsClient.get`, with the job still
                     // `.downloading`. "Waiting to retry" is true of all of them.
+                    let waitingToRetry = service.queue.deferred() > 0 || service.onlineStates.values.contains {
+                        if case .deferred = $0 { return true }
+                        return false
+                    }
                     task.updateTitle(String(localized: "Downloading", comment: "Compact download status."),
-                                     subtitle: service.queue.deferred() > 0
+                                     subtitle: waitingToRetry
                                         ? String(localized: "Waiting to retry…", comment: "Background download activity while waiting to retry.")
-                                        : String(localized: "Stations ready: \(service.queue.ready) of \(service.queue.total)", comment: "Background download activity. Values are ready and total station counts."))
+                                        : String(localized: "Stations ready: \(service.queue.ready + online.ready) of \(service.queue.total + online.total)", comment: "Background download activity. Values are ready and total station counts."))
                     try? await Task.sleep(for: .seconds(2))
                 }
                 task.setTaskCompleted(success: !Task.isCancelled)

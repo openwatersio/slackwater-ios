@@ -80,6 +80,7 @@ enum AppGroup {
     /// switch has to still be on next launch, and an accepted tier has to
     /// resume the work it started.
     static let downloadTierKey = "slackwater.downloadTier"
+    static let downloadAllCurrentsKey = "slackwater.downloadAllCurrents"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
     /// Alert rules (docs/alerts.md §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.

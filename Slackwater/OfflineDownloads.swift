@@ -229,6 +229,7 @@ struct OfflineManagerList: View {
         let anchor = LocationService.shared.rankingAnchor
         return ChsCurrentGateInfo.all.filter {
             guard $0.isOnline else { return false }
+            if service.allCurrentsSelected { return true }
             let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
             return km <= ChsFitService.autoFitRadiusKm || onlineWindow($0) != nil
         }
@@ -252,13 +253,13 @@ struct OfflineManagerList: View {
             LazyVStack(alignment: .leading, spacing: 14) {
                 tierSection
                 summary
-                chartsCard
                 ForEach(downloads) { download in
                     switch download {
                     case .fitted(let job): row(job)
                     case .online(let gate): onlineRow(gate)
                     }
                 }
+                chartsCard
             }
             .padding(16)
             .padding(.bottom, 30)
@@ -269,83 +270,65 @@ struct OfflineManagerList: View {
 
     // MARK: Tiers
 
-    /// The tiers, and the only place a duration is allowed to appear: someone
-    /// who opened the manager came looking for the number, whereas the same
-    /// number on the list's strip is an invitation to sit and wait.
     @ViewBuilder private var tierSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("In view").font(.headline)
-                Text("The stations on your list download on their own.")
-            }
-            .accessibilityIdentifier("download-tier-in-view")
-
-            if service.tier == .inView {
-                Button("Download \(service.remainingBeyondCohort) more within 25 km") {
-                    service.accept(.nearby)
-                }
-                .buttonStyle(.borderedProminent)
-                // Same reason as the list strip's Yes: untinted, this fills
-                // with the system accent and is the only blue on the screen.
-                // The explicit label colour matters for the same reason too —
-                // a prominent button's label inherits the surrounding
-                // foreground, so a leaf fill under a leaf label vanishes.
-                .tint(SN.leaf)
-                .foregroundStyle(SN.canvas)
-                .disabled(service.remainingBeyondCohort == 0)
-                .accessibilityIdentifier("download-tier-nearby-accept")
-            } else {
-                Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
-            }
-
-            // A Button, NOT a Toggle. Every queue tick re-evaluates this
-            // body, and that cancels a UISwitch's in-flight gesture: while
-            // anything was downloading — which is precisely when someone
-            // opens this sheet — a tap on the switch was silently eaten,
-            // and the tier never widened. A Button fires on touch-up and
-            // survives the same churn. Measured both ways on an erased
-            // device before this was changed (#462).
-            //
-            // Losing the off position costs nothing it was honestly
-            // offering: turning it off never stopped the work already in
-            // flight, only the widening, which is why the copy below had to
-            // explain that away.
-            if service.tier == .everything {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Keep downloading Canadian stations within 150 km")
-                        .foregroundStyle(SN.leaf)
-                    Text("Adding more whenever Slackwater is open. \(service.queue.ready) so far.")
-                        .font(.footnote)
-                }
-                .accessibilityIdentifier("download-tier-everything-on")
-            } else {
-                Button {
-                    service.accept(.everything)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        // 150 km, not "Canadian stations" unqualified — this
-                        // stops at ChsFitService.autoFitRadiusKm same as the
-                        // unconstrained auto-fit; lifting that radius is a
-                        // separate change (DownloadTier.everything).
-                        Text("Keep downloading Canadian stations within 150 km")
-                        // No estimate and no percentage: 1,073 stations is
-                        // hours of requests and has no finish line to show.
-                        Text("Adds more whenever Slackwater is open, as far as 150 km out.")
-                            .font(.footnote)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(SN.leaf)
-                .accessibilityIdentifier("download-tier-everything-toggle")
-            }
+            Text("Canadian tides and currents").font(.headline)
+            Text("Canadian data requirements mean we download tide and current predictions individually.")
+                .font(.subheadline)
+                .foregroundStyle(SN.foam.opacity(0.75))
+            Text("Choose any combination. Slackwater will take care of the downloads.")
+                .font(.footnote)
+                .foregroundStyle(SN.foam.opacity(0.62))
+            downloadChoice("Nearby", selected: true,
+                           seconds: service.estimatedSeconds(for: .inView),
+                           id: "download-tier-in-view") {}
+            downloadChoice("Within 25 km", selected: service.tier != .inView,
+                           seconds: service.estimatedSeconds(for: .nearby),
+                           id: "download-tier-nearby-accept") { service.accept(.nearby) }
+            downloadChoice("Within 150 km", selected: service.tier == .everything,
+                           seconds: service.estimatedSeconds(for: .everything),
+                           id: "download-tier-everything-toggle") { service.accept(.everything) }
+            downloadChoice("All current stations", selected: service.allCurrentsSelected,
+                           seconds: service.allCurrentsSeconds,
+                           id: "download-all-currents") { service.downloadAllGates() }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+    }
+
+    private func downloadChoice(_ title: LocalizedStringKey, selected: Bool,
+                                seconds: Double, id: String, action: @escaping () -> Void) -> some View {
+        // Buttons survive queue updates that can swallow a UISwitch gesture (#462).
+        Button {
+            if !selected { action() }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: selected ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundStyle(SN.leaf)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.subheadline.weight(.semibold))
+                    if seconds > 0 {
+                        Text("Estimated time: \(durationPhrase(seconds))")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else {
+                        Text("Available offline")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier(id)
     }
 
     // MARK: Summary
@@ -366,17 +349,6 @@ struct OfflineManagerList: View {
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
-            if !allGates.isEmpty {
-                // The cost is on the button because there is no pause and no
-                // cancel: tapping this is a commitment, so it says how long.
-                Button { service.downloadAllGates() } label: {
-                    Text("Download all \(allGates.count) Canadian currents · \(durationPhrase(allGatesSeconds))")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(SN.leaf)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("download-all-currents")
-            }
             if deferredCount > 0 {
                 Button { service.retryNow() } label: {
                     Text("Retry now")
@@ -476,7 +448,7 @@ struct OfflineManagerList: View {
             return [String(localized: "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.", comment: "Offline-download summary while offline."), onDemandLine]
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        let base = String(localized: "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice.", comment: "Offline-download progress summary.")
+        let base = String(localized: "Downloaded predictions stay available offline. Open any other Canadian station to download it.", comment: "Canadian offline explanation below download choices; opening another station downloads its predictions.")
         return [base, onDemandLine].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
@@ -484,11 +456,6 @@ struct OfflineManagerList: View {
         let rest = service.notQueued
         guard rest > 0 else { return "" }
         return String(localized: "\(rest) more Canadian stations are searchable everywhere — open one and it downloads.", comment: "Offline-download catalog note. The integer is a station count; vary by plural.")
-    }
-
-    private var allGates: [ChsJob] { service.gatesToDownload }
-    private var allGatesSeconds: Double {
-        allGates.reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
     }
 
     private var readyCount: Int { downloads.filter { downloadIsReady(managedState($0).state) }.count }

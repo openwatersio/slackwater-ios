@@ -41,7 +41,11 @@ struct DownloadStrip: View {
             HStack(spacing: 12) {
                 // A count, never a duration: locking the phone stops the work,
                 // so a time here would be a promise the app cannot keep.
-                Text("Download \(count) more?")
+                Button(action: onOpen) {
+                    Text("Download \(count) more?")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("download-strip-open")
                 Spacer(minLength: 8)
                 // Marks, not words: the question is already the sentence, and
                 // two more words beside it made the row wrap to a second line.
