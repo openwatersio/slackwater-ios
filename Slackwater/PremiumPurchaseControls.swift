@@ -46,6 +46,9 @@ struct PremiumPurchaseControls: View {
                                 Text(product.displayName).fontWeight(.semibold)
                                 if product.id == PremiumStore.lifetimeID {
                                     Text("Pay once, never again.").font(.caption2)
+                                } else if product.id == PremiumStore.yearlyID {
+                                    // App Review 3.1.2: a subscription states its length beside its price.
+                                    Text("Renews every year until you cancel.").font(.caption2)
                                 }
                             }
                             Spacer()
@@ -71,6 +74,12 @@ struct PremiumPurchaseControls: View {
                 }
                 .font(.footnote)
                 .disabled(purchasing)
+                // App Review 3.1.2: the purchase screen links both policies.
+                VStack(alignment: .leading, spacing: 8) {
+                    Link("Privacy Policy", destination: URL(string: "https://slackwater.xyz/privacy")!)
+                    Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                }
+                .font(.footnote)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

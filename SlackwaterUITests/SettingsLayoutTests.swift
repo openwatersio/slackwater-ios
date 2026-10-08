@@ -236,6 +236,9 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         support.tap()
         XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
         XCTAssert(app.buttons["Restore purchase"].isHittable)
+        // App Review 3.1.2 rejects a subscription sheet without both policy links.
+        XCTAssert(app.links["Privacy Policy"].exists)
+        XCTAssert(app.links["Terms of Use"].exists)
         save(app, "support-sheet.png")
         app.buttons["premium-done"].tap()
         XCTAssert(support.appears(within: 5))
