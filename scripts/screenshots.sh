@@ -17,6 +17,17 @@
 #   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
 #     SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh   # 2064×2752
 #
+#
+# The iPhone Duo takes an optional set of its own, either screen's size. The
+# simulator boots folded, and only Xcode's device view folds it, so unfold it
+# there before the inner run and leave it open. Each shot is of the screen the
+# app is on, saved upright at the size App Store Connect takes:
+#
+#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/duo-cover \
+#     SLACKWATER_SIM='iPhone Duo' ./scripts/screenshots.sh       # 1398×2034, folded
+#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/duo-inner \
+#     SLACKWATER_SIM='iPhone Duo' ./scripts/screenshots.sh       # 2853×2007, unfolded
+#
 #   SHOT_DIR=/tmp/shots ./scripts/screenshots.sh   where the PNGs land (default /tmp/slackwater-shots)
 #   SLACKWATER_SIM='iPhone 17' ./scripts/screenshots.sh
 #   WALK=WebsiteScreenshots ./scripts/screenshots.sh  which walk to run (default)

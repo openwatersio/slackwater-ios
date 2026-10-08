@@ -607,7 +607,38 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     func save(_ app: XCUIApplication, _ name: String) {
-        let png = XCUIScreen.main.screenshot().pngRepresentation
+        // The screen the app is on, not `XCUIScreen.main`: on an unfolded
+        // iPhone Duo, main is the dark cover screen.
+        let window = app.windows.firstMatch.frame.size
+        let shots = XCUIScreen.screens.map { $0.screenshot() }
+        let shot = shots.first { shot in
+            let size = shot.image.size
+            return abs(min(size.width, size.height) - min(window.width, window.height)) < 1
+                && abs(max(size.width, size.height) - max(window.width, window.height)) < 1
+        } ?? XCUIScreen.main.screenshot()
+        let image = shot.image
+        let pixels = { (s: CGSize) in CGSize(width: (s.width * image.scale).rounded(), height: (s.height * image.scale).rounded()) }
+        guard pixels(image.size) != pixels(window) else {
+            try? shot.pngRepresentation.write(to: URL(fileURLWithPath: shotDir + "/" + name))
+            return
+        }
+        // The Duo's inner screen comes back as its portrait framebuffer while the
+        // app runs landscape, and a pixel short each way of the window's own size,
+        // which is the size App Store Connect takes. Redraw it upright at that size.
+        // ponytail: clockwise, which is what the walk's pinned `.portrait` produces;
+        // a walk pinning a landscape orientation may need the other direction.
+        let rotate = (image.size.width > image.size.height) != (window.width > window.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        let png = UIGraphicsImageRenderer(size: window, format: format).pngData { context in
+            let cg = context.cgContext
+            if rotate {
+                cg.translateBy(x: window.width, y: 0)
+                cg.rotate(by: .pi / 2)
+            }
+            let drawn = rotate ? CGSize(width: window.height, height: window.width) : window
+            image.draw(in: CGRect(origin: .zero, size: drawn))
+        }
         try? png.write(to: URL(fileURLWithPath: shotDir + "/" + name))
     }
 
