@@ -187,7 +187,15 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
     SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh
   ```
 
-  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
+  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use. The script's default iPhone is the iPhone 18 Pro Max, which shoots 1320×2868.
+
+  The watch app makes an Apple Watch set required too. App Store Connect takes one watch size for every localization and scales it down, so shoot the largest, Ultra (422×514), from the same pinned clock, fix and favorites as the phone:
+
+  ```
+  WALK=WatchAppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/watch ./scripts/screenshots.sh
+  ```
+
+  Four frames: the list where the wearer is, that place's tide, the crown scrubbed off now, and Deception Pass's current.
 
   The iPhone Duo set is optional and takes either screen's size: the cover (1398×2034) or the inner screen (2853×2007). The inner screen is the one worth showing, unfolded in landscape with the sidebar beside the detail. Unfold the simulator in Xcode's device view first and leave it open; the `scripts/screenshots.sh` header has both commands.
 - [ ] Mac screenshots uploaded if distributing on Mac. Apple accepts 1280×800, 1440×900, 2560×1600, or 2880×1800 ([specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)). Run the installed Mac app, then use the guided capture session:

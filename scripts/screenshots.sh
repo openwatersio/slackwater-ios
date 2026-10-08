@@ -2,7 +2,7 @@
 # Shoot a screenshot walk — a UI-test class that drives the app's surfaces and
 # saves PNGs into SHOT_DIR. Two walks use it.
 #
-# The website's shots (SlackwaterUITests/WebsiteScreenshots.swift, iPhone 17
+# The website's shots (SlackwaterUITests/WebsiteScreenshots.swift, iPhone 18
 # Pro Max, 6.9", 1320×2868). They ship as WebP in slackwater.xyz/public/shots:
 #
 #   ./scripts/screenshots.sh
@@ -28,6 +28,12 @@
 #   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/duo-inner \
 #     SLACKWATER_SIM='iPhone Duo' ./scripts/screenshots.sh       # 2853×2007, unfolded
 #
+# The watch set (SlackwaterWatchUITests/WatchAppStoreScreenshots.swift) runs
+# on the largest watch, which App Store Connect scales down for the rest:
+#
+#   WALK=WatchAppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/watch \
+#     ./scripts/screenshots.sh                                   # 422×514
+#
 #   SHOT_DIR=/tmp/shots ./scripts/screenshots.sh   where the PNGs land (default /tmp/slackwater-shots)
 #   SLACKWATER_SIM='iPhone 17' ./scripts/screenshots.sh
 #   WALK=WebsiteScreenshots ./scripts/screenshots.sh  which walk to run (default)
@@ -39,13 +45,27 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-sim="${SLACKWATER_SIM:-iPhone 17 Pro Max}"
 walk="${WALK:-WebsiteScreenshots}"
+if [[ $walk == Watch* ]]; then
+  sim="${SLACKWATER_SIM:-Apple Watch Ultra 4 (49mm)}"
+  scheme=(-scheme SlackwaterWatch) target=SlackwaterWatchUITests platform="watchOS Simulator"
+else
+  sim="${SLACKWATER_SIM:-iPhone 18 Pro Max}"
+  scheme=(-scheme Slackwater -testPlan Slackwater) target=SlackwaterUITests platform="iOS Simulator"
+fi
 udid=$(xcrun simctl list devices available | grep -F "$sim (" | head -1 \
   | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
 [[ -n "$udid" ]] || { echo "no simulator named '$sim'" >&2; exit 1; }
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl status_bar "$udid" override --time 9:41 \
+# The walks' pinned clock (ShotWalk.shotEpoch), date included: an iPad's
+# status bar prints the date, and it must agree with the frames' readings.
+# simctl takes only UTC with milliseconds and shows it in the host's zone,
+# so the bar reads 9:41 on a Mac set to Pacific time. Inside the app the
+# iPad's bar names the weekday Sep 26 had in 2000 ("Tue"), a simulator bug;
+# the right date with that weekday still beats the host's real date.
+shot_time=$(date -u -r 1790440860 +%Y-%m-%dT%H:%M:%S.000Z)
+# watchOS has no status-bar overrides; its corner clock reads the host's.
+[[ $walk == Watch* ]] || xcrun simctl status_bar "$udid" override --time "$shot_time" \
   --dataNetwork wifi --wifiMode active --wifiBars 3 \
   --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
 
@@ -55,11 +75,11 @@ xcodegen generate
 rm -rf build/results-shots.xcresult
 mkdir -p build
 lockf build/xcodebuild.lock xcodebuild test \
-  -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater \
-  -destination "platform=iOS Simulator,id=$udid" \
-  -only-testing:SlackwaterUITests/$walk \
+  -project Slackwater.xcodeproj "${scheme[@]}" \
+  -destination "platform=$platform,id=$udid" \
+  -only-testing:$target/$walk \
   -parallel-testing-enabled NO \
   -clonedSourcePackagesDirPath build/SourcePackages \
   -resultBundlePath build/results-shots.xcresult | tail -20
-xcrun simctl status_bar "$udid" clear
+[[ $walk == Watch* ]] || xcrun simctl status_bar "$udid" clear
 ls -la "$TEST_RUNNER_M1_SHOT_DIR"/*.png
