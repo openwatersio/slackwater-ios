@@ -179,15 +179,17 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
 
 ## Before submission
 
-- [ ] Screenshots uploaded. Apple takes 1–10 per device size and scales the 6.9" set down for smaller iPhones, so two sets cover a universal app: 6.9" iPhone (1320×2868) and 13" iPad (2064×2752). `SlackwaterUITests/AppStoreScreenshots.swift` shoots both from a pinned clock, location fix and favorites, so a re-run reproduces them:
+- [ ] Screenshots uploaded. Apple takes 1–10 per device size. The required iPhone slot is "iPhone with Dynamic Island (medium display)", which accepts only 1206×2622 or 1179×2556; the 6.9" set (1320×2868) fills the optional large-display slot and is not scaled into the required one. A universal app needs the 6.3" iPhone and 13" iPad (2064×2752) sets, and the 6.9" set is worth adding. `SlackwaterUITests/AppStoreScreenshots.swift` shoots each from a pinned clock, location fix and favorites, so a re-run reproduces them:
 
   ```
+  WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.3 \
+    SLACKWATER_SIM='iPhone 18 Pro' ./scripts/screenshots.sh
   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 ./scripts/screenshots.sh
   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
     SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh
   ```
 
-  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use. The script's default iPhone is the iPhone 18 Pro Max, which shoots 1320×2868.
+  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use. The iPhone 18 Pro shoots 1206×2622; the script's default, the iPhone 18 Pro Max, shoots 1320×2868.
 
   The watch app makes an Apple Watch set required too. App Store Connect takes one watch size for every localization and scales it down, so shoot the largest, Ultra (422×514), from the same pinned clock, fix and favorites as the phone:
 
