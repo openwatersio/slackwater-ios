@@ -47,8 +47,12 @@ final class AlertPopupTests: ScreenshotTestCase {
         XCTAssert(app.buttons["Restore purchase"].isHittable)
     }
 
+    /// Not retried: a first swipe swallowed after the close is the bug this guards. Hosted
+    /// runners have dropped strip swipes with no popup involved (#613, #664); the native trace
+    /// says whether the pan ever began.
     func testTheStripIsStillScrubbableAfterThePopupCloses() {
-        let app = launch("-seedGate")
+        let app = launch("-seedGate",
+                         "-scrubTrace", "\(shotDir)/popup-scrub-\(UUID().uuidString).log")
         openFridayHarbor(app)
         pressStrip(app)
         XCTAssert(app.buttons["alert-popup-once"].appears(within: 5))
@@ -63,7 +67,7 @@ final class AlertPopupTests: ScreenshotTestCase {
         let before = reading.label
         app.otherElements["timeline-strip"].firstMatch.swipeLeft()
 
-        XCTAssertNotEqual(reading.label, before)
+        XCTAssertNotEqual(reading.label, before, "the first swipe after the popup closed did not scrub")
     }
 
     /// The invariant `tap.require(toFail: press)` (TimelineStrip.swift) exists to protect: a

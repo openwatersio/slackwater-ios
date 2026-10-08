@@ -185,7 +185,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         releaseFixture(token, "dodd-first-chunk")
         XCTAssert(waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30),
                   "Dodd did not become available offline: \(dodd.label)")
-        XCTAssert(tofino.label.contains("Downloading"))
+        // The queue starts Tofino after Dodd finishes, not in the same frame (#663).
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Downloading'"),
+                  "Tofino did not start downloading after Dodd: \(tofino.label)")
         releaseFixture(token, "tofino-first-chunk")
         XCTAssert(waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30),
                   "Tofino did not become available offline")
