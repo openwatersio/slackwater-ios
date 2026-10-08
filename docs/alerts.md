@@ -184,9 +184,10 @@ calendar.
 **Finding the calendar.** By stored identifier first. Failing that, by exact title across the same
 sources it would create in, because the calendar syncs: without the title match a second device
 turning the same station on creates a duplicate calendar with the same name and the user sees every
-event twice. The cost of the title match is that two devices subscribed to one current station and
-set to *different* comfort speeds rewrite each other's slack windows on every foreground. That is
-a setting describing one boat, and the events are otherwise identical on both devices.
+event twice. The comfort speed syncs through iCloud with the units, so devices on one account
+write the same slack windows. Two devices that do not share it, and are set to *different* comfort
+speeds, rewrite each other's slack windows on every foreground. That is a setting describing one
+boat, and the events are otherwise identical on both devices.
 
 **Creating it.** Google and Exchange accounts refuse new calendars, so the source falls back from
 the default for new events to iCloud to the device. If all three refuse, the toggle reports it and

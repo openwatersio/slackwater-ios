@@ -1,9 +1,15 @@
 import Foundation
 
+/// Display preferences that follow the person between devices: units and the
+/// comfort current. The App Group copy is what every reader uses.
 final class UnitsCloud {
     static let shared = UnitsCloud()
 
-    private static let allowed = [unitsKey: ["imperial", "metric"], speedUnitKey: ["kn", "kmh", "ms"]]
+    private static let allowed: [String: (Any) -> Bool] = [
+        unitsKey: { ["imperial", "metric"].contains($0 as? String) },
+        speedUnitKey: { ["kn", "kmh", "ms"].contains($0 as? String) },
+        AppGroup.slackWindowSpeedKey: { ($0 as? Double).map(slackThresholdRange.contains) == true },
+    ]
     private let defaults: UserDefaults
     private let cloud: NSUbiquitousKeyValueStore?
     private let reload: () -> Void
@@ -49,14 +55,20 @@ final class UnitsCloud {
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func set(_ value: String, forKey key: String) {
-        guard Self.allowed[key]?.contains(value) == true else { return }
-        if cloud?.object(forKey: key) as? String != value {
-            cloud?.set(value, forKey: key)
+    /// `reloading: false` leaves the reload to a caller that debounces it.
+    func set(_ value: Any, forKey key: String, reloading: Bool = true) {
+        guard Self.allowed[key]?(value) == true else { return }
+        if !same(cloud?.object(forKey: key), value) {
+            cloud?.set(value as Any?, forKey: key)
         }
-        guard defaults.string(forKey: key) != value else { return }
+        guard !same(defaults.object(forKey: key), value) else { return }
         defaults.set(value, forKey: key)
-        reload()
+        if reloading { reload() }
+    }
+
+    /// Strings and numbers both bridge to `NSObject`, whose `isEqual` compares values.
+    private func same(_ a: Any?, _ b: Any) -> Bool {
+        (a as? NSObject)?.isEqual(b) == true
     }
 
     private func adopt(seedMissing: Bool) {
@@ -64,13 +76,13 @@ final class UnitsCloud {
         var changed = false
         for (key, allowed) in Self.allowed {
             let remote = cloud.object(forKey: key)
-            if let value = remote as? String, allowed.contains(value) {
-                if defaults.string(forKey: key) != value {
+            if let value = remote, allowed(value) {
+                if !same(defaults.object(forKey: key), value) {
                     defaults.set(value, forKey: key)
                     changed = true
                 }
             } else if seedMissing, remote == nil,
-                      let value = defaults.string(forKey: key), allowed.contains(value) {
+                      let value = defaults.object(forKey: key), allowed(value) {
                 // Seed saved preferences only; a fresh device must not upload its fallback units.
                 cloud.set(value, forKey: key)
             }

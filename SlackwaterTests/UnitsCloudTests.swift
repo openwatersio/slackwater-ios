@@ -161,6 +161,48 @@ final class UnitsCloudTests: XCTestCase {
         }
     }
 
+    func testComfortCurrentSyncsOnlyInRangeNumbers() {
+        let key = AppGroup.slackWindowSpeedKey
+        let sync = sync()
+        sync.set(1.2, forKey: key)
+        sync.set(42.0, forKey: key)
+        sync.set("1.2", forKey: key)
+        XCTAssertEqual(cloud.values[key] as? Double, 1.2)
+        XCTAssertEqual(cloud.writeCount, 1)
+        XCTAssertEqual(defaults.double(forKey: key), 1.2)
+        XCTAssertEqual(reloads, 1)
+
+        sync.set(1.3, forKey: key, reloading: false)
+        XCTAssertEqual(cloud.values[key] as? Double, 1.3)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3)
+        XCTAssertEqual(reloads, 1, "the stepper's steps leave the reload to its settle")
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3, "an unrelated change must not revert a step")
+
+        cloud.values[key] = 0.8
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        XCTAssertEqual(defaults.double(forKey: key), 0.8)
+        cloud.values[key] = 11.0
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        withExtendedLifetime(sync) {
+            XCTAssertEqual(defaults.double(forKey: key), 0.8)
+            XCTAssertEqual(cloud.writeCount, 2, "adopting a remote value must not echo it")
+            XCTAssertEqual(reloads, 2)
+        }
+    }
+
+    func testSavedComfortCurrentSeedsAnEmptyCloud() {
+        let key = AppGroup.slackWindowSpeedKey
+        defaults.set(0.7, forKey: key)
+        let sync = sync()
+        expectation(for: NSPredicate { [cloud] _, _ in
+            cloud?.values[key] as? Double == 0.7
+        }, evaluatedWith: nil)
+        cloud.notify(NSUbiquitousKeyValueStoreInitialSyncChange)
+        waitForExpectations(timeout: 3)
+        withExtendedLifetime(sync) { XCTAssertEqual(reloads, 0) }
+    }
+
     func testCloudDisabledStillSavesLocalEdits() {
         XCTAssertNil(FavoritesCloud.store)
         let sync = UnitsCloud(defaults: defaults, cloud: nil, reload: { self.reloads += 1 })
