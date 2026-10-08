@@ -28,6 +28,8 @@ struct PlaceDetail: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    // The source captures the threshold, so one arriving from iCloud reloads it.
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults) private var slackWindowSpeed = defaultSlackThresholdKn
     @State private var store: TimelineWindowStore?
     @State private var source: TimelineSource?
     @State private var unavailable = false
@@ -58,7 +60,7 @@ struct PlaceDetail: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
         .onAppear { RecentsStore.shared.record(item.id) }
-        .task(id: "\(item.id)|\(downloads.modelRevision)") { await load() }
+        .task(id: "\(item.id)|\(slackWindowSpeed)|\(downloads.modelRevision)") { await load() }
         .userActivity(stationActivityType, isActive: offerOnPhone) { activity in
             activity.title = item.name
             activity.userInfo = ["stationID": item.id]

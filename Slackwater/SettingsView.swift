@@ -174,13 +174,16 @@ struct SettingsView: View {
                 // the value the user stops on is worth rewriting them for. Holding the
                 // stepper walks ~99 of them under auto-repeat, and each pass removes and
                 // re-adds every window in every subscribed calendar, over CalDAV, at a
-                // threshold nobody asked to keep.
+                // threshold nobody asked to keep. The same goes for iCloud.
                 // ponytail: a fixed 400 ms settle on the one control that repeats. A shared
                 // debouncer when a second control needs one.
+                let value = slackWindowSpeed
                 settle?.cancel()
                 settle = Task {
                     guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return }
-                    AlertScheduler.requestReschedule()
+                    UnitsCloud.shared.set(value, forKey: AppGroup.slackWindowSpeedKey)
+                    // Redraws the widgets, which draw the window too, and reschedules alerts.
+                    WidgetReload.trigger()
                 }
             })
     }
