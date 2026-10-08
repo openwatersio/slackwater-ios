@@ -10003,89 +10003,6 @@
         }
       }
     },
-    "Adding more whenever Slackwater is open. %lld so far." : {
-      "comment" : "Download tier summary. The integer is the number of downloaded stations.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilføjer flere, når Slackwater er åben. %lld indtil nu."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weitere werden geladen, solange Slackwater geöffnet ist. Bisher %lld."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añade más cuando Slackwater está abierto. %lld hasta ahora."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää asemia ladataan aina, kun Slackwater on auki. Tähän mennessä %lld."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "D’autres stations sont ajoutées quand Slackwater est ouvert. %lld jusqu’ici."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ne aggiunge altre quando Slackwater è aperta. %lld finora."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwaterを開いている間に追加しています。これまでに%lldか所。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwater가 열려 있을 때 계속 추가합니다. 지금까지 %lld개."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Legger til flere når Slackwater er åpen. %lld hittil."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Er worden meer gedownload wanneer Slackwater open is. Tot nu toe %lld."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionando mais sempre que Slackwater está aberto. %lld até agora."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adiciona mais sempre que o Slackwater está aberto. %lld até agora."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lägger till fler när Slackwater är öppet. %lld hittills."
-          }
-        }
-      }
-    },
     "Additional data is required to improve accuracy" : {
       "comment" : "Shown below the timeline while usable predictions are available and the station still needs additional data to meet its accuracy target. Download progress appears below this text.",
       "localizations" : {
@@ -10331,89 +10248,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ytterligare stationer använder harmoniska konstanter från TICON-4 från SEANOE enligt CC BY 4.0 (seanoe.org/data/00980/109129)."
-          }
-        }
-      }
-    },
-    "Adds more whenever Slackwater is open, as far as 150 km out." : {
-      "comment" : "Explanation of the widest station-download tier.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilføjer flere, når Slackwater er åben, op til 150 km væk."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lädt weitere, solange Slackwater geöffnet ist, bis zu 150 km entfernt."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añade más cuando Slackwater está abierto, hasta un radio de 150 km."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää asemia ladataan aina, kun Slackwater on auki, jopa 150 km:n päästä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoute d’autres stations quand Slackwater est ouvert, dans un rayon de 150 km."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ne aggiunge altre quando Slackwater è aperta, fino a 150 km."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwaterを開いている間に、150 km以内の観測所を追加します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwater가 열려 있을 때 최대 150 km 거리까지 계속 추가합니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Legger til flere når Slackwater er åpen, opptil 150 km unna."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Downloadt meer wanneer Slackwater open is, tot op 150 km afstand."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adiciona mais sempre que Slackwater está aberto, num raio de até 150 km."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adiciona mais sempre que o Slackwater está aberto, num raio de até 150 km."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lägger till fler när Slackwater är öppet, inom 150 km."
           }
         }
       }
@@ -16242,89 +16076,6 @@
         }
       }
     },
-    "Download %lld more within 25 km" : {
-      "comment" : "Accept additional station downloads within a 25 km radius.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hent %lld mere inden for 25 km"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld weitere im Umkreis von 25 km laden"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargar %lld más en un radio de 25 km"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lataa %lld lisää 25 km:n säteellä"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Télécharger %lld de plus dans un rayon de 25 km"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scarica altre %lld entro 25 km"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "25 km以内のさらに%lldか所をダウンロード"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "25 km 이내에서 %lld개 더 다운로드"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last ned %lld til innen 25 km"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nog %lld binnen 25 km downloaden"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixar mais %lld num raio de 25 km"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descarregar mais %lld num raio de 25 km"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hämta %lld till inom 25 km"
-          }
-        }
-      }
-    },
     "Download %lld more?" : {
       "comment" : "Offer to download additional nearby stations.",
       "localizations" : {
@@ -16404,95 +16155,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hämta %lld till?"
-          }
-        }
-      }
-    },
-    "Download all %lld Canadian currents · %@" : {
-      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hent alle %lld canadiske strømstationer · %@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle %1$lld kanadischen Strömungsstationen laden · %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Download all %1$lld Canadian currents · %2$@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargar las %lld corrientes canadienses · %@"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lataa kaikki %lld Kanadan virtausasemaa · %@"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Télécharger tous les %1$lld courants canadiens · %2$@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scarica tutte le %1$lld correnti canadesi · %2$@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カナダの潮流%1$lldか所すべてをダウンロード · %2$@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "캐나다 조류 %lld개 모두 다운로드 · %@"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last ned alle %1$lld kanadiske strømstasjoner · %2$@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle %1$lld Canadese stroomstations downloaden · %2$@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixar todas as %1$lld correntes canadenses · %2$@"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descarregar todas as %1$lld correntes canadianas · %2$@"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hämta alla %lld kanadensiska strömstationer · %@"
           }
         }
       }
@@ -22328,89 +21990,6 @@
         }
       }
     },
-    "In view" : {
-      "comment" : "Download tier containing stations shown in the station list.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I visningen"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Im Blick"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En pantalla"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Näkyvissä"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "À l’écran"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In vista"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "表示範囲内"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "화면에 보이는 관측소"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I utsnittet"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In beeld"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em vista"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em vista"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I vyn"
-          }
-        }
-      }
-    },
     "incoming" : {
       "comment" : "Plain-language gloss for a flooding current.",
       "localizations" : {
@@ -22822,89 +22401,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Den är först i kön — flyttades längst fram eftersom du öppnade den."
-          }
-        }
-      }
-    },
-    "Keep downloading Canadian stations within 150 km" : {
-      "comment" : "Accept ongoing downloads of Canadian stations within a 150 km radius.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fortsæt med at hente canadiske stationer inden for 150 km"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kanadische Stationen im Umkreis von 150 km weiter laden"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seguir descargando estaciones canadienses en un radio de 150 km"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jatka Kanadan asemien lataamista 150 km:n säteellä"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer à télécharger les stations canadiennes dans un rayon de 150 km"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continua a scaricare stazioni canadesi entro 150 km"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "150 km以内のカナダの観測所を継続してダウンロード"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "150 km 이내 캐나다 관측소 계속 다운로드"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fortsett å laste ned kanadiske stasjoner innen 150 km"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Canadese stations binnen 150 km blijven downloaden"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar baixando estações canadenses num raio de 150 km"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar a descarregar estações canadianas num raio de 150 km"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fortsätt hämta kanadensiska stationer inom 150 km"
           }
         }
       }
@@ -26485,89 +25981,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "I närheten"
-          }
-        }
-      }
-    },
-    "Nearby (25 km) — downloading" : {
-      "comment" : "Status of the nearby station-download tier.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I nærheden (25 km) — henter"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In der Nähe (25 km) — wird geladen"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cerca (25 km) — descargando"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lähistöllä (25 km) — ladataan"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "À proximité (25 km) — téléchargement en cours"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vicine (25 km) — download in corso"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "近く（25 km）— ダウンロード中"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "주변 (25 km) — 다운로드 중"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I nærheten (25 km) — laster ned"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In de buurt (25 km) — downloaden"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximas (25 km) — baixando"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximas (25 km) — a descarregar"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I närheten (25 km) — hämtar"
           }
         }
       }
@@ -42731,172 +42144,6 @@
         }
       }
     },
-    "The stations on your list download on their own." : {
-      "comment" : "Explanation of automatic downloads for stations in view.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stationerne på din liste hentes automatisk."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Stationen auf deiner Liste werden automatisch geladen."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las estaciones de tu lista se descargan automáticamente."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Luettelosi asemat latautuvat automaattisesti."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les stations de votre liste se téléchargent automatiquement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le stazioni del tuo elenco si scaricano automaticamente."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リストにある観測所は自動でダウンロードされます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "목록의 관측소는 자동으로 다운로드됩니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stasjonene på listen din lastes ned automatisk."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De stations in je lijst worden vanzelf gedownload."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As estações da sua lista são baixadas automaticamente."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As estações da sua lista são descarregadas automaticamente."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stationerna på din lista hämtas automatiskt."
-          }
-        }
-      }
-    },
-    "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice." : {
-      "comment" : "Offline-download progress summary.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De stationer, du har åbnet, er klar og forbliver klar offline. Resten udfyldes, når du bruger appen, og intet hentes to gange."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Stationen, die du geöffnet hast, sind bereit und bleiben offline verfügbar. Alles Weitere wird geladen, während du die App nutzt. Nichts wird zweimal geladen."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las estaciones que has abierto están listas y siguen disponibles sin conexión. Las demás se añaden a medida que usas la app, y ninguna se descarga dos veces."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avaamasi asemat ovat valmiina ja pysyvät käytettävissä ilman verkkoyhteyttä. Muut latautuvat käyttäessäsi sovellusta, eikä mitään ladata kahdesti."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les stations que vous avez ouvertes sont prêtes et restent disponibles hors ligne. Les autres s’ajoutent à mesure que vous utilisez l’app, et aucune n’est téléchargée deux fois."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le stazioni che hai aperto sono pronte e restano disponibili offline. Il resto si completa mentre usi l’app e nulla si scarica due volte."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開いた観測所は利用可能になり、オフラインでも使えます。それ以外もアプリを使う間に順次ダウンロードされます。同じデータを二重にダウンロードすることはありません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "열어 본 관측소는 준비되었으며 오프라인에서도 계속 사용할 수 있습니다. 나머지는 앱을 사용하면서 채워지고 중복 다운로드되지 않습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stasjonene du har åpnet, er klare og forblir klare frakoblet. Resten fylles inn etter hvert som du bruker appen, og ingenting lastes ned to ganger."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De stations die je hebt geopend zijn gereed en blijven offline beschikbaar. De rest wordt aangevuld terwijl je de app gebruikt, en niets wordt twee keer gedownload."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As estações que você abriu estão disponíveis e continuam disponíveis offline. O restante é preenchido conforme você usa o app, e nada é baixado duas vezes."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As estações que abriu estão disponíveis e continuam disponíveis sem ligação. O restante é preenchido à medida que usa a aplicação, e nada é descarregado duas vezes."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stationerna du har öppnat är klara och förblir klara offline. Resten fylls på när du använder appen, och inget hämtas två gånger."
-          }
-        }
-      }
-    },
     "The Sun and Moon are at right angles, so their tidal effects partly offset. The narrower range tends to bring lower highs and higher lows." : {
       "comment" : "Explanation of a neap tide.",
       "localizations" : {
@@ -49981,6 +49228,718 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Få en notis före de tidvatten- och strömhändelser du bryr dig om."
+          }
+        }
+      }
+    },
+    "Canadian tides and currents" : {
+      "comment" : "Heading for Canadian predictions, which require individual downloads.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadiske tidevand og strømme"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadische Gezeiten und Strömungen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadian tides and currents"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mareas y corrientes de Canadá"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadan vuorovedet ja virtaukset"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marées et courants du Canada"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maree e correnti del Canada"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カナダの潮汐と潮流"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐나다의 조석과 조류"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadisk tidevann og strøm"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadese getijden en stromingen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marés e correntes do Canadá"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marés e correntes do Canadá"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadensiskt tidvatten och strömmar"
+          }
+        }
+      }
+    },
+    "Canadian data requirements mean we download tide and current predictions individually." : {
+      "comment" : "Explain why Canadian predictions need separate downloads, unlike bundled predictions elsewhere.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadiske datakrav betyder, at vi henter tidevands- og strømprognoser enkeltvis."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgrund der kanadischen Datenanforderungen laden wir Gezeiten- und Strömungsvorhersagen einzeln herunter."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadian data requirements mean we download tide and current predictions individually."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los requisitos de datos de Canadá nos obligan a descargar las predicciones de mareas y corrientes individualmente."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadan datavaatimusten vuoksi lataamme vuorovesi- ja virtausennusteet yksitellen."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les exigences canadiennes en matière de données nous obligent à télécharger les prévisions de marées et de courants individuellement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I requisiti canadesi sui dati ci impongono di scaricare le previsioni di maree e correnti singolarmente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カナダのデータ要件により、潮汐と潮流の予測を個別にダウンロードする必要があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐나다의 데이터 요건에 따라 조석과 조류 예측을 개별적으로 다운로드해야 합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadiske datakrav gjør at vi laster ned tidevanns- og strømprognoser enkeltvis."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Door de Canadese gegevensvereisten downloaden we getijden- en stromingsvoorspellingen afzonderlijk."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os requisitos de dados do Canadá exigem que baixemos as previsões de marés e correntes individualmente."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os requisitos de dados do Canadá exigem que descarreguemos as previsões de marés e correntes individualmente."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanadensiska datakrav innebär att vi laddar ned tidvatten- och strömprognoser var för sig."
+          }
+        }
+      }
+    },
+    "Choose any combination. Slackwater will take care of the downloads." : {
+      "comment" : "Reassure users that multiple download checklist choices can be selected together.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vælg en hvilken som helst kombination. Slackwater klarer hentningerne."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle eine beliebige Kombination. Slackwater kümmert sich um die Downloads."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose any combination. Slackwater will take care of the downloads."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige cualquier combinación. Slackwater se encargará de las descargas."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valitse haluamasi yhdistelmä. Slackwater huolehtii latauksista."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez la combinaison qui vous convient. Slackwater s’occupera des téléchargements."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli qualsiasi combinazione. Slackwater si occuperà dei download."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由に組み合わせて選択できます。ダウンロードはSlackwaterが行います。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원하는 항목을 함께 선택하세요. Slackwater가 다운로드를 처리합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velg en hvilken som helst kombinasjon. Slackwater tar seg av nedlastingene."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies elke gewenste combinatie. Slackwater regelt de downloads."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha qualquer combinação. O Slackwater cuidará dos downloads."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha qualquer combinação. O Slackwater tratará dos descarregamentos."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Välj valfri kombination. Slackwater tar hand om nedladdningarna."
+          }
+        }
+      }
+    },
+    "Within 25 km" : {
+      "comment" : "Download checklist option for Canadian predictions within a 25-kilometre radius.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inden for 25 km"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Umkreis von 25 km"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Within 25 km"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En un radio de 25 km"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "25 km:n säteellä"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans un rayon de 25 km"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entro 25 km"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "25 km以内"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "25km 이내"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Innenfor 25 km"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Binnen 25 km"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em um raio de 25 km"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Num raio de 25 km"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inom 25 km"
+          }
+        }
+      }
+    },
+    "Within 150 km" : {
+      "comment" : "Download checklist option for Canadian predictions within a 150-kilometre radius.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inden for 150 km"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Umkreis von 150 km"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Within 150 km"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En un radio de 150 km"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "150 km:n säteellä"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans un rayon de 150 km"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entro 150 km"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "150 km以内"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "150km 이내"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Innenfor 150 km"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Binnen 150 km"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em um raio de 150 km"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Num raio de 150 km"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inom 150 km"
+          }
+        }
+      }
+    },
+    "All current stations" : {
+      "comment" : "Download checklist option for every Canadian tidal-current station. Current means water movement, not latest.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle strømstationer"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Strömungsstationen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All current stations"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas las estaciones de corrientes"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaikki virtausasemat"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les stations de courants"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutte le stazioni di correnti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての潮流観測所"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 조류 관측소"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle strømstasjoner"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle stromingsstations"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas as estações de correntes"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas as estações de correntes"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alla strömstationer"
+          }
+        }
+      }
+    },
+    "Estimated time: %@" : {
+      "comment" : "Approximate remaining download time for a checklist choice. The value is a localized duration such as about 3 minutes.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anslået tid: %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschätzte Zeit: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated time: %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiempo estimado: %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arvioitu aika: %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée estimée : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempo stimato: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推定時間：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예상 시간: %@"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anslått tid: %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschatte tijd: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempo estimado: %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempo estimado: %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beräknad tid: %@"
+          }
+        }
+      }
+    },
+    "Downloaded predictions stay available offline. Open any other Canadian station to download it." : {
+      "comment" : "Canadian offline explanation below download choices; opening another station downloads its predictions.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hentede prognoser forbliver tilgængelige offline. Åbn en anden canadisk station for at hente den."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heruntergeladene Vorhersagen bleiben offline verfügbar. Öffne eine andere kanadische Station, um sie herunterzuladen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaded predictions stay available offline. Open any other Canadian station to download it."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones descargadas siguen disponibles sin conexión. Abre cualquier otra estación de Canadá para descargarla."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ladatut ennusteet pysyvät käytettävissä offline-tilassa. Avaa jokin muu Kanadan asema ladataksesi sen ennusteet."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les prévisions téléchargées restent disponibles hors ligne. Ouvrez une autre station canadienne pour la télécharger."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le previsioni scaricate restano disponibili offline. Apri un’altra stazione canadese per scaricarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードした予測はオフラインでも利用できます。他のカナダの観測所を開くと、その予測をダウンロードできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드한 예측은 오프라인에서도 이용할 수 있습니다. 다른 캐나다 관측소를 열면 해당 예측이 다운로드됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nedlastede prognoser forblir tilgjengelige uten nett. Åpne en annen kanadisk stasjon for å laste den ned."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gedownloade voorspellingen blijven offline beschikbaar. Open een ander Canadees station om het te downloaden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As previsões baixadas continuam disponíveis offline. Abra qualquer outra estação canadense para baixá-la."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As previsões descarregadas continuam disponíveis offline. Abra qualquer outra estação canadiana para a descarregar."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nedladdade prognoser förblir tillgängliga offline. Öppna en annan kanadensisk station för att ladda ned den."
           }
         }
       }

@@ -210,12 +210,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let everything = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
         XCTAssert(everything.appears(within: 5))
         everything.tap()
-        // The widest tier has been accepted when the card stops offering it.
-        // Asserted here rather than left to the row waits below, so a tap that
-        // does not land fails as itself instead of as four missing stations —
-        // which is how the Toggle this replaced hid a real bug (#462).
-        XCTAssert(app.descendants(matching: .any)["download-tier-everything-on"]
-            .firstMatch.appears(within: 5), "the widest tier never took")
+        XCTAssert(waitFor(everything, "isSelected == true"), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch

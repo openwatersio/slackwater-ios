@@ -10,6 +10,73 @@ import UIKit
 import XCTest
 
 final class OfflineCoverageTests: ScreenshotTestCase {
+    func testCanadianDownloadChecklistAddsWork() {
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                         "-networkKillSwitch", "-chsFitOnly",
+                         "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        openDownloads(app)
+        save(app, "canadian-download-checklist.png")
+        XCTAssert(app.staticTexts["Canadian tides and currents"].exists)
+        XCTAssert(app.staticTexts["Canadian data requirements mean we download tide and current predictions individually."].exists)
+        let nearby = app.buttons["download-tier-in-view"].firstMatch
+        let within25 = app.buttons["download-tier-nearby-accept"].firstMatch
+        let within150 = app.buttons["download-tier-everything-toggle"].firstMatch
+        let currents = app.buttons["download-all-currents"].firstMatch
+        XCTAssert(nearby.isSelected)
+        XCTAssertFalse(within25.isSelected)
+        XCTAssertFalse(within150.isSelected)
+        XCTAssertFalse(currents.isSelected)
+        within25.tap()
+        XCTAssert(waitFor(within25, "isSelected == true"))
+        within150.tap()
+        XCTAssert(waitFor(within150, "isSelected == true"))
+        let farGate = app.descendants(matching: .any)["download-row-chs-weynton-passage"].firstMatch
+        XCTAssertFalse(farGate.exists)
+        currents.tap()
+        XCTAssert(waitFor(currents, "isSelected == true"))
+        XCTAssert(farGate.appears(within: 5), "all currents must include gates beyond 150 km")
+        save(app, "canadian-download-checklist-selected.png")
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-chsResetModels" }
+        app.launch()
+        openDownloads(app)
+        XCTAssert(within25.isSelected)
+        XCTAssert(within150.isSelected)
+        XCTAssert(currents.isSelected)
+        XCTAssert(farGate.appears(within: 5), "unfinished downloads must resume after relaunch")
+    }
+
+    func testCanadianDownloadChoicesFitTranslations() {
+        for (language, locale) in [("fr-CA", "fr_CA"), ("de", "de_DE")] {
+            let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                             "-networkKillSwitch", "-fixLat", "48.4235", "-fixLon", "-123.3705",
+                             "-AppleLanguages", "(\(language))", "-AppleLocale", locale)
+            let indicator = app.buttons["offline-status"].firstMatch
+            scrollTo(indicator, in: app)
+            indicator.tap()
+            XCTAssert(app.descendants(matching: .any)["downloads-manager"].firstMatch.appears(within: 5))
+            for id in ["download-tier-in-view", "download-tier-nearby-accept",
+                       "download-tier-everything-toggle", "download-all-currents"] {
+                XCTAssert(app.buttons[id].firstMatch.isHittable, "\(language): \(id) is outside the checklist")
+            }
+            save(app, "canadian-downloads-\(language).png")
+            app.terminate()
+        }
+    }
+
+    func testDownloadOfferOpensExplanation() {
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                         "-networkKillSwitch", "-chsFitOnly", "chs-victoria,chs-race-passage",
+                         "-chsFailOnly", "chs-victoria",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let offer = app.buttons["download-strip-open"].firstMatch
+        XCTAssert(offer.appears(within: 10))
+        offer.tap()
+        XCTAssert(app.navigationBars["Downloads"].appears(within: 5))
+        XCTAssert(app.staticTexts["Canadian tides and currents"].exists)
+    }
+
     // The CHS pending card speaks plain language — held pending by the network
     // kill switch (no fit can start, honest offline stand-in). Both station
     // kinds in one launch: a plain CHS tide port (Victoria) and a DERIVED gate

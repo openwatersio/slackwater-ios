@@ -150,6 +150,9 @@ final class ChsFitService: ObservableObject {
     /// `declinedNearby` deliberately does NOT persist — "Not now" holds for
     /// the session, and the manager is the way back in (spec §Asking once).
     @Published private(set) var tier: DownloadTier = .inView
+    @Published private(set) var allCurrentsSelected = false
+    private var tierJobs: [DownloadTier: [ChsJob]] = [:]
+    private var tierOnlineGates: [DownloadTier: [ChsCurrentGateInfo]] = [:]
     @Published private(set) var cohort = DownloadCohort()
     /// "Not now" holds for the session. The manager is the way back in.
     @Published private(set) var declinedNearby = false
@@ -261,6 +264,7 @@ final class ChsFitService: ObservableObject {
         // `.task` a moment after this returns.
         tier = AppGroup.defaults.string(forKey: AppGroup.downloadTierKey)
             .flatMap(DownloadTier.init(rawValue:)) ?? .inView
+        allCurrentsSelected = AppGroup.defaults.bool(forKey: AppGroup.downloadAllCurrentsKey)
         // One directory read, not 1,097 stat calls: which stations already
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
@@ -361,18 +365,28 @@ final class ChsFitService: ObservableObject {
     /// ACCRETE: a fix moving from Victoria to Halifax adds Halifax's nearest
     /// ports, and never drops what Victoria already paid for.
     private func adopt(lat: Double, lon: Double) {
-        for job in Self.autoFitSet(lat: lat, lon: lon,
-                                   constrained: Connectivity.shared.constrained,
-                                   tier: tier, cohort: cohort.ids) { queue.add(job) }
+        for choice in [DownloadTier.inView, .nearby, .everything] {
+            tierJobs[choice] = Self.autoFitSet(lat: lat, lon: lon, tier: choice, cohort: cohort.ids)
+            let online = Self.autoPrefetchGates(lat: lat, lon: lon,
+                                                constrained: choice == .inView && Connectivity.shared.constrained)
+            tierOnlineGates[choice] = choice == .nearby ? online.filter {
+                distanceKm($0.latitude, $0.longitude, lat, lon) <= DownloadTier.nearbyRadiusKm
+            } : online
+        }
+        let jobs = tier == .inView && Connectivity.shared.constrained
+            ? Self.autoFitSet(lat: lat, lon: lon, constrained: true, tier: tier, cohort: cohort.ids)
+            : tierJobs[tier] ?? []
+        for job in jobs { queue.add(job) }
+        if allCurrentsSelected {
+            for job in gatesToDownload { queue.add(job) }
+        }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
         guard let next = tier.next else {
             remainingBeyondCohort = 0
             return
         }
-        remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon,
-                                                constrained: Connectivity.shared.constrained,
-                                                tier: next, cohort: cohort.ids)
+        remainingBeyondCohort = (tierJobs[next] ?? [])
             .count { queue.status($0.id) == nil }
     }
 
@@ -395,21 +409,7 @@ final class ChsFitService: ObservableObject {
         pump()
     }
 
-    /// The user accepted a tier. This is the tap that lets the work continue
-    /// in the background — but only when it actually needs to.
-    ///
-    /// Every caller routes through here: the strip's own accept, the
-    /// manager's "Download more" button, and the manager's tier `Toggle`,
-    /// which fires on both directions of a flip (including down from
-    /// `.everything` to `.nearby`) and can re-fire the same value on a
-    /// redraw. A same-value tap is a true no-op — nothing changed, so
-    /// nothing runs, not even `pump()`. A narrowing tap still needs
-    /// `pump()` (the queue's own walk reacts to `tier` changing) but not a
-    /// new background submission — `BGTaskScheduler` grants a background
-    /// task per *submission*, not per accepted tier, and its pending-request
-    /// ceiling is small. A narrowing flip has strictly less work than the
-    /// task already covers, so submitting on it burns through that ceiling
-    /// for no benefit.
+    // iOS requires a foreground user action before submitting continued background work.
     func accept(_ newTier: DownloadTier) {
         guard newTier != tier else { return }
         #if os(iOS)
@@ -419,8 +419,9 @@ final class ChsFitService: ObservableObject {
         AppGroup.defaults.set(newTier.rawValue, forKey: AppGroup.downloadTierKey)
         if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
         pump()
+        prefetchOnlineGates(tierOnlineGates[newTier] ?? [])
 #if os(iOS)
-        if widened { BackgroundDownloads.submitIfPossible(queue: queue) }
+        if widened { BackgroundDownloads.submitIfPossible() }
 #endif
     }
 
@@ -439,6 +440,71 @@ final class ChsFitService: ObservableObject {
     }
 
     func declineNearby() { declinedNearby = true }
+
+    func estimatedSeconds(for choice: DownloadTier) -> Double {
+        estimatedSeconds(for: tierJobs[choice] ?? [])
+            + onlineDownloadSummary(tierOnlineGates[choice] ?? []).requestsRemaining
+                * observedSecondsPerRequest
+    }
+
+    private func estimatedSeconds(for jobs: [ChsJob]) -> Double {
+        let queued = Dictionary(uniqueKeysWithValues: queue.jobs.map { ($0.id, $0) })
+        return jobs.reduce(0) { seconds, candidate in
+            let job = queued[candidate.id] ?? candidate
+            guard job.status != .ready else { return seconds }
+            return seconds + max(0, job.requestCount - Double(job.done)) * observedSecondsPerRequest
+        }
+    }
+
+    var allCurrentsSeconds: Double {
+        estimatedSeconds(for: Self.candidates.filter(\.isCurrent))
+            + onlineDownloadSummary(ChsCurrentGateInfo.all.filter(\.isOnline)).requestsRemaining
+                * observedSecondsPerRequest
+    }
+
+    private func onlineRequestCount(_ gate: ChsCurrentGateInfo) -> Double {
+        let span = Self.onlineFetchSpan(anchor: nil, today: todayLocal(gate.tz))
+        return Double(Self.chunkPlan(days: span.end.timeIntervalSince(span.start) / 86_400,
+                                     end: span.end).count * 2 + 1)
+    }
+
+    var onlineDownloads: (ready: Int, total: Int, requestsCompleted: Double,
+                          requestsRemaining: Double, active: Bool) {
+        let gates = allCurrentsSelected ? ChsCurrentGateInfo.all.filter(\.isOnline)
+            : Array(onlineDesired.values)
+        return onlineDownloadSummary(gates)
+    }
+
+    nonisolated static func onlineDownloadIsActive(_ state: OnlineFetchState, queued: Bool,
+                                                   covered: Bool, online: Bool) -> Bool {
+        switch state {
+        case .fetching, .deferred: true
+        case .failed: false
+        case .idle: !covered && (queued || !online)
+        }
+    }
+
+    private func onlineDownloadSummary(_ gates: [ChsCurrentGateInfo])
+        -> (ready: Int, total: Int, requestsCompleted: Double, requestsRemaining: Double, active: Bool) {
+        var ready = 0, completed = 0.0, remaining = 0.0, active = false
+        for gate in gates {
+            let requests = onlineRequestCount(gate)
+            let state = onlineStates[gate.id] ?? .idle
+            let covered = ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil
+            active = active || Self.onlineDownloadIsActive(state,
+                queued: onlineRunning || onlinePending.contains { $0.id == gate.id },
+                covered: covered, online: Connectivity.shared.online)
+            if covered, state != .fetching {
+                ready += 1
+                completed += requests
+                continue
+            }
+            let progress = state == .fetching ? onlineProgress[gate.id] ?? 0 : 0
+            completed += requests * progress / 10
+            remaining += requests * (1 - progress / 10)
+        }
+        return (ready, gates.count, completed, remaining, active)
+    }
 
     /// Re-assert the UI-test hooks over jobs added by a later location fix.
     private func markFailOnly() {
@@ -498,9 +564,15 @@ final class ChsFitService: ObservableObject {
     /// first: these join the queue's proximity order rather than jumping it,
     /// so the passes you are actually near stay ahead of the rest.
     func downloadAllGates() {
+        guard !allCurrentsSelected else { return }
+        allCurrentsSelected = true
+        AppGroup.defaults.set(true, forKey: AppGroup.downloadAllCurrentsKey)
         for job in gatesToDownload { queue.add(job) }
         pump()
         prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
+        #if os(iOS)
+        BackgroundDownloads.submitIfPossible()
+        #endif
     }
 
     /// Start the nearest-first download run once.
@@ -518,8 +590,8 @@ final class ChsFitService: ObservableObject {
         onlineOrigin = (lat, lon)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
         pump()
-        prefetchOnlineGates(favoriteGates + Self.autoPrefetchGates(
-            lat: lat, lon: lon, constrained: Connectivity.shared.constrained))
+        prefetchOnlineGates(favoriteGates + (allCurrentsSelected
+            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? []))
     }
 
     /// Queue the visible station, then favorites, before the nearby tail.
@@ -614,8 +686,8 @@ final class ChsFitService: ObservableObject {
         // The watch detail requires harmonics; online gates have no fitted model.
         return
 #else
-        guard Connectivity.shared.online else { return }
         for gate in gates { onlineDesired[gate.id] = gate }
+        guard Connectivity.shared.online, !networkKillSwitch else { return }
         var due: [ChsCurrentGateInfo] = []
         for gate in gates where onlineState(gate.id) == .idle {
             if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
@@ -675,7 +747,10 @@ final class ChsFitService: ObservableObject {
 
     /// A background entry into the existing run loop, without `retryNow()`'s
     /// online-state reset.
-    func resumeForBackground() { pump() }
+    func resumeForBackground() {
+        pump()
+        prefetchOnlineGates(Array(onlineDesired.values))
+    }
 
     func setDownloadsActive(_ active: Bool) {
         downloadsActive = active
@@ -1134,6 +1209,7 @@ extension ChsModelStore {
         // defaults across an uninstall — without this a run that flipped the
         // switch on would leave every later run downloading the 150 km set.
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadTierKey)
+        AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
