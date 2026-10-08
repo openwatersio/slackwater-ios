@@ -16,21 +16,24 @@ struct PremiumView: View {
                         Text("Support Slackwater's development.")
                             .font(.body)
                     }
+                    #if PREMIUM_ENABLED
+                        if store.isPremium { PremiumPurchaseControls() }
+                    #endif
                     VStack(alignment: .leading, spacing: 20) {
                         if SettingsPlatform.current == .mobile {
                             benefit("Lock screen — Premium", symbol: "lock.iphone",
-                                    detail: "Tides and currents at a glance on your lock screen.")
+                                    detail: "Tides and currents at a glance on your lock screen.", preview: .lockScreen)
                         }
                         benefit("Favourites calendars", symbol: "calendar",
-                                detail: "See tides and slack windows alongside your plans.")
+                                detail: "See tides and slack windows alongside your plans.", preview: .calendar)
                         benefit("Alerts", symbol: "bell",
-                                detail: "Get notified before the tides and currents you care about.")
+                                detail: "Get notified before the tides and currents you care about.", preview: .alert)
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18))
                     #if PREMIUM_ENABLED
-                        PremiumPurchaseControls()
+                        if !store.isPremium { PremiumPurchaseControls() }
                     #endif
                 }
                 .padding(20)
@@ -54,12 +57,15 @@ struct PremiumView: View {
     }
 
     private func benefit(_ title: LocalizedStringKey, symbol: String,
-                         detail: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).frame(width: 24).foregroundStyle(SN.leaf)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(SN.foam.opacity(0.7))
+                         detail: LocalizedStringKey, preview: PremiumFeaturePreview.Feature) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PremiumFeaturePreview(feature: preview)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol).frame(width: 24).foregroundStyle(SN.leaf)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.subheadline).foregroundStyle(SN.foam.opacity(0.7))
+                }
             }
         }
     }

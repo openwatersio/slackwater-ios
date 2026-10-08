@@ -34,16 +34,8 @@ struct CalendarStationsView: View {
             // Revisit (a capped list, or a lazy container once the Toggle-tap bug above is
             // understood) if a real favorites list ever gets long enough for this to measure.
             VStack(alignment: .leading, spacing: 10) {
-                Label {
-                    Text(premium.isPremium
-                         ? String(localized: "Slackwater Premium")
-                         : String(localized: "Requires Slackwater Premium"))
-                } icon: {
-                    Image(systemName: "sparkles")
-                }
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(SN.leaf)
-                .padding(.bottom, 6)
+                PremiumRequirement()
+                    .padding(.bottom, 6)
 
                 if favorites.ids.isEmpty {
                     Text("Add a place to your favourites to create a calendar for its tides or slack-water events.")
@@ -57,6 +49,10 @@ struct CalendarStationsView: View {
                             .filter { !favorites.ids.contains($0) }, id: \.self) { stationID in
                     row(stationID)
                 }
+                Text("See tides and slack windows alongside your plans.")
+                    .font(.headline)
+                    .foregroundStyle(SN.foam)
+                    .padding(.top, 16)
                 Text("Turning on a favourite creates a separate calendar in your Calendar app. It contains high and low tides or slack-water events, plus eclipses.")
                     .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.62))

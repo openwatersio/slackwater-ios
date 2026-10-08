@@ -54,6 +54,7 @@ struct AlertsView: View {
 
     var body: some View {
         List {
+            PremiumRequirement()
             if store.rules.isEmpty {
                 Text("No alerts yet. Press and hold any station's timeline to set one.")
                     .foregroundStyle(SN.foam.opacity(0.62))
@@ -61,26 +62,29 @@ struct AlertsView: View {
             ForEach(alertStationGroups(store.rules, name: { name($0) })) { group in
                 Section(group.name) {
                     ForEach(group.rules) { rule in
-                        Button { editing = rule } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(alertRuleSummary(rule.trigger, stationName: group.name,
-                                                      imperial: units == "imperial"))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.white)
-                                if let when = alertRuleWhen(rule, tz: alertStationZone(rule.stationID)) {
-                                    Text(when)
-                                        .font(.caption.monospacedDigit())
-                                        .foregroundStyle(SN.foam.opacity(0.62))
-                                }
-                                Group {
-                                    if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
-                                        Label("Notifications are Premium", systemImage: "sparkles")
-                                    } else {
-                                        Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
+                        VStack(alignment: .leading, spacing: 6) {
+                            Button { editing = rule } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(alertRuleSummary(rule.trigger, stationName: group.name,
+                                                          imperial: units == "imperial"))
+                                        .monospacedDigit()
+                                        .foregroundStyle(.white)
+                                    if let when = alertRuleWhen(rule, tz: alertStationZone(rule.stationID)) {
+                                        Text(when)
+                                            .font(.caption.monospacedDigit())
+                                            .foregroundStyle(SN.foam.opacity(0.62))
                                     }
                                 }
-                                .font(.caption)
-                                .foregroundStyle(SN.foam.opacity(0.62))
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
+                                PremiumRequirement(title: "Notifications are Premium")
+                            } else {
+                                Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
+                                    .font(.caption)
+                                    .foregroundStyle(SN.foam.opacity(0.62))
                             }
                         }
                     }
@@ -88,6 +92,17 @@ struct AlertsView: View {
                         offsets.map { group.rules[$0].id }.forEach { store.remove($0) }
                     }
                 }
+            }
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Get notified before the tides and currents you care about.")
+                        .font(.headline)
+                        .foregroundStyle(SN.foam)
+                    Text("Spend less time checking and more time on the water. Get a reminder once or every time, with advance notice and daylight-only alerts.")
+                        .font(.footnote)
+                        .foregroundStyle(SN.foam.opacity(0.62))
+                }
+                .padding(.vertical, 8)
             }
         }
         .scrollContentBackground(.hidden)
