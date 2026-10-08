@@ -164,6 +164,8 @@ Because the diff is one enormous line of JSON, say in the PR description what th
 
 A stale `@slackwater/database` pin is a slug hazard. A bump can swap stations in the bundle, and `tools/gen-slugs.mjs` fails outright on a station with no published slug. Fix it upstream: run station-metadata's `slugs` command, release, then bump the pin here. Frequent bumps keep station swaps small.
 
+Every bump goes to [slackwater.xyz](https://github.com/openwatersio/slackwater.xyz) too, pinned to the same release, so the site and the app name, place, and credit every station alike. slackwater-database's [CONTRIBUTING](https://github.com/openwatersio/slackwater-database/blob/main/CONTRIBUTING.md#releases) owns the rule.
+
 A PR with a visual change must upload before and after screenshots in its
 description so the reviewer can see the change without checking out the branch.
 Present them side by side:
