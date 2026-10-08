@@ -42,6 +42,7 @@ struct StationListView: View {
     /// them; `SeriesFilterChips` writes it.
     @AppStorage(seriesFilterKey) private var seriesFilter: StationSeries?
     @FocusState private var searchFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
     /// One-shot: set by the detail-header title tap (issue #32) or the Nearby
@@ -472,11 +473,13 @@ struct StationListView: View {
                     ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
                 selected: mapPreview?.selection,
-                onSelect: { item in withAnimation(.snappy) { mapPreview = .station(item) } },
-                onSelectUnavailable: { station in
-                    withAnimation(.snappy) { mapPreview = .unavailable(station) }
+                onSelect: { item in
+                    withAnimation(reduceMotion ? nil : .snappy) { mapPreview = .station(item) }
                 },
-                onDeselect: { withAnimation(.snappy) { mapPreview = nil } }
+                onSelectUnavailable: { station in
+                    withAnimation(reduceMotion ? nil : .snappy) { mapPreview = .unavailable(station) }
+                },
+                onDeselect: { withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil } }
             )
             // Units belong in the identity for the same reason the slack
             // window does: both are baked into the pin source at build time,
@@ -575,7 +578,7 @@ struct StationListView: View {
         .padding(.bottom, 12)
         .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
             guard drag.translation.height > 40 else { return }
-            withAnimation(.snappy) { mapPreview = nil }
+            withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil }
         })
     }
 
@@ -846,8 +849,9 @@ struct StationListView: View {
 
         HStack(alignment: .firstTextBaseline) {
             MonoLabel(text: fix == nil && recents.lastOpened == nil
-                ? "Chesapeake Bay"
-                : String(localized: "Near Me", comment: "Nearby-stations section heading."))
+                        ? "Chesapeake Bay"
+                        : String(localized: "Near Me", comment: "Nearby-stations section heading."),
+                      isHeader: true)
             Spacer(minLength: 8)
             SeriesFilterChips()
         }
@@ -900,7 +904,7 @@ struct StationListView: View {
     }
 
     private func sectionLabel(_ text: String) -> some View {
-        MonoLabel(text: text)
+        MonoLabel(text: text, isHeader: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 26)
             .padding(.top, 14)
@@ -1360,7 +1364,8 @@ struct MyLocationTile<Card: View>: View {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."),
+                          color: SN.foam.opacity(0.9), isHeader: true)
                 Spacer(minLength: 8)
                 Text(approximate
                      ? String(localized: "Approximate location", comment: "My Location status when iOS supplies an approximate rather than precise location; replaces precise-looking coordinates.")
@@ -1399,7 +1404,8 @@ struct MyLocationLoadingTile: View {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."),
+                          color: SN.foam.opacity(0.9), isHeader: true)
             }
             // sectionLabel's three paddings (private to this file) — a header
             // over a plain card, not a box (#253).

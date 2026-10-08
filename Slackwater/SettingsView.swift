@@ -187,7 +187,7 @@ struct SettingsView: View {
 
     @ViewBuilder private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: label)
+            MonoLabel(text: label, isHeader: true)
             content()
                 .font(.footnote)
                 .lineSpacing(3)

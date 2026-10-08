@@ -125,7 +125,7 @@ struct RangeDetailSheet: View {
     /// each axis carries, which is the conflation this structure fixes.
     @ViewBuilder private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            MonoLabel(text: title, color: SN.foam.opacity(0.55))
+            MonoLabel(text: title, color: SN.foam.opacity(0.55), isHeader: true)
             group { content().padding(14) }
         }
     }

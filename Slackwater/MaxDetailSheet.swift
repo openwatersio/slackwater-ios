@@ -132,7 +132,7 @@ struct MaxDetailSheet: View {
 
     @ViewBuilder private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            MonoLabel(text: title, color: SN.foam.opacity(0.55))
+            MonoLabel(text: title, color: SN.foam.opacity(0.55), isHeader: true)
             VStack(spacing: 0) { content().padding(14) }
                 .frame(maxWidth: .infinity)
                 .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))

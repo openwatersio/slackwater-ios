@@ -408,6 +408,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 - Each tile is one element; it is a button only when it has a sheet.
 - Moon-sheet rows with a time are buttons.
 - A status card's icon speaks the status sentence (list §6.3).
+- A sheet's section titles and the Nearby heading are headings, heard in their written case. A tile's eyebrow, a row's label, and the "Predictions — not for navigation" line are not: they name a reading, not a group.
 - At accessibility text sizes the station links stack, the pill column keeps room for "ECLIPSE", and every link, menu, disclosure, and card action is at least 44 units tall (48 dp on Android).
 - With Reduce Motion, day disclosure and scrolling land without animation.
 
@@ -482,6 +483,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 27. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
 28. **Share at now:** sharing an untouched page shares the bare station link.
 29. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
+30. **Reduce Motion:** with Reduce Motion on, opening a day shows its rows at once, and the first-run tour reaches each mark without a glide.
 
 ## 19. Known iOS deviations from the intended contract
 
@@ -490,7 +492,6 @@ These are implementation gaps, not behavior to copy:
 - The share link compares the selection with the device clock rather than the page's reference now. On an untouched page left open for more than 200 seconds, Share includes an instant while the Now pill stays hidden.
 - Kartverket (Norwegian) tide stations show "TICON-4 harmonic prediction." in their footer; any tide station outside NOAA and CHS falls into that line.
 - The online gate's honesty path has no "Predictions — not for navigation" line and no report menu.
-- Day disclosure animates under Reduce Motion, and so does the first-run tour's scroll.
 
 Fixing one of these should update this section and add or amend a conformance scenario.
 
