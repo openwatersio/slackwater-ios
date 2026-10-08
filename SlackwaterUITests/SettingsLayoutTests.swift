@@ -237,8 +237,9 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
         XCTAssert(app.buttons["Restore purchase"].isHittable)
         // App Review 3.1.2 rejects a subscription sheet without both policy links.
-        XCTAssert(app.links["Privacy Policy"].exists)
-        XCTAssert(app.links["Terms of Use"].exists)
+        // Any element type: iOS 26 exposes a SwiftUI Link as a button, iOS 27 as a link.
+        XCTAssert(app.descendants(matching: .any)["Privacy Policy"].firstMatch.exists)
+        XCTAssert(app.descendants(matching: .any)["Terms of Use"].firstMatch.exists)
         save(app, "support-sheet.png")
         app.buttons["premium-done"].tap()
         XCTAssert(support.appears(within: 5))
