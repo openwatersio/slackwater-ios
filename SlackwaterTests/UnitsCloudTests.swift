@@ -170,6 +170,14 @@ final class UnitsCloudTests: XCTestCase {
         XCTAssertEqual(cloud.values[key] as? Double, 1.2)
         XCTAssertEqual(cloud.writeCount, 1)
         XCTAssertEqual(defaults.double(forKey: key), 1.2)
+        XCTAssertEqual(reloads, 1)
+
+        sync.set(1.3, forKey: key, reloading: false)
+        XCTAssertEqual(cloud.values[key] as? Double, 1.3)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3)
+        XCTAssertEqual(reloads, 1, "the stepper's steps leave the reload to its settle")
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3, "an unrelated change must not revert a step")
 
         cloud.values[key] = 0.8
         cloud.notify(NSUbiquitousKeyValueStoreServerChange)
@@ -178,7 +186,7 @@ final class UnitsCloudTests: XCTestCase {
         cloud.notify(NSUbiquitousKeyValueStoreServerChange)
         withExtendedLifetime(sync) {
             XCTAssertEqual(defaults.double(forKey: key), 0.8)
-            XCTAssertEqual(cloud.writeCount, 1, "adopting a remote value must not echo it")
+            XCTAssertEqual(cloud.writeCount, 2, "adopting a remote value must not echo it")
             XCTAssertEqual(reloads, 2)
         }
     }

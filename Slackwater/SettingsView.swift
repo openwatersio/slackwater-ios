@@ -169,19 +169,20 @@ struct SettingsView: View {
         Binding(
             get: { normalizedSlackThresholdKn(slackWindowSpeed) },
             set: {
-                slackWindowSpeed = normalizedSlackThresholdKn($0)
+                // iCloud takes every step, so the device and cloud copies never disagree
+                // and an unrelated change arriving mid-hold cannot pull the stepper back.
+                UnitsCloud.shared.set(normalizedSlackThresholdKn($0),
+                                      forKey: AppGroup.slackWindowSpeedKey, reloading: false)
                 // Every scheduled slack window was computed at the old threshold — but only
                 // the value the user stops on is worth rewriting them for. Holding the
                 // stepper walks ~99 of them under auto-repeat, and each pass removes and
                 // re-adds every window in every subscribed calendar, over CalDAV, at a
-                // threshold nobody asked to keep. The same goes for iCloud.
+                // threshold nobody asked to keep.
                 // ponytail: a fixed 400 ms settle on the one control that repeats. A shared
                 // debouncer when a second control needs one.
-                let value = slackWindowSpeed
                 settle?.cancel()
                 settle = Task {
                     guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return }
-                    UnitsCloud.shared.set(value, forKey: AppGroup.slackWindowSpeedKey)
                     // Redraws the widgets, which draw the window too, and reschedules alerts.
                     WidgetReload.trigger()
                 }

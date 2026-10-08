@@ -55,14 +55,15 @@ final class UnitsCloud {
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func set(_ value: Any, forKey key: String) {
+    /// `reloading: false` leaves the reload to a caller that debounces it.
+    func set(_ value: Any, forKey key: String, reloading: Bool = true) {
         guard Self.allowed[key]?(value) == true else { return }
         if !same(cloud?.object(forKey: key), value) {
             cloud?.set(value as Any?, forKey: key)
         }
         guard !same(defaults.object(forKey: key), value) else { return }
         defaults.set(value, forKey: key)
-        reload()
+        if reloading { reload() }
     }
 
     /// Strings and numbers both bridge to `NSObject`, whose `isEqual` compares values.
