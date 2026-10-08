@@ -87,6 +87,7 @@ extension TideStationRecord {
             // pair for stations.json; `testAstronomicalBoundsMatchTheGeneratedJSON`
             // holds the two implementations to each other.
             latDatum: station.astronomicalBounds?.lat,
-            hatDatum: station.astronomicalBounds?.hat)
+            hatDatum: station.astronomicalBounds?.hat,
+            source: station.source?.name)
     }
 }

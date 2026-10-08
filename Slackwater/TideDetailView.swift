@@ -378,9 +378,11 @@ struct TideDetailView: View {
             } else if record.id.hasPrefix("noaa/") {
                 Text("\(record.chartDatum) chart datum. NOAA harmonic prediction.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
-            } else {
-                Text("\(record.chartDatum) chart datum. TICON-4 harmonic prediction.")
+            } else if let source = record.source {
+                // Kartverket's terms ask to be named wherever its data is used.
+                Text("\(record.chartDatum) chart datum. Harmonic constants from \(source).")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
             }
         }
     }

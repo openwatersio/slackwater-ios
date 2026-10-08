@@ -306,7 +306,7 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 |---|---|
 | NOAA tide | "<datum> chart datum. NOAA harmonic prediction." |
 | NOAA subordinate tide | "<datum> chart datum. Based on <reference> tides and NOAA's published offsets; computed on this device." |
-| TICON tide | "<datum> chart datum. TICON-4 harmonic prediction." |
+| Other tide (TICON-4, Kartverket) | "<datum> chart datum. Harmonic constants from <publisher>." The publisher is the station database's `source.name`, so a new publisher is named rather than credited as another. |
 | Canadian tide | "<datum> chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." |
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |
@@ -483,12 +483,15 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 28. **Share at now:** sharing an untouched page shares the bare station link.
 29. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
 
+### Footer
+
+30. **A Norwegian tide:** Andenes's footer names Kartverket, not TICON-4.
+
 ## 19. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy:
 
 - The share link compares the selection with the device clock rather than the page's reference now. On an untouched page left open for more than 200 seconds, Share includes an instant while the Now pill stays hidden.
-- Kartverket (Norwegian) tide stations show "TICON-4 harmonic prediction." in their footer; any tide station outside NOAA and CHS falls into that line.
 - The online gate's honesty path has no "Predictions — not for navigation" line and no report menu.
 - Day disclosure animates under Reduce Motion, and so does the first-run tour's scroll.
 
