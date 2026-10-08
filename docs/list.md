@@ -44,7 +44,7 @@ Sections appear top to bottom in this order:
 | 4 | Favorites | At least one favorite remains after de-duplication |
 | 5 | Near Me | Always: a header row with the series filter, then 4 or 5 cards |
 | 6 | Recents | At least one recent remains after de-duplication |
-| 7 | Footer | Always: Downloads and Settings rows, then the wordmark |
+| 7 | Footer | Always: Downloads, Settings, and supporter-status rows, then the wordmark |
 
 Favorites and Recents have no empty-state copy; their heading simply does not render. The list has no pull-to-refresh and no reordering.
 
@@ -250,7 +250,7 @@ Canadian predictions download to the device in tiers: the stations in view, then
 - **Offering the next tier:** "Download N more?" with a decline button ("Not now") and an accept button ("Download N more"). Declining lasts for the session.
 - **Neither:** the strip takes no space.
 
-The footer is a rounded card with two rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), and "Settings", at least 48 units tall. Below the card are "Slackwater" and "by Open Waters".
+The footer is a rounded card with three rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), "Settings", and "Support Slackwater" ("Slackwater supporter ❇" when Premium is active), each at least 48 units tall. The support row opens a dedicated sheet with Premium benefits, purchase options, and restore. Settings retains widget setup instructions but no purchase controls. Below the card are "Slackwater" and "by Open Waters".
 
 ## 9. Opening a station
 
@@ -274,7 +274,7 @@ Opening a Canadian station moves its download to the front of the queue. At regu
 |---|---|
 | `slackwater://station/<id>` | Opens the station. The id is percent-encoded and read whole, so ids containing `/` survive. |
 | `https://slackwater.xyz/tides/<slug>[/<instant>]`, `…/currents/…` | Opens the station, centred on the instant when one is given. An instant that does not parse rejects the whole link. |
-| `slackwater://premium` | Opens Settings at Premium, in builds that sell it. |
+| `slackwater://premium` | Opens the dedicated Support Slackwater sheet, in builds that sell it. |
 
 An alert notification opens through the same path.
 

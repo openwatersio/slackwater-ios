@@ -16,11 +16,10 @@ final class RangeSheetTests: ScreenshotTestCase {
     func testTheRangeTileOpensASheetWithAllThreeSections() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        // Case-insensitive, as the other tile assertions in this target are:
-        // the eyebrow combines an uppercasing MonoLabel with an accessibility
-        // label that does not.
-        let tile = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label ==[c] 'range'")).firstMatch
+        // The nested eyebrow is also named Range. Target the actionable tile,
+        // which appears only once its sheet is available.
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Range,'")).firstMatch
         XCTAssert(tile.appears(within: 10), "no Range tile on the tide detail")
         tile.tap()
 
@@ -55,8 +54,8 @@ final class RangeSheetTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Chignik"].firstMatch)
         XCTAssert(leadReading(app).appears(within: 10), "Chignik detail did not render")
 
-        let tile = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label ==[c] 'range'")).firstMatch
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Range,'")).firstMatch
         XCTAssert(tile.appears(within: 10), "no Range tile at Chignik")
         tile.tap()
         XCTAssert(app.navigationBars["Range"].appears(within: 5), "the sheet did not open")
@@ -80,8 +79,8 @@ final class RangeSheetTests: ScreenshotTestCase {
         XCTAssert(lead.appears(within: 10), "no lead reading")
         let before = lead.label
 
-        let tile = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label ==[c] 'range'")).firstMatch
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Range,'")).firstMatch
         XCTAssert(tile.appears(within: 10), "no Range tile")
         tile.tap()
         XCTAssert(app.navigationBars["Range"].appears(within: 5), "the sheet did not open")

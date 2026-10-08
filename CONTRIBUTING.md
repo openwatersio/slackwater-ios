@@ -47,7 +47,7 @@ The `iPhone Duo` simulator (iOS 27.1 and later) boots folded, on its cover scree
 
 ## Screenshotting a deep-linked screen
 
-`xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens Settings at Premium) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
+`xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens the dedicated Support Slackwater sheet) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
 
 Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-seedGate", "-locDenied"])` (`-seedGate` skips the first-run gate), open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the [worktree test lock](#local-test-runs). Delete the file and run `xcodegen generate` again before committing.
 

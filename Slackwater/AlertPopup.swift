@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// Two rows and a header naming what the press landed on. No lead picker: half an hour, and
-/// the Alerts screen changes it. Without Premium both rows lead to Settings at Premium and no rule
+/// the Alerts screen changes it. Without Premium both rows open the Support Slackwater sheet and no rule
 /// is made — this is the third and last upsell surface (widgets-premium §5).
 struct AlertPopup: View {
     let stationID: String
@@ -48,7 +48,7 @@ struct AlertPopup: View {
         }
         .frame(width: 280)
         .background(SN.cardFill)
-        .sheet(isPresented: $showPremium) { SettingsView(opensPremium: true) }
+        .sheet(isPresented: $showPremium) { PremiumView() }
     }
 
     /// A way out that isn't a row: a press landed by accident must not have to set an alert to

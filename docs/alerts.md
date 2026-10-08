@@ -202,9 +202,7 @@ event produce one entry.
 confirmation naming the station and the number of events that will disappear; nothing synced
 vanishes off the user's Mac without them having read that sentence.
 
-**A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be
-turned off — but turning a station on opens Settings at Premium and changes nothing. Without Premium
-the toggles read off and do the same.
+**A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the dedicated Support Slackwater sheet and changes nothing. Without Premium the toggles read off and do the same.
 
 ### 5.2 Notifications
 
@@ -326,7 +324,7 @@ riding-dot overlay keeps `allowsHitTesting(false)` untouched.
   "Every low tide", "Every slack window", "Every time it falls past 3.3 ft".
 - A row whose rule already exists reads as on; tapping it removes the rule.
 - A 30-minute lead, and no lead picker: that is the rule sheet's job (§7.3).
-- For a free user both rows open Settings at Premium and no rule is created.
+- For a free user both rows open the dedicated Support Slackwater sheet and no rule is created.
 
 Notification permission is requested the first time a rule is created, never at launch.
 
@@ -347,8 +345,7 @@ toggle each — the same row idiom the Alerts row uses. The section's own line
 says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
 - Online gates are listed but unavailable, with the reason (§8).
-- Without Premium, turning a station on opens Settings at Premium and nothing changes; turning one off
-  works at any tier (§5.1).
+- Without Premium, turning a station on opens the dedicated Support Slackwater sheet and nothing changes; turning one off works at any tier (§5.1).
 - Denied calendar access leaves the toggles off and says so, with a link to Settings.
 
 ### 7.5 Alerts screen
@@ -423,9 +420,7 @@ within a minute, for every trigger read off a sampled series — the ones whose 
 with the run's start time. An eclipse is searched from an absolute window rather than the sample
 grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
-**UI:** a long press on a tide strip and on a current strip opens the popup with the right header;
-a free user's Alert me and calendar toggle each open Settings at Premium; with Premium, Settings →
-Calendar turns a station on and asks before turning it off.
+**UI:** a long press on a tide strip and on a current strip opens the popup with the right header; a free user's Alert me and calendar toggle each open the dedicated Support Slackwater sheet; with Premium, Settings → Calendar turns a station on and asks before turning it off.
 
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; two stations' calendars land separately and open the app at the event; a comfort-speed

@@ -191,7 +191,7 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        # The app's first URL scheme: `slackwater://premium` opens Settings at Premium
+        # The app's first URL scheme: `slackwater://premium` opens the Support Slackwater sheet
         # and `slackwater://station/<id>` opens that station's detail.
         # Widgets already emit both (Task 5/6); StationListView.onOpenURL
         # (SlackwaterApp.swift) is the receiving end.

@@ -2,7 +2,6 @@
 import SwiftUI
 
 struct WidgetSettingsContent: View {
-    var showsPreviews = true
     var platform: SettingsPlatform = .current
     /// The card the free widgets draw when first added: the default station,
     /// resolved as the widget provider resolves it. Nil when nothing is
@@ -47,59 +46,41 @@ struct WidgetSettingsContent: View {
                 }
             }
             #if PREMIUM_ENABLED
-                VStack(alignment: .leading, spacing: 16) {
-                    Label {
-                        MonoLabel(text: String(localized: "Slackwater Premium", comment: "Settings section heading."))
-                    } icon: {
-                        Image(systemName: "sparkles").foregroundStyle(SN.leaf)
-                    }
-                    if platform == .mobile {
-                        group(
-                            String(localized: "Lock screen — Premium", comment: "Settings widget section title."),
-                            note: String(
-                                localized:
-                                    "Long-press your lock screen → Customize → add Slackwater above or below the clock.",
-                                comment: "Instructions for adding a lock-screen widget."),
-                            rows: [
-                                (
-                                    String(localized: "Next Slack (inline)", comment: "Widget name and family."),
-                                    "lock.iphone",
-                                    String(
-                                        localized: "Above the clock: the next event and time.",
-                                        comment: "Inline widget description.")
-                                ),
-                                (
-                                    String(localized: "Next Event (circular)", comment: "Widget name and family."),
-                                    "circle.dashed",
-                                    String(
-                                        localized: "A glance: arrow and time.", comment: "Circular widget description.")
-                                ),
-                                (
-                                    String(localized: "Slack Window (rectangular)", comment: "Widget name and family."),
-                                    "rectangle.dashed",
-                                    String(
-                                        localized: "Next event plus the workable window.",
-                                        comment: "Rectangular widget description.")
-                                ),
-                            ], purchases: true
-                        ) {}
-                    } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Support Slackwater's development.")
-                                .font(.footnote)
-                                .foregroundStyle(SN.foam.opacity(0.62))
-                            PremiumPurchaseControls()
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
+                if platform == .mobile {
+                    group(
+                        String(localized: "Lock screen — Premium", comment: "Settings widget section title."),
+                        note: String(
+                            localized:
+                                "Long-press your lock screen → Customize → add Slackwater above or below the clock.",
+                            comment: "Instructions for adding a lock-screen widget."),
+                        rows: [
+                            (
+                                String(localized: "Next Slack (inline)", comment: "Widget name and family."),
+                                "lock.iphone",
+                                String(
+                                    localized: "Above the clock: the next event and time.",
+                                    comment: "Inline widget description.")
+                            ),
+                            (
+                                String(localized: "Next Event (circular)", comment: "Widget name and family."),
+                                "circle.dashed",
+                                String(
+                                    localized: "A glance: arrow and time.", comment: "Circular widget description.")
+                            ),
+                            (
+                                String(localized: "Slack Window (rectangular)", comment: "Widget name and family."),
+                                "rectangle.dashed",
+                                String(
+                                    localized: "Next event plus the workable window.",
+                                    comment: "Rectangular widget description.")
+                            ),
+                        ], premium: true
+                    ) {}
                 }
-                .id("settings-premium")
             #endif
         }
         .task {
-            guard showsPreviews, platform != .tv else { return }
+            guard platform != .tv else { return }
             card = await Task.detached {
                 let id = WidgetStationLoader.resolvedStationID(WidgetStationLoader.defaultStationID())
                 // The default is Current Location, so the prefix (and
@@ -122,11 +103,11 @@ struct WidgetSettingsContent: View {
 
     @ViewBuilder private func group(
         _ title: String, note: String,
-        rows: [(String, String, String)], purchases: Bool = false,
+        rows: [(String, String, String)], premium: Bool = false,
         @ViewBuilder previews: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if purchases {
+            if premium {
                 Label {
                     MonoLabel(text: title)
                 } icon: {
@@ -146,9 +127,6 @@ struct WidgetSettingsContent: View {
                 }
             }
             Text(note).font(.caption2).foregroundStyle(SN.foam.opacity(0.5))
-            #if PREMIUM_ENABLED
-                if purchases { PremiumPurchaseControls() }
-            #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
