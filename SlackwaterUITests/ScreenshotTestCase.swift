@@ -756,7 +756,7 @@ class ShotWalk: ScreenshotTestCase {
     }
 
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
-        var args = ["-seedGate", "-resetRecents", "-noCloudSync",
+        var args = ["-seedGate", "-seedTour", "-resetRecents", "-noCloudSync",
                     "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", shotEpoch] + fix + extra

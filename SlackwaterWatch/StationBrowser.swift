@@ -18,7 +18,7 @@ struct StationBrowser: View {
     @State private var groups: BrowseGroups?
     /// When the wearer last raised the app: rows read at this instant. No
     /// live tick; a reading refreshes on the next look, as on the phone.
-    @State private var shownAt = Date()
+    @State private var shownAt = appNow()
     @State private var path: [BrowseRoute] = []
 
     private struct Inputs: Hashable {
@@ -90,7 +90,7 @@ struct StationBrowser: View {
         .onChange(of: scenePhase) { _, phase in
             downloads.setDownloadsActive(phase == .active)
             guard phase == .active else { return }
-            shownAt = .now
+            shownAt = appNow()
             location.refresh()
         }
     }

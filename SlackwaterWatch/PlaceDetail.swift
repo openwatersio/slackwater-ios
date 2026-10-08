@@ -33,9 +33,9 @@ struct PlaceDetail: View {
     @State private var store: TimelineWindowStore?
     @State private var source: TimelineSource?
     @State private var unavailable = false
-    @State private var live = Date()
-    @State private var scrubTime = Date()
-    @State private var anchor = Date()
+    @State private var live = appNow()
+    @State private var scrubTime = appNow()
+    @State private var anchor = appNow()
     @State private var showSheet = false
     @State private var offerOnPhone = false
     @State private var showPhoneInstructions = false
@@ -87,12 +87,12 @@ struct PlaceDetail: View {
         // follow now; scrubbed away, stay there against the new now.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, store != nil else { return }
-            if scrubbedAway { live = Date() } else { returnToNow() }
+            if scrubbedAway { live = appNow() } else { returnToNow() }
         }
     }
 
     private func load() async {
-        let id = item.id, now = Date()
+        let id = item.id, now = appNow()
         let record = await Task.detached(priority: .userInitiated) {
             WidgetStationLoader.loadRecord(id: id, at: now)
         }.value
@@ -215,7 +215,7 @@ struct PlaceDetail: View {
     }
 
     private func returnToNow() {
-        live = Date()
+        live = appNow()
         guard let source else { return }
         let today = dayLocal(live, source.tz)
         // The store may not hold now any more; it jumps first, as the phone's does.

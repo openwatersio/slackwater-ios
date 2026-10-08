@@ -12,8 +12,17 @@ final class WatchLocation: NSObject, ObservableObject, CLLocationManagerDelegate
     /// UI-test hook, as on the phone (LocationService): denied without asking,
     /// so no system prompt can land on top of the list and take a tap.
     private static let testDenied = CommandLine.arguments.contains("-locDenied")
+    /// `-fixLat x -fixLon y`, as on the phone: a located list in any
+    /// simulator, which the App Store frames need.
+    private static let testFix: Fix? = {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "-fixLat"), let j = args.firstIndex(of: "-fixLon"),
+              i + 1 < args.count, j + 1 < args.count,
+              let lat = Double(args[i + 1]), let lon = Double(args[j + 1]) else { return nil }
+        return Fix(lat: lat, lon: lon)
+    }()
 
-    @Published private(set) var fix: Fix?
+    @Published private(set) var fix: Fix? = testFix
     private var fixedAt = Date.distantPast
     /// The phone's cutoff (`LocationService.recentLocation`): older than this,
     /// a fix says where the wearer was, not where they are.
@@ -30,7 +39,7 @@ final class WatchLocation: NSObject, ObservableObject, CLLocationManagerDelegate
     }
 
     func refresh() {
-        guard !Self.testDenied else { return }
+        guard !Self.testDenied, Self.testFix == nil else { return }
         switch manager.authorizationStatus {
         case .notDetermined: manager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
@@ -39,7 +48,7 @@ final class WatchLocation: NSObject, ObservableObject, CLLocationManagerDelegate
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard !Self.testDenied else { return }
+        guard !Self.testDenied, Self.testFix == nil else { return }
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: unavailable = false; manager.requestLocation()
         case .denied, .restricted: fix = nil; unavailable = true
