@@ -15,7 +15,8 @@ if [[ -n $MARKER && $(git rev-parse "$MARKER^{commit}") == $SHA ]]; then
   exit 0
 fi
 
-python3 scripts/nightly-validation.py "$SHA"
+# Exit 3 is the gate refusing an unvalidated commit: nothing to release, not a failure.
+python3 scripts/nightly-validation.py "$SHA" || exit $(( $? == 3 ? 0 : 1 ))
 
 VERSION=$(awk '$1 == "MARKETING_VERSION:" { print $2; exit }' project.yml)
 CURRENT_BUILD=$(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml)
@@ -46,7 +47,14 @@ NOTES=build/nightly-notes.md
 
 BUILD_NUMBER=$NEXT_BUILD ./scripts/testflight.sh
 
-BUILD_ROW=$(node scripts/asc.mjs builds | grep -F -m1 "$VERSION ($NEXT_BUILD)" || true)
+# ASC can list a processed build before its automatic Nightly assignment shows;
+# an empty group column there means not yet, so poll it before judging.
+# ponytail: 5 min budget; raise it if [] still outlasts it.
+for _ in {1..10}; do
+  BUILD_ROW=$(node scripts/asc.mjs builds | grep -F -m1 "$VERSION ($NEXT_BUILD)" || true)
+  [[ -z $BUILD_ROW || $BUILD_ROW == *'[]' ]] || break
+  sleep ${NIGHTLY_POLL_SECONDS:-30}
+done
 if ! print -r -- "$BUILD_ROW" | grep -Eq 'VALID.*\[Nightly\]$'; then
   echo "Build did not land exclusively in Nightly: $BUILD_ROW" >&2
   exit 1

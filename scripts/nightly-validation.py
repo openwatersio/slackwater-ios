@@ -41,8 +41,15 @@ def validate(sha, repository):
     print(f"Full main CI validated {sha} (run {run['id']}, attempt {run['run_attempt']}).")
 
 
+BLOCKED = 3
+
+
 if __name__ == "__main__":
     try:
         validate(sys.argv[1], os.environ["GITHUB_REPOSITORY"])
-    except (ValueError, KeyError, subprocess.CalledProcessError) as error:
-        sys.exit(f"Nightly blocked for {sys.argv[1]}: {error}")
+    except ValueError as error:
+        # A refusal releases nothing and is no release defect; main's CI run shows why.
+        print(f"::warning::Nightly blocked for {sys.argv[1]}: {error}")
+        sys.exit(BLOCKED)
+    except (KeyError, subprocess.CalledProcessError) as error:
+        sys.exit(f"Nightly could not validate {sys.argv[1]}: {error}")
