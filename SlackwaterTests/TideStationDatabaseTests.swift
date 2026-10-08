@@ -66,6 +66,13 @@ final class TideStationDatabaseTests: XCTestCase {
         XCTAssertGreaterThan(compared, 4_700, "#315 ships bounds on 4,772 of 4,782")
     }
 
+    /// The tide footer names the publisher from this field.
+    func testRecordsCarryTheirPublisher() {
+        XCTAssertEqual(TideStationRecord.record(id: "kartverket/ANX")?.source,
+                       "Kartverket / Norwegian Mapping Authority, Hydrographic Service")
+        XCTAssertEqual(TideStationRecord.record(id: Self.json.first { $0.id.hasPrefix("ticon/") }!.id)?.source, "TICON-4")
+    }
+
     /// A subordinate predicts through its reference and carries no datums of
     /// its own in the tcdb, so bounds can only reach it if the reader resolves
     /// the reference and reduces by the offsets. All 2,016 of them have bounds.

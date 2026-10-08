@@ -27,7 +27,7 @@
  * set — most of what that licence unlocks is either freshwater (see
  * FRESHWATER_NETWORKS in bundle.mjs) or a second, less accurate copy of a CHS
  * station (see CHS_COVERAGE_KM), and both are filtered out below. cc-by-4.0
- * obliges attribution, paid in SettingsView's "Data & attribution" section.
+ * obliges attribution, paid in AboutView's "Data & attribution" section.
  *
  * Three more filters, all inherited from slackwater-web's build-stations.mjs
  * and all still load-bearing:
@@ -236,7 +236,7 @@ const upstreamRegion = (s) => {
  * need to know, it covers licences nobody has added yet, and `=== true` drops
  * the one malformed row (`baltic-sea.geo`, whose `license` is a string) for
  * free. cc-by-4.0 obliges ATTRIBUTION, which the app pays in its credits
- * screen — see ATTRIBUTION below.
+ * screen; gen-tides.test.mjs fails when a shipped publisher is not credited.
  */
 // The database carries current stations in the same list since it unified
 // the two; this generator is the tide half, and a subordinate current keeps

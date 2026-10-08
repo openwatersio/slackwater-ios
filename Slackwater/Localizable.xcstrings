@@ -5567,6 +5567,89 @@
         }
       }
     },
+    "%@ chart datum. Harmonic constants from %@." : {
+      "comment" : "Tide station footer. The first value is a datum acronym; the second is the publisher's name as the station database gives it, in English (\"TICON-4\", \"Kartverket / Norwegian Mapping Authority, Hydrographic Service\"), which stays in English.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ søkortreference. Harmoniske konstanter fra %2$@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Seekartennull. Harmonische Konstanten von %2$@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %1$@. Constantes armónicas de %2$@."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merikartan vertailutaso %1$@. Harmonisten vakioiden lähde: %2$@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zéro des cartes : %1$@. Constantes harmoniques de %2$@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zero idrografico %1$@. Costanti armoniche di %2$@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海図基準面：%1$@。調和定数の提供元：%2$@。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 해도 기준면. 조화 상수 출처: %2$@."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sjøkartnull. Harmoniske konstanter fra %2$@."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ kaartnul. Harmonische constanten van %2$@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nível de redução %1$@. Constantes harmônicas de %2$@."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zero hidrográfico %1$@. Constantes harmónicas de %2$@."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sjökortsreferensnivå. Harmoniska konstanter från %2$@."
+          }
+        }
+      }
+    },
     "%@ chart datum. NOAA harmonic prediction." : {
       "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
       "localizations" : {
@@ -5646,89 +5729,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ sjökortsreferensnivå. NOAA:s harmoniska prognos."
-          }
-        }
-      }
-    },
-    "%@ chart datum. TICON-4 harmonic prediction." : {
-      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ søkortreference. Harmonisk prognose fra TICON-4."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ Seekartennull. Harmonische TICON-4-Vorhersage."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cero hidrográfico: %@. Predicción armónica de TICON-4."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Merikartan vertailutaso %@. TICON-4:n harmoninen ennuste."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zéro des cartes : %1$@. Prévision harmonique TICON-4."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zero idrografico %@. Previsione armonica TICON-4."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "海図基準面：%@。TICON-4の調和解析による予測です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 해도 기준면. TICON-4 조화 예측."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ sjøkartnull. Harmonisk prognose fra TICON-4."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ kaartnul. Harmonische TICON-4-voorspelling."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nível de redução %@. Previsão harmônica TICON-4."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zero hidrográfico %@. Previsão harmónica TICON-4."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ sjökortsreferensnivå. Harmonisk prognos från TICON-4."
           }
         }
       }
@@ -28564,6 +28564,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inga synliga härifrån."
+          }
+        }
+      }
+    },
+    "Norwegian stations: harmonic constants © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)." : {
+      "comment" : "Settings ▸ About attribution line. Keep \"© Kartverket\", the agency's English name, \"CC BY 4.0\" and \"kartverket.no\" exact; Kartverket's terms ask for that credit.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Norske stationer: harmoniske konstanter © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Norwegische Stationen: harmonische Konstanten © Kartverket (Norwegian Mapping Authority, Hydrographic Service) unter CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones de Noruega: constantes armónicas © Kartverket (Norwegian Mapping Authority, Hydrographic Service) bajo licencia CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Norjan asemat: harmoniset vakiot © Kartverket (Norwegian Mapping Authority, Hydrographic Service) CC BY 4.0 -lisenssillä (kartverket.no)."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stations norvégiennes : constantes harmoniques © Kartverket (Norwegian Mapping Authority, Hydrographic Service) sous CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stazioni norvegesi: costanti armoniche © Kartverket (Norwegian Mapping Authority, Hydrographic Service) con licenza CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ノルウェーの観測所：調和定数 © Kartverket（Norwegian Mapping Authority, Hydrographic Service）、CC BY 4.0（kartverket.no）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노르웨이 관측소: 조화 상수 © Kartverket (Norwegian Mapping Authority, Hydrographic Service), CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Norske stasjoner: harmoniske konstanter © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noorse stations: harmonische constanten © Kartverket (Norwegian Mapping Authority, Hydrographic Service) onder CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações da Noruega: constantes harmônicas © Kartverket (Norwegian Mapping Authority, Hydrographic Service) sob CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações da Noruega: constantes harmónicas © Kartverket (Norwegian Mapping Authority, Hydrographic Service) sob CC BY 4.0 (kartverket.no)."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Norska stationer: harmoniska konstanter © Kartverket (Norwegian Mapping Authority, Hydrographic Service) enligt CC BY 4.0 (kartverket.no)."
           }
         }
       }

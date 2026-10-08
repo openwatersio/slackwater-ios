@@ -42,6 +42,9 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// missing value as zero.
     var latDatum: Double? = nil
     var hatDatum: Double? = nil
+    /// The publisher of the constants, named as the database names it. Read
+    /// from the tcdb only; stations.json does not carry it.
+    var source: String? = nil
 
     var isSubordinate: Bool { reference != nil }
 
