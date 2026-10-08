@@ -9,39 +9,46 @@
   },
   "appInfoLocalization": {
     "name": "Slackwater — Tides & Currents",
-    "subtitle": "Offline worldwide predictions",
+    "subtitle": "Slack water times, offline",
     "privacyPolicyUrl": "https://slackwater.xyz/privacy/"
   },
   "version": {
     "copyright": "2026 Open Water Software, LLC"
   },
   "versionLocalization": {
-    "promotionalText": "Tide and current predictions worldwide, offline on your phone. Works on the water, on the beach, in the anchorage — no bars and nothing to load. Free, no account.",
+    "promotionalText": "The tide and currents app that works without signal. Tides worldwide and currents across the US and Canada, already on your phone. Free, no account, no ads.",
     "description": [
-      "Every tide app works fine at home. Slackwater works offline, where you need it — on the water, on the beach, in the anchorage — no bars and nothing to load. Thousands of stations worldwide, already on your phone.",
+      "The tide and currents app that works without signal. Tides for more than 4,700 stations worldwide and currents across the US and Canada, already on your phone — on the water, on the beach, in the anchorage, with no bars and nothing to load.",
       "",
-      "No spinner. No \"no internet connection\". No waiting on a server that isn't coming. You open it, and the answer is there.",
+      "No spinner. No \"no internet connection\". You open it, and the answer is there: rising or falling, flooding or ebbing, and how long until the next high, low or slack.",
       "",
       "And it does the part most tide apps skip. Heights are the easy half. The harder question is the current: when does the pass go slack? How hard is it running at max? Can you get through before it turns?",
       "",
       "WORKS WHERE THERE IS NO SIGNAL",
-      "The predictions are computed on your phone, not fetched. Down a dead-end road, out at the point, in an anchorage, or with the boat's electronics down — you get the same answer you would have got at the dock.",
+      "Predictions are made on your phone, not fetched. Down a dead-end road, out at the point, in an anchorage, or with the boat's electronics down — you get the same answer you would have got at the dock. The map for your area and your favourite stations stays on your phone too.",
       "",
       "CURRENTS, NOT JUST TIDES",
-      "A curve for the whole day, with slack, max flood and max ebb marked. Drag your thumb across it to read any moment. Every current station shows the tide at its reference port on the same screen.",
+      "Slack, max flood and max ebb on one curve, with speed and direction. Drag your thumb across the week to read any moment. Every current station links to the tide at its reference port.",
       "",
-      "A MAP THAT WORKS OFFLINE TOO",
-      "Every station on a map. The coastline you have already looked at stays on your phone and draws again with zero bars.",
+      "SUN, MOON AND THE TIDES THEY DRIVE",
+      "Sunrise, sunset and twilight, the moon's phase, spring and neap tides explained, and solar and lunar eclipses, for every station.",
+      "",
+      "ON YOUR WRIST, HOME SCREEN AND SIRI",
+      "An Apple Watch app that works without your phone: turn the Digital Crown to scrub the day. Home screen widgets for the next event and today's curve. Ask Siri for the next low tide, high tide or slack window. On iPhone and iPad, in 14 languages.",
       "",
       "FREE, NO ACCOUNT, NO ADS",
-      "The offline core is free and stays free.",
+      "Every station and every date is free and stays free. No account, no ads, no tracking, and the app is open source.",
+      "",
+      "Slackwater Premium is optional and funds development: lock screen widgets, Apple Watch complications, alerts before the tides and currents you care about, and station calendars. Choose a yearly subscription or a one-time lifetime purchase.",
       "",
       "WHERE THE NUMBERS COME FROM",
-      "Tides for more than 4,700 stations across a hundred countries are built in with nothing to download, each one from the national authority that publishes it and checked against that authority's own tide datums before it ships. Currents cover the United States and Canada: every NOAA current station, plus Canadian passes from the Salish Sea to Haida Gwaii and Cape Breton. Canadian stations build their own model from the Canadian Hydrographic Service's published predictions, then work offline for good. A few stations are listed but blank — where we cannot publish numbers we trust, we say so instead of guessing.",
+      "Tides for more than 4,700 stations across a hundred countries are built in, from NOAA, the Canadian Hydrographic Service, Norway's Kartverket and the TICON-4 global tide-gauge catalogue, and checked against each station's published tidal datums wherever it has them. Currents cover the United States and Canada: more than 2,500 NOAA current stations, plus 22 Canadian passes from the Salish Sea to Haida Gwaii and Cape Breton. Canadian stations download their data from the Canadian Hydrographic Service once, then work offline. A few Canadian passes sit in water the on-device model cannot predict; those fetch predictions when you are online, and say so. Where we cannot publish numbers we trust, the station is listed but blank instead of guessed.",
       "",
-      "Predictions are not observations — conditions vary with weather and river flow. Not for navigation."
+      "Predictions are not observations — conditions vary with weather and river flow. Not for navigation.",
+      "",
+      "Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
     ],
-    "keywords": "chart,table,slack,ebb,flood,marine,kayak,paddle,fishing,sailing,noaa,chs,harbor,harbour,salish sea",
+    "keywords": "chart,table,tidal,ebb,flood,marine,kayak,paddle,fishing,sailing,beach,widget,noaa,harbour,salish sea",
     "supportUrl": "https://slackwater.xyz/support/",
     "marketingUrl": "https://slackwater.xyz"
   },
@@ -51,9 +58,11 @@
     "contactEmail": "slackwater@openwaters.io",
     "demoAccountRequired": false,
     "notes": [
-      "All predictions are computed on-device from public harmonic data. The app is explicitly marked \"not for navigation\" in-app (every detail footer, the map, and Settings). Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
+      "All predictions are computed on-device from public harmonic data. The app is marked \"not for navigation\" on every station detail, the map, and Settings → About. Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
       "",
-      "No account is needed. Canadian stations download their data from the Canadian Hydrographic Service once, the first time each one is opened, and then work offline."
+      "No account is needed. Canadian stations download their data from the Canadian Hydrographic Service once, the first time each one is opened, and then work offline.",
+      "",
+      "Premium is optional: a yearly auto-renewable subscription or a one-time lifetime purchase. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars; every prediction stays free. To reach the purchase sheet, scroll to the bottom of the station list and tap Support Slackwater. Restore purchase and the Privacy Policy and Terms of Use links are on the same sheet."
     ]
   },
   "accessibility": {

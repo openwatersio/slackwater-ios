@@ -33,10 +33,10 @@ const png = (w, h) => {
 test('the committed listing loads and fits every limit', () => {
   const l = loadListing();
   assert.equal(l.appInfoLocalization.name, 'Slackwater — Tides & Currents');
-  assert.equal(l.versionLocalization.keywords.length, 98);
+  assert.equal(l.versionLocalization.keywords.length, 100);
   // Arrays of lines become one string with the paragraph breaks kept.
-  assert.match(l.versionLocalization.description, /^Every tide app.*\n\nNo spinner\./);
-  assert.match(l.versionLocalization.description, /\nWORKS WHERE THERE IS NO SIGNAL\nThe predictions/);
+  assert.match(l.versionLocalization.description, /^The tide and currents app.*\n\nNo spinner\./);
+  assert.match(l.versionLocalization.description, /\nWORKS WHERE THERE IS NO SIGNAL\nPredictions are made/);
   assert.match(l.reviewDetail.notes, /identically\.\n\nNo account/);
 });
 

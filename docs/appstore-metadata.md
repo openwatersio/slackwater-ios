@@ -6,13 +6,13 @@ The rules the App Store listing is written against. The values themselves live i
 
 Tides are worldwide. Currents are the United States and Canada. Any copy that describes the app as North American is wrong; any copy that implies currents are worldwide is also wrong, and it is the more expensive mistake.
 
-| What ships               | Count | Where it comes from                                          |
-| ------------------------ | ----- | ------------------------------------------------------------ |
-| Bundled tide stations    | 4,782 | 3,262 NOAA, 1,520 TICON across 105 countries and territories |
-| Bundled current stations | 2,534 | NOAA                                                         |
-| Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good         |
-| Canadian current passes  | 22    | CHS, same fetch-once model                                   |
-| Listed but blank         | 139   | Stations we cannot publish numbers for                       |
+| What ships               | Count | Where it comes from                                                         |
+| ------------------------ | ----- | --------------------------------------------------------------------------- |
+| Bundled tide stations    | 4,793 | 3,261 NOAA, 1,499 TICON across 105 countries and territories, 33 Kartverket |
+| Bundled current stations | 2,534 | NOAA, not every NOAA station (`tools/gen-noaa-currents.mjs` lists the filters) |
+| Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good                        |
+| Canadian current passes  | 22    | CHS: 13 fetch once, then offline; 9 fetch a month at a time when online     |
+| Listed but blank         | 136   | Stations we cannot publish numbers for                                      |
 
 Refresh the counts before submitting, and any time coverage changes:
 
@@ -23,7 +23,8 @@ const i = require("./Slackwater/Resources/station-index.json");
 console.log("bundled tide stations", i.tides.length, bySource(i.tides));
 console.log("bundled current stations", i.currents.length, bySource(i.currents));
 console.log("Canadian tide stations", require("./Slackwater/Resources/chs-stations.json").length);
-console.log("Canadian current passes", require("./Slackwater/Resources/chs-current-gates.json").length);
+const passes = require("./Slackwater/Resources/chs-current-gates.json");
+console.log("Canadian current passes", passes.length, "online only", passes.filter((g) => g.online).length);
 console.log("listed but blank", require("./Slackwater/Resources/unavailable-stations.json").length);
 // country isnt in the committed data, but every TICON id embeds an ISO 3166-1 alpha-3 code
 const ticonCountries = new Set(i.tides.filter((s) => s.id.startsWith("ticon/")).map((s) => s.id.match(/-([a-z]{3})-[a-z0-9_]+$/)[1]));
@@ -31,13 +32,21 @@ console.log("countries and territories", ticonCountries.size);
 '
 ```
 
-Round down in copy. "More than 4,700" survives a catalog change; "4,782" needs an App Store review to correct.
+Round down in copy. "More than 4,700" survives a catalog change; "4,793" needs an App Store review to correct.
+
+Every feature the copy names must be in the build attached to the version. Release builds have sold Premium since `nightly-1.14.0-57`, and the watch app, alerts, station calendars, and 14 languages ship alongside it.
 
 ## Name & subtitle
 
 `appInfoLocalization.name` and `appInfoLocalization.subtitle`, 30 characters each.
 
-The name already indexes "tides" and "currents", so the subtitle spends all 30 characters on words the name does not have: the differentiator, the coverage, and a third indexable noun. Never name a region here — currents will outgrow one before the listing is next reviewed.
+The name already indexes "tides" and "currents", so the subtitle spends its characters on words the name does not have. "Slack water times, offline" carries three:
+
+- **"Slack water"** as a phrase, because "Slackwater" in the name does not index as two words. Other tide apps named Slackwater already sit on the store, and the phrase is what people searching for slack water type.
+- **"Times"**, which pairs with "tides" for "tide times", the phrase British, Irish and Australian searchers use.
+- **"Offline"**, the differentiator.
+
+Never name a region here. Currents will outgrow one before the listing is next reviewed. Never put "worldwide" here either: beside "Currents" in the name it reads as worldwide currents.
 
 ## Keywords
 
@@ -46,9 +55,11 @@ The name already indexes "tides" and "currents", so the subtitle spends all 30 c
 The rules this set follows, for whoever edits it next:
 
 - **Never repeat a word from the name or subtitle.** Apple indexes those fields and combines across them, so `chart` and `table` pair with "tides" and "currents" for free. `tide chart` would waste ten characters buying nothing.
-- **Activity terms travel.** Kayak, paddle, fishing, sailing and marine are how a non-boater finds a tide app in any country.
-- **Name the data sources.** People search `noaa` and `chs` directly, and both read as credibility in the listing.
-- **Spell for both sides of the Atlantic where Apple does not stem.** `harbor` and `harbour` are separate terms, and worldwide coverage means most harbours are spelled the second way.
+- **Activity terms travel.** Kayak, paddle, fishing, sailing, beach and marine are how a non-boater finds a tide app in any country.
+- **Add what Apple does not stem.** `tidal` is not "tide", and people search "tidal currents" and "tidal chart".
+- **Name what people look for by feature.** `widget`: "tide widget" is a common search, and the home-screen widgets are free.
+- **Name the data source people search.** `noaa` is searched directly and reads as credibility. `chs` is rarely searched outside Canada and lost its bytes to `widget`.
+- **One spelling of harbour.** Storefronts without their own localization fall back to this listing, and most harbours worldwide are spelled the British way, so `harbour` stays and `harbor` goes.
 - **One regional anchor: `salish sea`.** Almost nobody targets it, it is the densest cluster of validated current gates, and it is the home audience. Drop it when currents ship outside North America and the characters are needed for a term that covers the new water — not before, and not to chase `tide chart`, which Garmin owns.
 
 Deliberately out: `gulf islands`, `juan de fuca`, `puget sound`, `knot`, `boating` (low value; `boating` is implied by the category).
@@ -57,24 +68,27 @@ Deliberately out: `gulf islands`, `juan de fuca`, `puget sound`, `knot`, `boatin
 
 **Primary: Weather. Secondary: Navigation.** (`appInfo.primaryCategory` and `appInfo.secondaryCategory`, as App Store Connect category IDs.)
 
-Weather is where tide apps live — Tide Guide and Tides Near Me both sit there, so it is where tide-app browsers and chart rankings are. Navigation carries an implication the app disclaims on every screen ("not for navigation"), so it stays secondary: the discovery surface without a primary shelf that contradicts the disclaimer.
+Weather is where tide apps live: 81 of the 103 tide and current apps on the US store in October 2026, and 12 of the 15 with more than 1,000 ratings, Tide Guide and Tides Near Me among them. It is where tide-app browsers and chart rankings are. Navigation carries an implication the app disclaims wherever it shows a prediction ("not for navigation"), so it stays secondary: the discovery surface without a primary shelf that contradicts the disclaimer.
 
 ## Promotional text
 
 `versionLocalization.promotionalText`, 170 characters, editable without review.
 
-This field sits directly above the description and is the one piece of copy that can change without a review — use it for anything time-sensitive. Keep it problem-first like the description rather than leading with a station count, or the two read as a spec sheet twice over.
+This field sits directly above the description and is the one piece of copy that can change without a review — use it for anything time-sensitive. It leads with the one-liner slackwater.xyz uses, "The tide and currents app that works without signal", then states coverage with its limit. Lead with a station count and the field and the description read as a spec sheet twice over.
 
 ## Description
 
 `versionLocalization.description`, 4,000 characters. In the JSON it is an array of lines: each paragraph is one line, an empty string separates paragraphs, and a section heading sits on the line directly above its paragraph.
 
-**Angle: problem first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the problem and the solution. Everything establishing _why the numbers are trustworthy_ — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
+**Angle: outcome first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the one-liner and the coverage. Everything establishing _why the numbers are trustworthy_ — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
 
-Two rules that are easy to break by accident:
+Rules that are easy to break by accident:
 
-- **Placement beats phrasing inside the first 200 characters.** "Offline" earns its spot in the second sentence because that is character 52, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
-- **Currents are named as North American every time coverage is claimed.** The provenance block is the only place the limit appears, so it cannot be trimmed for length.
+- **Placement beats phrasing inside the first 200 characters.** "Works without signal" and "currents across the US and Canada" both sit in the first two sentences, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
+- **Currents are named as the US and Canada every time coverage is claimed.** The opening and the provenance block both say so, and neither can be trimmed for length.
+- **Provenance names every source.** Tides come from NOAA, CHS, Kartverket and TICON-4, a research catalogue rather than a national authority. Only stations that publish datums are checked against them, so the copy says "wherever it has them".
+- **Premium is disclosed while it is on sale.** The paragraph under FREE, NO ACCOUNT, NO ADS names what Premium adds and that it is a yearly subscription or a lifetime purchase (App Review 2.3.2). Every prediction stays free, so the free claims hold either way.
+- **The Terms of Use line stays last while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
 
 ## What's New
 
@@ -89,16 +103,16 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 ## Privacy (App Store Connect "App Privacy" answers)
 
 - **Data collection: none.** No analytics, no tracking, no accounts, no third-party SDKs that phone home. Answer "Data Not Collected" throughout.
-- **Location** is requested (When In Use, optional) to rank nearby stations. It is used on-device only and never transmitted, so under Apple's definitions it is not "collection" and creates no privacy-label entry. Declining leaves the app fully functional.
+- **Location** is requested (When In Use, optional) to rank nearby stations. The coordinates stay on the device. The map packs below are chosen around the fix, so the tile host sees which map cells are requested, as with any map. Nothing reaches us, and there is no privacy-label entry. Declining leaves the app fully functional.
 - **Tracking (ATT): No.**
 - **Network requests the app makes**, none carrying identity beyond IP:
-  - `api-iwls.dfo-mpo.gc.ca` — Canadian station predictions, fetched once per station for on-device fitting, under DFO's own terms.
-  - `tiles.openfreemap.org` — basemap style and tiles when the map is open and online, cached on the device afterwards.
-- **In-app purchases** settle through StoreKit. Apple handles the transaction; no personal data reaches us, and the answers above do not change when Premium goes on sale.
+  - `api-iwls.dfo-mpo.gc.ca` — Canadian station predictions, from the phone and the watch, fetched once per station for on-device fitting (a month at a time for the online-only passes), under DFO's own terms.
+  - `tiles.openfreemap.org` — basemap style and tiles, downloaded at launch whether or not the map is opened: the world at low zoom, the area around the location fix, and the area around each favourite or downloaded station (`ChartPacks.swift`). Cached on the device afterwards.
+- **In-app purchases** settle through StoreKit. Apple handles the transaction and no personal data reaches us; the answers above hold with Premium on sale.
 
 Re-answer this section whenever a new host appears in the app. `grep -rhoE "https://[a-z0-9.-]+" --include="*.swift" Slackwater/` lists every one.
 
-- **Privacy manifests.** `Slackwater/PrivacyInfo.xcprivacy` and `SlackwaterWidgets/PrivacyInfo.xcprivacy` declare no tracking, no collected data, and the required-reason APIs each target uses: `UserDefaults` (`CA92.1`, and `1C8F.1` for the App Group) and file modification dates (`C617.1`). Both targets compile `ChsCurrentGate.swift`, which reads a file's modification date, so the two files are identical. Re-check them when a target starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api); App Store Connect reports a gap by email (ITMS-91053), not in the upload log.
+- **Privacy manifests.** `Slackwater/`, `SlackwaterWidgets/` and `SlackwaterWatch/PrivacyInfo.xcprivacy` declare no tracking, no collected data, and the required-reason APIs each target uses: `UserDefaults` (`CA92.1`, and `1C8F.1` for the App Group) and file modification dates (`C617.1`). Every target compiles `ChsCurrentGate.swift`, which reads a file's modification date, so the files are identical. `SlackwaterWatchWidgets` compiles the same files and has no manifest yet (#668). Re-check them when a target starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api); App Store Connect reports a gap by email (ITMS-91053), not in the upload log.
 
 ## Accessibility Nutrition Labels
 
@@ -121,7 +135,7 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
 
 ## Review notes
 
-`reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, that the app is marked not for navigation, that location is optional, that no account is needed, and that Canadian stations download their data once for offline use. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
+`reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, where the app is marked not for navigation, that location is optional, that no account is needed, and that Canadian stations download their data once for offline use. While Premium is on sale they also say what it unlocks and how to reach the purchase sheet, so the reviewer can test the purchase. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
 
 ## Before submission
 
@@ -135,5 +149,5 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
 - [ ] Station counts re-derived and rounded down.
-- [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.
+- [ ] Both Premium products attached to the version while the build sells them. A first in-app purchase goes to App Review with a version, and a purchase sheet whose products App Review cannot load is rejected under 2.1. `asc.mjs submit` stops on a submission holding an in-app purchase, so that submission goes through the App Store Connect UI.
 - [ ] Accessibility Nutrition Labels answered against Apple's current criteria, claiming only the rows that are yes.
