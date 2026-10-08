@@ -214,7 +214,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(about.appears(within: 5))
     }
 
-    func testPremiumSupporterSeesTheirEntitlementInline() {
+    func testPremiumSupporterSeesTheirStatusInTheFooterAndSheet() {
         let app = launch("-seedGate", "-locDenied", "-seedPremium")
         let support = app.buttons["support-slackwater"]
         scrollTo(support, in: app)

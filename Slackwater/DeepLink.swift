@@ -50,7 +50,7 @@ func deepLink(forStationID id: String?) -> URL? {
 
 func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
 
-/// A lock-screen widget's link: its station once unlocked, Settings’ Premium section
+/// A lock-screen widget's link: its station once unlocked, the Support Slackwater sheet
 /// while locked. The provider resolves `stationID` either way, so the locked
 /// case can't lean on `deepLink(_:)`'s nil fallback.
 func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {
