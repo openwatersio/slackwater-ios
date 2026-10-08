@@ -12,6 +12,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var alerts = AlertRuleStore.shared
     @ObservedObject private var calendars = StationCalendarStore.shared
+    @ObservedObject private var premium = PremiumStore.shared
+    @State private var showPremium = false
     @State private var settle: Task<Void, Never>?
 
     /// What the Calendar row says it is doing, from what is actually subscribed.
@@ -72,7 +74,7 @@ struct SettingsView: View {
                         Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
                     }
 
-                    section(String(localized: "Alerts", comment: "Settings section heading.")) {
+                    section(String(localized: "Alerts", comment: "Settings section heading."), premium: true) {
                         NavigationLink {
                             AlertsView()
                                 .navigationTitle("Alerts")
@@ -92,7 +94,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    section(String(localized: "Calendar", comment: "Settings section heading.")) {
+                    section(String(localized: "Calendar", comment: "Settings section heading."), premium: true) {
                         NavigationLink {
                             CalendarStationsView()
                                 .navigationTitle("Favourites calendars")
@@ -110,47 +112,74 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings-calendar-row")
                     }
 
-                    if let onReplayTour {
-                        section(String(localized: "How to read a station", comment: "Settings section heading.")) {
+                    #if PREMIUM_ENABLED
+                        section(String(localized: "Slackwater Premium"), premium: true) {
+                            if SettingsPlatform.current == .mobile {
+                                Text("Lock screen — Premium")
+                                    .font(.headline)
+                                    .foregroundStyle(SN.foam)
+                                PremiumFeaturePreview(feature: .lockScreen)
+                                Text("Tides and currents at a glance on your lock screen.")
+                                Text("Long-press your lock screen → Customize → add Slackwater above or below the clock.")
+                                    .font(.caption)
+                            }
+                            Button { showPremium = true } label: {
+                                Label(premium.isPremium
+                                      ? String(localized: "Slackwater supporter")
+                                      : String(localized: "Support Slackwater"), systemImage: "sparkles")
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(SN.leaf)
+                            .foregroundStyle(SN.canvas)
+                            .accessibilityIdentifier("settings-premium-cta")
+                        }
+                    #endif
+
+                    WidgetSettingsContent()
+
+                    section(String(localized: "About")) {
+                        if let onReplayTour {
                             Button {
                                 dismiss()
                                 onReplayTour()
                             } label: {
                                 HStack {
-                                    Text(
-                                        "Show the tour again",
-                                        comment: "Settings row that replays the first-run tour.")
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("How to read a station").font(.headline).foregroundStyle(SN.leaf)
+                                        Text("Show the tour again").font(.footnote)
+                                    }
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                 }
+                                .frame(minHeight: 44)
                             }
                             .accessibilityIdentifier("settings-replay-tour")
+                            Divider()
                         }
-
-                    }
-
-                    WidgetSettingsContent()
-
-                    NavigationLink {
-                        AboutView()
-                    } label: {
-                        HStack {
-                            Text("About")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
+                        NavigationLink {
+                            AboutView()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("About").font(.headline).foregroundStyle(SN.leaf)
+                                    Text("Licensing, acknowledgements, and privacy")
+                                        .font(.footnote)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .frame(minHeight: 44)
                         }
-                        .foregroundStyle(SN.leaf)
-                        .padding(16)
-                        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .accessibilityIdentifier("settings-about-row")
                     }
-                    .accessibilityIdentifier("settings-about-row")
 
                 }
                 .padding(20)
                 .padding(.bottom, 30)
             }
             .background(CanvasBackground())
+            .sheet(isPresented: $showPremium) { PremiumView() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(SN.canvas, for: .navigationBar)
@@ -189,11 +218,19 @@ struct SettingsView: View {
             })
     }
 
-    @ViewBuilder private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {
+    @ViewBuilder private func section(_ label: String, premium: Bool = false, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: label, isHeader: true)
+            HStack {
+                MonoLabel(text: label, isHeader: true)
+                if premium {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(SN.leaf)
+                        .accessibilityLabel("Premium")
+                }
+            }
             content()
                 .font(.footnote)
+                .multilineTextAlignment(.leading)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
         }

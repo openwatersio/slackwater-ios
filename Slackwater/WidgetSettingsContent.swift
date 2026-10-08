@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Free and Premium widgets, with previews and add instructions.
+// Slackwater — GPL v3. Free widgets, with previews and add instructions.
 import SwiftUI
 
 struct WidgetSettingsContent: View {
@@ -45,39 +45,6 @@ struct WidgetSettingsContent: View {
                     }
                 }
             }
-            #if PREMIUM_ENABLED
-                if platform == .mobile {
-                    group(
-                        String(localized: "Lock screen — Premium", comment: "Settings widget section title."),
-                        note: String(
-                            localized:
-                                "Long-press your lock screen → Customize → add Slackwater above or below the clock.",
-                            comment: "Instructions for adding a lock-screen widget."),
-                        rows: [
-                            (
-                                String(localized: "Next Slack (inline)", comment: "Widget name and family."),
-                                "lock.iphone",
-                                String(
-                                    localized: "Above the clock: the next event and time.",
-                                    comment: "Inline widget description.")
-                            ),
-                            (
-                                String(localized: "Next Event (circular)", comment: "Widget name and family."),
-                                "circle.dashed",
-                                String(
-                                    localized: "A glance: arrow and time.", comment: "Circular widget description.")
-                            ),
-                            (
-                                String(localized: "Slack Window (rectangular)", comment: "Widget name and family."),
-                                "rectangle.dashed",
-                                String(
-                                    localized: "Next event plus the workable window.",
-                                    comment: "Rectangular widget description.")
-                            ),
-                        ], premium: true
-                    ) {}
-                }
-            #endif
         }
         .task {
             guard platform != .tv else { return }
@@ -103,23 +70,11 @@ struct WidgetSettingsContent: View {
 
     @ViewBuilder private func group(
         _ title: String, note: String,
-        rows: [(String, String, String)], premium: Bool = false,
+        rows: [(String, String, String)],
         @ViewBuilder previews: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if premium {
-                Label {
-                    MonoLabel(text: title)
-                } icon: {
-                    Image(systemName: "sparkles").foregroundStyle(SN.leaf)
-                }
-                // The trait goes on the Label, not its title: a Label is one
-                // accessibility element and the title view's own traits are
-                // not that element's.
-                .accessibilityAddTraits(.isHeader)
-            } else {
-                MonoLabel(text: title, isHeader: true)
-            }
+            MonoLabel(text: title, isHeader: true)
             previews()
             ForEach(rows, id: \.0) { row in
                 HStack(alignment: .top, spacing: 10) {

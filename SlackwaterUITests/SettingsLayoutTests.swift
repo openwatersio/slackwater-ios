@@ -2,6 +2,52 @@
 import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
+    func testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage() {
+        let app = launch("-seedGate", "-locDenied", "-resetFavorites")
+        openSettings(app)
+        save(app, "settings-premium-top.png")
+        for (rowID, page) in [("settings-alerts-row", "Alerts"),
+                              ("settings-calendar-row", "Favourites calendars")] {
+            let row = rowID == "settings-alerts-row"
+                ? app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Press and hold any station")).firstMatch
+                : app.buttons[rowID].firstMatch
+            scrollTo(row, in: app)
+            XCTAssertTrue(row.isHittable)
+            row.tap()
+            XCTAssert(app.navigationBars[page].appears(within: 5))
+            let requirement = app.buttons["Requires Slackwater Premium"].firstMatch
+            guard requirement.appears(within: 5) else {
+                XCTFail("The premium requirement must be a button that opens the purchase sheet")
+                return
+            }
+            save(app, rowID + ".png")
+            requirement.tap()
+            XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+            app.buttons["premium-done"].tap()
+            XCTAssert(app.navigationBars[page].appears(within: 5))
+            app.navigationBars.buttons.firstMatch.tap()
+        }
+        let support = app.buttons["settings-premium-cta"]
+        scrollTo(support, in: app)
+        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
+        save(app, "settings-premium-section.png")
+        support.tap()
+        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
+        save(app, "premium-visuals-top.png")
+        let restore = app.buttons["Restore purchase"]
+        scrollTo(restore, in: app)
+        XCTAssertTrue(restore.isHittable)
+        XCTAssert(app.otherElements["premium-preview-calendar"].exists)
+        XCTAssert(app.otherElements["premium-preview-alert"].exists)
+        save(app, "premium-visuals-bottom.png")
+        app.buttons["premium-done"].tap()
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        let about = app.buttons["settings-about-row"]
+        scrollTo(about, in: app)
+        save(app, "settings-learn-about.png")
+    }
+
     func testHeightDefaultsUseRegionAndPreserveAnExplicitChoice() {
         for (region, selected) in [("US", "Feet"), ("FR", "Meters")] {
             let app = launch("-seedGate", "-locDenied", "-resetUnits",
@@ -225,6 +271,12 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["You have Premium — thank you."].exists)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "supporter-sheet.png")
+        app.buttons["premium-done"].tap()
+        openSettings(app)
+        let settingsSupport = app.buttons["settings-premium-cta"]
+        scrollTo(settingsSupport, in: app)
+        XCTAssertTrue(settingsSupport.label.contains("Slackwater supporter"))
+        save(app, "settings-supporter.png")
     }
 
     func testSupportSheetOpensAndClosesFromTheFooter() {
@@ -235,6 +287,8 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "support-footer.png")
         support.tap()
         XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5), "The lock-screen example must load before showing purchase controls")
+        scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
         save(app, "support-sheet.png")
         app.buttons["premium-done"].tap()

@@ -44,6 +44,7 @@ final class AlertPopupTests: ScreenshotTestCase {
         app.buttons["alert-popup-once"].tap()
 
         XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
     }
 

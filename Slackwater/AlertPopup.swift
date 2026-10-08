@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Two rows and a header naming what the press landed on. No lead picker: half an hour, and
 /// the Alerts screen changes it. Without Premium both rows open the Support Slackwater sheet and no rule
-/// is made — this is the third and last upsell surface (widgets-premium §5).
+/// is made. The same sheet opens from the Premium links in Settings.
 struct AlertPopup: View {
     let stationID: String
     let offer: AlertTrigger

@@ -8268,89 +8268,6 @@
         }
       }
     },
-    "A glance: arrow and time." : {
-      "comment" : "Circular widget description.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Et hurtigt blik: pil og tid."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auf einen Blick: Pfeil und Zeit."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De un vistazo: flecha y hora."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nuoli ja aika yhdellä silmäyksellä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un aperçu : flèche et heure."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A colpo d’occhio: freccia e ora."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "矢印と時刻をひと目で。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "화살표와 시간을 한눈에."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Et blikk: pil og tid."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In één oogopslag: pijl en tijd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Num relance: seta e hora."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Num relance: seta e hora."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En snabb blick: pil och tid."
-          }
-        }
-      }
-    },
     "A sliver, growing a little fuller each night." : {
       "comment" : "Plain-language explanation of a waxing crescent moon.",
       "localizations" : {
@@ -9418,89 +9335,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Om dessa prognoser"
-          }
-        }
-      }
-    },
-    "Above the clock: the next event and time." : {
-      "comment" : "Inline widget description.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Over uret: næste begivenhed og tidspunkt."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Über der Uhr: nächstes Ereignis und Zeit."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sobre el reloj: el próximo evento y su hora."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kellon yläpuolella: seuraava tapahtuma ja aika."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Au-dessus de l’horloge : le prochain événement et l’heure."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sopra l’orologio: prossimo evento e ora."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時計の上に、次の変化と時刻を表示。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "시계 위에 다음 현상과 시간 표시."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Over klokken: neste hendelse og tid."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boven de klok: de volgende gebeurtenis en tijd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Acima do relógio: próximo evento e hora."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Acima do relógio: próximo evento e hora."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ovanför klockan: nästa händelse och tid."
           }
         }
       }
@@ -26565,89 +26399,6 @@
         }
       }
     },
-    "Next Event (circular)" : {
-      "comment" : "Widget name and family.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Næste begivenhed (rund)"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nächstes Ereignis (rund)"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Evento siguiente (circular)"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seuraava tapahtuma (pyöreä)"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Événement suivant (circulaire)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prossimo evento (circolare)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次の変化（円形）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 현상 (원형)"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neste hendelse (sirkel)"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Volgende gebeurtenis (rond)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximo evento (circular)"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximo evento (circular)"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nästa händelse (rund)"
-          }
-        }
-      }
-    },
     "Next event plus the workable window." : {
       "comment" : "Rectangular widget description.",
       "localizations" : {
@@ -27308,89 +27059,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nästa strömstilla"
-          }
-        }
-      }
-    },
-    "Next Slack (inline)" : {
-      "comment" : "Widget name and family.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Næste strømstille (på linjen)"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nächstes Stauwasser (einzeilig)"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próxima estoa (en línea)"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seuraava virran tyyntyminen (rivillä)"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Étale suivante (en ligne)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prossima stanca (in linea)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次の潮止まり（インライン）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 정조 (인라인)"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neste strømstille (på én linje)"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Volgende kentering (in regel)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximo estofo (em linha)"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximo estofo (em linha)"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nästa strömstilla (på raden)"
           }
         }
       }
@@ -38280,89 +37948,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strömstilla period"
-          }
-        }
-      }
-    },
-    "Slack Window (rectangular)" : {
-      "comment" : "Widget name and family.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstille periode (rektangulær)"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stauwasserfenster (rechteckig)"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ventana de estoa (rectangular)"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heikon virtauksen jakso (suorakulmio)"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fenêtre d’étale (rectangulaire)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finestra di stanca (rettangolare)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "潮止まり時間帯（長方形）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정조 시간대 (직사각형)"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstillevindu (rektangel)"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kenteringsvenster (rechthoekig)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Janela de estofo (retangular)"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Período de estofo (retangular)"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strömstilla period (rektangulär)"
           }
         }
       }
@@ -50023,6 +49608,273 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nedladdade prognoser förblir tillgängliga offline. Öppna en annan kanadensisk station för att ladda ned den."
+          }
+        }
+      }
+    },
+    "A reminder before you go" : {
+      "comment" : "Caption in a sample Premium alert, not a scheduled notification.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En påmindelse før du tager af sted"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Erinnerung vor dem Aufbruch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A reminder before you go"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un recordatorio antes de salir"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muistutus ennen lähtöä"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rappel avant de partir"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un promemoria prima di partire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出発前にリマインダー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "출발 전 알림"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En påminnelse før du drar"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een herinnering voordat je vertrekt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um lembrete antes de sair"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um lembrete antes de sair"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En påminnelse innan du ger dig av"
+          }
+        }
+      }
+    },
+    "Spend less time checking and more time on the water. Get a reminder once or every time, with advance notice and daylight-only alerts." : {
+      "comment" : "Benefits below the alerts list: one-time or recurring reminders, configurable lead time, and daylight filter.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brug mindre tid på at tjekke og mere tid på vandet. Få en påmindelse én gang eller hver gang, med forvarsel og alarmer kun i dagslys."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weniger nachsehen, mehr Zeit auf dem Wasser. Lass dich einmalig oder jedes Mal erinnern – mit Vorlaufzeit und auf Wunsch nur bei Tageslicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spend less time checking and more time on the water. Get a reminder once or every time, with advance notice and daylight-only alerts."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dedica menos tiempo a consultar y más a disfrutar del agua. Recibe un recordatorio una vez o cada vez, con aviso previo y alertas solo de día."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vähemmän tarkistamista, enemmän aikaa vesillä. Saat muistutuksen kerran tai joka kerta, ennakkoon ja halutessasi vain päivänvalossa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passez moins de temps à vérifier et plus de temps sur l’eau. Recevez un rappel une fois ou à chaque occurrence, avec un préavis et des alertes limitées au jour."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meno tempo a controllare, più tempo sull’acqua. Ricevi un promemoria una volta o ogni volta, con preavviso e avvisi solo nelle ore di luce."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認する時間を減らし、水辺で過ごす時間を増やしましょう。1回だけ、または毎回のリマインダーを設定でき、事前通知や日中のみの通知も選べます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인하는 시간은 줄이고 물 위에서 보내는 시간을 늘리세요. 한 번 또는 매번 미리 알림을 받고, 낮 시간에만 알림을 받도록 설정할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bruk mindre tid på å sjekke og mer tid på vannet. Få en påminnelse én gang eller hver gang, med forhåndsvarsel og varsler bare i dagslys."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besteed minder tijd aan controleren en meer tijd op het water. Ontvang eenmalig of elke keer een herinnering, vooraf en desgewenst alleen bij daglicht."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passe menos tempo conferindo e mais tempo na água. Receba um lembrete uma vez ou sempre, com aviso antecipado e alertas apenas durante o dia."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passe menos tempo a verificar e mais tempo na água. Receba um lembrete uma vez ou sempre, com aviso antecipado e alertas apenas durante o dia."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lägg mindre tid på att kontrollera och mer tid på vattnet. Få en påminnelse en gång eller varje gång, med förvarning och aviseringar bara i dagsljus."
+          }
+        }
+      }
+    },
+    "Licensing, acknowledgements, and privacy" : {
+      "comment" : "About row subtitle: licenses, credits, and privacy information.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenser, anerkendelser og privatliv"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lizenzen, Danksagungen und Datenschutz"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licensing, acknowledgements, and privacy"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licencias, agradecimientos y privacidad"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisenssit, kiitokset ja tietosuoja"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences, remerciements et confidentialité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenze, riconoscimenti e privacy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス、謝辞、プライバシー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이선스, 감사의 글 및 개인정보 보호"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisenser, anerkjennelser og personvern"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenties, dankbetuigingen en privacy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenças, agradecimentos e privacidade"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenças, agradecimentos e privacidade"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenser, erkännanden och integritet"
           }
         }
       }
