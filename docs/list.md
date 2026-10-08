@@ -318,10 +318,11 @@ After the gate, if the coach-mark tour has not been seen and no search handoff o
 ## 12. Accessibility
 
 - Each card is one element that activates its station. Its reading must be one spoken phrase, such as "4.2 feet, rising", rather than separate number, unit, word, and arrow stops (see §15).
-- Section headings are headings, heard in their written case.
+- Section headings are headings, heard in their written case. A label that names a group is one; a card's eyebrow, a status line, and the search truncation notice are not.
 - The series chips are selectable buttons with a selected state.
 - Search hides the surface beneath it from assistive technology.
 - Reading order follows visual order.
+- With Reduce Motion, the map preview card and the station chooser's scroll land without animation.
 - At large text sizes names shrink before truncating, regions, status strips, and coordinates wrap, the distance drops first, chips wrap, the search field grows, and the action buttons stay 56 units with a clearance that scales with them.
 
 Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 by 48 dp on Android.
@@ -390,6 +391,7 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 21. **No search match:** A completed search with no match shows "No matches" and keeps the series filter visible.
 22. **Approximate fix:** My Location says "Approximate location" instead of precise coordinates when iOS supplies reduced accuracy.
 23. **Slack threshold:** Changing comfort current changes the example window in Settings and refreshes measured-current cards already mounted in the list or map preview.
+24. **Heading navigation:** With a fix, a favorite, and a recent, the headings rotor steps through My Location, Favorites, Near Me, and Recents, and stops on nothing inside a card.
 
 ## 15. Known iOS deviations from the intended contract
 
@@ -397,7 +399,6 @@ These are implementation gaps, not behavior to copy to another platform:
 
 - A list card's reading is not combined into one spoken phrase; VoiceOver reads the number, unit, word, and unlabelled arrow separately. Widgets already speak the combined phrase.
 - List cards are not announced as buttons; the map preview card is.
-- Section labels are not marked as headings, so heading navigation skips them.
 - The first-run tour reads the device location without checking authorization, unlike the ranking anchor.
 Fixing one of these should update this section and add or amend a conformance scenario.
 

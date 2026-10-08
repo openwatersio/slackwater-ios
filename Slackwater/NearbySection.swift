@@ -38,7 +38,8 @@ struct NearbySection: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                MonoLabel(text: String(localized: "Nearby", comment: "Nearby-stations section heading."))
+                MonoLabel(text: String(localized: "Nearby", comment: "Nearby-stations section heading."),
+                          isHeader: true)
                 Spacer(minLength: 8)
                 SeriesFilterChips()
             }

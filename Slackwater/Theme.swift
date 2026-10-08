@@ -56,6 +56,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @State private var tourArrived = false
     @State private var showPicker = false
     @State private var showAlertPopup = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -227,7 +228,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 // anchor (TourMarkLayer) — so scroll to `.stars`' id for it
                 // too. Smaller than publishing a second id for the same spot.
                 let scrollID = step == .moon ? .stars : step
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
                     scrollProxy.scrollTo(scrollID, anchor: .center)
                 }
             }

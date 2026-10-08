@@ -113,8 +113,12 @@ struct WidgetSettingsContent: View {
                 } icon: {
                     Image(systemName: "sparkles").foregroundStyle(SN.leaf)
                 }
+                // The trait goes on the Label, not its title: a Label is one
+                // accessibility element and the title view's own traits are
+                // not that element's.
+                .accessibilityAddTraits(.isHeader)
             } else {
-                MonoLabel(text: title)
+                MonoLabel(text: title, isHeader: true)
             }
             previews()
             ForEach(rows, id: \.0) { row in

@@ -1251,6 +1251,7 @@ struct MultiDaySchedule: View {
     @State private var expandedOffset: Int? = 0
     @State private var sunDay: SunDaySelection?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1300,7 +1301,11 @@ struct MultiDaySchedule: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation { expandedOffset = expanded ? nil : group.offset }
+                        // A nil animation is the no-motion path: the rows
+                        // appear at once rather than sliding open (#602).
+                        withAnimation(reduceMotion ? nil : .default) {
+                            expandedOffset = expanded ? nil : group.offset
+                        }
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityAddTraits(.isButton)
