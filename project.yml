@@ -45,7 +45,7 @@ packages:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.
     url: https://github.com/openwatersio/slackwater-database
-    exactVersion: 1.0.0-beta.20260930
+    exactVersion: 1.0.0-beta.20261009
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0

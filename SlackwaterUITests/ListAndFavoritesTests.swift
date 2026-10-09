@@ -134,7 +134,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["My Location"].exists)
         XCTAssert(app.staticTexts["Chesapeake Bay"].exists)
         XCTAssert(app.staticTexts["Annapolis (US Naval Academy)"].firstMatch.exists)
-        XCTAssert(app.staticTexts["Greenbury Point"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Greenbury Point, 1.6 nm east of"].firstMatch.exists)
     }
 
     /// Past the gate with the choice never made — the "or search" bypass, or
@@ -396,44 +396,42 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     // MARK: - Station identity presentation
 
     /// Same-named stations render as ONE entry in the list, with the namesakes
-    /// behind the chooser on the station page — two "Discovery Island" cards
+    /// behind the chooser on the station page — four "Cape Cod Canal" cards
     /// side by side look identical. Pick the non-nearest one from that chooser
     /// and the list shows that one from then on.
     func testM50MatchingStationChooser() throws {
         // Upright: the split-layout test leaves the device in landscape, and
         // these screenshots are the ones a human reads.
         XCUIDevice.shared.orientation = .portrait
-        // The fix is put ON Discovery Island, not on Victoria: at national
-        // scale the six stations nearest a Victoria fix are all harbour gauges
-        // inside 5 km, which is what Near Me is FOR and not what this test is
-        // about. Standing at the station is the deterministic way to put a
-        // collided name in the list.
+        // The fix is put ON the Bournedale gauge: standing at the station is
+        // the deterministic way to put a collided name at the top of the list.
         let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
-                         "-fixLat", "48.452", "-fixLon", "-123.155")  // Discovery Island
+                         "-fixLat", "41.77", "-fixLon", "-70.5617")  // Cape Cod Canal, Bournedale
         XCTAssert(app.staticTexts["Near Me"].appears(within: 10))
 
-        // One entry, not two: the nearer Discovery Island renders, the farther
-        // one is behind the chooser.
+        // One entry, not four: the nearest gauge renders, the others are
+        // behind the chooser. Sagamore, 2.3 km away, would rank in Near Me.
         // Scoped to the LIST: at regular width the detail pane auto-opens on the
         // first row, so an unscoped count also picks up its header title.
         let cards = listContainer(app).staticTexts
-            .matching(NSPredicate(format: "label == %@", "Discovery Island"))
+            .matching(NSPredicate(format: "label == %@", "Cape Cod Canal"))
         XCTAssertEqual(cards.count, 1, "same-named stations must render as one entry")
-        XCTAssert(app.staticTexts["3.0 nm NE"].firstMatch.exists, "the nearest one is the entry")
-        XCTAssertFalse(app.staticTexts["6.6 nm SSE"].exists,
-                       "the farther namesake must not render as its own card")
+        XCTAssertFalse(listContainer(app).staticTexts["Sagamore"].exists,
+                       "a farther namesake must not render as its own card")
 
-        // The list offers no chooser; the station page does, beside its tide
-        // link. Three since #268: the NOAA subordinate "2.6 nm SSE" (PCT1411)
-        // joined the two harmonic stations, and the count leaves out the one
-        // on screen.
+        // The list offers no chooser; the station page does.
         XCTAssertFalse(listContainer(app).descendants(matching: .any)["matching-stations"].exists,
                        "the list must not offer the chooser")
-        listContainer(app).staticTexts["3.0 nm NE"].firstMatch.tap()
-        XCTAssert(app.otherElements["detail-header"].appears(within: 8), "the entry did not open its station")
+        cards.firstMatch.tap()
+        let header = app.otherElements["detail-header"].firstMatch
+        XCTAssert(header.appears(within: 8), "the entry did not open its station")
+        // By region, scoped to the header: a current station named Bournedale
+        // sits 600 m away, so a bare text match would find its card instead.
+        XCTAssert(header.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bournedale"))
+            .firstMatch.exists, "the nearest one is the entry")
         let chooserButton = app.buttons["matching-stations"].firstMatch
         XCTAssert(chooserButton.appears(within: 8), "no matching-station affordance on the station page")
-        XCTAssertEqual(chooserButton.label, "Other locations (2)")
+        XCTAssertEqual(chooserButton.label, "Other locations (3)")
         chooserButton.tap()
 
         XCTAssert(app.descendants(matching: .any)["station-chooser"].firstMatch.appears(within: 5),
@@ -443,21 +441,21 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         }
         let rows = app.buttons.matching(identifier: "chooser-station")
         XCTAssert(rows.firstMatch.appears(within: 5))
-        XCTAssertEqual(rows.count, 3)
-        let shownRow = labelled(rows, "3.0 nm NE of Discovery Island")
-        let farRow = labelled(rows, "6.6 nm SSE of Discovery Island")
+        XCTAssertEqual(rows.count, 4)
+        let shownRow = labelled(rows, "Cape Cod Canal, Bournedale")
+        let farRow = labelled(rows, "Cape Cod Canal, RR. Bridge")
         XCTAssert(farRow.exists, "the chooser must offer the station the list collapsed")
         XCTAssert(shownRow.isSelected, "the chooser must open on the station the list shows")
         XCTAssert(labelled(rows, "from you").exists, "a row must say what its distance is from")
-        XCTAssert(app.staticTexts["Current · NOAA"].firstMatch.exists,
+        XCTAssert(app.staticTexts["Tide · NOAA"].firstMatch.exists,
                   "a chooser row must say what it measures and whose data it is")
 
         // The map holds exactly the candidates; a pin selects its row and
         // does not open the station.
         let pins = app.buttons.matching(identifier: "chooser-pin")
         XCTAssert(pins.firstMatch.appears(within: 15), "the chooser map drew no pins")
-        XCTAssertEqual(pins.count, 3)
-        let farPin = labelled(pins, "6.6 nm SSE of Discovery Island")
+        XCTAssertEqual(pins.count, 4)
+        let farPin = labelled(pins, "Cape Cod Canal, RR. Bridge")
         farPin.tap()
         wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: farRow)],
              timeout: 5)
@@ -471,23 +469,21 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Picking the collapsed one opens it — it is not lost, just quiet.
         farRow.tap()
-        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "6.6 nm SSE"))
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "RR. Bridge"))
             .firstMatch.appears(within: 8), "the chooser pick did not open that station")
         save(app, "chooser-detail-link.png")
 
         // The pick opened on top of the nearest station's page: back twice to
         // the list, which remembers it — the chosen station takes the place's
-        // entry. Each station's region is literally its bearing string, so a
-        // bare text match is unambiguous.
-        // Landed on the nearest station's page, by its region in the header —
-        // the pushed page has a header and a back button of its own, so
-        // neither says which page is showing. Scoped to the header: the iPad
-        // sidebar carries the same string.
+        // entry. Landed on the nearest station's page, by its region in the
+        // header — the pushed page has a header and a back button of its own,
+        // so neither says which page is showing. Scoped to the header: the
+        // iPad sidebar carries the same string.
         goBack(app, to: app.otherElements["detail-header"].firstMatch.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS %@", "3.0 nm NE")).firstMatch)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Bournedale")).firstMatch)
         goBack(app)
         let list = listContainer(app)
-        XCTAssert(list.staticTexts["6.6 nm SSE"].firstMatch.appears(within: 5),
+        XCTAssert(list.staticTexts["RR. Bridge"].firstMatch.appears(within: 5),
                   "the list must show the chosen station")
         // The previously opened namesake remains in Recents below this replacement.
         save(app, "chooser-remembered.png")
@@ -510,7 +506,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "discovery island")
-        pickSearchResult(app, app.staticTexts["3.0 nm NE"].firstMatch)
+        pickSearchResult(app, app.staticTexts["Discovery Island, 3.0 nm NE of"].firstMatch)
         XCTAssert(app.otherElements["detail-header"].appears(within: 8))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch.exists,
                        "an unpaired current station has no reference port to link")

@@ -16,7 +16,7 @@ final class MaxSheetTests: ScreenshotTestCase {
     /// so it has a fortnight to rank against.
     func testTheNextMaxTileOpensASheetWithBothSections() throws {
         let app = launch("-seedGate")
-        openSearch(app, "deception")
+        openSearch(app, "deception pass (n")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10), "current detail did not render")
 
@@ -39,7 +39,7 @@ final class MaxSheetTests: ScreenshotTestCase {
     /// whether the maximum marks or not.
     func testTheCaptionAlwaysCarriesATime() throws {
         let app = launch("-seedGate")
-        openSearch(app, "deception")
+        openSearch(app, "deception pass (n")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10))
         XCTAssert(nextMaxTile(app).appears(within: 10), "no Next max tile")
