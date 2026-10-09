@@ -167,7 +167,7 @@ Each display name is at most 30 characters and each description at most 45, and 
 | `pt-PT`                  | Premium anual         | Premium vitalício      | Alertas, calendários, ecrã bloqueado e Watch  |
 | `sv`                     | Premium årsabonnemang | Premium livstid        | Aviseringar, kalendrar, låsskärm och Watch    |
 
-The subscription group's display name is "Slackwater Premium" in every locale, a brand name that needs no translation; Apple refuses special characters in it. The group shows the app's own name above it on the Manage Subscriptions page.
+The subscription group needs one localization, `en-US`, with the display name "Slackwater Premium"; without any, App Store Connect holds its subscriptions at Missing Metadata. Other languages fall back to it, and a brand name needs no translation, so the group has no other localizations. Apple refuses special characters in the name. The group shows the app's own name above it on the Manage Subscriptions page.
 
 ### Review information
 
@@ -211,5 +211,5 @@ Review notes for Premium Lifetime:
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
 - [ ] Station counts re-derived and rounded down.
 - [ ] Both Premium products attached to the version while the build sells them. A first in-app purchase goes to App Review with a version, and a purchase sheet whose products App Review cannot load is rejected under 2.1. `asc.mjs submit` stops on a submission holding an in-app purchase, so that submission goes through the App Store Connect UI.
-- [ ] Each product's localizations, review notes and review screenshot entered from [In-app purchases](#in-app-purchases), and the subscription group's display name in every locale.
+- [ ] Each product's localizations, review notes and review screenshot entered from [In-app purchases](#in-app-purchases), and the subscription group's `en-US` display name.
 - [ ] After approval: the hand check in #610 done, then the Accessibility Nutrition Labels published, iPhone and iPad with `asc.mjs accessibility --yes` and Apple Watch in the UI, claiming only the cells that say Yes.
