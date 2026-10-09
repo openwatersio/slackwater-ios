@@ -1048,8 +1048,6 @@ struct StationListView: View {
                             if premium.isPremium {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter."))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
                                     Text("You have Premium — thank you.")
                                         .font(.caption)
                                         .foregroundStyle(SN.foam.opacity(0.6))
