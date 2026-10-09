@@ -1044,11 +1044,17 @@ struct StationListView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles").frame(width: 28)
-                            Text(premium.isPremium
-                                 ? String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter.")
-                                 : String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
+                                .foregroundStyle(premium.isPremium ? SN.leaf : SN.foam)
                             if premium.isPremium {
-                                Text(verbatim: "❇").accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter."))
+                                    Text("You have Premium — thank you.")
+                                        .font(.caption)
+                                        .foregroundStyle(SN.foam.opacity(0.6))
+                                }
+                                .padding(.vertical, 8)
+                            } else {
+                                Text(String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
