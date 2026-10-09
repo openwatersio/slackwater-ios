@@ -3,7 +3,7 @@
 import Foundation
 import SlackwaterKit
 
-enum WidgetStation {
+enum WidgetStation: Sendable {
     case tide(any TidePredicting, tz: TimeZone, name: String)
     case current(any CurrentPredicting, tz: TimeZone, name: String)
     case derived(DerivedSlackStation, tz: TimeZone, name: String)
@@ -16,7 +16,7 @@ enum WidgetStation {
     }
 }
 
-enum WidgetRecord {
+enum WidgetRecord: Sendable {
     case tide(TideStationRecord, station: any TidePredicting)
     case current(CurrentStationRecord, station: any CurrentPredicting)
     case derived(DerivedGateRecord)

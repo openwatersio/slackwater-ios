@@ -7,7 +7,7 @@ import WidgetKit
 
 /// Most-recent-first, capped at 6 (prototype addRecent slice(0,6)), persisted
 /// in UserDefaults. Recorded by the detail views on appear.
-final class RecentsStore: ObservableObject {
+@MainActor final class RecentsStore: ObservableObject {
     static let shared = RecentsStore()
     private static let key = AppGroup.recentsKey
 
@@ -67,7 +67,7 @@ final class RecentsStore: ObservableObject {
 /// ponytail: RecentsStore keeps the same shape and stays device-local on
 /// purpose. Recents are a record of what you did on *this* device; favourites
 /// are the list you curated. Sync them if that ever stops being true.
-final class FavoritesStore: ObservableObject {
+@MainActor final class FavoritesStore: ObservableObject {
     static let shared = FavoritesStore()
     private static let key = AppGroup.favoritesKey
     /// Set once this device's list has been written out as per-station cloud
@@ -100,7 +100,14 @@ final class FavoritesStore: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: cloud, queue: .main
-        ) { [weak self] note in self?.cloudChanged(note, cloud) }
+        ) { [weak self] note in
+            let accountChanged = note.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+                == NSUbiquitousKeyValueStoreAccountChange
+            MainActor.assumeIsolated {
+                guard let cloud = FavoritesCloud.store else { return }
+                self?.cloudChanged(accountChanged: accountChanged, cloud: cloud)
+            }
+        }
         cloud.synchronize()
         adopt(cloud)
     }
@@ -168,13 +175,12 @@ final class FavoritesStore: ObservableObject {
         FavoritesCloud.store?.removeObject(forKey: FavoritesCloud.prefix + id)
     }
 
-    private func cloudChanged(_ note: Notification, _ cloud: NSUbiquitousKeyValueStore) {
+    private func cloudChanged(accountChanged: Bool, cloud: NSUbiquitousKeyValueStore) {
         // Signing in or out of iCloud hands us a different store, usually an
         // empty one. Adopting that erases a list the user can still see on this
         // device, so treat the new account as never-migrated and let this
         // device's stars seed it instead.
-        if note.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
-            == NSUbiquitousKeyValueStoreAccountChange {
+        if accountChanged {
             AppGroup.defaults.set(false, forKey: Self.migratedKey)
         }
         adopt(cloud)

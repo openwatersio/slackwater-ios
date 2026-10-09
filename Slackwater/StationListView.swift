@@ -191,18 +191,18 @@ struct StationListView: View {
         // sheet or pushed screen the tap came from, so a detail that opened
         // the sheet stays under the newly pushed route on the back stack —
         // correct behavior, not a side effect to work around.
-        .environment(\.openChsRoute, openChsRoute)
+        .environment(\.openChsRoute, { openChsRoute($0) })
         // Same attachment point, same reasoning — the detail header lives
         // inside a pushed detail in both layouts, so ordinary ancestor
         // inheritance from here is enough; no `.sheet` re-forward needed
         // because a station detail never appears inside Settings or Downloads.
-        .environment(\.openMapFocused, openMapFocused)
+        .environment(\.openMapFocused, { openMapFocused($0, $1) })
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
         .sheet(isPresented: $showSettings) {
-            SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, openChsRoute)
+            SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, { openChsRoute($0) })
         }
         // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
         // a separate presentation hierarchy that only crosses SYSTEM
@@ -212,7 +212,7 @@ struct StationListView: View {
         // `dismiss()` fired, the following `openChsRoute(route)` silently did
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
-        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, { openChsRoute($0) }) }
         .sheet(isPresented: $showPremium) {
             PremiumView()
         }

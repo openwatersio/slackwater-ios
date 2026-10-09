@@ -5,7 +5,7 @@ import SwiftUI
 @testable import Slackwater
 import SlackwaterKit
 
-final class WidgetSnapshotTests: XCTestCase {
+@MainActor final class WidgetSnapshotTests: XCTestCase {
     var friday: WidgetStation { WidgetStationLoader.load(id: TideStationRecord.fridayHarborID)! }
     var current: WidgetStation {
         WidgetStationLoader.load(id: "current:" + CurrentStationRecord.all.first!.id)!

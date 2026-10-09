@@ -48,7 +48,7 @@ import UserNotifications
 }
 
 final class AlertNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = AlertNotificationDelegate()
+    @MainActor static let shared = AlertNotificationDelegate()
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {

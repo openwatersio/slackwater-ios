@@ -13,8 +13,8 @@ struct StationMapFlow {
 }
 
 /// The fitted Dodd model, reduced to one local map-flow reading.
-final class DoddMapFlowProvider {
-    private let flowAtDate: (Date) -> StationMapFlow?
+final class DoddMapFlowProvider: Sendable {
+    private let flowAtDate: @Sendable (Date) -> StationMapFlow?
 
     /// Production reads only the fitted Dodd model. A missing model stays
     /// absent rather than inventing a map flow.
@@ -32,7 +32,7 @@ final class DoddMapFlowProvider {
     }
 
     /// Test seam: keep model-store I/O outside pure flow behavior tests.
-    init(gate: CurrentStationRecord, signedSpeed: @escaping (Date) -> Double?) {
+    init(gate: CurrentStationRecord, signedSpeed: @escaping @Sendable (Date) -> Double?) {
         flowAtDate = { date in
             guard let signedKn = signedSpeed(date) else { return nil }
             return Self.flow(gate: gate, signedKn: signedKn)

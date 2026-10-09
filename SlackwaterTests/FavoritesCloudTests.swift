@@ -112,7 +112,7 @@ final class FavoritesCloudTests: XCTestCase {
     /// one guarantee: no real KVS. The simulator's store outlives the run, so
     /// one seeded test would leak its stars into the next launch that expects
     /// a clean device.
-    func testTheStoreIsUnavailableUnderTest() {
+    @MainActor func testTheStoreIsUnavailableUnderTest() {
         XCTAssertNil(FavoritesCloud.store)
     }
 }

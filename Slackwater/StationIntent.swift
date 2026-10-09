@@ -21,7 +21,8 @@ struct StationChoice: AppEntity {
 
 struct StationQuery: EntityQuery {
     private let locator: CatalogFileLocator
-    private let defaults: UserDefaults
+    // UserDefaults is thread-safe; EntityQuery requires the enclosing value to be Sendable.
+    nonisolated(unsafe) private let defaults: UserDefaults
     private let currentLocation = StationChoice(
         id: AppGroup.currentLocationStationID,
         name: String(localized: "Any Station", comment: "Widget station-picker choice that follows the nearest station."))

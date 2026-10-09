@@ -15,7 +15,8 @@ enum AppGroup {
     /// installed device to read this), so migration is the caller's job:
     /// `SlackwaterApp.init()` runs `migrateIfNeeded` explicitly, first thing,
     /// before anything touches FavoritesStore/RecentsStore/ChsFitService.
-    static let defaults: UserDefaults = {
+    // UserDefaults synchronizes its own access: https://developer.apple.com/documentation/foundation/userdefaults
+    nonisolated(unsafe) static let defaults: UserDefaults = {
         validateEntitlement(
             containerURL: FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id

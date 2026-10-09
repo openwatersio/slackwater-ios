@@ -16,7 +16,7 @@ import UIKit
 /// the first magnet after a scrub wedges the coordinator for the life of the
 /// detail — `magnet` returns early ever after, and every later scrub leaves
 /// the readout exactly where it was.
-private var landsInstantly: Bool {
+@MainActor private var landsInstantly: Bool {
     UIAccessibility.isReduceMotionEnabled || uiTestQuiet
 }
 
@@ -24,7 +24,7 @@ private var landsInstantly: Bool {
 /// Folding swaps the phone stack for the split view (or back) and SwiftUI
 /// rebuilds the detail with it, so the strip that comes back would open on
 /// now. One slot: a phone shows one detail.
-enum FoldHandoff {
+@MainActor enum FoldHandoff {
     struct Moment {
         let stationID: String
         let time: Date

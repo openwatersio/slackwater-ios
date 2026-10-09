@@ -1,23 +1,23 @@
 import XCTest
 @testable import Slackwater
 
-final class UnitsCloudTests: XCTestCase {
+@MainActor final class UnitsCloudTests: XCTestCase {
     private var defaults: UserDefaults!
     private var suite: String!
     private var cloud: MemoryUnitsCloud!
     private var reloads = 0
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         suite = "UnitsCloudTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)!
         cloud = MemoryUnitsCloud()
         reloads = 0
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suite)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func sync() -> UnitsCloud {

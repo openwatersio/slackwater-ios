@@ -77,7 +77,7 @@ private struct PatchHeader: Decodable {
 /// vends per-cell `FillCell`s (for the fill render path) or `PatchSample`s
 /// (channel-2 oriented) evaluated at a given instant. `init?` fails on any
 /// missing/malformed resource or header — there is no partial-load state.
-final class PatchField {
+final class PatchField: Sendable {
     private let bin: [UInt8]
     private let header: PatchHeader
 

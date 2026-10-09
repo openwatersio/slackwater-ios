@@ -5,7 +5,7 @@ import Foundation
 #if DEBUG
 /// The launch-argument hooks a UI test drives the app with, applied once from
 /// `SlackwaterApp.init` before anything reads the state they write.
-func applySeedHooksIfRequested() {
+@MainActor func applySeedHooksIfRequested() {
     // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
     // gate; -seedGate skips it (arguments-domain values would mask the
     // in-app write, so tests set persisted state explicitly instead).

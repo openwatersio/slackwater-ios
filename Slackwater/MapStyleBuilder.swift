@@ -60,7 +60,7 @@ let PIN_HALO: Double = 1.5
 // flood/ebb/slack for the one speed-less kind, derived gates — "No speed
 // exists to show", ChsGate.swift) fall through to the match. Anything else
 // is neutral.
-let PIN_STATE_COLOUR: [Any] = [
+@MainActor let PIN_STATE_COLOUR: [Any] = [
     "to-color", ["get", "state"],
     ["match", ["get", "state"],
      // A tide's trend is the curve's own pair (teal/amber), the same inks
@@ -252,7 +252,7 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
 /// The pin layers, bottom to top. Expressions come from the same JSON specs
 /// the web uses, converted via `mglJSONObject` so the two renderers cannot
 /// drift on paint.
-func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
+@MainActor func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     func e(_ json: Any) -> NSExpression { NSExpression(mglJSONObject: json) }
     let ink = NSExpression(forConstantValue: hexColor(CHART_INK))
     let font = NSExpression(forConstantValue: LABEL_FONT)

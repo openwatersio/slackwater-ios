@@ -4,7 +4,7 @@
 import XCTest
 @testable import Slackwater
 
-final class UnitsAndGroupsTests: XCTestCase {
+@MainActor final class UnitsAndGroupsTests: XCTestCase {
     func testHeightDefaultsFollowRegionRatherThanLanguage() {
         let suite = "HeightUnits.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

@@ -26,7 +26,7 @@ enum FavoritesCloud {
     /// and the unit-test host must never read or write a real iCloud store:
     /// the simulator's KVS outlives the run, so one seeded test would leak its
     /// stars into the next one's "clean" launch.
-    static let store: NSUbiquitousKeyValueStore? = {
+    @MainActor static let store: NSUbiquitousKeyValueStore? = {
         let args = CommandLine.arguments
         // -noCloudSync is on every UI-test launch; the two favourites hooks are
         // belt and braces for a launch that sets launchArguments directly.

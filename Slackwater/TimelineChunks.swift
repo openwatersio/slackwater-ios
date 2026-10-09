@@ -30,7 +30,7 @@ import UIKit
 /// The three constituent-backed station kinds. The online gate stays on the
 /// fetched-block builder (`TimelineData.build(onlinePoints:)`) — its data is
 /// bounded by what was downloaded, not by what can be computed.
-enum TimelineSource {
+enum TimelineSource: Sendable {
     case tide(TideStationRecord)
     /// `station`, when given, is the record's engine already resolved from
     /// single records (the watch's widget loader); nil resolves it here.
@@ -408,7 +408,7 @@ final class ScrollGate {
                 self.pendingPublish = false
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    publishAround(lastFocus)
+                    self.publishAround(self.lastFocus)
                 }
             }
         }

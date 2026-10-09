@@ -31,8 +31,8 @@ final class AppStoreScreenshots: ShotWalk {
     /// One favorite, not `ShotWalk`'s two. A phone fits four cards above the
     /// FAB row, and the frame is about the three groups being on screen
     /// together — a second favorite pushes the Near Me header under the FABs.
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         seededFavorites = "noaa/9444900"
     }
 

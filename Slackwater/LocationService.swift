@@ -6,7 +6,7 @@ import WidgetKit
 
 let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
 
-final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
+@MainActor final class LocationService: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     static let shared = LocationService()
 
     @Published var status: CLAuthorizationStatus
@@ -118,7 +118,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 }
 
 extension LocationService {
-    static func recentLocation(_ location: CLLocation?, now: Date = .now) -> CLLocation? {
+    nonisolated static func recentLocation(_ location: CLLocation?, now: Date = .now) -> CLLocation? {
         guard let location, location.horizontalAccuracy >= 0,
               abs(location.timestamp.timeIntervalSince(now)) <= 600 else { return nil }
         return location

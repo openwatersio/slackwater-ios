@@ -11,7 +11,7 @@ import SlackwaterKit
 /// a card opens into is the same drawing at a larger scale. What is the
 /// card's own: the four-swing window, the padded auto-fit domain, the axis
 /// row's edge rules, and the VoiceOver summary.
-struct StationCardGraph: View {
+nonisolated struct StationCardGraph: View {
     /// One extreme-to-extreme swing: half the M2 semidiurnal period (12.42 h).
     static let swing: TimeInterval = (12.42 / 2) * 3600
     /// Four swings total, weighted toward the future — the past is context,

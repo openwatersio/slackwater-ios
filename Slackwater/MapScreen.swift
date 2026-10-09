@@ -50,7 +50,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
 /// style load. The camera must be asserted post-layout: a zoomLevel set on a
 /// zero-frame view converts through a degenerate altitude and the map opened
 /// continent-wide.
-final class MapStyler: NSObject, MLNMapViewDelegate {
+@MainActor final class MapStyler: NSObject, @preconcurrency MLNMapViewDelegate {
     private weak var map: MLNMapView?
     private let center: CLLocationCoordinate2D
     private let zoom: Double
@@ -61,7 +61,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private var decimates: Bool { framing == nil }
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
     private var refreshTimer: Timer?
-    deinit { refreshTimer?.invalidate() }
+    isolated deinit { refreshTimer?.invalidate() }
 
     init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
          framing: [CLLocationCoordinate2D]? = nil, onProject: (([CGPoint]) -> Void)? = nil) {
@@ -306,7 +306,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // a pin still green from the morning's slack).
         guard refreshTimer == nil else { return }
         let timer = Timer(timeInterval: PIN_REFRESH_S, repeats: true) { [weak self] _ in
-            self?.refreshPins(force: true)
+            MainActor.assumeIsolated { self?.refreshPins(force: true) }
         }
         RunLoop.main.add(timer, forMode: .common)
         refreshTimer = timer
@@ -528,7 +528,7 @@ struct MapViewRepresentable: UIViewRepresentable {
         context.coordinator.apply(selection: selected)
     }
 
-    final class Coordinator: NSObject {
+    @MainActor final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
         let onSelectUnavailable: (UnavailableStation) -> Void
         let onMiss: ((Double) -> Void)?

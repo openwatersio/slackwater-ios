@@ -166,7 +166,7 @@ final class ChsFitService: ObservableObject {
     /// The first nine jobs lead; unconstrained paths continue through every station within 150 km.
     static let autoFitPorts = 6
     static let autoFitGates = 3
-    static let autoFitRadiusKm = 150.0
+    nonisolated static let autoFitRadiusKm = 150.0
 
     /// Every CHS station the app could fit, ports and validated gates. The 7
     /// online (fit-reject) gates are excluded here, at the source every job —

@@ -14,7 +14,7 @@
 //
 // None of this is reachable in the Simulator: BGTaskScheduler answers
 // .unavailable there, so it is verified by hand on a device.
-import BackgroundTasks
+@preconcurrency import BackgroundTasks
 import Foundation
 import os
 
@@ -39,8 +39,9 @@ enum BackgroundDownloads {
         guard queue.active || online.active else { return }
         let id = pattern.replacingOccurrences(of: "*", with: UUID().uuidString)
 
+        // The scheduler's default queue is background; this callback must not inherit MainActor.
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: id,
-                                                         using: nil) { task in
+                                                         using: nil) { @Sendable task in
             guard let task = task as? BGContinuedProcessingTask else {
                 task.setTaskCompleted(success: false)
                 return

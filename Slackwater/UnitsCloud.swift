@@ -2,7 +2,7 @@ import Foundation
 
 /// Display preferences that follow the person between devices: units and the
 /// comfort current. The App Group copy is what every reader uses.
-final class UnitsCloud {
+@MainActor final class UnitsCloud {
     static let shared = UnitsCloud()
 
     private static let allowed: [String: (Any) -> Bool] = [
@@ -31,18 +31,20 @@ final class UnitsCloud {
                   reason == NSUbiquitousKeyValueStoreServerChange
                     || reason == NSUbiquitousKeyValueStoreInitialSyncChange
                     || reason == NSUbiquitousKeyValueStoreAccountChange else { return }
-            guard let self else { return }
-            if reason == NSUbiquitousKeyValueStoreAccountChange {
-                self.retry?.cancel()
-                self.retry = nil
-            }
-            self.adopt(seedMissing: false)
-            if reason != NSUbiquitousKeyValueStoreAccountChange {
-                // Let cloud downloads settle, then recheck missing keys before seeding saved preferences.
-                self.retry?.cancel()
-                let retry = DispatchWorkItem { [weak self] in self?.adopt(seedMissing: true) }
-                self.retry = retry
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: retry)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if reason == NSUbiquitousKeyValueStoreAccountChange {
+                    self.retry?.cancel()
+                    self.retry = nil
+                }
+                self.adopt(seedMissing: false)
+                if reason != NSUbiquitousKeyValueStoreAccountChange {
+                    // Let cloud downloads settle, then recheck missing keys before seeding saved preferences.
+                    self.retry?.cancel()
+                    let retry = DispatchWorkItem { [weak self] in self?.adopt(seedMissing: true) }
+                    self.retry = retry
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: retry)
+                }
             }
         }
         cloud.synchronize()
@@ -50,7 +52,7 @@ final class UnitsCloud {
         adopt(seedMissing: false)
     }
 
-    deinit {
+    isolated deinit {
         retry?.cancel()
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }

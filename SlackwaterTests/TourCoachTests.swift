@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class TourCoachTests: XCTestCase {
-    override func setUp() {
+    override func setUp() async throws {
         UserDefaults.standard.removeObject(forKey: seenTourKey)
         TourCoach.shared.step = nil
         TourCoach.shared.station = nil

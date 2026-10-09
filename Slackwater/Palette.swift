@@ -287,7 +287,7 @@ func noonLocal(_ day: Date, _ tz: TimeZone) -> Date {
 
 /// NSCache, not a Dictionary: thread-safe (Canvas draws can run off-main) and
 /// bounded. DateFormatter itself is thread-safe for formatting since iOS 7.
-private let formatterCache = NSCache<NSString, DateFormatter>()
+nonisolated(unsafe) private let formatterCache = NSCache<NSString, DateFormatter>()
 
 func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
     let key = ("pattern|" + pattern + "|" + tz.identifier) as NSString

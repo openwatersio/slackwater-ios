@@ -8,7 +8,7 @@ import SlackwaterKit
 /// section that genuinely needs the annual constituent: a ±15-day window cannot
 /// say anything about a season, and a seasonless constituent set would return
 /// twelve confident months that all look alike.
-final class YearFigureTests: XCTestCase {
+@MainActor final class YearFigureTests: XCTestCase {
     private let station = TideStationRecord.record(id: TideStationRecord.fridayHarborID)!
     private let at = Date(timeIntervalSince1970: 1_780_000_000)  // 2026-05-29
 

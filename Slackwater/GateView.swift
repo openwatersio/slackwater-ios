@@ -117,11 +117,11 @@ struct GateView: View {
 
 /// Set by the gate's "or search" bypass, consumed by the list's first appear —
 /// the bypass lands straight in the search experience.
-var gateSearchHandoff = false
+@MainActor var gateSearchHandoff = false
 
 /// Set by a widget deep link that arrives before the gate is answered (RootView),
 /// consumed by the list's first appear — same handoff, one screen later.
-var pendingDeepLink: URL?
+@MainActor var pendingDeepLink: URL?
 
 /// The moment a shared station link carried, waiting for the detail of the
 /// station it named (#187). The link opens its station by pushing it, and
@@ -130,7 +130,7 @@ var pendingDeepLink: URL?
 /// list row pushes through a bare `NavigationLink`, so nothing else resets
 /// this, and an untagged value would land on whatever opened next. Observable
 /// so a detail already on screen sees a second link arrive.
-@Observable final class LinkedInstant {
+@MainActor @Observable final class LinkedInstant {
     struct Link: Equatable {
         let station: String   // a StationItem id
         let at: Date

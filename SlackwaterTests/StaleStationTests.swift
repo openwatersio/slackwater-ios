@@ -7,7 +7,7 @@
 import XCTest
 @testable import Slackwater
 
-final class StaleStationTests: XCTestCase {
+@MainActor final class StaleStationTests: XCTestCase {
 
     // MARK: - Tombstones
 

@@ -7,7 +7,7 @@
 // watchOS simulators take no status-bar override.
 import XCTest
 
-final class WatchAppStoreScreenshots: XCTestCase {
+@MainActor final class WatchAppStoreScreenshots: XCTestCase {
     private let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
 
     override func setUp() {

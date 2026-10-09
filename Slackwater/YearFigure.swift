@@ -33,7 +33,7 @@ struct YearFigure: View {
     /// current speeds with flood positive and ebb negative. Either way the
     /// month's envelope is its largest value and its smallest, and the shape
     /// the year traces is the same question.
-    static func months(_ series: [Peak], tz: TimeZone,
+    nonisolated static func months(_ series: [Peak], tz: TimeZone,
                        window: (start: Date, end: Date),
                        calendar: Calendar = .current) -> [Month] {
         var cal = calendar
@@ -55,7 +55,7 @@ struct YearFigure: View {
     /// The months a reader would plan around: where the water runs widest.
     /// Two of them, because the tide's seasonal structure is semi-annual at
     /// most stations — the equinoxes, not one peak.
-    static func standout(_ months: [Month]) -> [Month] {
+    nonisolated static func standout(_ months: [Month]) -> [Month] {
         Array(months.sorted { $0.span > $1.span }.prefix(2))
     }
 

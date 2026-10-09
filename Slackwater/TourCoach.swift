@@ -10,7 +10,7 @@ import UIKit
 
 let seenTourKey = "slackwater.seenTour"
 
-@Observable final class TourCoach {
+@MainActor @Observable final class TourCoach {
     /// `TourStep` lives in TourAnchor.swift so the anchors compile without
     /// this UIKit-using class; the name here is what the rest of the app says.
     typealias Step = TourStep

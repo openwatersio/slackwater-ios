@@ -8,7 +8,7 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class DetailLeadTests: XCTestCase {
+@MainActor final class DetailLeadTests: XCTestCase {
 
     private let utc = TimeZone(identifier: "UTC")!
 
