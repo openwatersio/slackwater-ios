@@ -82,10 +82,10 @@ final class BrowseGroupsTests: XCTestCase {
         XCTAssertFalse(g.recents.contains { $0.id == hero.id })
     }
 
-    /// Point Wilson has three current stations by one name; the phone shows
+    /// Cape Cod Canal has four tide stations by one name; the phone shows
     /// the nearest one (`StationGroups`), and so does the watch.
     func testNamesakesShowOnce() {
-        let g = BrowseGroups(fix: (48.1501, -122.7454), favoriteIds: [], recentIds: [], fitted: [])
+        let g = BrowseGroups(fix: (41.77, -70.5617), favoriteIds: [], recentIds: [], fitted: [])
         let places = (g.hero + g.nearby).map(\.placeKey)
         XCTAssertEqual(places.count, Set(places).count, "\(places)")
     }

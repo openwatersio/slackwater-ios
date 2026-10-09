@@ -109,8 +109,9 @@ import XCTest
 
     // MARK: - Station regions: one distance unit, compass points intact (M50)
 
-    /// The bundled region lines are NOAA's own qualifiers, normalized by
-    /// tools/enrich-currents.mjs. Two things must hold on every one of them.
+    /// NOAA's bearings ("6.6 nm SSE of") ride on a current's name and on a few
+    /// tide regions, as the station database normalizes them. Two things must
+    /// hold on every name and region line.
     func testBundledRegionsAreNauticalAndShoutTheirCompassPoints() {
         let titleCased = try! NSRegularExpression(
             pattern: "\\b(Nne|Ene|Ese|Sse|Ssw|Wsw|Wnw|Nnw|Ne|Se|Sw|Nw)\\b")
@@ -118,22 +119,23 @@ import XCTest
         // River (a subordinate current station since #268).
         let statute = try! NSRegularExpression(pattern: "\\b\\d+(?:\\.\\d+)?\\s*(?:mi\\.|miles?)\\b",
                                                options: .caseInsensitive)
-        let regions = StationItem.all.map(\.region)
-        XCTAssertFalse(regions.isEmpty, "no bundled stations — did the resources ship?")
-        for region in regions {
-            let r = NSRange(region.startIndex..., in: region)
-            XCTAssertNil(titleCased.firstMatch(in: region, range: r),
-                         "compass abbreviation title-cased in \"\(region)\" (SSE, not Sse)")
-            XCTAssertNil(statute.firstMatch(in: region, range: r),
-                         "statute miles in \"\(region)\" — the distance pill speaks nm")
+        let lines = StationItem.all.flatMap { [$0.name, $0.region] }
+        XCTAssertFalse(lines.isEmpty, "no bundled stations — did the resources ship?")
+        for line in lines {
+            let r = NSRange(line.startIndex..., in: line)
+            XCTAssertNil(titleCased.firstMatch(in: line, range: r),
+                         "compass abbreviation title-cased in \"\(line)\" (SSE, not Sse)")
+            XCTAssertNil(statute.firstMatch(in: line, range: r),
+                         "statute miles in \"\(line)\" — the distance pill speaks nm")
         }
     }
 
     /// The specific card Bryan found: "7.6 mi. Sse" is now "6.6 nm SSE".
     func testDiscoveryIslandSubtitleRendersFixed() {
-        let regions = StationItem.all.filter { $0.name == "Discovery Island" }.map(\.region)
+        let names = StationItem.all.map(\.name).filter { $0.hasPrefix("Discovery Island,") }
         // Three since #268: the subordinate current station 2.6 nm SSE joined.
-        XCTAssertEqual(Set(regions), ["3.0 nm NE", "6.6 nm SSE", "2.6 nm SSE"])
+        XCTAssertEqual(Set(names), ["Discovery Island, 3.0 nm NE of", "Discovery Island, 6.6 nm SSE of",
+                                    "Discovery Island, 2.6 nm SSE of"])
     }
 
     // MARK: - One entry per place (M50 matching-station grouping)
@@ -144,15 +146,15 @@ import XCTest
             $1.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon)
         }
         let places = StationGroups(ranked: ranked)
-        let discovery = ranked.filter { $0.name == "Discovery Island" }
-        XCTAssertEqual(discovery.count, 3, "the collision this exists for (three since #268)")
-        let shown = places.collapse(discovery.map(\.id))
-        XCTAssertEqual(shown, [discovery[0].id], "one entry per name, the nearest")
+        let canal = ranked.filter { $0.name == "Cape Cod Canal" }
+        XCTAssertEqual(canal.count, 4, "the collision this exists for: four gauges along one canal")
+        let shown = places.collapse(canal.map(\.id))
+        XCTAssertEqual(shown, [canal[0].id], "one entry per name, the nearest")
         XCTAssertEqual(places.shownIds, places.collapse(ranked.map(\.id)),
                        "the memoised list is the same collapse the per-render call made")
-        XCTAssertEqual(places.shown(discovery[1].id), discovery[0].id)
-        XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id),
-                       "the chooser still offers both, nearest first")
+        XCTAssertEqual(places.shown(canal[1].id), canal[0].id)
+        XCTAssertEqual(places.matches(canal[0]).map(\.id), canal.map(\.id),
+                       "the chooser still offers them all, nearest first")
     }
 
     /// A tide and a current station sharing a name are separate entries: a
@@ -160,9 +162,9 @@ import XCTest
     /// and the chooser offers one series.
     func testSameNamedStationsCollapseWithinTheirSeries() throws {
         let places = StationGroups(ranked: StationItem.all)
-        let alcatraz = StationItem.all.filter { $0.name == "Alcatraz Island" }
-        let tide = try XCTUnwrap(alcatraz.first { $0.series == .tide })
-        let current = try XCTUnwrap(alcatraz.first { $0.series == .current })
+        let northEnd = StationItem.all.filter { $0.name == "North End" }
+        let tide = try XCTUnwrap(northEnd.first { $0.series == .tide })
+        let current = try XCTUnwrap(northEnd.first { $0.series == .current })
         XCTAssertEqual(places.shown(tide.id), tide.id)
         XCTAssertEqual(StationItem.byId[places.shown(current.id)]?.series, .current)
         XCTAssertEqual(places.matches(tide).map(\.id), [tide.id])
@@ -174,17 +176,17 @@ import XCTest
     /// place ranks; the chooser itself stays nearest first.
     func testChosenNamesakeTakesThePlace() {
         let ranked = StationItem.rankedByDistance(StationItem.all, lat: firstRunFix.lat, lon: firstRunFix.lon)
-        let discovery = ranked.filter { $0.name == "Discovery Island" }
-        let far = discovery[2]
+        let canal = ranked.filter { $0.name == "Cape Cod Canal" }
+        let far = canal[3]
         let places = StationGroups(ranked: ranked, chosen: [far.id])
-        XCTAssertEqual(places.shown(discovery[0].id), far.id)
-        XCTAssertEqual(places.collapse(discovery.map(\.id)), [far.id])
+        XCTAssertEqual(places.shown(canal[0].id), far.id)
+        XCTAssertEqual(places.collapse(canal.map(\.id)), [far.id])
         XCTAssert(places.shownIds.contains(far.id))
-        XCTAssertFalse(places.shownIds.contains(discovery[0].id))
-        XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id))
+        XCTAssertFalse(places.shownIds.contains(canal[0].id))
+        XCTAssertEqual(places.matches(canal[0]).map(\.id), canal.map(\.id))
 
         let stale = StationGroups(ranked: ranked, chosen: ["noaa/gone"])
-        XCTAssertEqual(stale.shown(far.id), discovery[0].id, "a pick that left the bundle falls back to the nearest")
+        XCTAssertEqual(stale.shown(far.id), canal[0].id, "a pick that left the bundle falls back to the nearest")
     }
 
     /// iCloud carries one key per place: every key fits the 64-byte limit, and
@@ -192,14 +194,14 @@ import XCTest
     func testCloudPicksFitTheKeyLimitAndReadBackById() {
         let longest = StationItem.all.map { ChosenStationsStore.cloudKey($0.placeKey).utf8.count }.max() ?? 0
         XCTAssertLessThanOrEqual(longest, 64)
-        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
+        let canal = StationItem.all.filter { $0.name == "Cape Cod Canal" }
         let raw: [String: Any] = [
-            ChosenStationsStore.cloudKey(discovery[0].placeKey): discovery[1].id,
-            ChosenStationsStore.cloudKey("tide|A Name The Catalog No Longer Uses"): discovery[2].id,
+            ChosenStationsStore.cloudKey(canal[0].placeKey): canal[1].id,
+            ChosenStationsStore.cloudKey("tide|A Name The Catalog No Longer Uses"): canal[2].id,
             ChosenStationsStore.cloudPrefix + "stale": "noaa/gone",
             "slackwater.fav.x": 1.0,
         ]
-        XCTAssertEqual(ChosenStationsStore.picks(raw), [discovery[1].id, discovery[2].id])
+        XCTAssertEqual(ChosenStationsStore.picks(raw), [canal[1].id, canal[2].id])
     }
 
     /// A pick is a station id. Builds before the catalog could rename a
@@ -208,34 +210,33 @@ import XCTest
     func testPicksSurviveTheNameTheyWereKeyedBy() throws {
         let d = UserDefaults(suiteName: #function)!
         defer { d.removePersistentDomain(forName: #function) }
-        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
-        d.set(["current|Discovery Island, before its rename": discovery[1].id], forKey: AppGroup.chosenStationsKey)
-        XCTAssertEqual(ChosenStationsStore.load(d), [discovery[1].id])
-        d.set([discovery[2].id], forKey: AppGroup.chosenStationsKey)
-        XCTAssertEqual(ChosenStationsStore.load(d), [discovery[2].id])
+        let canal = StationItem.all.filter { $0.name == "Cape Cod Canal" }
+        d.set(["tide|Cape Cod Canal, before its rename": canal[1].id], forKey: AppGroup.chosenStationsKey)
+        XCTAssertEqual(ChosenStationsStore.load(d), [canal[1].id])
+        d.set([canal[2].id], forKey: AppGroup.chosenStationsKey)
+        XCTAssertEqual(ChosenStationsStore.load(d), [canal[2].id])
     }
 
     /// Choosing a namesake replaces the pick for its place and leaves every
     /// other place's pick alone; a group answers with its nearest chosen member.
     func testChoosingReplacesThePlacesPickOnly() throws {
-        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
-        let sierra = try XCTUnwrap(StationItem.all.first { $0.name == "Sierra Point" })
-        let before: Set<String> = [discovery[1].id, sierra.id]
-        let after = ChosenStationsStore.choosing(discovery[2], in: before)
-        XCTAssertEqual(after, [discovery[2].id, sierra.id])
-        let ranked = StationItem.rankedByDistance(discovery, lat: firstRunFix.lat, lon: firstRunFix.lon)
-        XCTAssertEqual(ChosenStationsStore.chosen(in: ranked, from: after)?.id, discovery[2].id)
-        XCTAssertNil(ChosenStationsStore.chosen(in: ranked, from: [sierra.id]))
+        let canal = StationItem.all.filter { $0.name == "Cape Cod Canal" }
+        let friday = try XCTUnwrap(StationItem.byId[TideStationRecord.fridayHarborID])
+        let before: Set<String> = [canal[1].id, friday.id]
+        let after = ChosenStationsStore.choosing(canal[2], in: before)
+        XCTAssertEqual(after, [canal[2].id, friday.id])
+        let ranked = StationItem.rankedByDistance(canal, lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertEqual(ChosenStationsStore.chosen(in: ranked, from: after)?.id, canal[2].id)
+        XCTAssertNil(ChosenStationsStore.chosen(in: ranked, from: [friday.id]))
     }
 
     /// A chooser row names where its station sits, not just how far it is.
     func testPlaceLabelSpellsOutTheLandmark() {
-        let sierra = StationItem.all.filter { $0.name == "Sierra Point" }.map(\.placeLabel)
-        XCTAssertEqual(Set(sierra), ["1.1 nm ENE of Sierra Point", "1.2 nm east of Sierra Point",
-                                     "3.8 nm east of Sierra Point"])
-        let anchor = Set(StationItem.all.filter { $0.name == "Anchor Point" }.map(\.placeLabel))
-        XCTAssert(anchor.contains("WNW of Anchor Point"), "\(anchor)")
-        XCTAssert(anchor.contains("Anchor Point, Petersburg, AK"), "\(anchor)")
+        let label = { (name: String) in Set(StationItem.all.filter { $0.name == name }.map(\.placeLabel)) }
+        XCTAssertEqual(label("Bailey Cut"), ["0.7 nm west of Bailey Cut"])
+        XCTAssertEqual(label("Calaveras Point"), ["west of Calaveras Point"])
+        XCTAssertEqual(label("Cape Cod Canal"), ["Cape Cod Canal, Sagamore", "Cape Cod Canal, Bournedale",
+                                                 "Cape Cod Canal, Bourne Bridge", "Cape Cod Canal, RR. Bridge"])
     }
 
     /// A unique name is untouched — and gets no chooser (one option is noise).
@@ -248,18 +249,18 @@ import XCTest
     }
 
     /// Collapse keeps input order and drops the duplicates behind it — the
-    /// Recents case (visit both Point Wilsons, see one row).
+    /// Recents case (visit two Cape Cod Canal gauges, see one row).
     func testCollapseKeepsOrderAndDedupes() {
         let ranked = StationItem.all.sorted {
             $0.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon) <
             $1.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon)
         }
         let places = StationGroups(ranked: ranked)
-        let wilsons = ranked.filter { $0.name == "Point Wilson" }
-        XCTAssertEqual(wilsons.count, 4)  // four since #268: PCT1496, 0.7 nm east
+        let canal = ranked.filter { $0.name == "Cape Cod Canal" }
+        XCTAssertEqual(canal.count, 4)
         let friday = TideStationRecord.fridayHarborID
-        XCTAssertEqual(places.collapse([wilsons[2].id, friday, wilsons[0].id]),
-                       [wilsons[0].id, friday])
+        XCTAssertEqual(places.collapse([canal[2].id, friday, canal[0].id]),
+                       [canal[0].id, friday])
     }
 
     /// Series and provider are what a chooser row says when the names match.
