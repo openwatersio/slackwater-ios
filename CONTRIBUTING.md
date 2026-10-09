@@ -252,6 +252,8 @@ xcrun xcresulttool export attachments --path <bundle> --output-path <dir>    # U
 
 ## Release and device validation
 
+A check that only a person can make goes in an issue labelled `manual testing`: anything that needs a device or a watch, or a simulator state no UI test can reach, such as a folded iPhone Duo. A pull request's checklist stops being tracked once it merges, so move any device check still open at merge into an issue, the way #610 collects the phone's. `gh issue list --label "manual testing"` is the queue.
+
 Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit source, and version numbering. Signing and provisioning traps are documented where they live (`project.yml` comments, `docs/testflight.md`, the `releasing-to-testflight` skill). Also check these constraints:
 
 - The `.storekit` file is wired to the scheme's `run:` action, so StoreKit works in the simulator and silently does not in an archive, where `Product.products(for:)` goes to real App Store Connect. Check `inAppPurchasesV2` and `subscriptionGroups` on the app before writing a word about a purchase.
