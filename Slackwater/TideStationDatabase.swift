@@ -26,7 +26,8 @@ func tideRecord(id: String, directory: URL) throws -> TideStationRecord? {
 extension TideStationRecord {
     /// The bundled database, mapped once for the life of the process. A
     /// missing or unreadable bundle is terminal, as it is for every catalog.
-    static let database: StationDatabase = {
+    // The mapped FlatBuffers reader exposes only reads; its package has no Sendable conformance.
+    nonisolated(unsafe) static let database: StationDatabase = {
         do { return try tideDatabase(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL) }
         catch {
             CatalogDiagnostics.log(error)

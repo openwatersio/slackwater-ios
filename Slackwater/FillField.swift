@@ -134,7 +134,7 @@ struct FillByteReader {
 /// Loads a committed fill bundle (`fill-<region>.bin` + `.json`) and vends
 /// per-element cells evaluated at a given instant. `init?` fails on any
 /// missing/malformed resource or header — there is no partial-load state.
-final class FillField {
+final class FillField: Sendable {
     private let bin: [UInt8]
     private let header: FillHeader
     private let idToName: [Int: String]

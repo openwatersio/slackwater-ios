@@ -10,7 +10,7 @@
 import Foundation
 import SlackwaterKit
 
-@Observable final class TideStandingStore {
+@MainActor @Observable final class TideStandingStore {
     private(set) var extremes: [TideExtreme] = []
     /// The window `extremes` came from, so a consumer can tell a whole local
     /// day from the fragment after its last midnight.

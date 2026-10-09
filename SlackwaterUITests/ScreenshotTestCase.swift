@@ -17,7 +17,7 @@ import UIKit
 import XCTest
 import notify
 
-class ScreenshotTestCase: XCTestCase {
+@MainActor class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
     static let fixtureNow = "1788868800"
     static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
@@ -31,10 +31,10 @@ class ScreenshotTestCase: XCTestCase {
         continueAfterFailure = false
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         for token in fixtureNotifyTokens.values { notify_cancel(token) }
         fixtureNotifyTokens.removeAll()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testArguments(_ args: [String], live: Bool = false, resetSettings: Bool = true) -> [String] {
@@ -816,7 +816,7 @@ private func scaled(_ timeout: TimeInterval) -> TimeInterval {
     min(timeout * uiWaitScale, timeout + 60)
 }
 
-extension XCUIElement {
+@MainActor extension XCUIElement {
     /// `waitForExistence`, on this machine's clock. See `uiWaitScale`.
     @discardableResult
     func appears(within timeout: TimeInterval) -> Bool {

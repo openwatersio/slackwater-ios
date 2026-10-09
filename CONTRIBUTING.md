@@ -14,6 +14,8 @@ open Slackwater.xcodeproj
 
 Build and run the `Slackwater` scheme. There is no other setup — the app ships its station data, so it works offline from first launch.
 
+All app and test targets use Swift 6 language mode. Keep UI-owned state on `MainActor` and prediction work off it. Values passed to background work should conform to `Sendable`; any `nonisolated(unsafe)` boundary needs a comment explaining the synchronization or thread-safety guarantee.
+
 Changing the bundled data additionally needs **Node 24** and a `npm install` in `tools/`.
 
 ## Trying a first launch

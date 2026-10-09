@@ -147,7 +147,7 @@ struct TideOffsets: Codable, Hashable {
 
 /// What every tide consumer needs: a harmonic `Station` or a subordinate
 /// reduced from one, behind the same three calls.
-protocol TidePredicting {
+protocol TidePredicting: Sendable {
     func heights(from: Date, to: Date, step: TimeInterval) -> [TidePoint]
     func rates(from: Date, to: Date, step: TimeInterval) -> [TideRatePoint]
     func extremes(from: Date, to: Date) -> [TideExtreme]

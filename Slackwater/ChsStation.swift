@@ -8,6 +8,7 @@
 // on-device, stored on the user's devices, and never publicly re-served.
 // Fitted models can be copied privately to the user's paired watch. No CHS data is bundled.
 import Foundation
+import Synchronization
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
 struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
@@ -120,7 +121,11 @@ struct ChsModel: Codable {
 /// keeps the default no-op and only `SlackwaterApp.init()` assigns the real
 /// trigger.
 enum WidgetReload {
-    static var trigger: () -> Void = {}
+    private static let hook = Mutex<@Sendable () -> Void>({})
+    static var trigger: @Sendable () -> Void {
+        get { hook.withLock { $0 } }
+        set { hook.withLock { $0 = newValue } }
+    }
 }
 
 /// One JSON file per station under Application Support/ChsModels — keyed by

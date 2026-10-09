@@ -111,7 +111,8 @@ extension ChsModelStore {
         return store
     }
 
-    private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
+    // Every access holds onlineCacheLock, including decoding and replacement.
+    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 
@@ -132,7 +133,7 @@ func prefetchAnchor(after window: ChsOnlineWindow, tz: TimeZone) -> Date {
 /// the fetch's anchor, `Timeline.window`'s back-pad behind it — and it grows
 /// as later fetches merge in (`merging`). So a stale window is a coverage
 /// question, not a staleness heuristic — see `covers`.
-struct ChsOnlineWindow: Codable {
+struct ChsOnlineWindow: Codable, Sendable {
     var schemaVersion = 1
     let stationID: String
     let iwlsName: String

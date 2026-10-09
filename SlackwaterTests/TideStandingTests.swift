@@ -4,7 +4,7 @@ import SlackwaterKit
 
 /// What counts as a remarkable tide, and over what window. The engine ranks;
 /// these hold the two judgements the app makes on top of it.
-final class TideStandingTests: XCTestCase {
+@MainActor final class TideStandingTests: XCTestCase {
     private let station = TideStationRecord.record(id: TideStationRecord.fridayHarborID)!
     /// A fixed instant so a ranking never depends on the day the suite runs.
     private let at = Date(timeIntervalSince1970: 1_780_000_000)  // 2026-05-29

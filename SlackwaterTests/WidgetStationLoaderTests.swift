@@ -5,13 +5,14 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class WidgetStationLoaderTests: XCTestCase {
+@MainActor final class WidgetStationLoaderTests: XCTestCase {
     private var storageRoots: [URL] = []
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         for root in storageRoots where FileManager.default.fileExists(atPath: root.path) {
             try FileManager.default.removeItem(at: root)
         }
+        try await super.tearDown()
     }
 
     private func makeStorage(_ change: (URL) throws -> Void = { _ in }) throws -> CatalogStorage {

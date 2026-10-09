@@ -5,7 +5,7 @@ import SlackwaterKit
 /// Section 1's figure: the day's biggest swing, for each day of the fortnight.
 /// The spring/neap beat IS the answer to "is this beyond normal", so the
 /// layout's whole job is to keep that beat readable.
-final class SwingFigureTests: XCTestCase {
+@MainActor final class SwingFigureTests: XCTestCase {
     private let station = TideStationRecord.record(id: TideStationRecord.fridayHarborID)!
     private let at = Date(timeIntervalSince1970: 1_780_000_000)
     private let size = CGSize(width: 320, height: 120)

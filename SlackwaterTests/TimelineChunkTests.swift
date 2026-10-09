@@ -7,7 +7,7 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class TimelineChunkTests: XCTestCase {
+@MainActor final class TimelineChunkTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
     let deception = CurrentStationRecord.all.first { $0.name.hasPrefix("Deception Pass") }!
 

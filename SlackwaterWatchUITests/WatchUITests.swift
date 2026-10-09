@@ -2,10 +2,10 @@
 // simulator (#521).
 import XCTest
 
-final class WatchUITests: XCTestCase {
+@MainActor final class WatchUITests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUp() {
+    override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
         // Isolate favorites, recents, and downloaded models; keep the location

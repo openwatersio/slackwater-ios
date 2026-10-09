@@ -403,11 +403,11 @@ struct WeekRangeBar: View {
 /// three views deep in every detail, and none of the layers between it and the
 /// scaffold has anything to say about dates.
 private struct OpenWeekPickerKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
+    static let defaultValue: @MainActor () -> Void = {}
 }
 
 extension EnvironmentValues {
-    var openWeekPicker: () -> Void {
+    var openWeekPicker: @MainActor () -> Void {
         get { self[OpenWeekPickerKey.self] }
         set { self[OpenWeekPickerKey.self] = newValue }
     }
@@ -440,11 +440,11 @@ extension EnvironmentValues {
 /// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
 /// have nothing to say about alerts.
 private struct OpenAlertPopupKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
+    static let defaultValue: @MainActor () -> Void = {}
 }
 
 extension EnvironmentValues {
-    var openAlertPopup: () -> Void {
+    var openAlertPopup: @MainActor () -> Void {
         get { self[OpenAlertPopupKey.self] }
         set { self[OpenAlertPopupKey.self] = newValue }
     }
@@ -633,11 +633,11 @@ struct StationDetailNote: View {
 /// goes dead below the strip in the iPad split detail column while tap
 /// gestures keep working (see MultiDaySchedule's row comment).
 private struct OpenTideDetailKey: EnvironmentKey {
-    static let defaultValue: (TideStationRecord) -> Void = { _ in }
+    static let defaultValue: @MainActor (TideStationRecord) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openTideDetail: (TideStationRecord) -> Void {
+    var openTideDetail: @MainActor (TideStationRecord) -> Void {
         get { self[OpenTideDetailKey.self] }
         set { self[OpenTideDetailKey.self] = newValue }
     }
@@ -651,11 +651,11 @@ extension EnvironmentValues {
 /// online gate's nearest-shipped link and the downloads-row tap both go
 /// through this, rather than each carrying its own single-case key.
 private struct OpenChsRouteKey: EnvironmentKey {
-    static let defaultValue: (ChsRoute) -> Void = { _ in }
+    static let defaultValue: @MainActor (ChsRoute) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openChsRoute: (ChsRoute) -> Void {
+    var openChsRoute: @MainActor (ChsRoute) -> Void {
         get { self[OpenChsRouteKey.self] }
         set { self[OpenChsRouteKey.self] = newValue }
     }
@@ -665,11 +665,11 @@ extension EnvironmentValues {
 /// discovery link can land on a NOAA current, a CHS port or a gate, and each
 /// pushes a different route. Same closure-not-NavigationLink reasoning.
 private struct OpenStationItemKey: EnvironmentKey {
-    static let defaultValue: (StationItem) -> Void = { _ in }
+    static let defaultValue: @MainActor (StationItem) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openStationItem: (StationItem) -> Void {
+    var openStationItem: @MainActor (StationItem) -> Void {
         get { self[OpenStationItemKey.self] }
         set { self[OpenStationItemKey.self] = newValue }
     }
@@ -680,11 +680,11 @@ extension EnvironmentValues {
 /// station at the zoom they pass — not a NavigationLink or Button, same
 /// press-tracking hazard in the iPad split detail column.
 private struct OpenMapFocusedKey: EnvironmentKey {
-    static let defaultValue: (StationItem, Double) -> Void = { _, _ in }
+    static let defaultValue: @MainActor (StationItem, Double) -> Void = { _, _ in }
 }
 
 extension EnvironmentValues {
-    var openMapFocused: (StationItem, Double) -> Void {
+    var openMapFocused: @MainActor (StationItem, Double) -> Void {
         get { self[OpenMapFocusedKey.self] }
         set { self[OpenMapFocusedKey.self] = newValue }
     }
@@ -838,9 +838,9 @@ struct SeriesFilterChips: View {
 /// name is the database's to change between catalog releases. Keyed by name,
 /// a pick was orphaned by every rename; as an id it survives them, and the
 /// group it answers for is found again from the id at read time.
-final class ChosenStationsStore: ObservableObject {
+@MainActor final class ChosenStationsStore: ObservableObject {
     static let shared = ChosenStationsStore()
-    static let cloudPrefix = "slackwater.pick."
+    nonisolated static let cloudPrefix = "slackwater.pick."
 
     @Published private(set) var ids: Set<String>
 
@@ -851,26 +851,31 @@ final class ChosenStationsStore: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: cloud, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.adopt(cloud) } }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let cloud = FavoritesCloud.store else { return }
+                self?.adopt(cloud)
+            }
+        }
         cloud.synchronize()
-        MainActor.assumeIsolated { self.adopt(cloud) }
+        self.adopt(cloud)
     }
 
     /// The picks on disk; an older place-keyed shape is written back as the array on the next change.
-    static func load(_ defaults: UserDefaults) -> Set<String> {
+    nonisolated static func load(_ defaults: UserDefaults) -> Set<String> {
         chosenStationIDs(defaults)
     }
 
     /// The pick that answers for a group of namesakes, nearest first: the
     /// first member chosen. Two can be chosen at once only after a rename
     /// merged two places, and the nearer is what the chooser would show anyway.
-    static func chosen(in group: [StationItem], from ids: Set<String>) -> StationItem? {
+    nonisolated static func chosen(in group: [StationItem], from ids: Set<String>) -> StationItem? {
         group.first { ids.contains($0.id) }
     }
 
     /// `ids` with `item` picked for its place: the other members of the place
     /// leave, so a pick stays one per place under the names of the day.
-    static func choosing(_ item: StationItem, in ids: Set<String>) -> Set<String> {
+    nonisolated static func choosing(_ item: StationItem, in ids: Set<String>) -> Set<String> {
         let place = Set((StationItem.byPlace[item.placeKey] ?? [item]).map(\.id))
         return ids.subtracting(place).union([item.id])
     }
@@ -878,7 +883,7 @@ final class ChosenStationsStore: ObservableObject {
     /// One KVS key per place, so two devices picking for the same place
     /// resolve last-writer-wins with no merge code (see FavoritesCloud). Keys
     /// cap at 64 bytes and a place key can run past that, so it is hashed.
-    static func cloudKey(_ placeKey: String) -> String {
+    nonisolated static func cloudKey(_ placeKey: String) -> String {
         // FNV-1a: stable across launches and devices, unlike `hashValue`.
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in placeKey.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
@@ -887,7 +892,7 @@ final class ChosenStationsStore: ObservableObject {
 
     /// The picked ids, out of `dictionaryRepresentation`. The key is only a
     /// collision slot; a pick for a station no longer bundled drops out.
-    static func picks(_ raw: [String: Any]) -> Set<String> {
+    nonisolated static func picks(_ raw: [String: Any]) -> Set<String> {
         var out = Set<String>()
         for (key, value) in raw where key.hasPrefix(cloudPrefix) {
             guard let id = value as? String, StationItem.byId[id] != nil else { continue }

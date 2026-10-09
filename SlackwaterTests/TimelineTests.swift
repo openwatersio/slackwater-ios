@@ -7,7 +7,7 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class TimelineTests: XCTestCase {
+@MainActor final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
     @MainActor func testInitialCenterDoesNotPublishFromLayout() async {

@@ -5,7 +5,7 @@ import SlackwaterKit
 /// The figure's layout, without drawing it. Everything interesting about the
 /// nesting is a decision about levels and a shared vertical scale, so that is
 /// what `StandingFigure.levels` returns and what these hold.
-final class StandingFigureTests: XCTestCase {
+@MainActor final class StandingFigureTests: XCTestCase {
     private let height: CGFloat = 200
 
     /// A big swing, but not the fortnight's biggest, with room at both ends.

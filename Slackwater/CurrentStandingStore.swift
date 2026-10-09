@@ -8,7 +8,7 @@
 import Foundation
 import SlackwaterKit
 
-@Observable final class CurrentStandingStore {
+@MainActor @Observable final class CurrentStandingStore {
     private(set) var floods: [Peak] = []
     private(set) var ebbs: [Peak] = []
     private(set) var window: (start: Date, end: Date) = (.distantPast, .distantPast)

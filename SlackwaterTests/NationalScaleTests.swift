@@ -13,7 +13,7 @@ import MapLibre
 import XCTest
 @testable import Slackwater
 
-final class NationalScaleTests: XCTestCase {
+@MainActor final class NationalScaleTests: XCTestCase {
 
     // MARK: - The bundle
 

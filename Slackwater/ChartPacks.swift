@@ -192,10 +192,10 @@ final class ChartPackManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name.MLNOfflinePackProgressChanged, object: nil, queue: .main
         ) { [weak self] note in
+            let key = (note.object as? MLNOfflinePack).flatMap { Self.chartContext(of: $0)?["chart"] }
             MainActor.assumeIsolated {
                 // Progress means this pack is alive again, whatever it did before.
-                if let pack = note.object as? MLNOfflinePack,
-                   let key = Self.chartContext(of: pack)?["chart"] {
+                if let key {
                     self?.errored.remove(key)
                 }
                 self?.setNeedsSummary()
@@ -204,9 +204,9 @@ final class ChartPackManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name.MLNOfflinePackError, object: nil, queue: .main
         ) { [weak self] note in
+            let key = (note.object as? MLNOfflinePack).flatMap { Self.chartContext(of: $0)?["chart"] }
             MainActor.assumeIsolated {
-                if let pack = note.object as? MLNOfflinePack,
-                   let key = Self.chartContext(of: pack)?["chart"] {
+                if let key {
                     self?.errored.insert(key)
                 }
                 self?.setNeedsSummary()
@@ -388,7 +388,7 @@ final class ChartPackManager: NSObject, ObservableObject {
         }
     }
 
-    static func chartContext(of pack: MLNOfflinePack) -> [String: String]? {
+    nonisolated static func chartContext(of pack: MLNOfflinePack) -> [String: String]? {
         (try? JSONSerialization.jsonObject(with: pack.context) as? [String: String])
             .flatMap { $0["chart"] != nil ? $0 : nil }
     }

@@ -16,7 +16,7 @@ private let timelineRevisions = Atomic<UInt64>(0)
 /// The free `rampT(_:anchors:)` (SlackWindow.swift), which `Timeline`'s own
 /// `rampT` overloads hide inside the enum. A module-qualified call names the
 /// module, and the phone and the watch build this file into different ones.
-private let rampAlongAnchors: (Double, [Double]) -> Double = rampT(_:anchors:)
+private let rampAlongAnchors: @Sendable (Double, [Double]) -> Double = rampT(_:anchors:)
 
 enum Timeline {
     /// Points per hour. Widened from 12 in the NEAPS pass: the tide track's

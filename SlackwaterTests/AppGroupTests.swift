@@ -1,9 +1,27 @@
 // Slackwater — GPL v3. App Group migration: standard-defaults state moves to
 // the shared suite exactly once; the shared container hosts ChsModels.
 import XCTest
+import Synchronization
 @testable import Slackwater
 
 final class AppGroupTests: XCTestCase {
+    func testBackgroundModelWriteReloadsWidgets() async throws {
+        let calls = Mutex(0)
+        let previous = WidgetReload.trigger
+        let id = "widget-reload-\(UUID().uuidString)"
+        defer {
+            WidgetReload.trigger = previous
+            try? FileManager.default.removeItem(at: ChsModelStore.url(id, suffix: "-test"))
+        }
+        WidgetReload.trigger = { calls.withLock { $0 += 1 } }
+        try await Task.detached {
+            try ChsModelStore.save("saved", id: id, suffix: "-test")
+        }.value
+        XCTAssertEqual(calls.withLock { $0 }, 1)
+        let saved: String? = ChsModelStore.load(id, suffix: "-test")
+        XCTAssertEqual(saved, "saved")
+    }
+
     func testEntitlementValidationUsesSharedContainerAvailability() {
         XCTAssertFalse(AppGroup.validateEntitlement(containerURL: nil, isTesting: true))
         XCTAssertTrue(AppGroup.validateEntitlement(
