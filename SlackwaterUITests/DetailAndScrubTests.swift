@@ -48,7 +48,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // loop's budget only reaches Active Pass from a Salish Sea anchor. A
         // dev machine with a custom simulator location (or none) ranks from
         // somewhere else entirely.
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        // Hosted runners have dropped this walk's scrub (#664); the native trace says
+        // whether the drag's hit test reached the strip and whether its pan began.
+        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705",
+                         "-scrubTrace", "\(shotDir)/m1-scrub-\(UUID().uuidString).log")
 
         // Units live in Settings only (no list pill): start this walk in feet.
         setUnits(app, "Feet")
