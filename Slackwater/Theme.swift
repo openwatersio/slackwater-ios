@@ -308,18 +308,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // strip's own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
-                // `.rect(.bounds)` anchors to the strip's own bounds — the centerline the press
-                // just parked its moment on sits inside it. `.presentationCompactAdaptation(.popover)`
-                // keeps it an arrow-anchored card on iPhone instead of adapting to a sheet.
-                .popover(isPresented: $showAlertPopup, attachmentAnchor: .rect(.bounds),
-                         arrowEdge: .top) {
-                    if let alertOffer {
-                        AlertPopup(stationID: favoriteId, offer: alertOffer,
-                                   moment: scrubTime, tz: tz, stationName: name)
-                            .presentationCompactAdaptation(.popover)
-                    }
-                }
-
             links(tl, jump)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
