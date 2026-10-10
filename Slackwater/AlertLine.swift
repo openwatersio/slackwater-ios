@@ -11,19 +11,41 @@ enum AlertLineState: Equatable {
 }
 
 /// The rule the line would open: one bound to this minute first — it is the one that expires —
-/// else one repeating this trigger. Enabled or not: a switched-off rule is found and woken in the
-/// sheet, never duplicated.
+/// then, at rest, the soonest one still ahead (a Rest tap binds to the offer's next occurrence,
+/// not the centerline's minute), else one repeating this trigger. Enabled or not: a switched-off
+/// rule is found and woken in the sheet, never duplicated.
 func alertLineRule(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
-                   at moment: Date) -> AlertRule? {
+                   at moment: Date, pressed: Bool, now: Date) -> AlertRule? {
     let minute = alertMinute(moment)
     let mine = rules.filter { $0.stationID == stationID && $0.trigger == offer }
-    return mine.first { $0.once == minute } ?? mine.first { $0.once == nil }
+    if let exact = mine.first(where: { $0.once == minute }) { return exact }
+    if !pressed, let ahead = mine.filter({ ($0.once ?? .distantPast) >= now }).min(by: { $0.once! < $1.once! }) {
+        return ahead
+    }
+    return mine.first { $0.once == nil }
 }
 
 func alertLineState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
-                    at moment: Date, pressed: Bool) -> AlertLineState {
-    if let rule = alertLineRule(rules, stationID: stationID, offer: offer, at: moment) { return .set(rule) }
+                    at moment: Date, pressed: Bool, now: Date) -> AlertLineState {
+    if let rule = alertLineRule(rules, stationID: stationID, offer: offer, at: moment,
+                                pressed: pressed, now: now) { return .set(rule) }
     return pressed ? .pressed(moment) : .rest
+}
+
+/// The first occurrence of an offer after a moment, for the line's Rest tap. The sheet binds
+/// "Does not repeat" to it rather than to the centerline's own minute, which on an unscrubbed
+/// strip is now, floored — already past, and the reschedule a save triggers drops a once rule
+/// whose minute has passed (§6). Nil when the station cannot be loaded or nothing comes within
+/// the notification horizon.
+/// ponytail: on the main actor, one station over 14 days; move it off if a tap ever measures.
+func alertNextOccurrence(stationID: String, offer: AlertTrigger, after: Date, threshold: Double) -> Date? {
+    guard let record = WidgetStationLoader.loadRecord(id: stationID) else { return nil }
+    let rule = AlertRule(stationID: stationID, trigger: offer)
+    return alertOccurrences(rule, station: WidgetStationLoader.station(from: record),
+                            position: record.alertPosition,
+                            from: after, to: after.addingTimeInterval(AlertHorizon.notifications),
+                            threshold: threshold)
+        .map(\.event).first { $0 > after }
 }
 
 /// "Set an alert" · "Set alert for low tide · Sat 14:32" · "Alert set · low tide · Sat 14:32" ·

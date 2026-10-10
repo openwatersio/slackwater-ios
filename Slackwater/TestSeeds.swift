@@ -37,8 +37,8 @@ import Foundation
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
     }
-    // Through the store, not the key: `AlertRuleStore.shared` has already loaded its rules
-    // by the time this runs, and the alert line reads the store (docs/alerts.md §7.1).
+    // Through the store, not the key: `SlackwaterApp.init` wires `AlertRuleStore.shared` before
+    // this runs, so the store already holds whatever the key held (docs/alerts.md §7.1).
     if CommandLine.arguments.contains("-resetAlerts") {
         AlertRuleStore.shared.rules.map(\.id).forEach { AlertRuleStore.shared.remove($0) }
     }

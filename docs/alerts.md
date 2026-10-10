@@ -334,28 +334,31 @@ alert ends up: a pressed moment, the centerline's own offer, or a sentence (§7.
 
 ### 7.1 The alert line
 
-One line of caption text, centred, directly under the strip and above the summary tiles: the
-first element of the scaffold's `links` slot, where `ChsDownloadNotice` sits on a CHS station
-while its download runs. The two never show together. `alertOffer` is nil exactly while a CHS
-station is still a preview (§8), so the notice has the slot while there is nothing to alert on,
-and the line takes it the moment the station can alert. An online gate has neither.
+One line of caption text, centred, directly under the strip and above the summary tiles: drawn
+by the scaffold between the strip card and its `links` slot, where `ChsDownloadNotice` leads on a
+CHS station while its download runs. On a CHS tide station `alertOffer` is nil exactly while it
+is still a preview (§8), so the notice has the space while there is nothing to alert on and the
+line takes it the moment the station can alert. A CHS current gate on a provisional model can
+alert (§8), so there the notice and the line both show. An online gate has neither.
 
 The line lives in `ScrubDetailScaffold`, not in the detail views, so the four phone details draw
 it from one place.
 
 | State | Reads | Tap |
 |---|---|---|
-| Rest | "Set an alert" — `bell`, `SN.foam` at 62 % | Opens the sheet on the centerline's offer, with the sentence field focused |
+| Rest | "Set an alert" — `bell`, `SN.foam` at 62 % | Opens the sheet on the centerline's offer, bound to its next occurrence, with the sentence field focused |
 | Pressed | "Set alert for low tide · Sat 14:32" — the resolved trigger's `alertEventName` and the parked moment in the station's zone | Opens the sheet on that moment |
 | Set | "Alert set · low tide · Sat 14:32" — `bell.fill` in `SN.leaf` | Opens the sheet on the existing rule, whose Delete removes it |
 
 Pressed is the strip's own state: a long press parks a moment and the line names it until the
 strip moves off that moment, by scrub, fling, return-to-now or a shared link, when it drops back to
 rest. While it holds, the strip's reading line runs on down through the time and day rows and
-into the line itself, so the parked moment and its name read as one thing. Set wins over the other two whenever a rule already exists for the centerline's offer at
-that minute (`once`) or for its trigger (repeating) — `alertLineState`, the `once` rule first —
-so a rule can be found again from the place that made it. Without Premium the line reads the same
-and the sheet's Save does the upselling (§7.2); a rule left by a lapsed subscription still reads
+into the line itself, so the parked moment and its name read as one thing. Set wins over the
+other two whenever a rule already exists for the centerline's offer: a `once` rule on that
+minute, then at rest the soonest `once` rule still ahead (a Rest tap binds to the offer's next
+occurrence, not the centerline's minute), then a repeating rule for its trigger —
+`alertLineRule`, in that order — so a rule can be found again from the place that made it. Without Premium the line reads the same and the sheet's Save
+does the upselling (§7.2); a rule left by a lapsed subscription still reads
 Set.
 
 A quiet line, not a button: no fill, no stroke, caption weight, a 44 pt tap target. It is the only
@@ -425,8 +428,14 @@ that draft:
   Notification permission is requested on the first save, never at launch; a denial still saves
   the rule, and the Alerts screen says why it is quiet.
 
-Reading is free here. A free user types "next lower low in daylight", sees "Hope Bay - Low tide ·
-Thu 06:12", and is asked to support the app only when they ask to be told.
+Reading is free here. A free user types "next lower low in daylight", sees "Hope Bay - Low tide"
+with "Does not repeat", and is asked to support the app only when they ask to be told.
+
+**A moment already past cannot be saved.** The strip shows 48 hours back and a press can land
+there; a `once` rule bound there would be dropped by the reschedule its save triggers (§6). The
+sheet says "This moment has passed" under When and disables Save. The Rest tap never meets this:
+it binds to the offer's next occurrence after now, or opens a repeating draft when the
+notification horizon holds none.
 
 ### 7.3 The sentence
 
@@ -520,15 +529,16 @@ alert that never fires.
 - `Slackwater/AlertPlan.swift` — `deliveryPlan`, copy, calendar event identity
 - `Slackwater/AlertScheduler.swift`, `Slackwater/AlertCalendar.swift`, `Slackwater/AlertNotifications.swift` — the run and its writers
 - `Slackwater/AlertLiveActivities.swift` — plan 2, the activity writer
-- `Slackwater/AlertOffer.swift` — what a press resolves to, and which rule the line's Set state reads
-- `Slackwater/AlertLine.swift` — the line under the strip and its three states
+- `Slackwater/AlertOffer.swift` — what a press resolves to, and the draft a new rule starts from
+- `Slackwater/AlertLine.swift` — the line under the strip, which rule it reads, its three states,
+  and the next occurrence a Rest tap binds to
 - `Slackwater/AlertSheet.swift` — the one sheet that makes and edits a rule
 - `Slackwater/AlertSentence.swift` — `AlertDraft`, the per-kind instructions, the session, and the
   pure mapping from a draft to a rule
 - `Slackwater/AlertsView.swift`, `Slackwater/CalendarStationsView.swift` — the lists
 - `Slackwater/TimelineStrip.swift` — the press recognizer
 - `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `onLongPress` closure, the line's place
-  in `links`, and the sheet's presentation
+  between the strip card and `links`, and the sheet's presentation
 - `SlackwaterWidgets/AlertLiveActivity.swift` — plan 2, the attributes and the three presentations;
   the attributes are shared with the app through the `PortableSources` template
 

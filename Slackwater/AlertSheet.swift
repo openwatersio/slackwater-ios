@@ -16,6 +16,13 @@ func alertRuleRepeating(_ rule: AlertRule, _ repeats: Bool, boundMoment: Date?) 
     return out
 }
 
+/// A once rule bound to a moment already past would be dropped by the reschedule its save
+/// triggers (§6) — the strip shows 48 hours back, so a press can land there. Repeating rules
+/// always save.
+func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
+    rule.once.map { $0 >= now } ?? true
+}
+
 struct AlertSheet: View {
     @State var rule: AlertRule
     let stationName: String
@@ -38,6 +45,7 @@ struct AlertSheet: View {
     }
 
     private var imperial: Bool { units == "imperial" }
+    private var canSave: Bool { alertSheetCanSave(rule, now: appNow()) }
 
     var body: some View {
         NavigationStack {
@@ -64,6 +72,11 @@ struct AlertSheet: View {
                         ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
                     }
                     Toggle("Daylight only", isOn: $rule.daylightOnly)
+                    if !canSave {
+                        Text("This moment has passed", comment: "Under the alert sheet's When section, when the chosen moment is already behind us.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    }
                 }
                 if !isNew {
                     Section {
@@ -86,7 +99,7 @@ struct AlertSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(saving)
+                        .disabled(saving || !canSave)
                         .accessibilityIdentifier("alert-sheet-save")
                 }
             }

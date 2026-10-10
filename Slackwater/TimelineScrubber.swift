@@ -69,6 +69,9 @@ struct TimelineScrubber: UIViewRepresentable {
     /// host has nothing to open — a list card's strip — and then the strip carries neither the
     /// press recognizer nor the matching VoiceOver action.
     var onLongPress: (() -> Void)? = nil
+    /// VoiceOver's stand-in for the press: the host both parks the moment and opens its sheet.
+    /// Nil wherever `onLongPress` is.
+    var onAlertAction: (() -> Void)? = nil
     /// The detail's station. Nil on a list card, which neither follows the
     /// Duo's hinge nor hands its moment across a fold.
     var stationID: String? = nil
@@ -429,12 +432,13 @@ struct TimelineScrubber: UIViewRepresentable {
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
                 },
             ]
-            // The press and hold, as an action: the moment is already on the centerline, so
-            // the host opens the popup for it exactly as it would after a press.
-            if let onLongPress = parent.onLongPress {
+            // The press and hold, as an action. A sighted press turns the line under the strip
+            // and leaves the tap to the user; VoiceOver has nothing to go and find, so the host
+            // opens the sheet for the centerline moment in the same step (docs/alerts.md §7.1).
+            if let onAlertAction = parent.onAlertAction {
                 sv.accessibilityCustomActions?.append(
                     UIAccessibilityCustomAction(name: String(localized: "Set an alert", comment: "VoiceOver chart action.")) { _ in
-                        onLongPress(); return true
+                        onAlertAction(); return true
                     })
             }
         }
@@ -812,6 +816,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.stripPressed) private var stripPressed
     @Environment(\.stripIsPressed) private var pressed
+    @Environment(\.stripAlertAction) private var stripAlertAction
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -822,6 +827,7 @@ struct TimelineScrubStrip: View {
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
                          onPickDate: openWeekPicker, onLongPress: stripPressed,
+                         onAlertAction: stripAlertAction,
                          stationID: stationID)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the

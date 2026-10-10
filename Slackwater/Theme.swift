@@ -48,7 +48,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// generic signature.
     var topBackdrop: AnyView? = nil
     /// What the strip offers to alert on for the centerline's moment (spec §7.1). Nil — the
-    /// online gate, a CHS preview — means no line and a press does nothing.
+    /// online gate, a CHS tide preview — means no line and a press does nothing.
     var alertOffer: AlertTrigger? = nil
     @State private var topHeight: CGFloat = 0
     /// The tour's glide has settled, which swaps the stars copy from the
@@ -164,6 +164,13 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripStationID, favoriteId)
             .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
             .environment(\.stripIsPressed, pressedMoment != nil)
+            // VoiceOver's "Set an alert" has no line to go and find: it parks the moment and
+            // opens the sheet in one step.
+            .environment(\.stripAlertAction, {
+                guard let alertOffer else { return }
+                pressedMoment = scrubTime
+                openAlertSheet(alertOffer, pressedAt: scrubTime)
+            })
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -327,8 +334,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             if let alertOffer {
                 AlertLine(state: alertLineState(alertRules.rules, stationID: favoriteId,
                                                 offer: alertOffer, at: scrubTime,
-                                                pressed: pressedMoment != nil),
-                          offer: alertOffer, tz: tz, action: { openAlertSheet(alertOffer) })
+                                                pressed: pressedMoment != nil, now: appNow()),
+                          offer: alertOffer, tz: tz,
+                          action: { openAlertSheet(alertOffer, pressedAt: pressedMoment) })
                     .padding(.horizontal, 16)
             }
             links(tl, jump)
@@ -339,18 +347,22 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     }
 
     /// What the line opens: the rule it reads, else a new rule for the pressed moment, else one
-    /// for the centerline — on an unscrubbed tide strip, the next low (§7.1).
-    private func openAlertSheet(_ offer: AlertTrigger) {
+    /// for the offer's next occurrence — on an unscrubbed tide strip, the next low (§7.1).
+    private func openAlertSheet(_ offer: AlertTrigger, pressedAt: Date?) {
         switch alertLineState(alertRules.rules, stationID: favoriteId, offer: offer,
-                              at: scrubTime, pressed: pressedMoment != nil) {
+                              at: scrubTime, pressed: pressedAt != nil, now: appNow()) {
         case .set(let rule):
             alertSubject = AlertSheetSubject(rule: rule, boundMoment: rule.once, isNew: false)
         case .pressed(let moment):
             alertSubject = AlertSheetSubject(rule: alertNewRule(stationID: favoriteId, offer: offer, at: moment),
                                              boundMoment: alertMinute(moment), isNew: true)
         case .rest:
-            alertSubject = AlertSheetSubject(rule: alertNewRule(stationID: favoriteId, offer: offer, at: scrubTime),
-                                             boundMoment: alertMinute(scrubTime), isNew: true)
+            // Nothing ahead in the horizon: the draft repeats, since there is no moment to bind.
+            let next = alertNextOccurrence(stationID: favoriteId, offer: offer, after: appNow(),
+                                           threshold: slackThresholdKn)
+            let draft = next.map { alertNewRule(stationID: favoriteId, offer: offer, at: $0) }
+                ?? AlertRule(stationID: favoriteId, trigger: offer, lead: alertNewRuleLead)
+            alertSubject = AlertSheetSubject(rule: draft, boundMoment: next.map(alertMinute), isNew: true)
         }
     }
 
@@ -484,10 +496,19 @@ private struct StripIsPressedKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet.
+private struct StripAlertActionKey: EnvironmentKey {
+    static let defaultValue: @MainActor () -> Void = {}
+}
+
 extension EnvironmentValues {
     var stripPressed: @MainActor () -> Void {
         get { self[StripPressedKey.self] }
         set { self[StripPressedKey.self] = newValue }
+    }
+    var stripAlertAction: @MainActor () -> Void {
+        get { self[StripAlertActionKey.self] }
+        set { self[StripAlertActionKey.self] = newValue }
     }
     var stripIsPressed: Bool {
         get { self[StripIsPressedKey.self] }

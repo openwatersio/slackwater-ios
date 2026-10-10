@@ -27,4 +27,15 @@ final class AlertSheetTests: XCTestCase {
         let every = AlertRule(stationID: "a", trigger: .slack)
         XCTAssertNil(alertRuleRepeating(every, false, boundMoment: nil).once)
     }
+
+    func testSaveIsOfferedOnlyForAMomentStillAhead() {
+        // A pressed moment can lie in the strip's 48-hour look-back; saving it would make a rule
+        // the next reschedule deletes.
+        let past = AlertRule(stationID: "a", trigger: .slack, once: moment.addingTimeInterval(-60))
+        let ahead = AlertRule(stationID: "a", trigger: .slack, once: moment.addingTimeInterval(60))
+        let every = AlertRule(stationID: "a", trigger: .slack)
+        XCTAssertFalse(alertSheetCanSave(past, now: moment))
+        XCTAssertTrue(alertSheetCanSave(ahead, now: moment))
+        XCTAssertTrue(alertSheetCanSave(every, now: moment))
+    }
 }
