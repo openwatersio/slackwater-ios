@@ -100,6 +100,22 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 
 [`release-notes/README.md`](release-notes/README.md) documents the format. An app's first version has no What's New field, so 1.14.0's introduction reaches TestFlight and the GitHub release only. Every version after it leads with what changed.
 
+## Spanish (Mexico) and French (Canada)
+
+`localizations` in the listing file, keyed by App Store Connect locale. Each locale writes its own `name`, `subtitle`, `promotionalText`, `description` and `keywords`, and `scripts/appstore.mjs` refuses one that leaves any out. The privacy policy, support and marketing URLs come from `en-US`. `asc.mjs app-info` and `asc.mjs localization` push every locale. Screenshots go to `en-US` only, and the other locales show that set. What's New is the English notes in every locale.
+
+A listing locale is independent of the app's string catalogs, so `es-MX` needs no `es-MX` translation of the app. ASO tools report that the US store indexes Spanish (Mexico) alongside English (US), and the Canadian store French (Canada) alongside English (Canada); Apple does not document this. With no English (Canada) listing, the Canadian store shows English (US).
+
+The rules above hold, with these additions:
+
+- **Every coverage claim names currents as the United States and Canada**, the promotional text included.
+- **Keywords skip every word in the English (US) name, subtitle and keywords**, since both stores index that listing too. The one repeat is French `table`: Apple combines words across one localization's fields but does not document combining across localizations, so `table` stays to keep "table des marées" whole.
+- **Spanish puts "Tabla de mareas" in the name.** "Mareas y corrientes" does not fit beside the brand in 30 characters, and "tabla de mareas" is the Spanish search for a tide app the way `tide chart` is the English one. Currents move to the subtitle.
+- **French mirrors the English subtitle.** "Heures d’étale" is "slack water times", and "heures" pairs with "marées" in the name for "heures des marées".
+- **The copy uses the app's own words**: estoa, flujo and reflujo, pleamar and bajamar in Spanish; étale, flot and jusant, marée haute and marée basse in French. Spanish says tú and French says vous, as the app does.
+
+In the Spanish keywords, `alta` and `baja` pair with `marea` for the everyday "marea alta" and "marea baja", and `internet` pairs with the subtitle's "sin". In the French ones, `shc` is the Service hydrographique du Canada, the French name for CHS, and `fleuve` is the regional anchor the way `salish sea` is in English: Quebec calls the St. Lawrence "le fleuve", and its tide stations are the francophone home water.
+
 ## Privacy (App Store Connect "App Privacy" answers)
 
 - **Data collection: none.** No analytics, no tracking, no accounts, no third-party SDKs that phone home. Answer "Data Not Collected" throughout.
@@ -209,7 +225,8 @@ Review notes for Premium Lifetime:
   ```
 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
-- [ ] Station counts re-derived and rounded down.
+- [ ] Station counts re-derived and rounded down, in every locale.
+- [ ] A native speaker has read the Spanish (Mexico) and French (Canada) copy.
 - [ ] Both Premium products attached to the version while the build sells them. A first in-app purchase goes to App Review with a version, and a purchase sheet whose products App Review cannot load is rejected under 2.1. `asc.mjs submit` stops on a submission holding an in-app purchase, so that submission goes through the App Store Connect UI.
 - [ ] Each product's localizations, review notes and review screenshot entered from [In-app purchases](#in-app-purchases), and the subscription group's `en-US` display name.
 - [ ] After approval: the hand check in #610 done, then the Accessibility Nutrition Labels published, iPhone and iPad with `asc.mjs accessibility --yes` and Apple Watch in the UI, claiming only the cells that say Yes.

@@ -52,6 +52,90 @@
     "supportUrl": "https://slackwater.xyz/support/",
     "marketingUrl": "https://slackwater.xyz"
   },
+  "localizations": {
+    "es-MX": {
+      "appInfoLocalization": {
+        "name": "Slackwater — Tabla de mareas",
+        "subtitle": "Corrientes sin conexión"
+      },
+      "versionLocalization": {
+        "promotionalText": "La app de mareas y corrientes que funciona sin señal. Mareas de todo el mundo y corrientes de EE. UU. y Canadá, ya en tu celular. Gratis, sin registro, sin anuncios.",
+        "description": [
+          "La app de mareas y corrientes que funciona sin señal. Mareas de más de 4,700 estaciones en todo el mundo y corrientes de Estados Unidos y Canadá, ya en tu celular: en el agua, en la playa, en el fondeadero, sin cobertura y sin nada que cargar.",
+          "",
+          "Nada de pantallas de carga. Nada de \"No hay conexión a internet\". Abres la app y la respuesta ya está ahí: si sube o baja, si es flujo o reflujo, y cuánto falta para la próxima pleamar, bajamar o estoa.",
+          "",
+          "Y hace la parte que casi todas las apps de mareas se saltan. Las alturas son la mitad fácil. La pregunta difícil es la corriente: ¿cuándo hay estoa en el paso? ¿Qué tan fuerte corre en su máximo? ¿Alcanzas a cruzar antes de que cambie?",
+          "",
+          "FUNCIONA DONDE NO HAY SEÑAL",
+          "Las predicciones se calculan en tu celular, no se descargan. Al final de un camino de terracería, en la punta, en un fondeadero o sin la electrónica del barco, obtienes la misma respuesta que en el muelle. El mapa de tu zona y tus estaciones favoritas también se quedan en tu celular.",
+          "",
+          "CORRIENTES, NO SOLO MAREAS",
+          "Estoa, máximo flujo y máximo reflujo en una sola curva, con velocidad y dirección. Desliza el dedo por la semana para leer cualquier momento. Cada estación de corriente enlaza con la marea de su puerto de referencia.",
+          "",
+          "EL SOL, LA LUNA Y SUS MAREAS",
+          "Amanecer, atardecer y crepúsculo, la fase de la luna, las mareas vivas y muertas explicadas, y los eclipses de sol y de luna, para cada estación.",
+          "",
+          "EN TU MUÑECA, EN TU PANTALLA DE INICIO Y CON SIRI",
+          "Una app para Apple Watch que funciona sin el iPhone: gira la Digital Crown para recorrer el día. Widgets en la pantalla de inicio con el próximo evento y la curva de hoy. Pídele a Siri la próxima bajamar, pleamar o ventana de estoa. En iPhone y iPad, en 14 idiomas.",
+          "",
+          "GRATIS, SIN REGISTRO, SIN ANUNCIOS",
+          "Todas las estaciones y todas las fechas son gratis y lo seguirán siendo. Sin registro, sin anuncios, sin rastreo, y la app es de código abierto.",
+          "",
+          "Slackwater Premium es opcional y financia el desarrollo: widgets en la pantalla de bloqueo, complicaciones para Apple Watch, alertas antes de las mareas y corrientes que te importan, y calendarios de estaciones. Elige una suscripción anual o una compra única de por vida.",
+          "",
+          "DE DÓNDE VIENEN LOS DATOS",
+          "Las mareas de más de 4,700 estaciones en un centenar de países ya vienen en la app, de NOAA, el Servicio Hidrográfico de Canadá, el Kartverket de Noruega y el catálogo mundial de mareógrafos TICON-4, y se verifican contra los niveles de referencia publicados de cada estación, donde los hay. Las corrientes cubren Estados Unidos y Canadá: más de 2,500 estaciones de corriente de NOAA y 22 pasos canadienses, desde el mar Salish hasta Haida Gwaii y la isla del Cabo Bretón. Las estaciones canadienses descargan sus datos del Servicio Hidrográfico de Canadá una sola vez y después funcionan sin conexión. Algunos pasos canadienses están en aguas que el cálculo en tu celular no puede predecir; esos descargan predicciones cuando tienes conexión, y lo indican. Donde no podemos publicar números confiables, la estación aparece en la lista pero en blanco: no adivinamos.",
+          "",
+          "Las predicciones no son observaciones: las condiciones cambian con el clima y el caudal de los ríos. No usar para la navegación.",
+          "",
+          "Términos de uso: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+        ],
+        "keywords": "pesca,vela,velero,lancha,barco,buceo,remo,marea,alta,baja,puerto,playa,internet,estoa,náutica"
+      }
+    },
+    "fr-CA": {
+      "appInfoLocalization": {
+        "name": "Slackwater — Marées & courants",
+        "subtitle": "Heures d’étale, hors ligne"
+      },
+      "versionLocalization": {
+        "promotionalText": "L’appli de marées et de courants qui fonctionne sans réseau. Marées du monde entier, courants des États-Unis et du Canada, déjà sur votre téléphone. Gratuit, sans compte.",
+        "description": [
+          "L’appli de marées et de courants qui fonctionne sans réseau. Les marées de plus de 4 700 stations partout dans le monde et les courants des États-Unis et du Canada, déjà sur votre téléphone : sur l’eau, à la plage, au mouillage, sans une seule barre et sans rien à charger.",
+          "",
+          "Pas de roue qui tourne. Pas de message « Aucune connexion Internet ». Vous ouvrez l’appli, et la réponse est là : la marée monte ou descend, le courant est en flot ou en jusant, et le temps qu’il reste avant la prochaine marée haute, marée basse ou étale.",
+          "",
+          "Et elle fait ce que la plupart des applis de marées négligent. Les hauteurs, c’est la moitié facile. La vraie question, c’est le courant : à quelle heure la passe sera-t-elle étale ? Quelle force atteint-il au maximum ? Aurez-vous le temps de passer avant la renverse ?",
+          "",
+          "FONCTIONNE LÀ OÙ IL N’Y A PAS DE RÉSEAU",
+          "Les prévisions sont calculées sur votre téléphone, pas téléchargées. Au bout d’un chemin de terre, sur la pointe, au mouillage ou sans l’électronique du bord, vous obtenez la même réponse qu’au quai. La carte de votre secteur et vos stations favorites restent aussi sur votre téléphone.",
+          "",
+          "DES COURANTS, PAS SEULEMENT DES MARÉES",
+          "L’étale, le flot max. et le jusant max. sur une même courbe, avec la vitesse et la direction. Glissez le doigt sur la semaine pour lire n’importe quel moment. Chaque station de courant renvoie à la marée de son port de référence.",
+          "",
+          "LE SOLEIL, LA LUNE ET LEURS MARÉES",
+          "Lever et coucher du soleil, crépuscules, phase de la lune, marées de vive-eau et de morte-eau expliquées, et éclipses solaires et lunaires, pour chaque station.",
+          "",
+          "AU POIGNET, SUR L’ÉCRAN D’ACCUEIL ET AVEC SIRI",
+          "Une appli Apple Watch qui fonctionne sans votre iPhone : tournez la Digital Crown pour parcourir la journée. Des widgets d’écran d’accueil pour le prochain événement et la courbe du jour. Demandez à Siri la prochaine marée basse, marée haute ou fenêtre d’étale. Sur iPhone et iPad, en 14 langues.",
+          "",
+          "GRATUIT, SANS COMPTE, SANS PUB",
+          "Toutes les stations et toutes les dates sont gratuites, et le resteront. Pas de compte, pas de pub, aucun pistage, et l’appli est à code source ouvert.",
+          "",
+          "Slackwater Premium est facultatif et finance le développement : widgets de l’écran verrouillé, complications Apple Watch, alertes avant les marées et les courants qui vous importent, et calendriers de stations. Choisissez un abonnement annuel ou un achat unique à vie.",
+          "",
+          "D’OÙ VIENNENT LES DONNÉES",
+          "Les marées de plus de 4 700 stations dans une centaine de pays sont intégrées, de la NOAA, du Service hydrographique du Canada, du Kartverket norvégien et du catalogue mondial de marégraphes TICON-4, et vérifiées par rapport aux niveaux de référence publiés pour chaque station, lorsqu’elle en a. Les courants couvrent les États-Unis et le Canada : plus de 2 500 stations de courant de la NOAA et 22 passes canadiennes, de la mer des Salish à Haida Gwaii et au Cap-Breton. Les stations canadiennes téléchargent leurs données du Service hydrographique du Canada une seule fois, puis fonctionnent hors ligne. Quelques passes canadiennes se trouvent dans des eaux que le calcul sur votre téléphone ne peut pas prédire ; celles-là téléchargent les prévisions quand vous êtes en ligne, et l’indiquent. Là où nous ne pouvons pas publier de chiffres fiables, la station figure dans la liste, mais vide : nous ne devinons pas.",
+          "",
+          "Les prévisions ne sont pas des observations : les conditions varient selon la météo et le débit des rivières. Non destiné à la navigation.",
+          "",
+          "Conditions d’utilisation : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+        ],
+        "keywords": "table,marée,haute,basse,pêche,voile,voilier,bateau,pagaie,plongée,plaisance,fleuve,shc,mer"
+      }
+    }
+  },
   "reviewDetail": {
     "contactFirstName": "Brandon",
     "contactLastName": "Keepers",

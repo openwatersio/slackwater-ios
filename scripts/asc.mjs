@@ -172,8 +172,8 @@ async function findVersion(versionString, states = EDITABLE) {
   return { ...v, first: all.length <= 1 };
 }
 
-// Find the localization for the listing's locale and PATCH it, or POST it
-// under its parent. The API refuses locale in a PATCH.
+// Find the localization for a locale and PATCH it, or POST it under its
+// parent. The API refuses locale in a PATCH.
 async function upsertLocalization(type, listPath, parentRel, locale, attributes) {
   const found = (await api('GET', `${listPath}?filter[locale]=${locale}`)).data[0];
   if (found) {
@@ -193,9 +193,12 @@ async function pushAppInfo(l) {
   const info = need(infos.find((i) => EDITABLE.includes(i.attributes.state ?? i.attributes.appStoreState)), 'appInfos',
     'no editable app info; one appears with a version in Prepare for Submission');
   await api('PATCH', `/v1/appInfos/${info.id}`, body('appInfos', { id: info.id, rels: categoryRels(l) }));
-  await upsertLocalization('appInfoLocalizations', `/v1/appInfos/${info.id}/appInfoLocalizations`,
-    { appInfo: ['appInfos', info.id] }, l.locale, l.appInfoLocalization);
-  console.log(`app info: ${l.appInfoLocalization.name}, ${l.appInfo.primaryCategory}/${l.appInfo.secondaryCategory}`);
+  for (const loc of l.locales) {
+    await upsertLocalization('appInfoLocalizations', `/v1/appInfos/${info.id}/appInfoLocalizations`,
+      { appInfo: ['appInfos', info.id] }, loc.locale, loc.appInfoLocalization);
+    console.log(`app info: ${loc.locale} ${loc.appInfoLocalization.name}`);
+  }
+  console.log(`app info: ${l.appInfo.primaryCategory}/${l.appInfo.secondaryCategory}`);
 }
 
 async function pushVersionLocalization(v, l) {
@@ -208,10 +211,16 @@ async function pushVersionLocalization(v, l) {
     if (!fs.existsSync(file)) fail(`no docs/release-notes/${version}.md; What's New comes from it`);
     notes = whatsNew(fs.readFileSync(file, 'utf8'), version);
   }
-  const loc = await upsertLocalization('appStoreVersionLocalizations', `/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations`,
-    { appStoreVersion: ['appStoreVersions', v.id] }, l.locale, versionLocalizationAttributes(l, notes));
-  console.log(`version ${version}: ${l.locale} description, keywords, promotional text, URLs${notes ? ', What\'s New' : ''}`);
-  return loc;
+  // ponytail: every locale gets the English What's New; read
+  // release-notes/<version>.<locale>.md first once a version's notes are translated.
+  const pushed = [];
+  for (const loc of l.locales) {
+    pushed.push(await upsertLocalization('appStoreVersionLocalizations', `/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations`,
+      { appStoreVersion: ['appStoreVersions', v.id] }, loc.locale, versionLocalizationAttributes(loc, notes)));
+    console.log(`version ${version}: ${loc.locale} description, keywords, promotional text, URLs${notes ? ', What\'s New' : ''}`);
+  }
+  // Screenshots go on the primary; the other locales show its set.
+  return pushed[0];
 }
 
 async function pushReviewDetail(v, l) {

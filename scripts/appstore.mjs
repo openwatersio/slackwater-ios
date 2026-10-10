@@ -15,15 +15,32 @@ const KEYWORD_BYTES = 100;
 // Multi-line fields are arrays of lines in the JSON, so the file stays readable.
 const text = (v) => (Array.isArray(v) ? v.join('\n') : v);
 
+// Every locale writes its own copy. Only the URLs carry over from the primary,
+// because English keywords in another locale would waste the field.
+const COPY = ['name', 'subtitle', 'promotionalText', 'description', 'keywords'];
+
+// The primary locale's fields sit at the top level and each other locale's
+// under localizations. l.locales lists them all, primary first, with the URLs
+// filled in.
 export function loadListing(file = new URL('../docs/appstore-listing.json', import.meta.url)) {
   const l = JSON.parse(fs.readFileSync(file, 'utf8'));
   l.versionLocalization.description = text(l.versionLocalization.description);
   l.reviewDetail.notes = text(l.reviewDetail.notes);
-  const fields = { ...l.appInfoLocalization, ...l.versionLocalization };
-  for (const [k, max] of Object.entries(LIMITS)) {
-    if (fields[k] !== undefined && [...fields[k]].length > max) throw new Error(`${k} is ${[...fields[k]].length} characters, limit ${max}`);
-  }
-  if (Buffer.byteLength(fields.keywords) > KEYWORD_BYTES) throw new Error(`keywords are ${Buffer.byteLength(fields.keywords)} bytes, limit ${KEYWORD_BYTES}`);
+  l.locales = Object.entries({ [l.locale]: l, ...l.localizations }).map(([locale, own]) => {
+    const fields = { ...own.appInfoLocalization, ...own.versionLocalization };
+    const missing = COPY.filter((k) => fields[k] === undefined);
+    if (missing.length) throw new Error(`${locale} has no ${missing.join(', ')}`);
+    fields.description = text(fields.description);
+    for (const [k, max] of Object.entries(LIMITS)) {
+      if (fields[k] !== undefined && [...fields[k]].length > max) throw new Error(`${locale} ${k} is ${[...fields[k]].length} characters, limit ${max}`);
+    }
+    if (Buffer.byteLength(fields.keywords) > KEYWORD_BYTES) throw new Error(`${locale} keywords are ${Buffer.byteLength(fields.keywords)} bytes, limit ${KEYWORD_BYTES}`);
+    return {
+      locale,
+      appInfoLocalization: { ...l.appInfoLocalization, ...own.appInfoLocalization },
+      versionLocalization: { ...l.versionLocalization, ...own.versionLocalization, description: fields.description },
+    };
+  });
   return l;
 }
 
@@ -53,7 +70,8 @@ export function body(type, { id, attributes, rels } = {}) {
 }
 
 // The first version of an app has no What's New; App Store Connect rejects the field.
-export const versionLocalizationAttributes = (l, whatsNew) => ({ ...l.versionLocalization, ...(whatsNew && { whatsNew }) });
+// loc is one of l.locales, or the listing itself for the primary.
+export const versionLocalizationAttributes = (loc, whatsNew) => ({ ...loc.versionLocalization, ...(whatsNew && { whatsNew }) });
 
 // The phone number stays out of the public repo. Unset, the API leaves it as is.
 export const reviewDetailAttributes = (l, phone) => ({ ...l.reviewDetail, ...(phone && { contactPhone: phone }) });

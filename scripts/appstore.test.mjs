@@ -48,6 +48,21 @@ test('the listing loader rejects copy over Apple’s limits', () => {
   assert.throws(() => loadListing(withListing((l) => { l.versionLocalization.keywords = '—'.repeat(34); })), /keywords are 102 bytes/);
 });
 
+test('every locale brings its own copy and takes the URLs from the primary', () => {
+  const l = loadListing();
+  assert.deepEqual(l.locales.map((loc) => loc.locale), ['en-US', 'es-MX', 'fr-CA']);
+  assert.deepEqual(l.locales[0].versionLocalization, l.versionLocalization);
+  const fr = l.locales.find((loc) => loc.locale === 'fr-CA');
+  assert.equal(fr.appInfoLocalization.privacyPolicyUrl, 'https://slackwater.xyz/privacy/');
+  assert.equal(fr.versionLocalization.supportUrl, 'https://slackwater.xyz/support/');
+  assert.match(fr.versionLocalization.description, /^L’appli de marées.*\n\nPas de roue/);
+  assert.notEqual(fr.versionLocalization.keywords, l.versionLocalization.keywords);
+  assert.equal(versionLocalizationAttributes(fr, 'New.').whatsNew, 'New.');
+
+  assert.throws(() => loadListing(withListing((l) => { delete l.localizations['es-MX'].versionLocalization.keywords; })), /es-MX has no keywords/);
+  assert.throws(() => loadListing(withListing((l) => { l.localizations['es-MX'].appInfoLocalization.subtitle = 'x'.repeat(31); })), /es-MX subtitle is 31 characters/);
+});
+
 test('What’s New is the notes between the version line and Worth testing', () => {
   const notes = '1.15.0 (60)\n\nFaster maps.\n\n· One\n· Two\n\nWorth testing: the map.\n';
   assert.equal(whatsNew(notes, '1.15.0'), 'Faster maps.\n\n· One\n· Two');

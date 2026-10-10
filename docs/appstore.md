@@ -35,11 +35,11 @@ Every command takes `--dry-run`. `submit`, `release`, and `accessibility` reach 
 |---|---|
 | `prepare <version> <build> [screenshotDir]` | Everything below except submit, release, and accessibility, in order |
 | `version <version>` | Finds or creates the iOS version, sets release type `MANUAL` and the copyright |
-| `app-info` | Name, subtitle, privacy policy URL, primary and secondary category, content rights |
-| `localization <version>` | Description, keywords, promotional text, support and marketing URLs, What's New |
+| `app-info` | Name, subtitle and privacy policy URL in every locale, primary and secondary category, content rights |
+| `localization <version>` | Description, keywords, promotional text, support and marketing URLs, and What's New, in every locale |
 | `review-details <version>` | Review contact and notes |
 | `attach-build <version> <build>` | Attaches a `VALID`, unexpired, App Store–eligible build |
-| `screenshots <version> [screenshotDir]` | Replaces the 6.9" iPhone (`APP_IPHONE_67`) and 13" iPad (`APP_IPAD_PRO_3GEN_129`) sets from `iphone-6.9/` and `ipad-13/` (default `/tmp/slackwater-appstore`) |
+| `screenshots <version> [screenshotDir]` | Replaces the `en-US` 6.9" iPhone (`APP_IPHONE_67`) and 13" iPad (`APP_IPAD_PRO_3GEN_129`) sets from `iphone-6.9/` and `ipad-13/` (default `/tmp/slackwater-appstore`); the other locales show them |
 | `submit <version> --yes` | Creates a review submission holding the version and submits it |
 | `release <version> --yes` | Releases a version in Pending Developer Release |
 | `accessibility --yes` | Publishes the Accessibility Nutrition Labels in the listing file for iPhone and iPad |
