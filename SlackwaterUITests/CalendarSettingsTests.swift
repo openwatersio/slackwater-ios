@@ -86,8 +86,8 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         XCTAssert(app.buttons["Turn Off"].appears(within: 15))
         // On this simulator's confirmationDialog presentation the explicit Cancel role is
         // omitted — Apple's own documented popover behavior: tapping outside the dialog
-        // serves as cancel, so an explicit Cancel row would be redundant. Dismiss the same
-        // way AlertPopupTests does for its own popover, off-center so the tap can't land on
+        // serves as cancel, so an explicit Cancel row would be redundant. Dismiss by tapping
+        // outside, off-center so the tap can't land on
         // the dialog itself. dy: 0.7, not a point near the top: on iPad, Settings presents as a
         // bounded (not full-screen) sheet and this confirmationDialog anchors as a popover near
         // the toggle — high on screen, not centered the way it renders on iPhone — so a

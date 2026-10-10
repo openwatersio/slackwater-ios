@@ -318,7 +318,7 @@ import notify
             .press(forDuration: 0.05, thenDragTo:
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
                 withVelocity: .default, thenHoldForDuration: 0)
-        XCTAssertFalse(app.buttons["alert-popup-close"].exists, "scrubbing opened the alert popover")
+        XCTAssertFalse(app.descendants(matching: .any)["alert-sheet"].exists, "scrubbing opened the alert sheet")
     }
 
     /// Bring the whole strip into view so its Now pill clears system chrome (#634).
