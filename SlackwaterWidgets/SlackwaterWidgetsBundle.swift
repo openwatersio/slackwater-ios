@@ -13,11 +13,8 @@ struct StationProvider: AppIntentTimelineProvider {
         [.accessoryInline, .accessoryCircular, .accessoryRectangular]
 
     /// Build only what this family draws. A locked accessory needs no station
-    /// record, and inline needs no graph. Circular and rectangular build both
-    /// a snapshot and a full card-span graph, roughly twice the harmonic
-    /// evaluation per entry of either alone.
-    // ponytail: both full builds per entry; narrow the graph to the family's
-    // span or derive the snapshot from it if the timeline is measured too slow.
+    /// record, and inline needs no graph. Circular and rectangular build
+    /// event labels and readings alongside a full card-span graph.
     private func entryBuilder(_ intent: StationConfigIntent,
                               for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
         let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)

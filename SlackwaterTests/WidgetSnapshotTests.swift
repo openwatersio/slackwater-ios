@@ -1,5 +1,4 @@
-// Slackwater — GPL v3. WidgetSnapshot: next event, slack window, and a
-// render-ready day curve — deterministic given (station, now).
+// Slackwater — GPL v3. Accessory labels and next event, plus home-screen cards.
 import XCTest
 import SwiftUI
 @testable import Slackwater
@@ -34,32 +33,6 @@ import SlackwaterKit
         XCTAssertEqual(s.stationName, "Current Location · Friday Harbor")
     }
 
-    func testTideSnapshotCarriesNextHighAndLow() throws {
-        let now = Date(timeIntervalSince1970: 1_755_800_000)
-        let s = WidgetSnapshot.build(friday, now: now)
-
-        let high = try XCTUnwrap(s.nextHigh)
-        let low = try XCTUnwrap(s.nextLow)
-        XCTAssertGreaterThan(high.time, now)
-        XCTAssertGreaterThan(low.time, now)
-        XCTAssertTrue(high.label.hasPrefix("High "))
-        XCTAssertTrue(low.label.hasPrefix("Low "))
-    }
-
-    func testTideSnapshotCarriesScrubberMovement() {
-        let station = Station(
-            constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
-            offset: 6)
-        let tide = WidgetStation.tide(station, tz: TimeZone(identifier: "UTC")!,
-                                      name: "Fast Tide")
-        let now = Date(timeIntervalSince1970: 1_755_800_000)
-        let s = WidgetSnapshot.build(tide, now: now)
-
-        XCTAssertFalse(s.tideMovements.isEmpty)
-        XCTAssertNotNil(s.tideRate)
-        XCTAssert(s.tideMovements.allSatisfy { (0...1).contains($0.fraction) })
-    }
-
     /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
     /// app's own Settings choice, so a metric-only label shipped to every
     /// imperial user. Setting imperial explicitly (rather than relying on
@@ -80,22 +53,11 @@ import SlackwaterKit
         XCTAssertFalse(label.hasSuffix("m"), "expected an imperial label, got \(label)")
     }
 
-    func testCurrentNextEventAndWindow() {
-        let s = WidgetSnapshot.build(current, now: Date())
-        XCTAssertNotNil(s.next)
-        // A slack inside the sampled day gets its 0.5 kn window attached.
-        if s.next!.label == "Slack" { XCTAssertNotNil(s.window) }
-    }
-
-    func testCurrentSnapshotPreservesMiniScrubberState() {
+    func testCurrentNextEventIsFuture() throws {
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let s = WidgetSnapshot.build(current, now: now)
-
+        XCTAssertGreaterThan(try XCTUnwrap(s.next).time, now)
         XCTAssertEqual(s.curveKind, .current)
-        XCTAssertEqual(s.threshold, slackThresholdKn)
-        XCTAssertLessThan(s.sparkline.min()!, 0)
-        XCTAssertGreaterThan(s.sparkline.max()!, 0)
-        XCTAssertFalse(s.state.isEmpty)
         XCTAssertFalse(s.value.isEmpty)
     }
 
@@ -375,84 +337,29 @@ import SlackwaterKit
                        "a concrete choice must never resolve to the current location")
     }
 
-    func testSparklineShape() {
-        let s = WidgetSnapshot.build(friday, now: Date())
-        XCTAssertEqual(s.sparkline.count, 97)
-        XCTAssert(s.sparkline.allSatisfy { (0.0...1.0).contains($0) })
-        XCTAssert((0.0...1.0).contains(s.nowFraction))
-    }
-
     func testDeterministic() {
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         XCTAssertEqual(WidgetSnapshot.build(friday, now: now),
                        WidgetSnapshot.build(friday, now: now))
     }
 
-    /// Regression for the unpadded backward fetch: `DerivedSlackStation
-    /// .schematicSigned` reads 0 before the first slack in its `slacks`
-    /// array, so a fetch starting exactly at dayStart left the sparkline
-    /// flat from midnight until the day's first slack. Picks a fixed epoch
-    /// whose UNPADDED first slack lands well after midnight (guarded below),
-    /// so the leading samples can only be non-flat if the backward pad
-    /// pulled in the slack that actually straddles midnight.
-    func testDerivedSparklineIsNotFlatBeforeFirstSlack() {
-        let tz = TimeZone(identifier: "UTC")!
-        let station = derivedGate(tz: tz)
-        guard case .derived(let gate, _, _) = station else { return XCTFail("expected .derived") }
-
-        let now = Date(timeIntervalSince1970: 1_755_800_000)
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-        let dayStart = cal.startOfDay(for: now)
-
-        // Fixture sanity: without a backward pad, the day's first slack is
-        // well after midnight, so a flat run at the start is unambiguous.
-        let unpaddedFirst = gate.slacks(from: dayStart, to: dayStart.addingTimeInterval(86_400)).first
-        let firstSlackOffset = try! XCTUnwrap(unpaddedFirst).time.timeIntervalSince(dayStart)
-        XCTAssertGreaterThan(firstSlackOffset, 3_600,
-                             "fixture must have its first slack well after midnight to exercise the pad")
-
-        let s = WidgetSnapshot.build(station, now: now)
-        // Samples strictly before that first slack must show real curve
-        // (the prior cycle bleeding across midnight), not the padding bug's
-        // flat run of exact zeros.
-        let leadingCount = Int(firstSlackOffset / (86_400.0 / 96))
-        let leading = s.sparkline.prefix(leadingCount)
-        XCTAssertGreaterThan(leading.count, 0)
-        XCTAssert(leading.contains { abs($0) > 0.01 }, "leading samples are flat — backward pad missing")
-    }
-
-    func testDerivedStateUsesTheCanonicalSlackWindow() {
-        let station = derivedGate(tz: TimeZone(identifier: "UTC")!)
-        guard case .derived(let gate, _, _) = station else { return XCTFail("expected .derived") }
-        let seed = Date(timeIntervalSince1970: 1_755_800_000)
-        let slacks = gate.slacks(from: seed.addingTimeInterval(-30 * 3600),
-                                 to: seed.addingTimeInterval(30 * 3600))
-        let now = slacks[1].time.addingTimeInterval(15 * 60)
-
-        XCTAssertNotEqual(gate.phase(at: now, slacks: slacks).word, "Slack")
-        XCTAssertEqual(WidgetSnapshot.build(station, now: now).state,
-                       gate.phase(at: now, slacks: slacks).word)
-    }
-
-    /// 2026-03-08 is the US spring-forward date: America/Los_Angeles has a
-    /// 23-hour local day. The derived branch is the one whose sample count
-    /// is pinned to the real day length (step = dayLength/96), so this is
-    /// the one that must hold exactly 97 on a DST day.
-    func testDerivedSparklineHandlesDSTDay() {
+    func testDerivedNextSlackAcrossDSTTransitions() throws {
         let tz = TimeZone(identifier: "America/Los_Angeles")!
         let station = derivedGate(tz: tz)
+        guard case .derived(let gate, _, _) = station else { return XCTFail("expected .derived") }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
-        let now = cal.date(from: DateComponents(year: 2026, month: 3, day: 8, hour: 12))!
-
-        let s = WidgetSnapshot.build(station, now: now)
-        XCTAssertEqual(s.sparkline.count, 97)
-        XCTAssert((0.0...1.0).contains(s.nowFraction))
-        // The correct (23h) denominator, not the old fixed 86_400s one.
-        let dayStart = cal.startOfDay(for: now)
-        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
-        XCTAssertEqual(dayEnd.timeIntervalSince(dayStart), 23 * 3600)
-        XCTAssertEqual(s.nowFraction, now.timeIntervalSince(dayStart) / (23 * 3600), accuracy: 0.0001)
+        for (month, day) in [(3, 8), (11, 1)] {
+            let now = cal.date(from: DateComponents(year: 2026, month: month, day: day, hour: 12))!
+            let expected = try XCTUnwrap(gate.slacks(from: now, to: cal.date(byAdding: .day, value: 2, to: now)!)
+                .first { $0.time > now })
+            let s = WidgetSnapshot.build(station, now: now)
+            let next = try XCTUnwrap(s.next)
+            XCTAssertEqual(next.time, expected.time)
+            XCTAssertGreaterThan(next.time, now)
+            XCTAssertEqual(next.label, "Slack")
+            XCTAssertEqual(s.tz, tz)
+            XCTAssertEqual(s.curveKind, .schematic)
+        }
     }
 }

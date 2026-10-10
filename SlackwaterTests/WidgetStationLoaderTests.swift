@@ -381,7 +381,6 @@ import SlackwaterKit
             XCTAssertGreaterThan((graphValues.max() ?? 0) - (graphValues.min() ?? 0), 1)
             let snapshot = WidgetSnapshot.build(WidgetStationLoader.station(from: record), now: now)
             XCTAssertEqual(snapshot.curveKind, .current)
-            XCTAssertGreaterThan(snapshot.sparkline.count, 10)
             XCTAssertNotNil(snapshot.next)
             XCTAssertNil(WidgetStationLoader.loadRecord(
                 id: id, at: start.addingTimeInterval(11 * 86_400)),
