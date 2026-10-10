@@ -1,6 +1,6 @@
 # App Store metadata
 
-The listing Slackwater submits, and the rules any edit to it is written against. Nothing here has been submitted — App Store Connect still holds placeholder values.
+The listing Slackwater submits, and the rules any edit to it is written against.
 
 ## Coverage, as every field below states it
 
@@ -78,10 +78,11 @@ This field sits directly above the description and is the one piece of copy that
 
 **Angle: problem first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the problem and the solution. Everything establishing _why the numbers are trustworthy_ — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
 
-Two rules that are easy to break by accident:
+Three rules that are easy to break by accident:
 
 - **Placement beats phrasing inside the first 200 characters.** "Offline" earns its spot in the second sentence because that is character 52, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
 - **Currents are named as North American every time coverage is claimed.** The provenance block is the only place the limit appears, so it cannot be trimmed for length.
+- **The last lines link the Terms of Use and Privacy Policy.** App Review 3.1.2 requires a Terms of Use link in the description for an app that sells a subscription, and rejects the submission without one. Slackwater uses Apple's standard EULA, so the link goes to Apple's page and the custom EULA field in App Store Connect stays empty. The purchase screen links the same two pages (`PremiumPurchaseControls.swift`).
 
 Full text:
 
@@ -126,6 +127,10 @@ Full text:
 >
 > Predictions are not observations — conditions vary with weather and river
 > flow. Not for navigation.
+>
+> Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+>
+> Privacy Policy: https://slackwater.xyz/privacy/
 
 ## What's New (4,000 chars max)
 
@@ -223,4 +228,5 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
 - [ ] Station counts re-derived and rounded down.
 - [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.
+- [ ] Description ends with the Terms of Use and Privacy Policy links, and the Privacy Policy URL field is `https://slackwater.xyz/privacy/`.
 - [ ] Accessibility Nutrition Labels answered against Apple's current criteria, claiming only the rows that are yes.
