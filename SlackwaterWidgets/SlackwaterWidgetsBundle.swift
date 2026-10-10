@@ -59,6 +59,7 @@ struct SlackwaterWidgetsBundle: WidgetBundle {
     var body: some Widget {
         NextEventWidget()
         DayCurveWidget()
+        LiveActivitySpike()  // SPIKE, throwaway
         #if PREMIUM_ENABLED
         SlackInlineWidget()
         SlackCircularWidget()

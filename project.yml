@@ -138,6 +138,7 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true  # SPIKE
         NSUserActivityTypes: [io.openwaters.slackwater.station]
         # SwiftUI's `.preferredColorScheme(.dark)` (RootView, SlackwaterApp.swift)
         # only reaches the app's own view hierarchy. This plist key sets the
@@ -220,7 +221,9 @@ targets:
     type: app-extension
     platform: iOS
     templates: [PortableSources]
-    sources: [SlackwaterWidgets]
+    sources:
+      - SlackwaterWidgets
+      - Slackwater/LiveActivitySpikeAttributes.swift  # SPIKE
     info:
       path: SlackwaterWidgets/Info.plist
       properties:

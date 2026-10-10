@@ -79,7 +79,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if seenGate {
+            if CommandLine.arguments.contains("-laSpike") {
+                LiveActivitySpikeView()  // SPIKE, throwaway
+            } else if seenGate {
                 StationListView()
             } else {
                 GateView()
