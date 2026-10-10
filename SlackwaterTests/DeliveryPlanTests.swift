@@ -74,8 +74,8 @@ final class DeliveryPlanTests: XCTestCase {
     }
 
     func testTwoRulesOnTheSameMomentDeliverOneNotification() {
-        // Both popup rows on for one moment: "Alert me" makes a `once` rule, "Every low tide" a
-        // repeating one, and at the moment itself the two carry the same title and the same body.
+        // A `once` rule on one moment beside an "Every low tide" rule: at the moment itself the two
+        // carry the same title and the same body.
         let station = "a"
         let trigger = AlertTrigger.tideExtreme(high: false)
         let every = AlertRule(stationID: station, trigger: trigger, lead: 1_800)

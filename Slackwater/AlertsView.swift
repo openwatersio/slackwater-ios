@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Every alert rule, grouped by station, with why each one is or isn't delivering (docs/alerts.md §7.3).
+// Slackwater — GPL v3. Every alert rule, grouped by station, with why each one is or isn't delivering (docs/alerts.md §7.5).
 import SwiftUI
 
 /// The first thing that explains a quiet rule, or when its deliveries run out.
@@ -56,7 +56,7 @@ struct AlertsView: View {
         List {
             PremiumRequirement()
             if store.rules.isEmpty {
-                Text("No alerts yet. Press and hold any station's timeline to set one.")
+                Text("No alerts yet. Tap Set an alert under any station's timeline.")
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
             ForEach(alertStationGroups(store.rules, name: { name($0) })) { group in
@@ -107,6 +107,8 @@ struct AlertsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(CanvasBackground())
-        .sheet(item: $editing) { rule in AlertSheet(rule: rule, stationName: name(rule.stationID)) }
+        .sheet(item: $editing) { rule in
+            AlertSheet(rule: rule, stationName: name(rule.stationID), boundMoment: rule.once)
+        }
     }
 }

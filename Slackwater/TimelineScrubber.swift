@@ -69,6 +69,9 @@ struct TimelineScrubber: UIViewRepresentable {
     /// host has nothing to open — a list card's strip — and then the strip carries neither the
     /// press recognizer nor the matching VoiceOver action.
     var onLongPress: (() -> Void)? = nil
+    /// VoiceOver's stand-in for the press: the host both parks the moment and opens its sheet.
+    /// Nil wherever `onLongPress` is.
+    var onAlertAction: (() -> Void)? = nil
     /// The detail's station. Nil on a list card, which neither follows the
     /// Duo's hinge nor hands its moment across a fold.
     var stationID: String? = nil
@@ -429,12 +432,13 @@ struct TimelineScrubber: UIViewRepresentable {
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
                 },
             ]
-            // The press and hold, as an action: the moment is already on the centerline, so
-            // the host opens the popup for it exactly as it would after a press.
-            if let onLongPress = parent.onLongPress {
+            // The press and hold, as an action. A sighted press turns the line under the strip
+            // and leaves the tap to the user; VoiceOver has nothing to go and find, so the host
+            // opens the sheet for the centerline moment in the same step (docs/alerts.md §7.1).
+            if let onAlertAction = parent.onAlertAction {
                 sv.accessibilityCustomActions?.append(
                     UIAccessibilityCustomAction(name: String(localized: "Set an alert", comment: "VoiceOver chart action.")) { _ in
-                        onLongPress(); return true
+                        onAlertAction(); return true
                     })
             }
         }
@@ -698,11 +702,11 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
-        /// A press and hold: park its moment on the centerline and let the scaffold open the
-        /// popup there. Instant, not the tap's animated magnet ride — a press names one moment,
-        /// and a popup opening over a sliding strip could not say what it was about until the
-        /// slide landed. The day row belongs to the picker's tap and answers a press with
-        /// nothing.
+        /// A press and hold: park its moment on the centerline and tell the scaffold, whose line
+        /// under the strip names it (§7.1). Instant, not the tap's animated magnet ride — a press
+        /// names one moment, and a line changing under a sliding strip could not say what it was
+        /// about until the slide landed. The day row belongs to the picker's tap and answers a
+        /// press with nothing.
         @objc func handlePress(_ g: UILongPressGestureRecognizer) {
             guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
             let p = g.location(in: sv)
@@ -810,7 +814,9 @@ struct TimelineScrubStrip: View {
     @Environment(\.stripStationID) private var stationID
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.openAlertPopup) private var openAlertPopup
+    @Environment(\.stripPressed) private var stripPressed
+    @Environment(\.stripIsPressed) private var pressed
+    @Environment(\.stripAlertAction) private var stripAlertAction
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -820,7 +826,8 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker, onLongPress: openAlertPopup,
+                         onPickDate: openWeekPicker, onLongPress: stripPressed,
+                         onAlertAction: stripAlertAction,
                          stationID: stationID)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the
@@ -936,6 +943,13 @@ struct TimelineScrubStrip: View {
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
                     .opacity(settled && commentary != nil ? 1 : 0)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
+                // Held: the reading line runs on through the time and day rows to the alert
+                // line under the strip, which names the parked moment (docs/alerts.md §7.1).
+                if pressed {
+                    Rectangle().fill(.white.opacity(0.18))
+                        .frame(width: 1, height: geo.height - geo.bodyBottom)
+                        .position(x: w / 2, y: geo.bodyBottom + (geo.height - geo.bodyBottom) / 2)
+                }
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas

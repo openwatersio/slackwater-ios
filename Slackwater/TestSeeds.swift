@@ -37,6 +37,11 @@ import Foundation
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
     }
+    // Through the store, not the key: `SlackwaterApp.init` wires `AlertRuleStore.shared` before
+    // this runs, so the store already holds whatever the key held (docs/alerts.md §7.1).
+    if CommandLine.arguments.contains("-resetAlerts") {
+        AlertRuleStore.shared.rules.map(\.id).forEach { AlertRuleStore.shared.remove($0) }
+    }
     // -seedTideModel <id> (UserDefaults argument domain): writes a
     // synthetic fitted model for one bundled CHS tide port, so a derived
     // gate whose reference it is (Malibu Rapids ← Point Atkinson) renders

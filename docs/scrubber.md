@@ -250,7 +250,7 @@ Every tap stops opening motion, momentum, and an earlier settle before acting. O
 
 #### 6.5.1 Press and hold
 
-A press held on the plot or event-time row resolves like a tap (the magnet within 46 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host opens the alert popup over the centerline (docs/alerts.md §7). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host exactly as a press does. A strip whose host has no popup to open (a list card) carries neither the recognizer nor the action.
+A press held on the plot or event-time row resolves like a tap (the magnet within 46 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host's alert line under the strip names the parked moment, and the strip runs its reading line on down to it while the press holds (docs/alerts.md §7.1). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host and opens its alert sheet in one step, since there is no line to go and find. A strip whose host has no alerts (a list card) carries neither the recognizer nor the action.
 
 ## 7. Magnetic settling
 
@@ -743,7 +743,7 @@ These scenarios define the minimum behavior shared by all platforms.
 These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
-- The online-current detail has no alert popup, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
+- The online-current detail has no alerts, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
