@@ -157,6 +157,32 @@ jobs:
       - run: npm run check
         working-directory: services/testflight-feedback
 
+  # A pull request can slip a package in through package-lock.json, which
+  # reviewers rarely read. npm keeps existing resolved URLs when it regenerates,
+  # so the diff alone misses a swapped tarball; lockfile-lint catches that.
+  lockfile:
+    name: Lockfile · ${{ matrix.dir }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        dir: [tools, services/testflight-feedback]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Check the lockfile regenerates from package.json
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
+      - name: Check every package resolves from the npm registry
+        run: npx -y lockfile-lint@5.0.1 --path package-lock.json --allowed-hosts npm --validate-https --validate-integrity --validate-package-names
+
   # Builds once for every test shard below. The shards spent about half of
   # each job rebuilding the same app (a 521 s build behind ~500 s of tests),
   # and on a free org's five macOS slots that doubled the wall clock.
@@ -442,7 +468,7 @@ jobs:
   required:
     name: Required checks
     if: always()
-    needs: [changes, data, feedback, build, app]
+    needs: [changes, data, feedback, lockfile, build, app]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify required jobs
@@ -450,6 +476,7 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           DATA: ${{ needs.data.result }}
           FEEDBACK: ${{ needs.feedback.result }}
+          LOCKFILE: ${{ needs.lockfile.result }}
           APP_NEEDED: ${{ needs.changes.outputs.app }}
           BUILD: ${{ needs.build.result }}
           APP: ${{ needs.app.result }}
@@ -457,6 +484,7 @@ jobs:
           test "$CHANGES" = success
           test "$DATA" = success
           test "$FEEDBACK" = success
+          test "$LOCKFILE" = success
           if [ "$APP_NEEDED" = true ]; then
             test "$BUILD" = success
             test "$APP" = success

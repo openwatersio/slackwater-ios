@@ -212,13 +212,14 @@ SwiftUI's `.task` runs inside UIKit's first-commit block, so synchronous work th
 
 ## CI
 
-`Required checks` in `.github/workflows/ci.yml` is the protected-branch merge gate. It requires the change filter, data generators, TestFlight intake, and app build/tests to succeed; a docs-only app skip is accepted. The branch rule does not require an up-to-date PR branch.
+`Required checks` in `.github/workflows/ci.yml` is the protected-branch merge gate. It requires the change filter, data generators, TestFlight intake, lockfile checks, and app build/tests to succeed; a docs-only app skip is accepted. The branch rule does not require an up-to-date PR branch.
 
 | Job             | Where         | What it does                                                  |
 | --------------- | ------------- | ------------------------------------------------------------- |
 | What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
 | Data generators | GitHub-hosted | Regenerates the bundles, checks committed copies, and runs CI/release tooling checks |
 | TestFlight intake | GitHub-hosted | Tests and type-checks the TestFlight feedback service (`services/testflight-feedback`) |
+| Lockfile        | GitHub-hosted | Checks that each `package-lock.json` regenerates unchanged and resolves only from the npm registry |
 | Build for testing | GitHub-hosted | Builds the app and its test bundles once and uploads them |
 | App tests       | GitHub-hosted | Runs `scripts/test.sh` against that upload in five shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
 
