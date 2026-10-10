@@ -84,7 +84,7 @@ struct SettingsView: View {
                             HStack {
                                 Text(
                                     alerts.rules.isEmpty
-                                        ? "Press and hold any station's timeline to set an alert"
+                                        ? "Tap Set an alert under any station's timeline"
                                         : "\(alerts.rules.count) alerts")
                                 Spacer()
                                 Image(systemName: "chevron.right")

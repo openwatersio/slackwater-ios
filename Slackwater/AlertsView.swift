@@ -56,7 +56,7 @@ struct AlertsView: View {
         List {
             PremiumRequirement()
             if store.rules.isEmpty {
-                Text("No alerts yet. Press and hold any station's timeline to set one.")
+                Text("No alerts yet. Tap Set an alert under any station's timeline.")
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
             ForEach(alertStationGroups(store.rules, name: { name($0) })) { group in
