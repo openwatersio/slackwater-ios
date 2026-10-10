@@ -137,8 +137,7 @@ threshold changes every `.slackWindowOpens` occurrence (§6).
 |---|---|---|---|
 | EventKit, one calendar per station | station subscriptions | 90 days | Premium |
 | One-shot local notification | rules | 14 days, soonest 64 | Premium |
-| AlarmKit `Alarm.Schedule.fixed(fire)` | rules | plan 2 | Premium |
-| The alarm's Live Activity countdown | rules | plan 2 | Premium |
+| Scheduled Live Activity, its start alert replacing the notification | rules | soonest few, plan 2 | Premium |
 
 Every delivered item opens the station at the event: `shareURL(forStationID:at:tz:)` with the
 event instant, falling back to `deepLink(forStationID:)` for a station with no published slug.
@@ -224,18 +223,56 @@ vanishes off the user's Mac without them having read that sentence.
   different leads stays two reminders. The `once` rule keeps the delivery, since it has no other
   occurrence to show on the Alerts screen (§7.3).
 
-### 5.3 Alarms and the countdown
+### 5.3 Live Activities
 
-Plan 2, after the on-device spike (§11).
+Plan 2, after the on-device spike (§11). The last half hour before an occurrence, and a slack
+window while it is open, live in the Dynamic Island and on the Lock Screen so the boater is not
+reopening the app at the dock.
 
-- AlarmKit alerts break through Silent mode and Focus. That is right for a 05:40 transit and
-  wrong for anything else, so an alarm is offered only on current and slack triggers and is never
-  a default. It is also where App Review scrutiny lands; keeping alarms to "wake me for a
-  transit" is the mitigation.
-- `AlarmManager.schedule(id:configuration:)` with `.alarm(schedule: .fixed(fire), attributes:)`,
-  soonest-first, stopping at `AlarmManager.AlarmError.maximumLimitReached`.
-- `AlarmAttributes` conforms to `ActivityAttributes`; the widget extension supplies the Live
-  Activity UI, counting down with `Text(timerInterval:)` to the event and across the window.
+**One scheduled thing, not two.** iOS 26's
+`Activity.request(attributes:content:pushType:style:alertConfiguration:start:)` schedules a Live
+Activity for a date and the system starts it then, app in the background. A scheduled start
+must carry an `alertConfiguration`, and that alert is the notification: it fires at `fire` with
+the §5.2 title and body. The occurrence that gets an activity is dropped from the notification
+writer, so nothing buzzes twice. Not an alarm: AlarmKit's countdown is templated, breaks through
+Silent and Focus, and is where App Review looks, so it stays the opt-in transit alarm under
+Next (§12).
+
+**Budget.** Scheduled activities count toward the system's handful of simultaneous Live
+Activities, shared with every other app. The plan takes the soonest N of its notification
+occurrences, in the writer's order, where N is whatever the system accepts: the writer requests
+in order and stops at the first `ActivityAuthorizationError`, and every occurrence it could not
+place stays an ordinary notification. N is never hard-coded. A `once` rule, a repeating rule,
+any trigger: whichever is soonest. No new UI decides this.
+
+**Static content, system timers.** The app has no background execution (§6), so the content
+state is fixed when the activity is scheduled and nothing updates it. Everything that moves is a
+timer the system draws: `Text(timerInterval:)` down to `event`, then across `event…end`.
+`ActivityContent.staleDate` is `event`; the widget reads `context.isStale` to turn one scheduled
+start into two faces:
+
+| | Counting down | Stale, after `event` |
+|---|---|---|
+| Island compact | tide or current glyph · `14:32` · timer to the event | glyph · timer to `end` ("open 38m"), or the height for a tide |
+| Island expanded, Lock Screen | "Race Passage · Slack window" · timer · "14:32–15:10, under 0.5 kn" | "Open" · timer to close · the same line |
+| Minimal | glyph | glyph |
+
+A tide extreme, a peak and a derived slack have no `end`: the stale face names the moment and
+the height, and the activity is ended on the next run. `noWindow` never shows "Open". The tap
+opens the station at the event through the same URL every delivery carries.
+
+The attributes are the occurrence's facts, nothing rendered: station name, trigger, `event`,
+`end`, `noWindow`, `heightM`, the threshold, the units, the URL.
+
+**Ending.** Nothing ends an activity on time while the app is closed. Past its window it sits on
+the Lock Screen with a stopped timer until the user swipes it, the app next foregrounds and the
+run ends it, or iOS ends it at eight hours. For a window under two hours that is acceptable and
+documented here rather than worked around. A run ends every activity of ours that is
+scheduled but not started, or whose window has closed, before requesting the plan's; a rule
+removed takes its activity with it.
+
+The watch Smart Stack would come with `.supplementalActivityFamilies([.small])` and is not in
+plan 2.
 
 ## 6. Scheduling
 
@@ -243,6 +280,7 @@ Plan 2, after the on-device spike (§11).
 struct DeliveryPlan: Equatable {
     var calendar: [AlertOccurrence]        // from station subscriptions
     var notifications: [AlertOccurrence]   // from rules
+    var liveActivities: [AlertOccurrence]  // plan 2: the soonest of `notifications`, moved here (§5.3)
 }
 
 func deliveryPlan(rules: [AlertRule], subscriptions: [StationCalendar],
@@ -262,6 +300,9 @@ thread, plans, and hands the plan to thin writers.
 - Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier.
   The tier gates turning a station on (§7.4), not what an existing subscription publishes.
 - Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64.
+- Live Activities, plan 2: the soonest of those, as many as the system takes (§5.3). The two
+  lists never share an occurrence; one the activity writer cannot place goes back to the
+  notification writer in the same run.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - Rules whose `once` is in the past are removed.
@@ -379,19 +420,21 @@ nothing and their Settings row is unavailable, rather than offering an alert tha
 - `Slackwater/AlertOccurrences.swift` — `alertOccurrences`, the crossing search, the daylight filter
 - `Slackwater/AlertPlan.swift` — `deliveryPlan`, copy, calendar event identity
 - `Slackwater/AlertScheduler.swift`, `Slackwater/AlertCalendar.swift`, `Slackwater/AlertNotifications.swift` — the run and its writers
+- `Slackwater/AlertLiveActivities.swift` — plan 2, the activity writer
 - `Slackwater/AlertOffer.swift` — what a press resolves to, and what each popup row does
 - `Slackwater/AlertPopup.swift` — the popover card
 - `Slackwater/AlertSheet.swift`, `Slackwater/AlertsView.swift`, `Slackwater/CalendarStationsView.swift` — editing
 - `Slackwater/TimelineStrip.swift` — the press recognizer and the popover anchor
 - `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `onLongPress` closure
-- `SlackwaterWidgets/AlertLiveActivity.swift` — plan 2
+- `SlackwaterWidgets/AlertLiveActivity.swift` — plan 2, the attributes and the three presentations;
+  the attributes are shared with the app through the `PortableSources` template
 
 Occurrences run in the app, which already links Almanac; the widget extension gains Live Activity
 UI in plan 2 and no dependency now.
 
 **`project.yml`**, app target `info.properties`: `NSCalendarsFullAccessUsageDescription`, plus
-`NSAlarmKitUsageDescription` and `NSSupportsLiveActivities` with the alarms. None is an
-entitlement, so the Manual-signed Release provisioning profiles stay as they are.
+`NSSupportsLiveActivities` in plan 2. Neither is an entitlement, so the Manual-signed Release
+provisioning profiles stay as they are.
 
 No engine or Almanac version change.
 
@@ -407,7 +450,10 @@ No engine or Almanac version change.
 - `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
   drops the rule then; clearing `once` makes the same rule repeat.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
-  free plan keeps every subscribed calendar and no notifications.
+  free plan keeps every subscribed calendar and no notifications. Plan 2: the activity list is
+  the soonest of the notification list and the two never overlap; an occurrence the writer
+  cannot place returns to the notifications; a removed rule's activity goes; `staleDate` is the
+  event; copy per trigger for each face.
 - Station calendars — the trigger list per station kind; a tide station's day holds its highs and
   lows and nothing else; the tier gate on turning a station on; the turn-off's event count.
 - Copy — place-first notification titles against place-less calendar titles; bodies per trigger;
@@ -428,15 +474,16 @@ Alerts and Calendar identify their Premium requirement at the top. For free user
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; two stations' calendars land separately and open the app at the event; a comfort-speed
 change rewrites the windows; turning a station off takes its events with it; losing Premium clears
-pending notifications and leaves the calendars alone.
+pending notifications and leaves the calendars alone. Plan 2: an activity scheduled, the app
+force-quit, starts at `fire` with its alert and no second notification; each face renders in the
+Island and on the Lock Screen; the window face flips at the event.
 
-## 11. Spikes before the alarm plan
+## 11. Spikes before the Live Activity plan
 
-1. **AlarmKit, on device.** How many `.fixed` alarms schedule before `maximumLimitReached`.
-   Whether `CountdownDuration.preAlert` shows a countdown ahead of a `.fixed` alarm or only for
-   timers. Whether the presentation needs `NSSupportsLiveActivities`. If a countdown cannot
-   precede a fixed alarm, the countdown is a scheduled ActivityKit Live Activity
-   (`Activity.request(…start:)`, iOS 26) for the soonest alarm.
+1. **Scheduled start, on device.** Whether a Live Activity scheduled with `start:` starts after
+   the app is force-quit, not merely backgrounded; Apple documents only the background case.
+   How many scheduled requests succeed before `ActivityAuthorizationError`, with another app's
+   activity running. Whether `isStale` flips the face at `staleDate` with the app closed.
 2. **Cost.** Ninety days of occurrences for every subscribed station plus every rule, measured on a
    phone. The bar: reschedule never delays the first frame.
 
@@ -445,10 +492,15 @@ pending notifications and leaves the calendars alone.
 **Plan 1:** rules, occurrences, the plan, station calendars, the notification writer, the long
 press and its popup, the Alerts screen, Settings → Calendar.
 
-**Plan 2, after spike 1:** AlarmKit alarms and the countdown on current and slack triggers.
+**Plan 2, after spike 1:** scheduled Live Activities for the soonest occurrences (§5.3).
 
 **Next, same tier:**
 
+- An AlarmKit alarm, opt-in per rule, on current and slack triggers only: it breaks through
+  Silent and Focus, which is right for a 05:40 transit and wrong for anything else, and is where
+  App Review looks. `AlarmManager.schedule(id:configuration:)` with
+  `.alarm(schedule: .fixed(fire), attributes:)`, stopping at `maximumLimitReached`; needs
+  `NSAlarmKitUsageDescription`.
 - `.tidePercentile` — "lowest low of the season" — on `Ranking.swift` (slackwater-engine v0.8.0)
   and the station LAT/HAT bounds, once the #217 range UI brings both into the app. Suppressed
   where the constituent set has no Sa/Ssa amplitude.
