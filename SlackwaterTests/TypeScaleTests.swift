@@ -172,14 +172,16 @@ extension TypeScaleTests {
             // the Dynamic-Type-scaled size (Theme.swift).
             "TideDetailView.swift:lead",
             "CurrentLead.swift:body",
-            // An alert's event name: its in-app readers are the rule summaries in the
-            // Alerts screen and the rule sheet, whose Text carries the mono trait
-            // (AlertsView.swift, AlertSheet.swift); its other reader is alert copy, which
-            // the system renders.
+            // An alert's event name: its in-app readers are the rule summaries in the Alerts
+            // screen and the alert sheet, and the line under the strip, whose Texts carry the
+            // mono trait (AlertsView.swift, AlertSheet.swift, AlertLine.swift); its other reader
+            // is alert copy, which the system renders.
             "AlertRule.swift:alertEventName",
-            // The popup's repeating row: built here, rendered by AlertPopup's one Text, which
-            // carries the mono trait (AlertPopup.swift).
+            // The repeat menu's words and the line's Set reading: built here, rendered by
+            // AlertSheet's Picker row and AlertLine's one Text, both with the mono trait.
             "AlertOffer.swift:alertEveryLabel",
+            // The line's words: rendered by AlertLine's one Text, which carries the mono trait.
+            "AlertLine.swift:alertLineLabel",
             // The watch complications' value and gauge ends: built here, drawn by
             // ComplicationViews' Texts, which carry the mono trait (SlackwaterWatchWidgets/).
             "ComplicationReading.swift:build",

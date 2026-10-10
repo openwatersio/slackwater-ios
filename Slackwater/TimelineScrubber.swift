@@ -698,11 +698,11 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
-        /// A press and hold: park its moment on the centerline and let the scaffold open the
-        /// popup there. Instant, not the tap's animated magnet ride — a press names one moment,
-        /// and a popup opening over a sliding strip could not say what it was about until the
-        /// slide landed. The day row belongs to the picker's tap and answers a press with
-        /// nothing.
+        /// A press and hold: park its moment on the centerline and tell the scaffold, whose line
+        /// under the strip names it (§7.1). Instant, not the tap's animated magnet ride — a press
+        /// names one moment, and a line changing under a sliding strip could not say what it was
+        /// about until the slide landed. The day row belongs to the picker's tap and answers a
+        /// press with nothing.
         @objc func handlePress(_ g: UILongPressGestureRecognizer) {
             guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
             let p = g.location(in: sv)
@@ -810,7 +810,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.stripStationID) private var stationID
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.openAlertPopup) private var openAlertPopup
+    @Environment(\.stripPressed) private var stripPressed
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -820,7 +820,7 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker, onLongPress: openAlertPopup,
+                         onPickDate: openWeekPicker, onLongPress: stripPressed,
                          stationID: stationID)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the

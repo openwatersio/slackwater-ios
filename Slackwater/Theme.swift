@@ -47,15 +47,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// A detail can supply its scrub-time sky without changing the scaffold's
     /// generic signature.
     var topBackdrop: AnyView? = nil
-    /// What a long press on the strip offers to alert on (spec §7.1). Nil — the online
-    /// gate — means a press does nothing.
+    /// What the strip offers to alert on for the centerline's moment (spec §7.1). Nil — the
+    /// online gate, a CHS preview — means no line and a press does nothing.
     var alertOffer: AlertTrigger? = nil
     @State private var topHeight: CGFloat = 0
     /// The tour's glide has settled, which swaps the stars copy from the
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
-    @State private var showAlertPopup = false
+    /// The moment a long press parked (§7.1). Cleared the moment the strip moves off it.
+    @State private var pressedMoment: Date? = nil
+    @State private var alertSubject: AlertSheetSubject? = nil
+    @ObservedObject private var alertRules = AlertRuleStore.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -159,7 +162,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
-            .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
+            .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
+            // A scrub, fling, return-to-now or shared link after a press drops the line back to
+            // Rest; compared by minute so the strip's own settle does not.
+            .onChange(of: scrubTime) { _, t in
+                if let p = pressedMoment, alertMinute(p) != alertMinute(t) { pressedMoment = nil }
+            }
+            .sheet(item: $alertSubject) { subject in
+                AlertSheet(rule: subject.rule, stationName: name,
+                           boundMoment: subject.boundMoment, isNew: subject.isNew)
+            }
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
             // link lands while this detail is already up — a second link to the
@@ -308,11 +320,38 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // strip's own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
+            // Under the strip, above the links (§7.1). Absent while there is nothing to alert on:
+            // an online gate, or a CHS station still a preview — the download notice has the
+            // space then.
+            if let alertOffer {
+                AlertLine(state: alertLineState(alertRules.rules, stationID: favoriteId,
+                                                offer: alertOffer, at: scrubTime,
+                                                pressed: pressedMoment != nil),
+                          offer: alertOffer, tz: tz, action: { openAlertSheet(alertOffer) })
+                    .padding(.top, 4)
+                    .padding(.horizontal, 16)
+            }
             links(tl, jump)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
         }
         .padding(.bottom, 12)
+    }
+
+    /// What the line opens: the rule it reads, else a new rule for the pressed moment, else one
+    /// for the centerline — on an unscrubbed tide strip, the next low (§7.1).
+    private func openAlertSheet(_ offer: AlertTrigger) {
+        switch alertLineState(alertRules.rules, stationID: favoriteId, offer: offer,
+                              at: scrubTime, pressed: pressedMoment != nil) {
+        case .set(let rule):
+            alertSubject = AlertSheetSubject(rule: rule, boundMoment: rule.once, isNew: false)
+        case .pressed(let moment):
+            alertSubject = AlertSheetSubject(rule: alertNewRule(stationID: favoriteId, offer: offer, at: moment),
+                                             boundMoment: alertMinute(moment), isNew: true)
+        case .rest:
+            alertSubject = AlertSheetSubject(rule: alertNewRule(stationID: favoriteId, offer: offer, at: scrubTime),
+                                             boundMoment: alertMinute(scrubTime), isNew: true)
+        }
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
@@ -424,17 +463,25 @@ extension EnvironmentValues {
     }
 }
 
+/// What the line's sheet opens on.
+struct AlertSheetSubject: Identifiable {
+    let rule: AlertRule
+    let boundMoment: Date?
+    let isNew: Bool
+    var id: UUID { rule.id }
+}
+
 /// How the strip tells the scaffold it was pressed and held. Same reasoning as
 /// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
 /// have nothing to say about alerts.
-private struct OpenAlertPopupKey: EnvironmentKey {
+private struct StripPressedKey: EnvironmentKey {
     static let defaultValue: @MainActor () -> Void = {}
 }
 
 extension EnvironmentValues {
-    var openAlertPopup: @MainActor () -> Void {
-        get { self[OpenAlertPopupKey.self] }
-        set { self[OpenAlertPopupKey.self] = newValue }
+    var stripPressed: @MainActor () -> Void {
+        get { self[StripPressedKey.self] }
+        set { self[StripPressedKey.self] = newValue }
     }
 }
 

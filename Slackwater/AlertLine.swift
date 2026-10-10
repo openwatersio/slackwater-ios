@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. The line under the strip: Rest, Pressed, or Set (docs/alerts.md §7.1).
-import Foundation
+import SwiftUI
 
 /// What the line reads. Set wins whenever a rule already exists for the centerline's offer, so a
 /// rule can be found again from the place that made it; Pressed is the strip's own state after a
@@ -50,5 +50,32 @@ func alertLineLabel(_ state: AlertLineState, offer: AlertTrigger, tz: TimeZone, 
         }
         return String(localized: "Alert set · \(lowered(alertEveryLabel(offer, imperial: imperial)))",
                       comment: "The line under the timeline when a repeating alert already exists. The argument reads like 'every low tide'.")
+    }
+}
+
+/// One quiet line, centred, caption weight, a 44 pt target. Not a Button: Button press tracking
+/// goes dead in the iPad split layout's detail column (ReadoutTile, MultiDaySchedule).
+struct AlertLine: View {
+    let state: AlertLineState
+    let offer: AlertTrigger
+    let tz: TimeZone
+    let action: () -> Void
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
+
+    var body: some View {
+        let on: Bool = { if case .set = state { return true } else { return false } }()
+        let label = alertLineLabel(state, offer: offer, tz: tz, imperial: units == "imperial")
+        HStack(spacing: 6) {
+            Image(systemName: on ? "bell.fill" : "bell")
+            Text(label).monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundStyle(on ? SN.leaf : SN.foam.opacity(0.62))
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("alert-line")
     }
 }
