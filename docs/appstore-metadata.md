@@ -68,7 +68,7 @@ Weather is where tide apps live — Tide Guide and Tides Near Me both sit there,
 
 ## Promotional text (170 chars max, editable without review)
 
-> Tide and current predictions worldwide, offline on your phone. Works on the water, an the beach, in the anchorage — no bars and nothing to load. Free, no account.
+> Tide and current predictions worldwide, offline on your phone. Works on the water, on the beach, in the anchorage — no bars and nothing to load. Free, no account.
 
 (162 characters.)
 
@@ -87,7 +87,7 @@ Three rules that are easy to break by accident:
 Full text:
 
 > Every tide app works fine at home. Slackwater works offline, where you need
-> it — on the water, an the beach, in the anchorage — no bars and nothing to
+> it — on the water, on the beach, in the anchorage — no bars and nothing to
 > load. Thousands of stations worldwide, already on your phone.
 >
 > No spinner. No "no internet connection". No waiting on a server that isn't
@@ -131,6 +131,116 @@ Full text:
 > Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 >
 > Privacy Policy: https://slackwater.xyz/privacy/
+
+## Spanish (Mexico) and French (Canada)
+
+App Store Connect localizations `es-MX` and `fr-CA`. A listing locale is independent of the app's string catalogs, so `es-MX` needs no `es-MX` translation of the app. ASO tools report that the US store indexes Spanish (Mexico) alongside English (US) and the Canadian store indexes French (Canada) alongside English (Canada); Apple does not document this. With no English (Canada) listing, the Canadian store shows English (US). Screenshots fall back to the English (US) set, and What's New, required in every localization of an update, can carry the English notes until they are translated.
+
+The rules above hold, with three additions:
+
+- **Every coverage claim names currents as the United States and Canada**, the promotional text included.
+- **Keywords skip every word in the English (US) name, subtitle and keywords**, since both stores index these beside English. The one repeat is French `table`: Apple combines words across one localization's fields but does not document combining across localizations, so `table` stays to keep "table des marées" whole.
+- **Spanish puts "Tabla de mareas" in the name.** "Mareas y corrientes" does not fit beside the brand in 30 characters, and "tabla de mareas" is the Spanish search for a tide app the way `tide chart` is the English one. Currents move to the subtitle.
+
+### Spanish (Mexico)
+
+| Field        | Value                          | Limit        |
+| ------------ | ------------------------------ | ------------ |
+| **Name**     | `Slackwater — Tabla de mareas` | 30 (28 used) |
+| **Subtitle** | `Corrientes sin conexión`      | 30 (23 used) |
+
+Keywords:
+
+```
+pesca,vela,velero,lancha,barco,buceo,remo,marea,alta,baja,puerto,playa,internet,estoa,náutica
+```
+
+(94 bytes.) `alta` and `baja` pair with `marea` for the everyday "marea alta" and "marea baja"; `internet` pairs with the subtitle's "sin".
+
+Promotional text:
+
+> Mareas de todo el mundo y corrientes de EE. UU. y Canadá, sin conexión en tu celular. En el agua, en la playa, en el fondeadero, sin señal. Gratis y sin registro.
+
+(162 characters.)
+
+Description:
+
+> Todas las apps de mareas funcionan bien en casa. Slackwater funciona sin conexión, donde lo necesitas: en el agua, en la playa, en el fondeadero, sin señal y sin nada que cargar. Miles de estaciones en todo el mundo, ya en tu celular.
+>
+> Nada de pantallas de carga. Nada de "No hay conexión a internet". Nada de esperar a un servidor que no va a responder. Abres la app y la respuesta ya está ahí.
+>
+> Y hace la parte que casi todas las apps de mareas se saltan. Las alturas son la mitad fácil. La pregunta difícil es la corriente: ¿a qué hora llega la estoa al paso? ¿Qué tan fuerte corre en su máximo? ¿Alcanzas a cruzar antes de que cambie?
+>
+> FUNCIONA DONDE NO HAY SEÑAL
+> Las predicciones se calculan en tu celular, no se descargan. Al final de un camino de terracería, en la punta, en un fondeadero o sin la electrónica del barco, obtienes la misma respuesta que en el muelle.
+>
+> CORRIENTES, NO SOLO MAREAS
+> Una curva para todo el día, con la estoa, el máximo flujo y el máximo reflujo marcados. Desliza el dedo sobre ella para leer cualquier momento. Cada estación de corriente muestra en la misma pantalla la marea de su puerto de referencia.
+>
+> UN MAPA QUE TAMBIÉN FUNCIONA SIN CONEXIÓN
+> Todas las estaciones en un mapa. La costa que ya consultaste se queda en tu celular y se vuelve a dibujar sin señal.
+>
+> GRATIS, SIN REGISTRO, SIN ANUNCIOS
+> Lo esencial funciona sin conexión, es gratis y lo seguirá siendo.
+>
+> DE DÓNDE VIENEN LOS DATOS
+> Las mareas de más de 4,700 estaciones en un centenar de países ya vienen en la app, sin nada que descargar. Cada una proviene de la autoridad nacional que la publica y se verifica contra los niveles de referencia de esa misma autoridad antes de publicarse. Las corrientes cubren Estados Unidos y Canadá: todas las estaciones de corriente de NOAA, más los pasos canadienses desde el mar Salish hasta Haida Gwaii y la isla del Cabo Bretón. Cada estación canadiense arma su propio modelo a partir de las predicciones que publica el Servicio Hidrográfico de Canadá y desde ahí funciona sin conexión para siempre. Algunas estaciones aparecen en la lista pero en blanco: donde no podemos publicar números confiables, lo decimos en vez de adivinar.
+>
+> Las predicciones no son observaciones: las condiciones cambian con el clima y el caudal de los ríos. No usar para la navegación.
+>
+> Términos de uso: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+>
+> Aviso de privacidad: https://slackwater.xyz/privacy/
+
+### French (Canada)
+
+| Field        | Value                            | Limit        |
+| ------------ | -------------------------------- | ------------ |
+| **Name**     | `Slackwater — Marées & courants` | 30 (30 used) |
+| **Subtitle** | `Prévisions hors ligne, partout` | 30 (30 used) |
+
+Keywords:
+
+```
+table,marée,haute,basse,pêche,voile,voilier,bateau,pagaie,plongée,étale,plaisance,fleuve,shc
+```
+
+(96 bytes.) `shc` is the Service hydrographique du Canada, the French name for CHS. `fleuve` is the regional anchor, as `salish sea` is in English: Quebec calls the St. Lawrence "le fleuve", and its tide stations are the francophone home water.
+
+Promotional text:
+
+> Marées du monde entier et courants des États-Unis et du Canada, hors ligne sur votre téléphone. Sur l’eau, à la plage, au mouillage, sans réseau. Gratuit, sans compte.
+
+(167 characters.)
+
+Description:
+
+> Toutes les applis de marées fonctionnent bien à la maison. Slackwater fonctionne hors ligne, là où vous en avez besoin : sur l’eau, sur la plage, au mouillage, sans réseau et sans rien à charger. Des milliers de stations partout dans le monde, déjà sur votre téléphone.
+>
+> Pas de roue qui tourne. Pas de message « Aucune connexion Internet ». Pas d’attente pour un serveur qui ne répondra pas. Vous ouvrez l’appli, et la réponse est là.
+>
+> Et elle fait ce que la plupart des applis de marées négligent. Les hauteurs, c’est la moitié facile. La vraie question, c’est le courant : à quelle heure la passe sera-t-elle étale ? Quelle force atteint-il au maximum ? Aurez-vous le temps de passer avant la renverse ?
+>
+> FONCTIONNE LÀ OÙ IL N’Y A PAS DE RÉSEAU
+> Les prévisions sont calculées sur votre téléphone, pas téléchargées. Au bout d’un chemin de terre, sur la pointe, au mouillage ou sans l’électronique du bord, vous obtenez la même réponse qu’au quai.
+>
+> DES COURANTS, PAS SEULEMENT DES MARÉES
+> Une courbe pour toute la journée, avec l’étale, le flot max. et le jusant max. indiqués. Glissez le doigt dessus pour lire n’importe quel moment. Chaque station de courant affiche, sur le même écran, la marée à son port de référence.
+>
+> UNE CARTE QUI FONCTIONNE AUSSI HORS LIGNE
+> Toutes les stations sur une carte. La côte que vous avez déjà consultée reste sur votre téléphone et s’affiche de nouveau sans réseau.
+>
+> GRATUIT, SANS COMPTE, SANS PUB
+> L’essentiel fonctionne hors ligne, est gratuit et le restera.
+>
+> D’OÙ VIENNENT LES DONNÉES
+> Les marées de plus de 4 700 stations dans une centaine de pays sont intégrées, sans rien à télécharger. Chacune provient de l’autorité nationale qui la publie et est vérifiée par rapport aux niveaux de référence de cette même autorité avant sa mise en ligne. Les courants couvrent les États-Unis et le Canada : toutes les stations de courant de la NOAA, plus des passes canadiennes de la mer des Salish à Haida Gwaii et au Cap-Breton. Chaque station canadienne bâtit son propre modèle à partir des prévisions publiées par le Service hydrographique du Canada, puis fonctionne hors ligne pour de bon. Quelques stations sont listées mais vides : là où nous ne pouvons pas publier de chiffres fiables, nous le disons plutôt que de deviner.
+>
+> Les prévisions ne sont pas des observations : les conditions varient selon la météo et le débit des rivières. Non destiné à la navigation.
+>
+> Conditions d’utilisation : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+>
+> Politique de confidentialité : https://slackwater.xyz/privacy/
 
 ## What's New (4,000 chars max)
 
@@ -225,7 +335,8 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
     -o /tmp/slackwater-mac-screenshot-checks
   /tmp/slackwater-mac-screenshot-checks
   ```
-- [ ] Station counts re-derived and rounded down.
+- [ ] Station counts re-derived and rounded down, in every localization.
+- [ ] A native speaker has read the Spanish (Mexico) and French (Canada) copy.
 - [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.
 - [ ] Description ends with the Terms of Use and Privacy Policy links, and the Privacy Policy URL field is `https://slackwater.xyz/privacy/`.
