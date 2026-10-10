@@ -163,6 +163,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
             .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
+            .environment(\.stripIsPressed, pressedMoment != nil)
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -328,7 +329,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                                                 offer: alertOffer, at: scrubTime,
                                                 pressed: pressedMoment != nil),
                           offer: alertOffer, tz: tz, action: { openAlertSheet(alertOffer) })
-                    .padding(.top, 4)
                     .padding(.horizontal, 16)
             }
             links(tl, jump)
@@ -478,10 +478,20 @@ private struct StripPressedKey: EnvironmentKey {
     static let defaultValue: @MainActor () -> Void = {}
 }
 
+/// Whether the scaffold holds a pressed moment, so the strip can run its reading line down to
+/// the alert line that names it.
+private struct StripIsPressedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var stripPressed: @MainActor () -> Void {
         get { self[StripPressedKey.self] }
         set { self[StripPressedKey.self] = newValue }
+    }
+    var stripIsPressed: Bool {
+        get { self[StripIsPressedKey.self] }
+        set { self[StripIsPressedKey.self] = newValue }
     }
 }
 

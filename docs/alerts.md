@@ -351,7 +351,8 @@ it from one place.
 
 Pressed is the strip's own state: a long press parks a moment and the line names it until the
 strip moves off that moment, by scrub, fling, return-to-now or a shared link, when it drops back to
-rest. Set wins over the other two whenever a rule already exists for the centerline's offer at
+rest. While it holds, the strip's reading line runs on down through the time and day rows and
+into the line itself, so the parked moment and its name read as one thing. Set wins over the other two whenever a rule already exists for the centerline's offer at
 that minute (`once`) or for its trigger (repeating) — `alertLineState`, the `once` rule first —
 so a rule can be found again from the place that made it. Without Premium the line reads the same
 and the sheet's Save does the upselling (§7.2); a rule left by a lapsed subscription still reads
@@ -407,9 +408,10 @@ that draft:
   because the draft already says what the alert is. A sentence that parses replaces the draft
   below it, and the field keeps the words until the sheet closes so the user can see what the
   app made of them.
-- **The summary**, `alertRuleSummary`: "Hope Bay - Low tide", and for a `once` rule the date it
-  fires in the station's zone. For a sentence the parser could not fit, the summary line carries
-  its reply instead — "Slackwater can't alert on wind yet" — and Save is disabled.
+- **The summary**, `alertRuleSummary`: "Hope Bay - Low tide". No date: the moment a `once` rule
+  watches is the line's to name (§7.1) and the Alerts screen's (§7.5), and the bound minute is
+  not always the event's own (§3). For a sentence the parser could not fit, the summary line
+  carries its reply instead — "Slackwater can't alert on wind yet" — and Save is disabled.
 - **Repeat**, written the way a calendar event writes it: a menu reading "Does not repeat" or the
   trigger's `alertEveryLabel` — "Every low tide", "Every slack window", "Every time it falls past
   3.3 ft". Choosing the latter clears `once`; choosing "Does not repeat" binds the rule to the

@@ -72,6 +72,13 @@ struct AlertLine: View {
         .font(.caption)
         .foregroundStyle(on ? SN.leaf : SN.foam.opacity(0.62))
         .frame(maxWidth: .infinity, minHeight: 44)
+        // Pressed: the strip's reading line continues from the top edge down to the words,
+        // so the parked moment and its name read as one thing.
+        .overlay(alignment: .top) {
+            if case .pressed = state {
+                Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 14)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)

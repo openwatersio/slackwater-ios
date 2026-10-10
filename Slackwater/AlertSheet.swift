@@ -46,11 +46,6 @@ struct AlertSheet: View {
                     Text(alertRuleSummary(rule.trigger, stationName: stationName, imperial: imperial))
                         .monospacedDigit()
                         .accessibilityIdentifier("alert-summary")
-                    // In the station's zone, wherever the phone is reading it.
-                    if let when = alertRuleWhen(rule, tz: alertStationZone(rule.stationID)) {
-                        LabeledContent("This one", value: when)
-                            .monospacedDigit()
-                    }
                 }
                 Section("When") {
                     Picker("Repeat", selection: Binding(

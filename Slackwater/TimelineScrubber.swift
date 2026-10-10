@@ -811,6 +811,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.stripPressed) private var stripPressed
+    @Environment(\.stripIsPressed) private var pressed
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -936,6 +937,13 @@ struct TimelineScrubStrip: View {
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
                     .opacity(settled && commentary != nil ? 1 : 0)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
+                // Held: the reading line runs on through the time and day rows to the alert
+                // line under the strip, which names the parked moment (docs/alerts.md §7.1).
+                if pressed {
+                    Rectangle().fill(.white.opacity(0.18))
+                        .frame(width: 1, height: geo.height - geo.bodyBottom)
+                        .position(x: w / 2, y: geo.bodyBottom + (geo.height - geo.bodyBottom) / 2)
+                }
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas

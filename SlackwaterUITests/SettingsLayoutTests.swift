@@ -9,7 +9,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         for (rowID, page) in [("settings-alerts-row", "Alerts"),
                               ("settings-calendar-row", "Favourites calendars")] {
             let row = rowID == "settings-alerts-row"
-                ? app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Press and hold any station")).firstMatch
+                ? app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Tap Set an alert under any station")).firstMatch
                 : app.buttons[rowID].firstMatch
             scrollTo(row, in: app)
             XCTAssertTrue(row.isHittable)
