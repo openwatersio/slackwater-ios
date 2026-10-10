@@ -22,9 +22,12 @@ struct LiveActivitySpikeView: View {
                     Button("End all", role: .destructive) { Task { await endAll() } }
                     Button("List") { Task { await list() } }
                 }
+                // A home-screen launch has no -laSpike argument, so the flag sticks until cleared.
+                Section { Button("Leave spike (next launch is the app)") { UserDefaults.standard.set(false, forKey: "laSpike") } }
                 Section("Log") { ForEach(log.indices.reversed(), id: \.self) { Text(log[$0]).font(.caption.monospaced()) } }
             }
             .navigationTitle("Live Activity spike")
+            .onAppear { UserDefaults.standard.set(true, forKey: "laSpike") }
         }
     }
 
