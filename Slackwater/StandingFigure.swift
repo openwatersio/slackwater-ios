@@ -284,7 +284,7 @@ struct StandingFigure: View {
 
 /// A measurement as the drawing prints it. Its own one-line declaration so
 /// TypeScaleTests' indirection key names the symbol its text walk computes —
-/// `dimensions`' signature spans two lines (see WidgetSnapshot.swift:normalize).
+/// `dimensions`' signature spans two lines, which the scanner skips.
 private func dimensionLabel(_ metres: Double, _ imperial: Bool) -> String {
     formatHeight(metres, imperial: imperial)
 }

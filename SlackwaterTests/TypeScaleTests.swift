@@ -72,14 +72,9 @@ extension TypeScaleTests {
     ///      - `scheduleEntries()` in the four detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
-    ///      - `WidgetSnapshot.build(_:now:)` (WidgetSnapshot.swift, H2 — the
-    ///        allowlist key is `normalize`, not `build`; see the comment on
-    ///        that entry below): the formatted height/speed lands in
-    ///        `Event.label`, a plain `String` the widget/lock-screen views
-    ///        consume as `Text(next.label)` in a SIXTH and SEVENTH file
-    ///        (HomeWidgets.swift, AccessoryWidgets.swift) — all four
-    ///        consuming sites carry `.monospacedDigit()` themselves,
-    ///        verified by hand rather than by this scan.
+    ///      - `WidgetSnapshot.build(_:now:)`: formatted labels and values
+    ///        reach AccessoryWidgetContent and PremiumFeaturePreview, whose
+    ///        consuming Texts carry `.monospacedDigit()`.
     ///    (`TimelineStrip.compactTime(_:)` was a sixth until the NEAPS pass
     ///    deleted it along with the gutter — its `cardTime(` reading now
     ///    prints as 24h `clockTime(`, which is not a watched formatter.)
@@ -154,15 +149,8 @@ extension TypeScaleTests {
             // canvas does the same through its `cardGraph` builders above.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
-            // The heuristic's blind spot in miniature: these three calls live
-            // in `build(_:now:)`, but `enclosingDeclaration` walks upward to
-            // the nearest brace-opening `func`/`var` line by TEXT, not real
-            // nesting — and `build` declares a local `func normalize(...)`
-            // earlier in its own body, which is textually closer than
-            // `build`'s own declaration line. The scanner reports
-            // "normalize", not "build"; the key below has to match what it
-            // actually computes, not what a real parser would say.
-            "WidgetSnapshot.swift:normalize",
+            // Labels and values are rendered with mono digits by the accessory views.
+            "WidgetSnapshot.swift:build",
             // The station-details mean flow: formatted on the record and
             // consumed by `StationDetailRow`'s value `Text`, which carries the
             // mono trait for its whole column (Theme.swift).
@@ -196,7 +184,7 @@ extension TypeScaleTests {
             // Alert copy is shown by Notification Center and Calendar, never by a Text of
             // ours. The call lives in `alertCopy`, whose signature spans two lines, so the
             // text walk climbs past it to `leadAmount` just above — the key has to match
-            // what the scanner computes (see WidgetSnapshot.swift:normalize).
+            // what the scanner computes (a multiline signature is not a brace-opening declaration).
             "AlertPlan.swift:leadAmount",
         ]
         // Nor is anything in this file: its readings are GeoJSON properties
