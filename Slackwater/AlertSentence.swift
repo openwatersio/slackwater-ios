@@ -185,19 +185,19 @@ func alertSentenceInstructions(kind: StationCalendarKind, imperial: Bool) -> Str
         return """
         You turn one sentence into an alert at a tide station. The sentence is about this place only.
         What can be alerted on here: low tide, high tide, the water rising past a height, the water falling past a height, a lunar eclipse. Heights are in \(unit).
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
         """
     case .current:
         return """
         You turn one sentence into an alert at a tidal current station. The sentence is about this place only.
         What can be alerted on here: the slack window opening (when the current is slow enough to get through), max flood, max ebb, a lunar eclipse.
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
         """
     case .derived:
         return """
         You turn one sentence into an alert at a tidal gate whose slacks are known but whose speeds are not. The sentence is about this place only.
         What can be alerted on here: slack, a lunar eclipse.
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
         """
     }
 }
@@ -214,14 +214,17 @@ var alertSentenceAvailable: Bool {
 /// The draft comes back as the engine's trigger; the caller resolves the occurrence.
 func alertSentenceParse(_ sentence: String, kind: StationCalendarKind, imperial: Bool) async -> AlertSentenceDraft? {
     let session = LanguageModelSession(instructions: alertSentenceInstructions(kind: kind, imperial: imperial))
+    // A parser wants the likeliest reading every time, not a sample: the same words make the
+    // same draft, and the tests that run the model can hold it to that.
+    let greedy = GenerationOptions(sampling: .greedy)
     do {
         switch kind {
         case .tide:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: TideSentenceDraft.self).content, imperial: imperial)
+            return alertSentenceDraft(try await session.respond(to: sentence, generating: TideSentenceDraft.self, options: greedy).content, imperial: imperial)
         case .current:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: CurrentSentenceDraft.self).content, imperial: imperial)
+            return alertSentenceDraft(try await session.respond(to: sentence, generating: CurrentSentenceDraft.self, options: greedy).content, imperial: imperial)
         case .derived:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: DerivedSentenceDraft.self).content, imperial: imperial)
+            return alertSentenceDraft(try await session.respond(to: sentence, generating: DerivedSentenceDraft.self, options: greedy).content, imperial: imperial)
         }
     } catch {
         return nil
