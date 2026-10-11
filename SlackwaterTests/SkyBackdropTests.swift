@@ -190,6 +190,48 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertTrue(lit(1, -9)); XCTAssertFalse(lit(0, 9))
     }
 
+    /// The tilt is Almanac's bright limb, turned into SwiftUI's frame. A waxing
+    /// crescent low in the west after sunset is lit on its lower right from
+    /// Victoria and on its lower left from Sydney. At every instant the limb
+    /// points along the great circle to the sun, within a couple of degrees:
+    /// the sun's direction at the moon, worked from both bodies' alt/az.
+    func testMoonTiltAimsTheLitLimbAtTheSun() throws {
+        let f = ISO8601DateFormatter()
+        let victoria = (lat: 48.4284, lon: -123.3656), sydney = (lat: -33.8688, lon: 151.2093)
+        func tilt(_ time: String, _ site: (lat: Double, lon: Double)) throws -> Double {
+            let observer = try Observer(latitudeDeg: site.lat, longitudeDeg: site.lon)
+            return try XCTUnwrap(moonTilt(at: XCTUnwrap(f.date(from: time)), observer: observer))
+        }
+        let north = try tilt("2026-10-15T02:00:00Z", victoria)
+        XCTAssertGreaterThan(cos(north), 0, "lit on the right")
+        XCTAssertGreaterThan(sin(north), 0, "lit from below (y runs down)")
+        let south = try tilt("2026-10-14T09:00:00Z", sydney)
+        XCTAssertLessThan(cos(south), 0, "lit on the left")
+        XCTAssertGreaterThan(sin(south), 0, "lit from below (y runs down)")
+
+        func gap(_ a: Double, _ b: Double) -> Double { abs(atan2(sin(a - b), cos(a - b))) }
+        for (time, site) in [("2026-10-15T02:00:00Z", victoria), ("2026-10-21T06:00:00Z", victoria),
+                             ("2026-10-28T12:00:00Z", victoria), ("2026-11-02T15:00:00Z", victoria),
+                             ("2026-10-14T09:00:00Z", sydney), ("2026-10-21T12:00:00Z", sydney),
+                             ("2026-11-02T19:00:00Z", sydney)] {
+            let at = try XCTUnwrap(f.date(from: time))
+            let observer = try Observer(latitudeDeg: site.lat, longitudeDeg: site.lon)
+            let sun = try sunAltAz(at, observer: observer), moon = try moonAltAz(at, observer: observer)
+            let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
+            let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
+            // Facing the moon, a larger azimuth is to the right.
+            let right = cos(sunAlt) * sin(deltaAz)
+            let up = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
+            let toSun = atan2(-up, right)
+            XCTAssertLessThan(gap(try tilt(time, site), toSun), 2 * .pi / 180, time)
+            // The sky backdrop puts east on the right, so in the north it is the
+            // sky's mirror image, and the tilt is mirrored with it.
+            let sky = SkyState(time: at, latitude: site.lat, longitude: site.lon)
+            XCTAssertLessThan(gap(sky.moonLightAngle, site.lat >= 0 ? .pi - toSun : toSun),
+                              2 * .pi / 180, time)
+        }
+    }
+
     /// Phase names are presentation, kept app-side when the astronomy moved to
     /// Almanac (#228). The prototype's moonName buckets, driven by phase.
     func testMoonPhaseNames() {
