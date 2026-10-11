@@ -23,13 +23,39 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
     rule.once.map { $0 >= now } ?? true
 }
 
+enum AlertSheetNote: Equatable {
+    case nothingAhead, notOffered, failed
+}
+
+/// What a parse does to the sheet: a rule replaces the draft wholesale — trigger, moment, lead,
+/// daylight — under the draft's own id, so a sentence after a press edits the same rule; anything
+/// else leaves the draft alone and says why.
+func alertSheetApply(_ outcome: AlertSentenceOutcome, to rule: AlertRule,
+                     boundMoment: Date?) -> (rule: AlertRule, boundMoment: Date?, note: AlertSheetNote?) {
+    switch outcome {
+    case .rule(var parsed, let bound):
+        parsed.id = rule.id
+        parsed.enabled = rule.enabled
+        return (parsed, bound, nil)
+    case .nothingAhead: return (rule, boundMoment, .nothingAhead)
+    case .notOffered: return (rule, boundMoment, .notOffered)
+    case .failed: return (rule, boundMoment, .failed)
+    }
+}
+
 struct AlertSheet: View {
     @State var rule: AlertRule
     let stationName: String
     /// The moment "Does not repeat" binds to: the pressed or centerline moment for a new rule, the
-    /// rule's own `once` for an existing one, nil for one that already repeats.
-    let boundMoment: Date?
+    /// rule's own `once` for an existing one, nil for one that already repeats. A sentence rebinds it.
+    @State private var boundMoment: Date?
     let isNew: Bool
+    /// The Rest tap opens on the field; a press and the Alerts screen open on the draft (§7.2).
+    let focusSentence: Bool
+    @State private var sentence = ""
+    @State private var parsing = false
+    @State private var note: AlertSheetNote?
+    @FocusState private var sentenceFocused: Bool
     @ObservedObject private var store = AlertRuleStore.shared
     @ObservedObject private var premium = PremiumStore.shared
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
@@ -38,11 +64,13 @@ struct AlertSheet: View {
     @State private var saving = false
     @State private var showPremium = false
 
-    init(rule: AlertRule, stationName: String, boundMoment: Date?, isNew: Bool = false) {
+    init(rule: AlertRule, stationName: String, boundMoment: Date?, isNew: Bool = false,
+         focusSentence: Bool = false) {
         _rule = State(initialValue: rule)
         self.stationName = stationName
-        self.boundMoment = boundMoment
+        _boundMoment = State(initialValue: boundMoment)
         self.isNew = isNew
+        self.focusSentence = focusSentence
     }
 
     private var imperial: Bool { units == "imperial" }
@@ -51,6 +79,28 @@ struct AlertSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The field, when the on-device model is ready (§7.3). The keyboard's own
+                // dictation key is the voice input.
+                if alertSentenceAvailable {
+                    Section {
+                        HStack(spacing: 8) {
+                            TextField(String(localized: "Tell me when…", comment: "Placeholder of the alert sheet's sentence field."),
+                                      text: $sentence)
+                                .focused($sentenceFocused)
+                                .submitLabel(.go)
+                                .onSubmit { Task { await parse() } }
+                                .disabled(parsing)
+                                .accessibilityIdentifier("alert-sentence")
+                            if parsing { ProgressView() }
+                        }
+                        if let note {
+                            Text(noteText(note))
+                                .font(.footnote)
+                                .foregroundStyle(SN.foam.opacity(0.62))
+                                .accessibilityIdentifier("alert-sentence-note")
+                        }
+                    }
+                }
                 Section {
                     Text(alertRuleSummary(rule.trigger, stationName: stationName, imperial: imperial))
                         .monospacedDigit()
@@ -89,6 +139,7 @@ struct AlertSheet: View {
                     }
                 }
             }
+            .onAppear { sentenceFocused = focusSentence && alertSentenceAvailable }
             .scrollContentBackground(.hidden)
             .background(CanvasBackground())
             .navigationTitle(isNew ? "New Alert" : "Alert")
@@ -100,7 +151,7 @@ struct AlertSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(saving || !canSave)
+                        .disabled(saving || !canSave || parsing)
                         .accessibilityIdentifier("alert-sheet-save")
                 }
             }
@@ -111,6 +162,49 @@ struct AlertSheet: View {
         .presentationDetents(hSize == .regular ? [.large] : [.medium, .large])
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPremium) { PremiumView() }
+    }
+
+    private func noteText(_ note: AlertSheetNote) -> String {
+        switch note {
+        case .nothingAhead:
+            return String(localized: "Nothing in the next 14 days", comment: "Under the sentence field when the ask has no occurrence coming.")
+        case .notOffered:
+            return String(localized: "Slackwater can't alert on that here yet", comment: "Under the sentence field when the words ask for something this station cannot alert on.")
+        case .failed:
+            return String(localized: "Couldn't read that. Try other words.", comment: "Under the sentence field when the on-device model could not answer.")
+        }
+    }
+
+    /// One parse: the words → a draft → the first occurrence → the same controls the user reads
+    /// and corrects before Save. The words stay in the field so what the app made of them can be
+    /// read against them.
+    private func parse() async {
+        let words = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty, let record = WidgetStationLoader.loadRecord(id: rule.stationID) else { return }
+        if alertSentenceOutOfScope(words, kind: record.calendarKind) {
+            apply(.notOffered); return
+        }
+        parsing = true
+        defer { parsing = false }
+        guard let draft = await alertSentenceParse(words, kind: record.calendarKind, imperial: imperial) else {
+            apply(.failed); return
+        }
+        let station = WidgetStationLoader.station(from: record)
+        let threshold = slackThresholdKn
+        let outcome = alertSentenceOutcome(draft, stationID: rule.stationID, now: appNow(), tz: station.tz) {
+            trigger, daylight, from, to in
+            alertOccurrences(AlertRule(stationID: rule.stationID, trigger: trigger, daylightOnly: daylight),
+                             station: station, position: record.alertPosition,
+                             from: from, to: to, threshold: threshold).map(\.event).first { $0 > from }
+        }
+        apply(outcome)
+    }
+
+    private func apply(_ outcome: AlertSentenceOutcome) {
+        let r = alertSheetApply(outcome, to: rule, boundMoment: boundMoment)
+        rule = r.rule
+        boundMoment = r.boundMoment
+        note = r.note
     }
 
     /// Being told is Premium (§2): a free user's Save opens the Support sheet and writes nothing.
