@@ -51,6 +51,7 @@ final class AlertOfferTests: XCTestCase {
     func testTheEveryLabelReadsAsASentence() {
         XCTAssertEqual(alertEveryLabel(.slackWindowOpens, imperial: true), "Every slack window")
         XCTAssertEqual(alertEveryLabel(.tideExtreme(high: false), imperial: true), "Every low tide")
+        XCTAssertEqual(alertEveryLabel(.tideExtreme(high: false, ofDay: true), imperial: true), "Every lower low tide")
         XCTAssertEqual(alertEveryLabel(.currentPeak(flood: true), imperial: true), "Every max flood")
         XCTAssertEqual(alertEveryLabel(.eclipse, imperial: true), "Every lunar eclipse")
     }

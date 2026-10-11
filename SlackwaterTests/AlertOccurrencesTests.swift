@@ -134,6 +134,52 @@ import SlackwaterKit
         XCTAssertEqual(alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5), [])
     }
 
+    func testTheLowerLowIsTheLowestLowOfEachStationDay() throws {
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        guard case .tide(let engine, let tz, _) = station else { return XCTFail("expected a tide station") }
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        let every = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false))
+        let lower = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false, ofDay: true))
+
+        let all = alertOccurrences(every, station: station, position: position, from: now, to: week, threshold: 0.5)
+        let found = alertOccurrences(lower, station: station, position: position, from: now, to: week, threshold: 0.5)
+
+        XCTAssertFalse(found.isEmpty)
+        XCTAssertLessThan(found.count, all.count, "Friday Harbor is mixed: most days have two lows")
+        let byDay = Dictionary(grouping: engine.extremes(from: now.addingTimeInterval(-86_400), to: week.addingTimeInterval(86_400))
+            .filter { $0.kind == .low }, by: { cal.startOfDay(for: $0.time) })
+        for o in found {
+            let lows = try XCTUnwrap(byDay[cal.startOfDay(for: o.event)])
+            XCTAssertEqual(o.event, alertMinute(try XCTUnwrap(lows.min { $0.height < $1.height }).time))
+        }
+        XCTAssertEqual(Set(found.map { cal.startOfDay(for: $0.event) }).count, found.count, "one lower low per day")
+    }
+
+    func testTheLowerLowIsJudgedAgainstTheWholeDayNotTheRange() throws {
+        // A range that starts after a day's lower low must not promote that day's other low.
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        let lower = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false, ofDay: true))
+        let whole = alertOccurrences(lower, station: station, position: position, from: now.addingTimeInterval(-86_400), to: week.addingTimeInterval(86_400), threshold: 0.5)
+        let first = try XCTUnwrap(whole.first { $0.event > now })
+        let later = alertOccurrences(lower, station: station, position: position, from: first.event.addingTimeInterval(60), to: week, threshold: 0.5)
+        XCTAssertTrue(Set(later.map(\.event)).isSubset(of: Set(whole.map(\.event))))
+        XCTAssertFalse(later.map(\.event).contains(first.event))
+    }
+
+    func testTheHigherHighIsTheHighestHighOfEachStationDay() throws {
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        guard case .tide(let engine, let tz, _) = station else { return XCTFail("expected a tide station") }
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        let rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: true, ofDay: true))
+        let found = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
+        let highs = engine.extremes(from: now.addingTimeInterval(-86_400), to: week.addingTimeInterval(86_400)).filter { $0.kind == .high }
+        XCTAssertFalse(found.isEmpty)
+        for o in found {
+            let day = highs.filter { cal.isDate($0.time, inSameDayAs: o.event) }
+            XCTAssertEqual(o.event, alertMinute(try XCTUnwrap(day.max { $0.height < $1.height }).time))
+        }
+    }
+
     func testDaylightOnlyKeepsTheLowsUnderTheSun() throws {
         let (station, position) = try load(TideStationRecord.fridayHarborID)
         var rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false))

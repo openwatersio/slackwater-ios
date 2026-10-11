@@ -63,7 +63,7 @@ enum AlertTrigger: Codable, Equatable {
     case slackWindowOpens                      // current stations and fitted current gates
     case slack                                 // derived gates: an instant, no speed series
     case currentPeak(flood: Bool)
-    case tideExtreme(high: Bool)
+    case tideExtreme(high: Bool, ofDay: Bool? = nil)   // ofDay: the lower low or higher high of its day
     case tideCrossing(heightM: Double, rising: Bool)
     case eclipse
 }
@@ -119,7 +119,7 @@ Every trigger reads a producer that exists today:
 | `.slackWindowOpens` | `CurrentPredicting.events()` slacks → `speeds(step: 600)` over the span ±6 h → `slackWindow()` → `mergeWindows()`. One occurrence per run, at its opening — the moment `currentAxisMoments()` prints as "the time a planner is aiming at". A slack no run covers is an occurrence at the slack with `noWindow`. |
 | `.slack` | `DerivedSlackStation.slacks(from:to:)` |
 | `.currentPeak` | `events()` filtered to `.maxFlood` or `.maxEbb` |
-| `.tideExtreme` | `TidePredicting.extremes()` filtered by kind |
+| `.tideExtreme` | `TidePredicting.extremes()` filtered by kind. `ofDay`: the query reaches a day past either end and keeps the lowest low (highest high) of each station-local calendar day, so a mixed tide's lower low is judged against its whole day, not the range |
 | `.tideCrossing` | `TidePredicting.heights(step: 600)`, linearly interpolated at each crossing of `heightM` in the rule's direction |
 | `.eclipse` | `visibleEclipses(from:to:observer:)`, at `WindowEclipse.start` |
 
@@ -431,7 +431,7 @@ control edits that draft:
   Notification permission is requested on the first save, never at launch; a denial still saves
   the rule, and the Alerts screen says why it is quiet.
 
-Reading is free here. A free user types "next lower low in daylight", sees "Hope Bay - Low tide"
+Reading is free here. A free user types "next lower low in daylight", sees "Hope Bay - Lower low tide"
 with "Does not repeat", and is asked to support the app only when they ask to be told.
 
 **A moment already past cannot be saved.** The strip shows 48 hours back and a press can land
@@ -448,7 +448,7 @@ occurrence. It never does arithmetic, never sees a date, and never answers a que
 
 ```swift
 @Generable enum AlertRelativeDay { case today, tomorrow, daysAhead(Int) }
-@Generable enum TideSentenceTrigger { case lowTide, highTide, lunarEclipse, risesPast(height: Double), fallsPast(height: Double) }
+@Generable enum TideSentenceTrigger { case lowTide, highTide, lowerLow, higherHigh, lunarEclipse, risesPast(height: Double), fallsPast(height: Double) }
 @Generable enum CurrentSentenceTrigger { case slackWindow, maxFlood, maxEbb, lunarEclipse }
 @Generable enum DerivedSentenceTrigger { case slack, lunarEclipse }
 
@@ -670,9 +670,6 @@ findable entry; then the sentence, a field and a parser on top of a sheet that a
   App Review looks. `AlarmManager.schedule(id:configuration:)` with
   `.alarm(schedule: .fixed(fire), attributes:)`, stopping at `maximumLimitReached`; needs
   `NSAlarmKitUsageDescription`.
-- `.tideExtreme(high:, rank:)` — the lower of a day's two lows, the higher of its highs — so
-  "the next lower low in daylight" is a trigger and not a near miss. The first ask the sentence
-  cannot express; ranked within the station-local calendar day the extreme falls in.
 - A way to learn what people ask for that the triggers cannot express. The app has no server
   (§14), so this is an opt-in share from the sheet's "can't alert on …" line into the feedback
   channel, never a log. The word list in `alertSentenceOutOfScope` is the first, hand-kept

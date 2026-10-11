@@ -14,9 +14,14 @@ line; lead, day and daylight may need a tap. The automated subset is
 | remind me an hour before tomorrow's low | Low tide | no | lead 1 h, tomorrow |
 | when does it drop below 2 feet during the day | Falling past 2.0 ft | no | daylight |
 | let me know whenever it rises past 8 ft | Rising past 8.0 ft | yes | |
-| lowest low in daylight | Low tide | no | daylight (a near miss until the rank trigger exists) |
+| lowest low in daylight | Lower low tide | no | daylight |
+| every lower low tide | Lower low tide | yes | |
+| the higher high tomorrow | Higher high tide | no | tomorrow |
+| the low low tide | Lower low tide | no | |
+| when is the next high | High tide | no | |
+| every low tide between sunrise and sunset | Low tide | yes | daylight (the model drops this one; the toggle needs a tap) |
 | ping me 30 minutes before every low tide in daylight | Low tide | yes | lead 30 min, daylight |
-| when is high water tomorrow | High tide | no | tomorrow |
+| when is high water tomorrow | High tide | no | tomorrow (the model drops the day now and then) |
 | is there a lunar eclipse coming | Lunar eclipse | no | |
 | alert me at low tide | Low tide | no | |
 | each high | High tide | yes | |
