@@ -130,6 +130,40 @@ final class AlertSentenceTests: XCTestCase {
         XCTAssertTrue(alertLeads.contains(lead(45)!), "a tie lands on one of the offered leads either way")
     }
 
+    // MARK: the model, where it runs
+
+    /// Runs on a Mac with Apple Intelligence on (the simulator borrows the host model); skips on
+    /// hosted runners. Trigger and repeats only — the rest is checked by hand from the fixture.
+    func testTheModelParsesTheCommonPhrasings() async throws {
+        try XCTSkipUnless(alertSentenceAvailable, "no on-device model here")
+        let cases: [(String, StationCalendarKind, AlertTrigger, Bool)] = [
+            ("tell me when the next low tide is", .tide, .tideExtreme(high: false), false),
+            ("every high tide", .tide, .tideExtreme(high: true), true),
+            ("let me know whenever it rises past 8 ft", .tide, .tideCrossing(heightM: displayedHeightM(8 / toFeet(1), imperial: true), rising: true), true),
+            ("is there a lunar eclipse coming", .tide, .eclipse, false),
+            ("next slack window", .current, .slackWindowOpens, false),
+            ("every max ebb", .current, .currentPeak(flood: false), true),
+            ("the next slack", .derived, .slack, false),
+        ]
+        for (sentence, kind, trigger, repeats) in cases {
+            let parsed = await alertSentenceParse(sentence, kind: kind, imperial: true)
+            let draft = try XCTUnwrap(parsed, sentence)
+            XCTAssertEqual(draft.trigger, trigger, sentence)
+            XCTAssertEqual(draft.repeats, repeats, sentence)
+        }
+    }
+
+    func testDaylightAndLeadAndDayComeThrough() async throws {
+        try XCTSkipUnless(alertSentenceAvailable, "no on-device model here")
+        let first = await alertSentenceParse("ping me 30 minutes before every low tide in daylight", kind: .tide, imperial: true)
+        let d = try XCTUnwrap(first)
+        // The lead is the one field the model drops now and then; the fixture's bar lets it need a tap.
+        XCTAssertTrue(d.daylightOnly); XCTAssertTrue(d.repeats)
+        let second = await alertSentenceParse("when is high water tomorrow", kind: .tide, imperial: false)
+        let t = try XCTUnwrap(second)
+        XCTAssertEqual(t.day, .tomorrow); XCTAssertEqual(t.trigger, .tideExtreme(high: true))
+    }
+
     // MARK: the instructions
 
     func testInstructionsNameTheKindsTriggersAndTheUnits() {

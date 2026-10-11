@@ -185,19 +185,19 @@ func alertSentenceInstructions(kind: StationCalendarKind, imperial: Bool) -> Str
         return """
         You turn one sentence into an alert at a tide station. The sentence is about this place only.
         What can be alerted on here: low tide, high tide, the water rising past a height, the water falling past a height, a lunar eclipse. Heights are in \(unit).
-        Pick the closest trigger. Never invent one.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
         """
     case .current:
         return """
         You turn one sentence into an alert at a tidal current station. The sentence is about this place only.
         What can be alerted on here: the slack window opening (when the current is slow enough to get through), max flood, max ebb, a lunar eclipse.
-        Pick the closest trigger. Never invent one.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
         """
     case .derived:
         return """
         You turn one sentence into an alert at a tidal gate whose slacks are known but whose speeds are not. The sentence is about this place only.
         What can be alerted on here: slack, a lunar eclipse.
-        Pick the closest trigger. Never invent one.
+        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true.
         """
     }
 }
