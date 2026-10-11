@@ -414,8 +414,9 @@ control edits that draft:
   app made of them.
 - **The summary**, `alertRuleSummary`: "Hope Bay - Low tide". No date: the moment a `once` rule
   watches is the line's to name (§7.1) and the Alerts screen's (§7.5), and the bound minute is
-  not always the event's own (§3). For a sentence the parser could not fit, the summary line
-  carries its reply instead — "Slackwater can't alert on wind yet" — and Save is disabled.
+  not always the event's own (§3). A sentence the words or the window rule out leaves the summary
+  and the draft as they were, and a line under the field says why: "Slackwater can't alert on that
+  here yet", "Nothing in the next 14 days", or "Couldn't read that. Try other words." (§7.3).
 - **Repeat**, written the way a calendar event writes it: a menu reading "Does not repeat" or the
   trigger's `alertEveryLabel` — "Every low tide", "Every slack window", "Every time it falls past
   3.3 ft". Choosing the latter clears `once`; choosing "Does not repeat" binds the rule to the
@@ -445,15 +446,25 @@ a predictor: it turns words into the same `AlertRule` a press makes, and the eng
 occurrence. It never does arithmetic, never sees a date, and never answers a question itself.
 
 ```swift
-@Generable struct AlertDraft {
-    var trigger: Trigger              // the station kind's own cases only, see below
+@Generable enum AlertRelativeDay { case today, tomorrow, daysAhead(Int) }
+@Generable enum TideSentenceTrigger { case lowTide, highTide, lunarEclipse, risesPast(height: Double), fallsPast(height: Double) }
+@Generable enum CurrentSentenceTrigger { case slackWindow, maxFlood, maxEbb, lunarEclipse }
+@Generable enum DerivedSentenceTrigger { case slack, lunarEclipse }
+
+@Generable struct TideSentenceDraft {   // and Current…, Derived…, with their own trigger enum
+    var trigger: TideSentenceTrigger
     var repeats: Bool                 // "every" / "whenever" against "the next" / "tomorrow's"
     var daylightOnly: Bool
     var leadMinutes: Int?             // "an hour before"; nil keeps the sheet's 30
-    var day: RelativeDay?             // .today, .tomorrow, .daysAhead(Int); nil means the first
-    var unsupported: String?          // set, and nothing else trusted, when the ask does not fit
+    var day: AlertRelativeDay?        // nil means the first occurrence from now
 }
+
+enum AlertSentenceOutcome { case rule(AlertRule, boundMoment: Date?), nothingAhead, notOffered, failed }
 ```
+
+`alertSentenceParse` runs the model and hands back the engine's trigger; `alertSentenceOutcome`
+turns that into a rule with the occurrence finder as a parameter, so the mapping is tested
+without a model.
 
 - **One `Trigger` enum per station kind**, so the model cannot propose what the station cannot
   do. A tide station's cases are low tide, high tide, rises past a height, falls past a height,
@@ -462,13 +473,24 @@ occurrence. It never does arithmetic, never sees a date, and never answers a que
   it with `displayedHeightM`, the same rounding a press gets.
 - **`RelativeDay`, never a `Date`.** The model is weak at dates and knows nothing of the
   station's zone. Swift resolves the day through `Calendar` with the station's `timeZone`,
-  then searches `alertOccurrences` from that day's start across the notification horizon (§6)
-  for the first occurrence, and that minute becomes `once`. A sentence with nothing in the
-  horizon reads "Nothing in the next 14 days" and Save is disabled.
+  then searches `alertOccurrences` across that day — 23, 24 or 25 hours long, and today starts
+  now — or, with no day named, from now across the notification horizon (§6), for the first
+  occurrence, and that minute becomes `once`. A singular sentence with nothing in its window
+  reads "Nothing in the next 14 days" and the draft is left as it was. A repeating sentence still
+  binds that moment, so the Repeat menu offers both choices. A lead in the sentence lands on the
+  nearest of the sheet's six.
 - **Instructions are a fixed paragraph per station kind**: what the place is, what each trigger
-  means in a boater's words, the user's units, and that unsupported asks go in `unsupported`.
-  One `LanguageModelSession` per parse, no transcript carried between parses, so the on-device
-  4K-token budget is never a concern.
+  means in a boater's words, the user's units, and which words mean once and which mean every.
+  One `LanguageModelSession` per parse, no transcript carried between parses — five parses on one
+  session overflow the on-device 4K-token window — decoded greedily, so the same words make the
+  same draft and the tests that run the model can hold it to that.
+- **The model never refuses.** Asked for wind at a tide station it answers "low tide"; an
+  "unsupported" field or enum case is never chosen (probed 2026-10-10: eleven sentences, three
+  runs, as a free-text field and as a trigger case). So a short word list in Swift
+  (`alertSentenceOutOfScope`) catches the obvious asks — wind, weather, sunset, slack at a tide
+  station, a tide at a current station — before the model is called, and the sheet says
+  "Slackwater can't alert on that here yet". For everything else the guard is the next bullet
+  but one.
 - **Availability.** `SystemLanguageModel.default.availability` is checked when the sheet opens.
   Anything but `.available` — a phone without Apple Intelligence, a device language it does not
   support, the model still downloading — hides the field, and the sheet works as it does for a
@@ -486,7 +508,8 @@ occurrence. It never does arithmetic, never sees a date, and never answers a que
 Two deliberate omissions. The `Speech` framework is not used: the keyboard's dictation key is
 voice input with no microphone or speech-recognition usage string and no privacy review. And the
 station is never parsed from the sentence: the sheet belongs to a detail view, so the place is the
-one on screen. "At Race Passage" from Hope Bay's sheet lands in `unsupported`.
+one on screen. "At Race Passage" from Hope Bay's sheet is a tide alert at Hope Bay, read back as
+such before Save.
 
 ### 7.4 Settings → Calendar
 
@@ -534,8 +557,9 @@ alert that never fires.
 - `Slackwater/AlertLine.swift` — the line under the strip, which rule it reads, its three states,
   and the next occurrence a Rest tap binds to
 - `Slackwater/AlertSheet.swift` — the one sheet that makes and edits a rule
-- `Slackwater/AlertSentence.swift` — `AlertDraft`, the per-kind instructions, the session, and the
-  pure mapping from a draft to a rule
+- `Slackwater/AlertSentence.swift` — the three drafts and `AlertRelativeDay`, the per-kind
+  instructions, availability, the session per parse, the word list, and the pure mapping from a
+  draft to an `AlertSentenceOutcome`
 - `Slackwater/AlertsView.swift`, `Slackwater/CalendarStationsView.swift` — the lists
 - `Slackwater/TimelineStrip.swift` — the press recognizer
 - `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `onLongPress` closure, the line's place
@@ -580,16 +604,21 @@ No engine or Almanac version change.
   way is never removed.
 - The line — what each press resolves to per consumer; Rest, Pressed and Set against a rule set
   that holds a `once` rule, a repeating rule, both, or neither; Set surviving a lapsed Premium.
-- The sentence — the mapping from `AlertDraft` to `AlertRule` is pure and tested without a model:
-  each trigger case per station kind, a height in feet landing as the displayed metres, `repeats`
-  deciding `once`, a `RelativeDay` resolved across a DST transition in the station's zone, the
-  first occurrence found and bound, an empty horizon reported, `unsupported` disabling Save. The
-  model itself is not under test here.
+- The sentence — the mapping from a draft to a rule is pure and tested without a model: each
+  trigger case per station kind, a height in feet landing as the displayed metres, `repeats`
+  deciding `once`, a relative day resolved across a DST transition in the station's zone, the
+  first occurrence found and bound, an empty window reported, a lead rounded to the sheet's
+  choices, the word list catching the obvious asks. What a parse does to the sheet
+  (`alertSheetApply`) is pure too: a rule replaces the draft under the draft's own id; anything
+  else keeps the draft and says why.
+- The model, where it runs — two tests exercise the on-device model on the common phrasings
+  (trigger, repeats, daylight) and skip where there is none. The simulator borrows the Mac's
+  model, so they run on a developer's machine and skip on hosted runners.
 
-**Phrasings, on a device** with Apple Intelligence, because the model runs nowhere in CI: a list
-of twenty sentences per station kind in `SlackwaterTests/Fixtures/alert-phrasings.md` with the
-rule each should make, walked by hand before a release that touches the instructions. The bar is
-every sentence landing on the right trigger and repeat choice; lead and daylight may need a tap.
+**Phrasings, on a device** with Apple Intelligence: `SlackwaterTests/Fixtures/alert-phrasings.md`
+lists the sentences per station kind with the rule each should make, walked by hand before a
+release that touches the instructions. The bar is every sentence landing on the right trigger and
+repeat choice; lead, day and daylight may need a tap.
 
 **A drift test** reschedules from two different 10-minute windows and requires the same instants to
 within a minute, for every trigger read off a sampled series — the ones whose results could move
@@ -623,10 +652,9 @@ press, the Alerts screen, Settings → Calendar.
 
 **Plan 2, after spike 1:** scheduled Live Activities for the soonest occurrences (§5.3).
 
-**Plan 3:** the alert line, the one sheet, and the sentence (§7). Lands in two steps: first the
-line and the sheet with the field hidden, which retires the popover and gives every phone the
-findable entry; then the sentence, which is a field and a parser on top of a sheet that already
-works.
+**Plan 3:** the alert line, the one sheet, and the sentence (§7). Landed in two steps: first the
+line and the sheet with the field hidden, which retired the popover and gave every phone the
+findable entry; then the sentence, a field and a parser on top of a sheet that already worked.
 
 **Next, same tier:**
 
@@ -640,7 +668,8 @@ works.
   cannot express; ranked within the station-local calendar day the extreme falls in.
 - A way to learn what people ask for that the triggers cannot express. The app has no server
   (§14), so this is an opt-in share from the sheet's "can't alert on …" line into the feedback
-  channel, never a log.
+  channel, never a log. The word list in `alertSentenceOutOfScope` is the first, hand-kept
+  signal.
 - `.tidePercentile` — "lowest low of the season" — on `Ranking.swift` (slackwater-engine v0.8.0)
   and the station LAT/HAT bounds, once the #217 range UI brings both into the app. Suppressed
   where the constituent set has no Sa/Ssa amplitude.
