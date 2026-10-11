@@ -401,9 +401,10 @@ press only lands on a strip that is already still, none of the row's rest-state 
 
 ### 7.2 The alert sheet
 
-One `AlertSheet` makes and edits rules. It is a `.sheet` at the medium detent, which lands on
-iPhone and in the iPad split layout alike. It holds a draft `AlertRule`, and every control edits
-that draft:
+One `AlertSheet` makes and edits rules. It is a `.sheet` at the medium detent on a phone, where it
+reads as a card over the strip, and at the large detent in a regular-width layout, where a medium
+form sheet would cut the Form off above On and Delete. It holds a draft `AlertRule`, and every
+control edits that draft:
 
 - **The sentence field**, at the top, when the parser is available (§7.3). Placeholder "Tell me
   when…", with the keyboard's own dictation button for voice. Focused when the sheet opens from

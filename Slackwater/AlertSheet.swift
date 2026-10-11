@@ -34,6 +34,7 @@ struct AlertSheet: View {
     @ObservedObject private var premium = PremiumStore.shared
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSize
     @State private var saving = false
     @State private var showPremium = false
 
@@ -105,7 +106,9 @@ struct AlertSheet: View {
             }
             .accessibilityIdentifier("alert-sheet")
         }
-        .presentationDetents([.medium, .large])
+        // A medium form sheet on iPad cuts the Form off above its last section, and a List
+        // only materializes rows near the screen, so On and Delete are out of reach there.
+        .presentationDetents(hSize == .regular ? [.large] : [.medium, .large])
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPremium) { PremiumView() }
     }
