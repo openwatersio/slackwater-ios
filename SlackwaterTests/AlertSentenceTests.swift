@@ -17,18 +17,26 @@ final class AlertSentenceTests: XCTestCase {
 
     func testTheWordListCatchesTheObviousOutOfScopeAsks() {
         // Review Focus 1: the model maps these to a tide trigger; the words catch them first.
-        for s in ["wind over 20 knots", "next slack at Race Passage", "max flood tomorrow", "sunset tonight",
-                  "when is the current slack", "weather tomorrow"] {
+        for s in ["wind over 20 knots", "next slack at Race Passage", "max flood tomorrow",
+                  "when is the current slack", "weather tomorrow", "big waves"] {
             XCTAssertTrue(alertSentenceOutOfScope(s, kind: .tide), s)
         }
+        // In scope, every one: daylight words the guide itself teaches, a place name the station
+        // never parses, and plain tide asks. These reach the model and are read back before Save.
         for s in ["tell me when the next low tide is", "every high tide", "when does it drop below 2 feet",
-                  "lowest low in daylight", "is there a lunar eclipse coming"] {
+                  "lowest low in daylight", "is there a lunar eclipse coming",
+                  "every low tide between sunrise and sunset", "low tide before sunset",
+                  "low tide at Race Passage", "when the window opens", "sunset tonight"] {
             XCTAssertFalse(alertSentenceOutOfScope(s, kind: .tide), s)
         }
         XCTAssertTrue(alertSentenceOutOfScope("next low tide", kind: .current))
+        XCTAssertTrue(alertSentenceOutOfScope("when it passes 3 feet", kind: .current))
         XCTAssertFalse(alertSentenceOutOfScope("next slack window", kind: .current))
+        XCTAssertFalse(alertSentenceOutOfScope("high water slack", kind: .current), "a boater's name for a slack")
+        XCTAssertFalse(alertSentenceOutOfScope("the slack before the flood", kind: .current))
         XCTAssertTrue(alertSentenceOutOfScope("max ebb", kind: .derived))
         XCTAssertFalse(alertSentenceOutOfScope("the next slack", kind: .derived))
+        XCTAssertFalse(alertSentenceOutOfScope("the slack before the flood", kind: .derived))
     }
 
     // MARK: draft → trigger
@@ -75,6 +83,16 @@ final class AlertSentenceTests: XCTestCase {
         XCTAssertEqual(cal.component(.day, from: alertSentenceWindow(day: .daysAhead(3), now: saturday, tz: pacific).from), 7)
     }
 
+    func testADayAheadFromTheModelIsClampedToTheHorizon() {
+        // Model output is a trust boundary: a huge day count must neither crash nor search past
+        // the 14-day horizon the copy names.
+        let far = alertSentenceWindow(day: .daysAhead(Int.max), now: now, tz: utc)
+        XCTAssertLessThanOrEqual(far.to.timeIntervalSince(now), AlertHorizon.notifications + 86_400)
+        XCTAssertGreaterThan(far.from, now)
+        XCTAssertEqual(alertSentenceWindow(day: .daysAhead(30), now: now, tz: utc).from,
+                       alertSentenceWindow(day: .daysAhead(14), now: now, tz: utc).from)
+    }
+
     // MARK: the outcome
 
     func testASingularSentenceBindsToTheFirstOccurrence() {
@@ -105,7 +123,9 @@ final class AlertSentenceTests: XCTestCase {
     func testANamedDayWithNoOccurrenceIsNothingAhead() {
         // Review Focus 2.
         XCTAssertEqual(alertSentenceOutcome(draft(.tideExtreme(high: true), day: .tomorrow), stationID: "a", now: now, tz: utc,
-                                            nextOccurrence: { _, _, _, _ in nil }), .nothingAhead)
+                                            nextOccurrence: { _, _, _, _ in nil }), .nothingAhead(namedDay: true))
+        XCTAssertEqual(alertSentenceOutcome(draft(.tideExtreme(high: true)), stationID: "a", now: now, tz: utc,
+                                            nextOccurrence: { _, _, _, _ in nil }), .nothingAhead(namedDay: false))
     }
 
     func testARepeatingSentenceWithNothingAheadStillMakesARule() {
@@ -127,7 +147,7 @@ final class AlertSentenceTests: XCTestCase {
         XCTAssertEqual(lead(10), 900)
         XCTAssertEqual(lead(0), 0)
         XCTAssertEqual(lead(2_000), 86_400)
-        XCTAssertTrue(alertLeads.contains(lead(45)!), "a tie lands on one of the offered leads either way")
+        XCTAssertEqual(lead(45), 3_600, "a tie breaks toward more warning")
     }
 
     // MARK: the model, where it runs
@@ -171,6 +191,9 @@ final class AlertSentenceTests: XCTestCase {
         XCTAssertTrue(tide.contains("feet")); XCTAssertTrue(tide.contains("low tide")); XCTAssertFalse(tide.contains("slack"))
         let cur = alertSentenceInstructions(kind: .current, imperial: false)
         XCTAssertTrue(cur.contains("slack")); XCTAssertFalse(cur.contains("metres") || cur.contains("feet"), "a current station has no heights")
-        XCTAssertLessThan(alertSentenceInstructions(kind: .derived, imperial: false).count, 1_200, "the on-device window is 4K tokens shared with the schema and the reply")
+        for kind in [StationCalendarKind.tide, .current, .derived] {
+            XCTAssertLessThan(alertSentenceInstructions(kind: kind, imperial: true).count, 1_200,
+                              "the on-device window is 4K tokens shared with the schema and the reply")
+        }
     }
 }

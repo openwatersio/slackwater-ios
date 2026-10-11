@@ -24,7 +24,7 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
 }
 
 enum AlertSheetNote: Equatable {
-    case nothingAhead, notOffered, failed
+    case nothingAhead, nothingThatDay, notOffered, failed
 }
 
 /// What a parse does to the sheet: a rule replaces the draft wholesale — trigger, moment, lead,
@@ -37,7 +37,7 @@ func alertSheetApply(_ outcome: AlertSentenceOutcome, to rule: AlertRule,
         parsed.id = rule.id
         parsed.enabled = rule.enabled
         return (parsed, bound, nil)
-    case .nothingAhead: return (rule, boundMoment, .nothingAhead)
+    case .nothingAhead(let namedDay): return (rule, boundMoment, namedDay ? .nothingThatDay : .nothingAhead)
     case .notOffered: return (rule, boundMoment, .notOffered)
     case .failed: return (rule, boundMoment, .failed)
     }
@@ -52,6 +52,8 @@ struct AlertSheet: View {
     let isNew: Bool
     /// The Rest tap opens on the field; a press and the Alerts screen open on the draft (§7.2).
     let focusSentence: Bool
+    /// Read once at open (§7.3): the field must not vanish mid-sentence, and the check is not free.
+    @State private var sentenceAvailable = alertSentenceAvailable
     @State private var sentence = ""
     @State private var parsing = false
     @State private var note: AlertSheetNote?
@@ -81,7 +83,7 @@ struct AlertSheet: View {
             Form {
                 // The field, when the on-device model is ready (§7.3). The keyboard's own
                 // dictation key is the voice input.
-                if alertSentenceAvailable {
+                if sentenceAvailable {
                     Section {
                         HStack(spacing: 8) {
                             TextField(String(localized: "Tell me when…", comment: "Placeholder of the alert sheet's sentence field."),
@@ -139,7 +141,13 @@ struct AlertSheet: View {
                     }
                 }
             }
-            .onAppear { sentenceFocused = focusSentence && alertSentenceAvailable }
+            // After the presentation settles: focus set in onAppear is dropped by the sheet's
+            // own animation on first presentation.
+            .task {
+                guard focusSentence, sentenceAvailable else { return }
+                try? await Task.sleep(for: .milliseconds(350))
+                sentenceFocused = true
+            }
             .scrollContentBackground(.hidden)
             .background(CanvasBackground())
             .navigationTitle(isNew ? "New Alert" : "Alert")
@@ -168,6 +176,8 @@ struct AlertSheet: View {
         switch note {
         case .nothingAhead:
             return String(localized: "Nothing in the next 14 days", comment: "Under the sentence field when the ask has no occurrence coming.")
+        case .nothingThatDay:
+            return String(localized: "Nothing that day", comment: "Under the sentence field when the ask named a day that holds no such event.")
         case .notOffered:
             return String(localized: "Slackwater can't alert on that here yet", comment: "Under the sentence field when the words ask for something this station cannot alert on.")
         case .failed:

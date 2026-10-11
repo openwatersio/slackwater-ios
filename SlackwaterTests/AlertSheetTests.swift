@@ -49,8 +49,9 @@ final class AlertSheetTests: XCTestCase {
 
     func testNothingAheadAndNotOfferedKeepTheDraftAndSayWhy() {
         let draft = AlertRule(stationID: "a", trigger: .slack, once: moment)
-        let a = alertSheetApply(.nothingAhead, to: draft, boundMoment: moment)
+        let a = alertSheetApply(.nothingAhead(namedDay: false), to: draft, boundMoment: moment)
         XCTAssertEqual(a.rule, draft); XCTAssertEqual(a.boundMoment, moment); XCTAssertEqual(a.note, .nothingAhead)
+        XCTAssertEqual(alertSheetApply(.nothingAhead(namedDay: true), to: draft, boundMoment: moment).note, .nothingThatDay)
         let b = alertSheetApply(.notOffered, to: draft, boundMoment: moment)
         XCTAssertEqual(b.rule, draft); XCTAssertEqual(b.note, .notOffered)
         // Review Focus 4: a throw mid-parse leaves the sheet usable.

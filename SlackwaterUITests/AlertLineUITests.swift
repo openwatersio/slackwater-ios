@@ -139,8 +139,11 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssert(sheet(app).appears(within: 5))
         let field = app.textFields["alert-sentence"]
         try XCTSkipUnless(field.waitForExistence(timeout: 2), "no on-device model here")
+        // Opened from Rest, the field is focused once the sheet has settled (§7.2).
+        let focused = XCTNSPredicateExpectation(predicate: NSPredicate { el, _ in
+            ((el as? XCUIElement)?.value(forKey: "hasKeyboardFocus") as? Bool) == true }, object: field)
+        XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 5), .completed, "the field did not take focus from the Rest tap")
 
-        field.tap()
         field.typeText("every high tide\n")
         let summary = app.staticTexts["alert-summary"]
         // A parse takes a few seconds in the simulator.

@@ -87,8 +87,8 @@ struct AlertSentenceDraft: Equatable {
 enum AlertSentenceOutcome: Equatable {
     /// The rule the sentence described, and the moment "Does not repeat" binds to.
     case rule(AlertRule, boundMoment: Date?)
-    /// A singular ask with no occurrence in its window.
-    case nothingAhead
+    /// A singular ask with no occurrence in its window: the named day, or the whole horizon.
+    case nothingAhead(namedDay: Bool)
     /// The words name something this station kind cannot alert on.
     case notOffered
     /// The model was unavailable or threw; the sheet keeps the draft it had.
@@ -96,18 +96,20 @@ enum AlertSentenceOutcome: Equatable {
 }
 
 /// The model never refuses: asked for wind at a tide station it answers "low tide". These words
-/// are the asks it gets wrong most, caught before it is asked. Short on purpose — the sheet shows
-/// every parse before Save, and that is the real guard.
+/// are the asks it gets wrong most, caught before it is asked. Short on purpose, and never a word
+/// that can sit inside an in-scope ask — "sunset" is a daylight word, "flood" names the slack
+/// before it, a place name is ignored (§7.3) — because the sheet shows every parse before Save,
+/// and that is the real guard.
 /// ponytail: a word list; a classifier if the misses ever measure.
 func alertSentenceOutOfScope(_ sentence: String, kind: StationCalendarKind) -> Bool {
     let words = sentence.lowercased()
-    let everywhere = ["wind", "weather", "waves?", "swell", "rain", "fog", "sunset", "sunrise", "moonrise", "moonset"]
+    let everywhere = ["wind", "weather", "waves?", "swell", "rain", "fog"]
     let perKind: [String] = switch kind {
-    case .tide: ["slack", "currents?", "ebb", "flood", "knots?", "passage", "pass", "narrows", "rapids"]
-    case .current: ["low tide", "high tide", "low water", "high water", "tide height", "feet", "metres?", "meters?"]
-    case .derived: ["low tide", "high tide", "ebb", "flood", "max", "knots?", "feet", "metres?", "meters?"]
+    case .tide: ["slack", "currents?", "knots?", "max"]
+    case .current: ["low tide", "high tide", "tide height", "feet", "foot", "metres?", "meters?"]
+    case .derived: ["max", "knots?", "low tide", "high tide", "feet", "foot", "metres?", "meters?"]
     }
-    // Whole words: "wind" must not match "window", nor "pass" "passage" on a current station.
+    // Whole words: "wind" must not match "window".
     return (everywhere + perKind).contains { words.range(of: "\\b\($0)\\b", options: .regularExpression) != nil }
 }
 
@@ -152,7 +154,10 @@ func alertSentenceWindow(day: AlertRelativeDay?, now: Date, tz: TimeZone) -> (fr
     guard let day else { return (now, now.addingTimeInterval(AlertHorizon.notifications)) }
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
-    let offset = switch day { case .today: 0; case .tomorrow: 1; case .daysAhead(let n): max(n, 0) }
+    // Model output is a trust boundary: a day count is clamped to the horizon the copy names
+    // (and `date(byAdding:)` returns nil on overflow).
+    let horizonDays = Int(AlertHorizon.notifications / 86_400)
+    let offset = switch day { case .today: 0; case .tomorrow: 1; case .daysAhead(let n): min(max(n, 0), horizonDays) }
     let start = cal.startOfDay(for: cal.date(byAdding: .day, value: offset, to: now)!)
     let end = cal.date(byAdding: .day, value: 1, to: start)!
     return (max(start, now), end)
@@ -164,10 +169,12 @@ func alertSentenceOutcome(_ draft: AlertSentenceDraft, stationID: String, now: D
                           nextOccurrence: (AlertTrigger, Bool, Date, Date) -> Date?) -> AlertSentenceOutcome {
     let window = alertSentenceWindow(day: draft.day, now: now, tz: tz)
     let next = nextOccurrence(draft.trigger, draft.daylightOnly, window.from, window.to).map(alertMinute)
-    if !draft.repeats && next == nil { return .nothingAhead }
-    // The sheet offers six leads; a sentence's "45 minutes" lands on the nearest.
+    if !draft.repeats && next == nil { return .nothingAhead(namedDay: draft.day != nil) }
+    // The sheet offers six leads; a sentence's "45 minutes" lands on the nearest, and a tie
+    // breaks toward more warning — the safer error on the water.
     let lead = draft.leadMinutes.map { minutes in
-        alertLeads.min { abs($0 - Double(minutes) * 60) < abs($1 - Double(minutes) * 60) }!
+        let asked = Double(minutes) * 60
+        return alertLeads.reversed().min { abs($0 - asked) < abs($1 - asked) }!
     } ?? alertNewRuleLead
     let rule = AlertRule(stationID: stationID, trigger: draft.trigger, once: draft.repeats ? nil : next,
                          lead: lead, daylightOnly: draft.daylightOnly)

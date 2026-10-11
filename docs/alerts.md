@@ -416,7 +416,8 @@ control edits that draft:
   watches is the line's to name (§7.1) and the Alerts screen's (§7.5), and the bound minute is
   not always the event's own (§3). A sentence the words or the window rule out leaves the summary
   and the draft as they were, and a line under the field says why: "Slackwater can't alert on that
-  here yet", "Nothing in the next 14 days", or "Couldn't read that. Try other words." (§7.3).
+  here yet", "Nothing in the next 14 days", "Nothing that day", or "Couldn't read that. Try other
+  words." (§7.3).
 - **Repeat**, written the way a calendar event writes it: a menu reading "Does not repeat" or the
   trigger's `alertEveryLabel` — "Every low tide", "Every slack window", "Every time it falls past
   3.3 ft". Choosing the latter clears `once`; choosing "Does not repeat" binds the rule to the
@@ -475,8 +476,9 @@ without a model.
   station's zone. Swift resolves the day through `Calendar` with the station's `timeZone`,
   then searches `alertOccurrences` across that day — 23, 24 or 25 hours long, and today starts
   now — or, with no day named, from now across the notification horizon (§6), for the first
-  occurrence, and that minute becomes `once`. A singular sentence with nothing in its window
-  reads "Nothing in the next 14 days" and the draft is left as it was. A repeating sentence still
+  occurrence, and that minute becomes `once`. A day count from the model is clamped to the
+  horizon. A singular sentence with nothing in its window reads "Nothing in the next 14 days",
+  or "Nothing that day" when a day was named, and the draft is left as it was. A repeating sentence still
   binds that moment, so the Repeat menu offers both choices. A lead in the sentence lands on the
   nearest of the sheet's six.
 - **Instructions are a fixed paragraph per station kind**: what the place is, what each trigger
@@ -487,11 +489,13 @@ without a model.
 - **The model never refuses.** Asked for wind at a tide station it answers "low tide"; an
   "unsupported" field or enum case is never chosen (probed 2026-10-10: eleven sentences, three
   runs, as a free-text field and as a trigger case). So a short word list in Swift
-  (`alertSentenceOutOfScope`) catches the obvious asks — wind, weather, sunset, slack at a tide
-  station, a tide at a current station — before the model is called, and the sheet says
-  "Slackwater can't alert on that here yet". For everything else the guard is the next bullet
-  but one.
-- **Availability.** `SystemLanguageModel.default.availability` is checked when the sheet opens.
+  (`alertSentenceOutOfScope`) catches the obvious asks — wind, weather, slack at a tide station,
+  a tide height at a current station — before the model is called, and the sheet says
+  "Slackwater can't alert on that here yet". The list never holds a word that can sit inside an
+  in-scope ask: "sunset" is a daylight word, "flood" names the slack before it, and a place name
+  is ignored. For everything else the guard is that every parse is shown before it is saved.
+- **Availability.** `SystemLanguageModel.default.availability` is read once when the sheet
+  opens, so the field never vanishes mid-sentence.
   Anything but `.available` — a phone without Apple Intelligence, a device language it does not
   support, the model still downloading — hides the field, and the sheet works as it does for a
   press: the Rest tap opens it on the centerline's offer, which on an unscrubbed tide strip is the

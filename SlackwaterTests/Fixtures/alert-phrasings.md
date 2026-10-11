@@ -28,7 +28,7 @@ line; lead, day and daylight may need a tap. The automated subset is
 | a day before the eclipse | Lunar eclipse | no | lead 1 day |
 | wind over 20 knots | — word list: not offered | | |
 | next slack at Race Passage | — word list: not offered | | |
-| sunset tonight | — word list: not offered | | |
+| sunset tonight | Low tide (a near miss: read it back before Save) | no | |
 
 ## Current station
 
@@ -46,6 +46,7 @@ line; lead, day and daylight may need a tap. The automated subset is
 | an hour before every slack in daylight | Slack window | yes | lead 1 h, daylight |
 | low tide tomorrow | — word list: not offered | | |
 | wind | — word list: not offered | | |
+| high water slack | Slack window | no | |
 
 ## Derived gate
 
