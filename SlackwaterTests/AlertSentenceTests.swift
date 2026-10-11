@@ -152,8 +152,19 @@ final class AlertSentenceTests: XCTestCase {
 
     // MARK: the model, where it runs
 
-    /// Runs on a Mac with Apple Intelligence on (the simulator borrows the host model); skips on
-    /// hosted runners. Trigger and repeats only — the rest is checked by hand from the fixture.
+    /// A model that is "available" but throws is not a wrong draft: skip, and say what it threw.
+    private func parseOrSkip(_ sentence: String, kind: StationCalendarKind, imperial: Bool) async throws -> AlertSentenceDraft {
+        do {
+            return try await alertSentenceParseThrowing(sentence, kind: kind, imperial: imperial)
+        } catch {
+            throw XCTSkip("the model reads available here but cannot answer: \(error)")
+        }
+    }
+
+    /// Runs on a Mac with Apple Intelligence on (the simulator borrows the host model); skips
+    /// where there is no model, and where `availability` says there is one but it cannot answer
+    /// (GitHub's macOS runners). Trigger and repeats only — the rest is checked by hand from the
+    /// fixture.
     func testTheModelParsesTheCommonPhrasings() async throws {
         try XCTSkipUnless(alertSentenceAvailable, "no on-device model here")
         let cases: [(String, StationCalendarKind, AlertTrigger, Bool)] = [
@@ -166,8 +177,7 @@ final class AlertSentenceTests: XCTestCase {
             ("the next slack", .derived, .slack, false),
         ]
         for (sentence, kind, trigger, repeats) in cases {
-            let parsed = await alertSentenceParse(sentence, kind: kind, imperial: true)
-            let draft = try XCTUnwrap(parsed, sentence)
+            let draft = try await parseOrSkip(sentence, kind: kind, imperial: true)
             XCTAssertEqual(draft.trigger, trigger, sentence)
             XCTAssertEqual(draft.repeats, repeats, sentence)
         }
@@ -175,12 +185,10 @@ final class AlertSentenceTests: XCTestCase {
 
     func testDaylightAndLeadAndDayComeThrough() async throws {
         try XCTSkipUnless(alertSentenceAvailable, "no on-device model here")
-        let first = await alertSentenceParse("ping me 30 minutes before every low tide in daylight", kind: .tide, imperial: true)
-        let d = try XCTUnwrap(first)
+        let d = try await parseOrSkip("ping me 30 minutes before every low tide in daylight", kind: .tide, imperial: true)
         // The lead is the one field the model drops now and then; the fixture's bar lets it need a tap.
         XCTAssertTrue(d.daylightOnly); XCTAssertTrue(d.repeats)
-        let second = await alertSentenceParse("when is high water tomorrow", kind: .tide, imperial: false)
-        let t = try XCTUnwrap(second)
+        let t = try await parseOrSkip("when is high water tomorrow", kind: .tide, imperial: false)
         XCTAssertEqual(t.day, .tomorrow); XCTAssertEqual(t.trigger, .tideExtreme(high: true))
     }
 

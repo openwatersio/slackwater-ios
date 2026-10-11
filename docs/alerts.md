@@ -495,7 +495,10 @@ without a model.
   in-scope ask: "sunset" is a daylight word, "flood" names the slack before it, and a place name
   is ignored. For everything else the guard is that every parse is shown before it is saved.
 - **Availability.** `SystemLanguageModel.default.availability` is read once when the sheet
-  opens, so the field never vanishes mid-sentence.
+  opens, so the field never vanishes mid-sentence. `.available` is not a promise the model can
+  answer — GitHub's macOS runners read available and throw on every request — so a parse that
+  throws reads "Couldn't read that. Try other words." and keeps the draft, and the tests that run
+  the model skip there rather than fail.
   Anything but `.available` — a phone without Apple Intelligence, a device language it does not
   support, the model still downloading — hides the field, and the sheet works as it does for a
   press: the Rest tap opens it on the centerline's offer, which on an unscrubbed tide strip is the

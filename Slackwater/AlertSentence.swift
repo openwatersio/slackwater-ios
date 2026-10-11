@@ -218,22 +218,27 @@ var alertSentenceAvailable: Bool {
 }
 
 /// One session per parse, no transcript carried: five parses on one session overflow the window.
-/// The draft comes back as the engine's trigger; the caller resolves the occurrence.
-func alertSentenceParse(_ sentence: String, kind: StationCalendarKind, imperial: Bool) async -> AlertSentenceDraft? {
+/// The draft comes back as the engine's trigger; the caller resolves the occurrence. Throws what
+/// the model throws — `availability` can read `.available` on a machine whose model cannot answer
+/// (GitHub's macOS runners do), and the tests that run the model need to tell that from a wrong
+/// draft.
+func alertSentenceParseThrowing(_ sentence: String, kind: StationCalendarKind, imperial: Bool) async throws -> AlertSentenceDraft {
     let session = LanguageModelSession(instructions: alertSentenceInstructions(kind: kind, imperial: imperial))
     // A parser wants the likeliest reading every time, not a sample: the same words make the
     // same draft, and the tests that run the model can hold it to that.
     let greedy = GenerationOptions(sampling: .greedy)
-    do {
-        switch kind {
-        case .tide:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: TideSentenceDraft.self, options: greedy).content, imperial: imperial)
-        case .current:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: CurrentSentenceDraft.self, options: greedy).content, imperial: imperial)
-        case .derived:
-            return alertSentenceDraft(try await session.respond(to: sentence, generating: DerivedSentenceDraft.self, options: greedy).content, imperial: imperial)
-        }
-    } catch {
-        return nil
+    switch kind {
+    case .tide:
+        return alertSentenceDraft(try await session.respond(to: sentence, generating: TideSentenceDraft.self, options: greedy).content, imperial: imperial)
+    case .current:
+        return alertSentenceDraft(try await session.respond(to: sentence, generating: CurrentSentenceDraft.self, options: greedy).content, imperial: imperial)
+    case .derived:
+        return alertSentenceDraft(try await session.respond(to: sentence, generating: DerivedSentenceDraft.self, options: greedy).content, imperial: imperial)
     }
+}
+
+/// The sheet's view of a parse: a draft, or nil for anything the model could not do — the sheet
+/// says "Couldn't read that" and keeps the draft it had.
+func alertSentenceParse(_ sentence: String, kind: StationCalendarKind, imperial: Bool) async -> AlertSentenceDraft? {
+    try? await alertSentenceParseThrowing(sentence, kind: kind, imperial: imperial)
 }
