@@ -174,7 +174,7 @@ There is deliberately **no section measured against the station's own ends**, as
 
 ### 6.6 Moon (every kind)
 
-- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant.
+- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant, upright: lit on the right while waxing.
 - **Value:** an eclipse in progress ("Solar Eclipse", "Total Eclipse", "Partial Eclipse", "Penumbral Eclipse"), otherwise the phase: "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous", "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent". New and full span 1.7 days either side; the quarters span 1.4.
 - **Caption:** the tide the Moon is driving: "Perigean spring tide", "Apogean spring tide", "Perigean neap tide", "Apogean neap tide", "Perigean tide", "Apogean tide", "Spring tide", or "Neap tide". Perigee and apogee count within 2 days. When none applies, "<N>% lit".
 - **Absent** outside the years the astronomy library supports (1950–2101 today).
@@ -185,7 +185,7 @@ The tile opens the Moon sheet.
 
 Title "Moon", with Done. From top to bottom:
 
-1. the glyph, the phase or eclipse name, "<N>% lit", a sentence about the phase, and the tide label with its explanation;
+1. the glyph, tilted as the Moon stands in the station's sky at the selected instant (bright limb from the zenith, as an observer facing the Moon sees it; the eclipse shadow does not turn with it), the phase or eclipse name, "<N>% lit", a sentence about the phase, and the tide label with its explanation;
 2. "Distance from Earth" in kilometres rounded to 100, with a schematic orbit marking "Closest" and "Farthest" dates;
 3. moonrise and moonset times, or "—";
 4. the next full and next new Moon;

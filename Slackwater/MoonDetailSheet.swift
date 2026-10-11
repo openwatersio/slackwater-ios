@@ -9,6 +9,9 @@ import SwiftUI
 
 struct MoonFacts {
     let illumination: MoonIllumination
+    /// The head glyph's `moonTilt`: the moon as it stands in this sky at the
+    /// scrub time. Nil draws it upright.
+    let tilt: Double?
     let rise: Date?
     let set: Date?
     let nextFull: Date?
@@ -111,6 +114,7 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
     let newAt = phases.first { $0.phase == .new }?.time
     return MoonFacts(
         illumination: illumination,
+        tilt: moonTilt(at: at, observer: observer),
         rise: events.first { $0.kind == .rise }?.time,
         set: events.first { $0.kind == .set }?.time,
         nextFull: fullAt,
@@ -260,9 +264,15 @@ struct MoonDetailSheet: View {
                 if solarEclipse != nil {
                     SolarEclipseGlyph(obscuration: solarObscuration, size: 54)
                 } else {
-                    MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
+                    // Tilted as it stands in the sky, the same way the sky
+                    // backdrop draws it; the umbra stays screen-stable there too.
+                    // The rows below are calendar glyphs and stay upright.
+                    let tilt = facts.tilt ?? 0
+                    MoonGlyph(fraction: facts.illumination.fraction,
+                              waxing: facts.tilt == nil ? facts.illumination.waxing : true,
                               size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
-                              wash: eclipse?.wash(at: at) ?? 0)
+                              wash: eclipse?.wash(at: at) ?? 0, shadowTilt: .radians(-tilt))
+                        .rotationEffect(.radians(tilt))
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)

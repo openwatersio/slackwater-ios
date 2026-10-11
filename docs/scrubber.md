@@ -604,7 +604,7 @@ The backdrop behind the lead responds continuously to `selectedTime` and station
 
 - interpolate sky colours from solar altitude;
 - position sun and moon against their visible horizon spans;
-- show the moon's illuminated limb and current lunar eclipse shadow;
+- show the moon's illuminated limb and current lunar eclipse shadow, with the bright limb at its angle from the zenith (Almanac's bright-limb angle less the parallactic angle). Sun and moon sit east on the right, a mirror image of the sky in the northern hemisphere, so there the limb is mirrored too and keeps facing the drawn sun;
 - during a solar eclipse, keep the moon visible over the sun and darken the sky according to the locally obscured fraction;
 - reveal stars as the sky darkens; and
 - switch foreground ink between light foam and deep navy for contrast.
