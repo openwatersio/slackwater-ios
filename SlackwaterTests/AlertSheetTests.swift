@@ -28,6 +28,37 @@ final class AlertSheetTests: XCTestCase {
         XCTAssertNil(alertRuleRepeating(every, false, boundMoment: nil).once)
     }
 
+    // MARK: what a sentence does to the draft
+
+    func testASentenceReplacesTheBoundMoment() {
+        // Review Focus 3: the pressed minute goes; the sentence's occurrence is the new binding.
+        let pressed = AlertRule(stationID: "a", trigger: .tideExtreme(high: false), once: moment, lead: 1_800)
+        let event = moment.addingTimeInterval(7 * 3_600)
+        let fromSentence = AlertRule(stationID: "a", trigger: .tideExtreme(high: true), once: event, lead: 900, daylightOnly: true)
+
+        let r = alertSheetApply(.rule(fromSentence, boundMoment: event), to: pressed, boundMoment: moment)
+
+        XCTAssertEqual(r.rule.trigger, .tideExtreme(high: true))
+        XCTAssertEqual(r.rule.once, event)
+        XCTAssertEqual(r.boundMoment, event)
+        XCTAssertEqual(r.rule.lead, 900)
+        XCTAssertTrue(r.rule.daylightOnly)
+        XCTAssertEqual(r.rule.id, pressed.id, "the sheet edits one rule; a sentence does not mint a second id")
+        XCTAssertNil(r.note)
+    }
+
+    func testNothingAheadAndNotOfferedKeepTheDraftAndSayWhy() {
+        let draft = AlertRule(stationID: "a", trigger: .slack, once: moment)
+        let a = alertSheetApply(.nothingAhead(namedDay: false), to: draft, boundMoment: moment)
+        XCTAssertEqual(a.rule, draft); XCTAssertEqual(a.boundMoment, moment); XCTAssertEqual(a.note, .nothingAhead)
+        XCTAssertEqual(alertSheetApply(.nothingAhead(namedDay: true), to: draft, boundMoment: moment).note, .nothingThatDay)
+        let b = alertSheetApply(.notOffered, to: draft, boundMoment: moment)
+        XCTAssertEqual(b.rule, draft); XCTAssertEqual(b.note, .notOffered)
+        // Review Focus 4: a throw mid-parse leaves the sheet usable.
+        let c = alertSheetApply(.failed, to: draft, boundMoment: moment)
+        XCTAssertEqual(c.rule, draft); XCTAssertEqual(c.note, .failed)
+    }
+
     func testSaveIsOfferedOnlyForAMomentStillAhead() {
         // A pressed moment can lie in the strip's 48-hour look-back; saving it would make a rule
         // the next reschedule deletes.

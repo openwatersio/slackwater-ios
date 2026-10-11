@@ -178,7 +178,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             }
             .sheet(item: $alertSubject) { subject in
                 AlertSheet(rule: subject.rule, stationName: name,
-                           boundMoment: subject.boundMoment, isNew: subject.isNew)
+                           boundMoment: subject.boundMoment, isNew: subject.isNew,
+                           focusSentence: subject.focusSentence)
             }
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
@@ -362,7 +363,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                                            threshold: slackThresholdKn)
             let draft = next.map { alertNewRule(stationID: favoriteId, offer: offer, at: $0) }
                 ?? AlertRule(stationID: favoriteId, trigger: offer, lead: alertNewRuleLead)
-            alertSubject = AlertSheetSubject(rule: draft, boundMoment: next.map(alertMinute), isNew: true)
+            alertSubject = AlertSheetSubject(rule: draft, boundMoment: next.map(alertMinute), isNew: true,
+                                             focusSentence: true)
         }
     }
 
@@ -480,6 +482,8 @@ struct AlertSheetSubject: Identifiable {
     let rule: AlertRule
     let boundMoment: Date?
     let isNew: Bool
+    /// The Rest tap opens on the sentence field; a press opens on its moment (§7.2).
+    var focusSentence = false
     var id: UUID { rule.id }
 }
 
