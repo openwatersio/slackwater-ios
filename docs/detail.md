@@ -247,6 +247,10 @@ Only one day is open at a time. The anchor day starts open. Tapping an open day 
 
 The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
 
+The golden and blue hours sit among those events in time order, one row per edge. Golden hour is the Sun's center between the horizon and +6°: the morning row “Golden hour ends” (+6° rising) follows Sunrise, and the evening row “Golden hour begins” (+6° falling) precedes Sunset. Blue hour is the Sun's center between −4° and −8°: “Blue hour begins” and “Blue hour ends” at −8° then −4° rising in the morning, and at −4° then −8° falling in the evening. A golden- or blue-hour edge the day does not reach, as at high latitude, has no row. `sunWindowEdges` (`SunWindows.swift`) supplies these edges, and `sunWindowSpans` pairs the same edges into spans.
+
+Every row with a time is a button: tapping it moves the timeline to that time and closes the sheet.
+
 Daylight duration totals the elapsed time above the horizon between that day’s rise/set crossings at the bottom of the table; it displays “—” when either crossing is absent. Almanac supplies sea-level times for an unobstructed horizon. Calculations run off the main actor; failures show an unavailable message rather than missing-event dashes.
 
 ### 8.4 Rows

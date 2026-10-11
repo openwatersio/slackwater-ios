@@ -1374,7 +1374,7 @@ struct MultiDaySchedule: View {
         .sheet(item: $sunDay) { day in
             if let sunLocation {
                 SunDetailSheet(at: day.id, latitude: sunLocation.latitude,
-                               longitude: sunLocation.longitude, tz: tz)
+                               longitude: sunLocation.longitude, tz: tz, onJump: onTap)
             }
         }
     }
