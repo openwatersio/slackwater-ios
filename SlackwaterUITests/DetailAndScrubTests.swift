@@ -7,7 +7,7 @@ import UIKit
 import XCTest
 
 final class DetailAndScrubTests: ScreenshotTestCase {
-    func testScheduleSunDetails() {
+    func testScheduleSunDetails() throws {
         let app = launch("-seedGate", "-locDenied")
         openFridayHarbor(app)
         let tomorrow = app.buttons["schedule-day-d1"].firstMatch
@@ -27,7 +27,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
         XCTAssertFalse(app.descendants(matching: .any)["sun-horizon-dip"].firstMatch.exists)
         var previousY = -Double.infinity
-        for kind in ["astroDawn", "nauticalDawn", "civilDawn", "rise", "transit", "set", "civilDusk", "nauticalDusk", "astroDusk"] {
+        for kind in ["astroDawn", "nauticalDawn", "morningBlueStart", "civilDawn", "morningBlueEnd", "rise",
+                     "morningGoldenEnd", "transit", "eveningGoldenStart", "set", "eveningBlueStart",
+                     "civilDusk", "eveningBlueEnd", "nauticalDusk", "astroDusk"] {
             let event = app.descendants(matching: .any)["sun-event-\(kind)"].firstMatch
             XCTAssertTrue(event.exists, kind)
             XCTAssertGreaterThan(event.frame.minY, previousY, kind)
@@ -36,7 +38,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
         XCTAssertGreaterThan(daylight.frame.minY, previousY)
         save(app, "sun-details.png")
-        app.buttons["Done"].tap()
+        // Every row is a destination: the sheet closes and the timeline lands on the row's time.
+        let golden = app.descendants(matching: .any)["sun-event-eveningGoldenStart"].firstMatch
+        let clock = try XCTUnwrap(golden.label.components(separatedBy: ", ").last)
+        XCTAssertNotEqual(scrubClock(app), clock)
+        golden.tap()
+        XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10),
+                      "the sheet stayed up after a jump")
+        XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(clock)'"),
+                      "the timeline did not land on \(clock): \(scrubClock(app))")
         XCTAssertTrue(row.appears(within: 5))
     }
 

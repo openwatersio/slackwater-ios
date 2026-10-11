@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SunDayFacts: Sendable {
     let interval: DateInterval
-    let events: [SunEvent]
+    let times: [SunMoment: Date]
 
     init(at: Date, tz: TimeZone, latitude: Double, longitude: Double) throws {
         var calendar = Calendar(identifier: .gregorian)
@@ -13,17 +13,24 @@ struct SunDayFacts: Sendable {
         }
         let observer = try Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         self.interval = interval
-        events = try sunEvents(from: interval.start, to: interval.end, observer: observer)
+        var times: [SunMoment: Date] = [:]
+        let events = try sunEvents(from: interval.start, to: interval.end, observer: observer)
+        let edges = try sunWindowEdges(.goldenHour, from: interval.start, to: interval.end, observer: observer)
+            + sunWindowEdges(.blueHour, from: interval.start, to: interval.end, observer: observer)
+        for (time, moment) in events.map({ ($0.time, SunMoment($0.kind)) }) + edges where times[moment] == nil {
+            times[moment] = time
+        }
+        self.times = times
     }
 
-    func time(_ kind: SunEventKind) -> Date? {
-        events.first { $0.kind == kind }?.time
-    }
+    func time(_ moment: SunMoment) -> Date? { times[moment] }
 
-    var orderedKinds: [SunEventKind] {
-        let kinds: [SunEventKind] = [.astroDawn, .nauticalDawn, .civilDawn, .rise, .transit,
-                                    .set, .civilDusk, .nauticalDusk, .astroDusk]
-        return kinds.sorted { (time($0) ?? interval.end) < (time($1) ?? interval.end) }
+    /// Almanac's nine events always, a missing one reading "—"; a golden- or blue-hour
+    /// edge only on a day it happens.
+    var ordered: [SunMoment] {
+        let nine = Set(SunEventKind.allCases.map(SunMoment.init))
+        return SunMoment.allCases.filter { nine.contains($0) || times[$0] != nil }
+            .sorted { (time($0) ?? interval.end) < (time($1) ?? interval.end) }
     }
 
     var daylight: TimeInterval? {
@@ -38,6 +45,8 @@ struct SunDetailSheet: View {
     let latitude: Double
     let longitude: Double
     let tz: TimeZone
+    /// Moves the timeline to a row's time; the sheet closes after.
+    let onJump: (Date) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .subheadline) private var iconWidth = 24
@@ -77,14 +86,11 @@ struct SunDetailSheet: View {
         }
     }
 
-    private func when(_ facts: SunDayFacts, _ kind: SunEventKind) -> String {
-        facts.time(kind).map { chartTime($0, tz) } ?? "—"
-    }
 
     private func table(_ facts: SunDayFacts) -> some View {
         VStack(spacing: 18) {
-            ForEach(facts.orderedKinds, id: \.rawValue) { kind in
-                eventRow(facts, kind)
+            ForEach(facts.ordered, id: \.rawValue) { moment in
+                eventRow(moment, facts.time(moment))
             }
             Divider()
             LabeledContent("Daylight", value: facts.daylight.map {
@@ -99,18 +105,24 @@ struct SunDetailSheet: View {
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18))
     }
 
-    private func eventRow(_ facts: SunDayFacts, _ kind: SunEventKind) -> some View {
+    private func eventRow(_ moment: SunMoment, _ time: Date?) -> some View {
         let label: LocalizedStringKey
         let symbol: String
         let color: Color
-        switch kind {
+        switch moment {
         case .astroDawn: (label, symbol, color) = ("Astronomical dawn", "sparkles", SN.sunrise)
         case .nauticalDawn: (label, symbol, color) = ("Nautical dawn", "moon.stars", SN.sunrise)
+        case .morningBlueStart: (label, symbol, color) = ("Blue hour begins", "moon.haze", SN.graphLine)
         case .civilDawn: (label, symbol, color) = ("Civil dawn", "sun.horizon", SN.sunrise)
+        case .morningBlueEnd: (label, symbol, color) = ("Blue hour ends", "moon.haze", SN.graphLine)
         case .rise: (label, symbol, color) = ("Sunrise", "sunrise", SN.sunrise)
+        case .morningGoldenEnd: (label, symbol, color) = ("Golden hour ends", "sun.haze", SN.sun)
         case .transit: (label, symbol, color) = ("Solar noon", "sun.max", SN.sun)
+        case .eveningGoldenStart: (label, symbol, color) = ("Golden hour begins", "sun.haze", SN.sun)
         case .set: (label, symbol, color) = ("Sunset", "sunset", SN.sunset)
+        case .eveningBlueStart: (label, symbol, color) = ("Blue hour begins", "moon.haze", SN.graphLine)
         case .civilDusk: (label, symbol, color) = ("Civil dusk", "sun.horizon", SN.sunset)
+        case .eveningBlueEnd: (label, symbol, color) = ("Blue hour ends", "moon.haze", SN.graphLine)
         case .nauticalDusk: (label, symbol, color) = ("Nautical dusk", "moon.stars", SN.sunset)
         case .astroDusk: (label, symbol, color) = ("Astronomical dusk", "sparkles", SN.sunset)
         }
@@ -126,10 +138,24 @@ struct SunDetailSheet: View {
                 Text(label).fixedSize(horizontal: false, vertical: true)
             }
             if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
-            Text(when(facts, kind)).foregroundStyle(color).fixedSize()
+            HStack(spacing: 8) {
+                Text(time.map { chartTime($0, tz) } ?? "—").foregroundStyle(color).fixedSize()
+                if time != nil {
+                    Image(systemName: "chevron.right").font(.caption2)
+                        .foregroundStyle(SN.foam.opacity(0.5))
+                        .accessibilityHidden(true)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let time else { return }
+            onJump(time)
+            dismiss()
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("sun-event-\(kind.rawValue)")
+        .accessibilityAddTraits(time != nil ? .isButton : [])
+        .accessibilityIdentifier("sun-event-\(moment.rawValue)")
     }
 }
