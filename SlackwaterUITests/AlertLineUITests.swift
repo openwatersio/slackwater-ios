@@ -114,6 +114,48 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssertEqual(line(app).label, "Set an alert")
     }
 
+    /// Review Focus 4 of the sentence plan: without the model — every hosted runner — the sheet
+    /// is the one the press path uses, and nothing waits on a field that is not there.
+    func testTheSheetWorksWithoutTheField() throws {
+        let app = launch("-seedGate", "-resetAlerts")
+        openFridayHarbor(app)
+        XCTAssert(line(app).appears(within: 5))
+        line(app).tap()
+        XCTAssert(sheet(app).appears(within: 5))
+        if app.textFields["alert-sentence"].exists {
+            throw XCTSkip("the on-device model is here; the fieldless sheet is covered on hosted runners")
+        }
+        XCTAssertTrue(app.staticTexts["alert-summary"].label.contains("Low tide"))
+        XCTAssert(app.buttons["alert-sheet-save"].exists)
+    }
+
+    /// Only where the model runs: a typed sentence lands on the summary and the repeat row, and
+    /// the free Save still upsells.
+    func testASentenceLandsOnTheSummary() throws {
+        let app = launch("-seedGate", "-resetAlerts")
+        openFridayHarbor(app)
+        XCTAssert(line(app).appears(within: 5))
+        line(app).tap()
+        XCTAssert(sheet(app).appears(within: 5))
+        let field = app.textFields["alert-sentence"]
+        try XCTSkipUnless(field.waitForExistence(timeout: 2), "no on-device model here")
+
+        field.tap()
+        field.typeText("every high tide\n")
+        let summary = app.staticTexts["alert-summary"]
+        // A parse takes a few seconds in the simulator.
+        let parsed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "High tide"), object: summary)
+        wait(for: [parsed], timeout: 30)
+        XCTAssertTrue(summary.label.contains("High tide"), "summary read: \(summary.label)")
+        let repeat_ = app.descendants(matching: .any)["alert-sheet-repeat"].firstMatch
+        XCTAssertTrue(repeat_.label.contains("Every high tide") || (repeat_.value as? String)?.contains("Every high tide") == true,
+                      "repeat read: \(repeat_.label) / \(String(describing: repeat_.value))")
+        save(app, "alert-sentence.png")
+
+        app.buttons["alert-sheet-save"].tap()
+        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+    }
+
     /// Not retried: a first swipe swallowed after the sheet is the bug this guards. Hosted
     /// runners have dropped strip swipes with no sheet involved (#613, #664); the native trace
     /// says whether the pan ever began.
