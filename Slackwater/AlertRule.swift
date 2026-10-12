@@ -38,8 +38,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
 
     private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled }
 
-    // `daylightOnly` is the field builds before the sun window wrote and the only one they read,
-    // so it is still read as a fallback and always written.
+    // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
+    // It is still read as a fallback, and written for the two windows it can say; a golden- or
+    // blue-hour rule leaves it out, so an older build cannot read the rule and keeps it as is
+    // (`AlertRuleStore.unreadable`) instead of firing it at any hour and saving it that way.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -60,7 +62,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(once, forKey: .once)
         try c.encode(lead, forKey: .lead)
         try c.encodeIfPresent(sun, forKey: .sun)
-        try c.encode(sun == .daylight, forKey: .daylightOnly)
+        switch sun {
+        case nil, .daylight: try c.encode(sun == .daylight, forKey: .daylightOnly)
+        case .goldenHour, .blueHour: break
+        }
         try c.encode(enabled, forKey: .enabled)
     }
 }

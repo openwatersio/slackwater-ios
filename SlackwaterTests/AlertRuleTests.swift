@@ -134,13 +134,18 @@ import XCTest
         XCTAssertNil(try decode(false).sun)
     }
 
-    func testTheSunWindowRoundTripsAndStillWritesDaylightOnly() throws {
-        // An older build reads `daylightOnly` and nothing else, so it stays in the JSON.
-        for (sun, flag) in [(SunWindow?.none, false), (.daylight, true), (.goldenHour, false), (.blueHour, false)] {
+    func testTheSunWindowRoundTripsAndWritesDaylightOnlyWhereItCan() throws {
+        // An older build reads `daylightOnly` and nothing else: written for any time and daylight,
+        // left out for the windows it cannot say, so that build keeps the rule unread rather than
+        // firing it at any hour.
+        for (sun, flag) in [(SunWindow?.none, false), (.daylight, true), (.goldenHour, nil), (.blueHour, nil)] {
             let rule = AlertRule(stationID: "a", trigger: .slack, sun: sun)
             let data = try JSONEncoder().encode(rule)
             let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
             XCTAssertEqual(json["daylightOnly"] as? Bool, flag, "\(String(describing: sun))")
+            if flag == nil {
+                XCTAssertNil(json["daylightOnly"], "the key itself must be absent for \(String(describing: sun))")
+            }
             XCTAssertEqual(json["sun"] as? String, sun?.rawValue, "\(String(describing: sun))")
             XCTAssertEqual(try JSONDecoder().decode(AlertRule.self, from: data), rule)
         }

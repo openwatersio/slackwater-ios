@@ -131,8 +131,10 @@ position: `sunWindowSpans` (`SunWindows.swift`), which the Sun sheet's rows read
 sunrise to sunset; golden hour is the Sun's centre between the horizon and +6°, morning and
 evening; blue hour is −4° to −8°. A night the Sun spends inside a band is one span across
 midnight, and a polar day with no edge has no span, so it reads as never. Rules stored before
-the field have `daylightOnly`, which decodes as daylight when true and any time when false, and
-every rule still writes `daylightOnly` so an older build reads it.
+the field have `daylightOnly`, which decodes as daylight when true and any time when false. Any-time
+and daylight rules still write `daylightOnly` so an older build reads them; a golden- or blue-hour
+rule leaves it out, so that build cannot decode the rule and keeps it byte-for-byte (§3) rather
+than firing it at any hour and saving it that way.
 
 `once` filters the result to the occurrence on that minute: at most one, and none at all if a later
 engine version moves the event further than a minute, in which case the rule quietly finds nothing

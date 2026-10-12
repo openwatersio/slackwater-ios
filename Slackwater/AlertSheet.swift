@@ -126,7 +126,7 @@ struct AlertSheet: View {
                     }
                     Picker("Sun", selection: $rule.sun) {
                         Text("Any time", comment: "Sun menu choice: no filter on the time of day.").tag(SunWindow?.none)
-                        Text("Daylight").tag(SunWindow?.some(.daylight))
+                        Text("In daylight", comment: "Sun menu choice in the alert sheet: sunrise to sunset.").tag(SunWindow?.some(.daylight))
                         Text("Golden hour").tag(SunWindow?.some(.goldenHour))
                         Text("Blue hour").tag(SunWindow?.some(.blueHour))
                     }
