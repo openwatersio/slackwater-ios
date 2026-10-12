@@ -15,7 +15,7 @@ enum AlertRelativeDay: Equatable {
 /// One trigger enum per station kind, so the model cannot propose what the station cannot do.
 @Generable
 enum TideSentenceTrigger: Equatable {
-    case lowTide, highTide, lunarEclipse
+    case lowTide, highTide, lowerLow, higherHigh, lunarEclipse
     case risesPast(height: Double)
     case fallsPast(height: Double)
 }
@@ -123,6 +123,8 @@ func alertSentenceDraft(_ d: TideSentenceDraft, imperial: Bool) -> AlertSentence
     let trigger: AlertTrigger = switch d.trigger {
     case .lowTide: .tideExtreme(high: false)
     case .highTide: .tideExtreme(high: true)
+    case .lowerLow: .tideExtreme(high: false, ofDay: true)
+    case .higherHigh: .tideExtreme(high: true, ofDay: true)
     case .lunarEclipse: .eclipse
     case .risesPast(let h): .tideCrossing(heightM: metres(h, imperial: imperial), rising: true)
     case .fallsPast(let h): .tideCrossing(heightM: metres(h, imperial: imperial), rising: false)
@@ -191,8 +193,8 @@ func alertSentenceInstructions(kind: StationCalendarKind, imperial: Bool) -> Str
     case .tide:
         return """
         You turn one sentence into an alert at a tide station. The sentence is about this place only.
-        What can be alerted on here: low tide, high tide, the water rising past a height, the water falling past a height, a lunar eclipse. Heights are in \(unit).
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
+        What can be alerted on here: low tide, high tide, the water rising past a height, the water falling past a height, a lunar eclipse, and two for a mixed tide: the lowest low of the day and the highest high of the day. Heights are in \(unit).
+        Pick the closest trigger. Never invent one. A plain low, low tide, high, high tide or high water is low tide or high tide. A number of \(unit) with under, below, over, past or above is the water falling past or rising past that height. Only "lowest low", "lower low", "low low", "highest high", "higher high" or "high high" is the lowest low of the day or the highest high of the day. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null. "In daylight", "during the day", "daytime", "while it is light" is daylightOnly true; a sentence without such words is daylightOnly false.
         """
     case .current:
         return """

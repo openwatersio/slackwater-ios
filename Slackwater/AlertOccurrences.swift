@@ -132,10 +132,22 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     case (.slack, .derived(let g, _, _)):
         found = g.slacks(from: from, to: to)
             .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
-    case (.tideExtreme(let high), .tide(let s, _, _)):
-        found = s.extremes(from: from, to: to)
+    case (.tideExtreme(let high, let ofDay), .tide(let s, let tz, _)):
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        // A day's rank needs the whole station day, 23 to 25 hours long, so that query runs
+        // midnight to midnight. The plain query stays as asked: the engine's heights shift in
+        // the eighth decimal with the range.
+        let span = ofDay == true
+            ? cal.startOfDay(for: from)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: to)) ?? to)
+            : from...to
+        var extremes = s.extremes(from: span.lowerBound, to: span.upperBound)
             .filter { $0.kind == (high ? .high : .low) }
-            .map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
+        if ofDay == true {
+            extremes = Dictionary(grouping: extremes, by: { cal.startOfDay(for: $0.time) }).values
+                .compactMap { $0.max { high ? $0.height < $1.height : $0.height > $1.height } }
+                .sorted { $0.time < $1.time }
+        }
+        found = extremes.map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
     case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
         let samples = s.heights(from: alertSampleGrid(from), to: to, step: 600).map { (time: $0.time, height: $0.height) }
         found = tideCrossings(samples, level: level, rising: rising)

@@ -53,6 +53,10 @@ final class AlertSentenceTests: XCTestCase {
         XCTAssertEqual(d.day, .tomorrow)
         XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowTide, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger,
                        .tideExtreme(high: false))
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowerLow, repeats: false, daylightOnly: true, leadMinutes: nil, day: nil), imperial: true).trigger,
+                       .tideExtreme(high: false, ofDay: true))
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .higherHigh, repeats: true, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger,
+                       .tideExtreme(high: true, ofDay: true))
         XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lunarEclipse, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger, .eclipse)
     }
 
@@ -172,6 +176,9 @@ final class AlertSentenceTests: XCTestCase {
             ("every high tide", .tide, .tideExtreme(high: true), true),
             ("let me know whenever it rises past 8 ft", .tide, .tideCrossing(heightM: displayedHeightM(8 / toFeet(1), imperial: true), rising: true), true),
             ("is there a lunar eclipse coming", .tide, .eclipse, false),
+            ("lowest low in daylight", .tide, .tideExtreme(high: false, ofDay: true), false),
+            ("every lower low tide", .tide, .tideExtreme(high: false, ofDay: true), true),
+            ("the higher high tomorrow", .tide, .tideExtreme(high: true, ofDay: true), false),
             ("next slack window", .current, .slackWindowOpens, false),
             ("every max ebb", .current, .currentPeak(flood: false), true),
             ("the next slack", .derived, .slack, false),
@@ -188,15 +195,17 @@ final class AlertSentenceTests: XCTestCase {
         let d = try await parseOrSkip("ping me 30 minutes before every low tide in daylight", kind: .tide, imperial: true)
         // The lead is the one field the model drops now and then; the fixture's bar lets it need a tap.
         XCTAssertTrue(d.daylightOnly); XCTAssertTrue(d.repeats)
-        let t = try await parseOrSkip("when is high water tomorrow", kind: .tide, imperial: false)
-        XCTAssertEqual(t.day, .tomorrow); XCTAssertEqual(t.trigger, .tideExtreme(high: true))
+        let t = try await parseOrSkip("remind me an hour before tomorrow's low", kind: .tide, imperial: false)
+        XCTAssertEqual(t.day, .tomorrow); XCTAssertEqual(t.trigger, .tideExtreme(high: false))
+        let w = try await parseOrSkip("when is high water tomorrow", kind: .tide, imperial: false)
+        XCTAssertEqual(w.trigger, .tideExtreme(high: true), "high water is the plain high, not the higher high")
     }
 
     // MARK: the instructions
 
     func testInstructionsNameTheKindsTriggersAndTheUnits() {
         let tide = alertSentenceInstructions(kind: .tide, imperial: true)
-        XCTAssertTrue(tide.contains("feet")); XCTAssertTrue(tide.contains("low tide")); XCTAssertFalse(tide.contains("slack"))
+        XCTAssertTrue(tide.contains("feet")); XCTAssertTrue(tide.contains("low tide")); XCTAssertTrue(tide.contains("lower low")); XCTAssertFalse(tide.contains("slack"))
         let cur = alertSentenceInstructions(kind: .current, imperial: false)
         XCTAssertTrue(cur.contains("slack")); XCTAssertFalse(cur.contains("metres") || cur.contains("feet"), "a current station has no heights")
         for kind in [StationCalendarKind.tide, .current, .derived] {

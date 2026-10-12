@@ -8,7 +8,9 @@ enum AlertTrigger: Codable, Hashable {
     /// A derived gate's slack: an instant, with no speed series to open a window from.
     case slack
     case currentPeak(flood: Bool)
-    case tideExtreme(high: Bool)
+    /// `ofDay` true: only the lowest low (or highest high) of each station-local day, the
+    /// lower low of a mixed tide. Optional so rules stored before the field decode as every.
+    case tideExtreme(high: Bool, ofDay: Bool? = nil)
     /// A height picked off the curve, in metres, in the direction the curve was moving.
     case tideCrossing(heightM: Double, rising: Bool)
     case eclipse
@@ -90,7 +92,9 @@ func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: B
     case .slackWindowOpens: return noWindow ? String(localized: "Slack") : String(localized: "Slack window")
     case .slack: return String(localized: "Slack")
     case .currentPeak(let flood): return flood ? String(localized: "Max flood") : String(localized: "Max ebb")
-    case .tideExtreme(let high): return high ? String(localized: "High tide") : String(localized: "Low tide")
+    case .tideExtreme(let high, let ofDay):
+        if ofDay == true { return high ? String(localized: "Higher high tide") : String(localized: "Lower low tide") }
+        return high ? String(localized: "High tide") : String(localized: "Low tide")
     case .tideCrossing(let heightM, let rising):
         let height = formatHeight(heightM, imperial: imperial), unit = heightUnit(imperial: imperial)
         return rising ? String(localized: "Rising past \(height) \(unit)")

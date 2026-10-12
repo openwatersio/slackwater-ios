@@ -59,7 +59,7 @@ import XCTest
 
     func testEveryTriggerSurvivesCoding() throws {
         let triggers: [AlertTrigger] = [
-            .slackWindowOpens, .slack, .currentPeak(flood: true), .tideExtreme(high: false),
+            .slackWindowOpens, .slack, .currentPeak(flood: true), .tideExtreme(high: false), .tideExtreme(high: false, ofDay: true),
             .tideCrossing(heightM: 0.25, rising: false), .eclipse,
         ]
         let decoded = try JSONDecoder().decode([AlertTrigger].self,
@@ -84,6 +84,10 @@ import XCTest
                        "Race Passage - Max ebb")
         XCTAssertEqual(alertRuleSummary(.tideExtreme(high: true), stationName: "Friday Harbor", imperial: true),
                        "Friday Harbor - High tide")
+        XCTAssertEqual(alertRuleSummary(.tideExtreme(high: false, ofDay: true), stationName: "Friday Harbor", imperial: true),
+                       "Friday Harbor - Lower low tide")
+        XCTAssertEqual(alertRuleSummary(.tideExtreme(high: true, ofDay: true), stationName: "Friday Harbor", imperial: true),
+                       "Friday Harbor - Higher high tide")
         XCTAssertEqual(alertRuleSummary(.tideCrossing(heightM: 1, rising: true), stationName: "Friday Harbor", imperial: false),
                        "Friday Harbor - Rising past 1.00 m")
         XCTAssertEqual(alertRuleSummary(.tideCrossing(heightM: 1, rising: false), stationName: "Friday Harbor", imperial: true),
