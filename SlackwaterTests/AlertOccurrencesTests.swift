@@ -180,6 +180,27 @@ import SlackwaterKit
         }
     }
 
+    func testTheDayRankHoldsAcrossTheFallBackDay() throws {
+        // The station's 25-hour day: a fixed pad of 86,400 s can cut it short, and a range that
+        // starts late in it must still rank against the whole day.
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        guard case .tide(_, let tz, _) = station else { return XCTFail("expected a tide station") }
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        let fallBack = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+        let nextDay = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: fallBack))
+        XCTAssertEqual(nextDay.timeIntervalSince(fallBack), 25 * 3_600, "not the station's fall-back day")
+        let rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false, ofDay: true))
+        let wide = Set(alertOccurrences(rule, station: station, position: position,
+                                        from: fallBack.addingTimeInterval(-2 * 86_400), to: fallBack.addingTimeInterval(9 * 86_400),
+                                        threshold: 0.5).map(\.event))
+        for minutes in stride(from: 0, through: 25 * 60, by: 10) {
+            let from = fallBack.addingTimeInterval(TimeInterval(minutes * 60))
+            let narrow = alertOccurrences(rule, station: station, position: position,
+                                          from: from, to: from.addingTimeInterval(7 * 86_400), threshold: 0.5).map(\.event)
+            XCTAssertTrue(Set(narrow).isSubset(of: wide), "a range from \(from) promoted a low the whole day rejects")
+        }
+    }
+
     func testDaylightOnlyKeepsTheLowsUnderTheSun() throws {
         let (station, position) = try load(TideStationRecord.fridayHarborID)
         var rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false))

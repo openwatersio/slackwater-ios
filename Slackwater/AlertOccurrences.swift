@@ -133,13 +133,16 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         found = g.slacks(from: from, to: to)
             .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
     case (.tideExtreme(let high, let ofDay), .tide(let s, let tz, _)):
-        // A day's rank needs the whole day, so that query reaches a day past either end. The
-        // plain query stays unpadded: the engine's heights shift in the eighth decimal with the range.
-        let pad: TimeInterval = ofDay == true ? 86_400 : 0
-        var extremes = s.extremes(from: from.addingTimeInterval(-pad), to: to.addingTimeInterval(pad))
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        // A day's rank needs the whole station day, 23 to 25 hours long, so that query runs
+        // midnight to midnight. The plain query stays as asked: the engine's heights shift in
+        // the eighth decimal with the range.
+        let span = ofDay == true
+            ? cal.startOfDay(for: from)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: to)) ?? to)
+            : from...to
+        var extremes = s.extremes(from: span.lowerBound, to: span.upperBound)
             .filter { $0.kind == (high ? .high : .low) }
         if ofDay == true {
-            var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
             extremes = Dictionary(grouping: extremes, by: { cal.startOfDay(for: $0.time) }).values
                 .compactMap { $0.max { high ? $0.height < $1.height : $0.height > $1.height } }
                 .sorted { $0.time < $1.time }
