@@ -93,6 +93,25 @@ import SlackwaterKit
         XCTAssertEqual(store.extremes.map(\.time), first)
     }
 
+    /// A CHS port renders first from its preview identity — the fitted
+    /// record's id with no constituents — and the same view then receives the
+    /// fitted record. The iPad's split pane opens the nearest station at launch,
+    /// often mid-fit, and keeps that view alive; caching the empty scan under
+    /// the shared id left its Range tile inert for good.
+    func testAFittedRecordRescansAfterItsPreviewIdentity() async {
+        let s = station
+        let preview = TideStationRecord(id: s.id, name: s.name, region: s.region, aliases: s.aliases,
+                                        latitude: s.latitude, longitude: s.longitude, timezone: s.timezone,
+                                        chartDatum: s.chartDatum, datumOffset: 0, constituents: [])
+        let store = TideStandingStore()
+        await store.load(record: preview, around: at)
+        await store.loadYear(record: preview, around: at)
+        await store.load(record: s, around: at)
+        await store.loadYear(record: s, around: at)
+        XCTAssertGreaterThan(store.extremes.count, 50, "the fitted record was never scanned")
+        XCTAssertFalse(store.months.isEmpty, "the fitted record's year was never scanned")
+    }
+
     // MARK: - The Range tile's caption
 
     /// Real standings rather than fixtures: the caption rule is only
