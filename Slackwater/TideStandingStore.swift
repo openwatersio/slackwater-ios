@@ -15,20 +15,22 @@ import SlackwaterKit
     /// The window `extremes` came from, so a consumer can tell a whole local
     /// day from the fragment after its last midnight.
     private(set) var window: (start: Date, end: Date) = (.distantPast, .distantPast)
-    /// The station already scanned. Keyed by id rather than by window: the
-    /// window moves with the scrub and the ranking deliberately does not, so
-    /// re-anchoring it per scrub would reintroduce the per-frame cost.
-    private var loaded: String?
+    /// The station already scanned. Keyed by the record rather than by window:
+    /// the window moves with the scrub and the ranking deliberately does not,
+    /// so re-anchoring it per scrub would reintroduce the per-frame cost. Not
+    /// by id alone: a CHS port's preview identity shares its fitted record's
+    /// id but has no constituents, and the same view receives both.
+    private var loaded: TideStationRecord?
 
     func load(record: TideStationRecord, around date: Date) async {
-        guard loaded != record.id else { return }
+        guard loaded != record else { return }
         let w = TideStanding.window(around: date, tz: record.tz)
         let station = record.engineStation
         extremes = await Task.detached(priority: .userInitiated) {
             station.extremes(from: w.start, to: w.end)
         }.value
         window = w
-        loaded = record.id
+        loaded = record
     }
 
     /// The year, scanned only when the sheet that shows it opens.
@@ -39,7 +41,7 @@ import SlackwaterKit
     /// a month, and a reader who does not open the sheet never asks the
     /// question this answers.
     private(set) var months: [YearFigure.Month] = []
-    private var loadedYear: String?
+    private var loadedYear: TideStationRecord?
 
     /// Not gated on the station's astronomical bounds, deliberately.
     ///
@@ -56,14 +58,14 @@ import SlackwaterKit
     /// across the year; Portland, which has them, varies 1.16×. The gate was
     /// hiding the stronger signal and showing the weaker one.
     func loadYear(record: TideStationRecord, around date: Date) async {
-        guard loadedYear != record.id else { return }
+        guard loadedYear != record else { return }
         let w = TideStanding.yearWindow(around: date, tz: record.tz)
         let station = record.engineStation, tz = record.tz
         months = await Task.detached(priority: .userInitiated) {
             YearFigure.months(station.extremes(from: w.start, to: w.end)
                 .map { Peak(time: $0.time, magnitude: $0.height) }, tz: tz, window: w)
         }.value
-        loadedYear = record.id
+        loadedYear = record
     }
 
     func standing(at extreme: TideExtreme) -> TideStanding? {
