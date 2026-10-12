@@ -34,28 +34,6 @@ func tideCrossings(_ samples: [(time: Date, height: Double)], level: Double, ris
     return found
 }
 
-/// Sunrise → sunset spans at a position, padded a day either side of the range so an
-/// event near either end still finds its day. One Almanac search for the whole range.
-/// ponytail: a polar day with no rise or set has no span, so it reads as night.
-func daylightSpans(from: Date, to: Date, lat: Double, lon: Double) -> [ClosedRange<Date>] {
-    guard let observer = try? Observer(latitudeDeg: lat, longitudeDeg: lon),
-          let events = try? sunEvents(from: from.addingTimeInterval(-86_400),
-                                      to: to.addingTimeInterval(86_400), observer: observer)
-    else { return [] }
-    var spans: [ClosedRange<Date>] = []
-    var rise: Date?
-    for event in events {
-        switch event.kind {
-        case .rise: rise = event.time
-        case .set:
-            if let r = rise { spans.append(r...event.time) }
-            rise = nil
-        default: break
-        }
-    }
-    return spans
-}
-
 /// The opening of every merged slack run, with its close, plus the bare instant of any
 /// slack no run covers (`end == nil`) — the moments `currentAxisMoments` prints. Series
 /// and events are padded 6 h beyond the range so a window straddling either end is whole;
@@ -180,8 +158,8 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
             found = []
         }
     }
-    if rule.daylightOnly {
-        let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)
+    if let sun = rule.sun {
+        let spans = sunWindowSpans(sun, from: from, to: to, lat: position.lat, lon: position.lon)
         found = found.filter { f in spans.contains { $0.contains(f.event) } }
     }
     return found.map {

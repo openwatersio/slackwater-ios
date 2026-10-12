@@ -2,7 +2,7 @@
 
 Walked by hand on a device with Apple Intelligence before a release that touches
 `alertSentenceInstructions` (docs/alerts.md §10). The bar: trigger and repeat right on every
-line; lead, day and daylight may need a tap. The automated subset is
+line; lead, day and the sun window may need a tap. The automated subset is
 `AlertSentenceTests.testTheModelParsesTheCommonPhrasings`.
 
 ## Tide station (feet)
@@ -12,14 +12,20 @@ line; lead, day and daylight may need a tap. The automated subset is
 | tell me when the next low tide is | Low tide | no | |
 | every high tide | High tide | yes | |
 | remind me an hour before tomorrow's low | Low tide | no | lead 1 h, tomorrow |
-| when does it drop below 2 feet during the day | Falling past 2.0 ft | no | daylight |
+| when does it drop below 2 feet during the day | Falling past 2.0 ft | no | daylight (the model reads "when does it" as every now and then; the Repeat row shows it) |
 | let me know whenever it rises past 8 ft | Rising past 8.0 ft | yes | |
 | lowest low in daylight | Lower low tide | no | daylight |
 | every lower low tide | Lower low tide | yes | |
 | the higher high tomorrow | Higher high tide | no | tomorrow |
 | the low low tide | Lower low tide | no | |
 | when is the next high | High tide | no | |
-| every low tide between sunrise and sunset | Low tide | yes | daylight (the model drops this one; the toggle needs a tap) |
+| every low tide between sunrise and sunset | Low tide | yes | daylight |
+| low tide before sunset | Low tide | no | daylight, a fair reading |
+| the next low tide at golden hour | Low tide | no | golden hour |
+| every high tide in the golden hour | High tide | yes | golden hour |
+| low tide at blue hour | Low tide | no | blue hour |
+| next low tide at dusk | Low tide | no | blue hour |
+| every lower low in the golden light | Lower low tide | yes | golden hour |
 | ping me 30 minutes before every low tide in daylight | Low tide | yes | lead 30 min, daylight |
 | when is high water tomorrow | High tide | no | tomorrow (the model drops the day now and then) |
 | is there a lunar eclipse coming | Lunar eclipse | no | |

@@ -12,10 +12,10 @@ import XCTest
 
         let rule = AlertRule(stationID: "current:noaa/PUG1701",
                              trigger: .tideCrossing(heightM: 1.4, rising: true),
-                             lead: 1_800, daylightOnly: true)
+                             lead: 1_800, sun: .goldenHour)
         store.upsert(rule)
         var edited = rule
-        edited.daylightOnly = false
+        edited.sun = nil
         store.upsert(edited)
 
         XCTAssertEqual(AlertRuleStore(defaults: defaults).rules, [edited])
@@ -70,7 +70,7 @@ import XCTest
     func testDefaultsFireAtTheEventAndRepeat() {
         let rule = AlertRule(stationID: "noaa/9449880", trigger: .tideExtreme(high: false))
         XCTAssertEqual(rule.lead, 0)
-        XCTAssertFalse(rule.daylightOnly)
+        XCTAssertNil(rule.sun)
         XCTAssertNil(rule.once)
         XCTAssertTrue(rule.enabled)
     }
@@ -119,6 +119,31 @@ import XCTest
         XCTAssertEqual(store.rules.first?.stationID, TideStationRecord.fridayHarborID)
         XCTAssertEqual(store.rules.first?.lead, 1_800)
         XCTAssertNil(store.rules.first?.once, "a rule from before `once` existed repeats")
+    }
+
+    func testADaylightOnlyRuleReadsAsTheDaylightWindow() throws {
+        // Rules written before the sun window: `daylightOnly` true is daylight, false is any time.
+        func decode(_ daylightOnly: Bool) throws -> AlertRule {
+            let stored: [String: Any] = [
+                "id": UUID().uuidString, "stationID": TideStationRecord.fridayHarborID,
+                "trigger": ["tideExtreme": ["high": false]], "lead": 0, "daylightOnly": daylightOnly, "enabled": true,
+            ]
+            return try JSONDecoder().decode(AlertRule.self, from: JSONSerialization.data(withJSONObject: stored))
+        }
+        XCTAssertEqual(try decode(true).sun, .daylight)
+        XCTAssertNil(try decode(false).sun)
+    }
+
+    func testTheSunWindowRoundTripsAndStillWritesDaylightOnly() throws {
+        // An older build reads `daylightOnly` and nothing else, so it stays in the JSON.
+        for (sun, flag) in [(SunWindow?.none, false), (.daylight, true), (.goldenHour, false), (.blueHour, false)] {
+            let rule = AlertRule(stationID: "a", trigger: .slack, sun: sun)
+            let data = try JSONEncoder().encode(rule)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(json["daylightOnly"] as? Bool, flag, "\(String(describing: sun))")
+            XCTAssertEqual(json["sun"] as? String, sun?.rawValue, "\(String(describing: sun))")
+            XCTAssertEqual(try JSONDecoder().decode(AlertRule.self, from: data), rule)
+        }
     }
 
     func testOnceSurvivesARoundTrip() {

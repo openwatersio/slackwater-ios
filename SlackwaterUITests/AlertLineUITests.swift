@@ -129,6 +129,21 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssert(app.buttons["alert-sheet-save"].exists)
     }
 
+    /// The sun row sits under Remind me (§7.2): a picker, Any time by default, below the
+    /// medium detent's fold on a phone.
+    func testTheSunRowStartsOnAnyTime() {
+        let app = launch("-seedGate", "-resetAlerts")
+        openFridayHarbor(app)
+        XCTAssert(line(app).appears(within: 5))
+        line(app).tap()
+        XCTAssert(sheet(app).appears(within: 5))
+        let sun = app.descendants(matching: .any)["alert-sheet-sun"].firstMatch
+        scrollTo(sun, in: app)
+        XCTAssert(sun.exists, "no Sun row in the sheet")
+        XCTAssertTrue(sun.label.contains("Any time") || (sun.value as? String)?.contains("Any time") == true,
+                      "sun read: \(sun.label) / \(String(describing: sun.value))")
+    }
+
     /// Only where the model runs: a typed sentence lands on the summary and the repeat row, and
     /// the free Save still upsells.
     func testASentenceLandsOnTheSummary() throws {

@@ -8,9 +8,9 @@ final class AlertSentenceTests: XCTestCase {
     private let pacific = TimeZone(identifier: "America/Vancouver")!
     private let utc = TimeZone(identifier: "UTC")!
 
-    private func draft(_ trigger: AlertTrigger, repeats: Bool = false, daylight: Bool = false,
+    private func draft(_ trigger: AlertTrigger, repeats: Bool = false, sun: SunWindow? = nil,
                        lead: Int? = nil, day: AlertRelativeDay? = nil) -> AlertSentenceDraft {
-        AlertSentenceDraft(trigger: trigger, repeats: repeats, daylightOnly: daylight, leadMinutes: lead, day: day)
+        AlertSentenceDraft(trigger: trigger, repeats: repeats, sun: sun, leadMinutes: lead, day: day)
     }
 
     // MARK: the word list
@@ -42,28 +42,30 @@ final class AlertSentenceTests: XCTestCase {
     // MARK: draft → trigger
 
     func testATideDraftMapsToTheEngineTrigger() {
-        let rises = TideSentenceDraft(trigger: .risesPast(height: 8), repeats: true, daylightOnly: false, leadMinutes: nil, day: nil)
+        let rises = TideSentenceDraft(trigger: .risesPast(height: 8), repeats: true, sun: nil, leadMinutes: nil, day: nil)
         XCTAssertEqual(alertSentenceDraft(rises, imperial: true).trigger,
                        .tideCrossing(heightM: displayedHeightM(8 / toFeet(1), imperial: true), rising: true))
-        let falls = TideSentenceDraft(trigger: .fallsPast(height: 1.5), repeats: false, daylightOnly: true, leadMinutes: 60, day: .tomorrow)
+        let falls = TideSentenceDraft(trigger: .fallsPast(height: 1.5), repeats: false, sun: .daylight, leadMinutes: 60, day: .tomorrow)
         let d = alertSentenceDraft(falls, imperial: false)
         XCTAssertEqual(d.trigger, .tideCrossing(heightM: 1.5, rising: false))
-        XCTAssertTrue(d.daylightOnly)
+        XCTAssertEqual(d.sun, .daylight)
         XCTAssertEqual(d.leadMinutes, 60)
         XCTAssertEqual(d.day, .tomorrow)
-        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowTide, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger,
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowTide, repeats: false, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger,
                        .tideExtreme(high: false))
-        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowerLow, repeats: false, daylightOnly: true, leadMinutes: nil, day: nil), imperial: true).trigger,
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowerLow, repeats: false, sun: .daylight, leadMinutes: nil, day: nil), imperial: true).trigger,
                        .tideExtreme(high: false, ofDay: true))
-        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .higherHigh, repeats: true, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger,
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .higherHigh, repeats: true, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger,
                        .tideExtreme(high: true, ofDay: true))
-        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lunarEclipse, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger, .eclipse)
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lowTide, repeats: false, sun: .goldenHour, leadMinutes: nil, day: nil), imperial: true).sun,
+                       .goldenHour)
+        XCTAssertEqual(alertSentenceDraft(TideSentenceDraft(trigger: .lunarEclipse, repeats: false, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger, .eclipse)
     }
 
     func testCurrentAndDerivedDraftsMapToTheEngineTrigger() {
-        XCTAssertEqual(alertSentenceDraft(CurrentSentenceDraft(trigger: .slackWindow, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger, .slackWindowOpens)
-        XCTAssertEqual(alertSentenceDraft(CurrentSentenceDraft(trigger: .maxEbb, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger, .currentPeak(flood: false))
-        XCTAssertEqual(alertSentenceDraft(DerivedSentenceDraft(trigger: .slack, repeats: false, daylightOnly: false, leadMinutes: nil, day: nil), imperial: true).trigger, .slack)
+        XCTAssertEqual(alertSentenceDraft(CurrentSentenceDraft(trigger: .slackWindow, repeats: false, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger, .slackWindowOpens)
+        XCTAssertEqual(alertSentenceDraft(CurrentSentenceDraft(trigger: .maxEbb, repeats: false, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger, .currentPeak(flood: false))
+        XCTAssertEqual(alertSentenceDraft(DerivedSentenceDraft(trigger: .slack, repeats: false, sun: nil, leadMinutes: nil, day: nil), imperial: true).trigger, .slack)
     }
 
     // MARK: the day window
@@ -102,8 +104,8 @@ final class AlertSentenceTests: XCTestCase {
     func testASingularSentenceBindsToTheFirstOccurrence() {
         let event = now.addingTimeInterval(5 * 3_600 + 20)
         let out = alertSentenceOutcome(draft(.tideExtreme(high: false), lead: 15), stationID: "a", now: now, tz: utc,
-                                       nextOccurrence: { trigger, daylight, from, to in
-                                           XCTAssertEqual(trigger, .tideExtreme(high: false)); XCTAssertFalse(daylight)
+                                       nextOccurrence: { trigger, sun, from, to in
+                                           XCTAssertEqual(trigger, .tideExtreme(high: false)); XCTAssertNil(sun)
                                            XCTAssertEqual(from, self.now); return event })
         guard case .rule(let rule, let bound) = out else { return XCTFail("\(out)") }
         XCTAssertEqual(rule.once, alertMinute(event))
@@ -115,12 +117,12 @@ final class AlertSentenceTests: XCTestCase {
 
     func testARepeatingSentenceStillBindsAMomentForTheMenu() {
         let event = now.addingTimeInterval(3_600)
-        let out = alertSentenceOutcome(draft(.slackWindowOpens, repeats: true, daylight: true), stationID: "a", now: now, tz: utc,
-                                       nextOccurrence: { _, daylight, _, _ in XCTAssertTrue(daylight); return event })
+        let out = alertSentenceOutcome(draft(.slackWindowOpens, repeats: true, sun: .blueHour), stationID: "a", now: now, tz: utc,
+                                       nextOccurrence: { _, sun, _, _ in XCTAssertEqual(sun, .blueHour); return event })
         guard case .rule(let rule, let bound) = out else { return XCTFail("\(out)") }
         XCTAssertNil(rule.once)
         XCTAssertEqual(bound, alertMinute(event))
-        XCTAssertTrue(rule.daylightOnly)
+        XCTAssertEqual(rule.sun, .blueHour)
         XCTAssertEqual(rule.lead, alertNewRuleLead, "no lead in the sentence keeps the sheet's half hour")
     }
 
@@ -194,9 +196,11 @@ final class AlertSentenceTests: XCTestCase {
         try XCTSkipUnless(alertSentenceAvailable, "no on-device model here")
         let d = try await parseOrSkip("ping me 30 minutes before every low tide in daylight", kind: .tide, imperial: true)
         // The lead is the one field the model drops now and then; the fixture's bar lets it need a tap.
-        XCTAssertTrue(d.daylightOnly); XCTAssertTrue(d.repeats)
+        XCTAssertEqual(d.sun, .daylight); XCTAssertTrue(d.repeats)
         let t = try await parseOrSkip("remind me an hour before tomorrow's low", kind: .tide, imperial: false)
         XCTAssertEqual(t.day, .tomorrow); XCTAssertEqual(t.trigger, .tideExtreme(high: false))
+        let g = try await parseOrSkip("the next low tide at golden hour", kind: .tide, imperial: true)
+        XCTAssertEqual(g.sun, .goldenHour); XCTAssertEqual(g.trigger, .tideExtreme(high: false))
         let w = try await parseOrSkip("when is high water tomorrow", kind: .tide, imperial: false)
         XCTAssertEqual(w.trigger, .tideExtreme(high: true), "high water is the plain high, not the higher high")
     }
@@ -205,9 +209,9 @@ final class AlertSentenceTests: XCTestCase {
 
     func testInstructionsNameTheKindsTriggersAndTheUnits() {
         let tide = alertSentenceInstructions(kind: .tide, imperial: true)
-        XCTAssertTrue(tide.contains("feet")); XCTAssertTrue(tide.contains("low tide")); XCTAssertTrue(tide.contains("lower low")); XCTAssertFalse(tide.contains("slack"))
+        XCTAssertTrue(tide.contains("feet")); XCTAssertTrue(tide.contains("low tide")); XCTAssertTrue(tide.contains("lower low")); XCTAssertTrue(tide.contains("golden hour")); XCTAssertFalse(tide.contains("slack"))
         let cur = alertSentenceInstructions(kind: .current, imperial: false)
-        XCTAssertTrue(cur.contains("slack")); XCTAssertFalse(cur.contains("metres") || cur.contains("feet"), "a current station has no heights")
+        XCTAssertTrue(cur.contains("slack")); XCTAssertTrue(cur.contains("golden hour")); XCTAssertFalse(cur.contains("metres") || cur.contains("feet"), "a current station has no heights")
         for kind in [StationCalendarKind.tide, .current, .derived] {
             XCTAssertLessThan(alertSentenceInstructions(kind: kind, imperial: true).count, 1_200,
                               "the on-device window is 4K tokens shared with the schema and the reply")

@@ -205,14 +205,29 @@ import SlackwaterKit
         let (station, position) = try load(TideStationRecord.fridayHarborID)
         var rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false))
         let all = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
-        rule.daylightOnly = true
+        rule.sun = .daylight
         let sunlit = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
-        let spans = daylightSpans(from: now, to: week, lat: position.lat, lon: position.lon)
+        let spans = sunWindowSpans(.daylight, from: now, to: week, lat: position.lat, lon: position.lon)
 
         XCTAssertLessThan(sunlit.count, all.count)
         XCTAssertFalse(sunlit.isEmpty)
         XCTAssertTrue(sunlit.allSatisfy { o in spans.contains { $0.contains(o.event) } })
         XCTAssertTrue(Set(sunlit.map(\.event)).isSubset(of: Set(all.map(\.event))))
+    }
+
+    func testTheGoldenHourKeepsOnlyTheLowsInsideIt() throws {
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        var rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: false))
+        let month = now.addingTimeInterval(30 * 86_400)
+        let all = alertOccurrences(rule, station: station, position: position, from: now, to: month, threshold: 0.5)
+        rule.sun = .goldenHour
+        let golden = alertOccurrences(rule, station: station, position: position, from: now, to: month, threshold: 0.5)
+        let spans = sunWindowSpans(.goldenHour, from: now, to: month, lat: position.lat, lon: position.lon)
+
+        XCTAssertFalse(golden.isEmpty, "a month of lows at Friday Harbor lands in a golden hour somewhere")
+        XCTAssertLessThan(golden.count, all.count)
+        XCTAssertTrue(golden.allSatisfy { o in spans.contains { $0.contains(o.event) } })
+        XCTAssertEqual(golden.map(\.event), all.map(\.event).filter { e in spans.contains { $0.contains(e) } })
     }
 
     func testEclipsesLandOnTheFirstBite() throws {
@@ -231,7 +246,7 @@ import SlackwaterKit
 
     func testNinetyDaysOfWindowsStayInsideTheLaunchBudget() throws {
         let (station, position) = try load(deception)
-        let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens, daylightOnly: true)
+        let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens, sun: .daylight)
         var found: [AlertOccurrence] = []
         let took = elapsed {
             found = alertOccurrences(rule, station: station, position: position,

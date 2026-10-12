@@ -56,16 +56,6 @@ final class SunWindowSpansTests: XCTestCase {
     private let lat = 48.5, lon = -123.0
     private func utc(_ s: String) -> Date { ISO8601DateFormatter().date(from: s)! }
 
-    func testDaylightMatchesDaylightSpans() {
-        for (from, to) in [("2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z"),
-                           ("2026-03-07T00:00:00Z", "2026-03-10T00:00:00Z"),   // spring forward
-                           ("2026-10-31T00:00:00Z", "2026-11-03T00:00:00Z")] { // fall back
-            let spans = sunWindowSpans(.daylight, from: utc(from), to: utc(to), lat: lat, lon: lon)
-            XCTAssertFalse(spans.isEmpty)
-            XCTAssertEqual(spans, daylightSpans(from: utc(from), to: utc(to), lat: lat, lon: lon), from)
-        }
-    }
-
     func testGoldenAndBlueHoursFlankDaylight() throws {
         let from = utc("2026-06-10T00:00:00Z"), to = utc("2026-06-13T00:00:00Z")
         let day = sunWindowSpans(.daylight, from: from, to: to, lat: lat, lon: lon)
