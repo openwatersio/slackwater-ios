@@ -23825,6 +23825,89 @@
         }
       }
     },
+    "far larger than the daily tide, which is too small to measure" : {
+      "comment" : "The annual swing, at water whose daily tide is too small to measure.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "langt større end det daglige tidevand, som er for lille til at måle"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "weit größer als die tägliche Tide, die zu klein zum Messen ist"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mucho mayor que la marea diaria, demasiado pequeña para medirse"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "paljon suurempi kuin vuorokauden vuorovesi, joka on liian pieni mitattavaksi"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bien plus grand que la marée quotidienne, trop faible pour être mesurée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "molto più grande della marea giornaliera, troppo piccola per essere misurata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定できないほど小さい毎日の潮汐よりはるかに大きい"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "측정할 수 없을 만큼 작은 하루 조차보다 훨씬 큼"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "langt større enn det daglige tidevannet, som er for lite til å måles"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "veel groter dan het dagelijkse getij, dat te klein is om te meten"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "muito maior que a maré diária, pequena demais para ser medida"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "muito maior do que a maré diária, demasiado pequena para ser medida"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mycket större än det dagliga tidvattnet, som är för litet för att mätas"
+          }
+        }
+      }
+    },
     "Farthest" : {
       "comment" : "Moon-orbit farthest point.",
       "localizations" : {
