@@ -55,7 +55,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// throwaway rules (§5.1) are rules with no lead, and the alert sheet starts a new rule at
     /// its own half hour (§7.2).
     var lead: TimeInterval = 0
-    var daylightOnly = false
+    var sun: SunWindow?          // nil is any time; daylight, goldenHour, blueHour
     var enabled = true
 }
 
@@ -84,7 +84,7 @@ enum AlertTrigger: Codable, Equatable {
   never stored: once it has become a rule, the rule is the whole record (§7.3).
 - `tideCrossing` stores metres, the engine's unit, and displays in the user's units. `rising` is
   the direction of the curve at the moment the user pressed.
-- Lead defaults to 30 minutes. Lead, daylight-only and `once` are edited in the alert sheet,
+- Lead defaults to 30 minutes. Lead, the sun window and `once` are edited in the alert sheet,
   from the line that made the rule or from the Alerts screen (§7.2).
 - Rules are JSON in the App Group suite under `slackwater.alertRules`, device-local. They do not
   sync through iCloud the way favourites do: two devices holding one rule would buzz twice. A rule
@@ -126,8 +126,15 @@ Every trigger reads a producer that exists today:
 Every instant is floored to its minute, so two runs that find an event a second apart name the
 same occurrence and the same `key`.
 
-`daylightOnly` keeps an occurrence when its `event` falls between an Almanac `sunEvents` rise and
-the following set at the station's position.
+`sun` keeps an occurrence when its `event` falls inside a span of that window at the station's
+position: `sunWindowSpans` (`SunWindows.swift`), which the Sun sheet's rows read too. Daylight is
+sunrise to sunset; golden hour is the Sun's centre between the horizon and +6°, morning and
+evening; blue hour is −4° to −8°. A night the Sun spends inside a band is one span across
+midnight, and a polar day with no edge has no span, so it reads as never. Rules stored before
+the field have `daylightOnly`, which decodes as daylight when true and any time when false. Any-time
+and daylight rules still write `daylightOnly` so an older build reads them; a golden- or blue-hour
+rule leaves it out, so that build cannot decode the rule and keeps it byte-for-byte (§3) rather
+than firing it at any hour and saving it that way.
 
 `once` filters the result to the occurrence on that minute: at most one, and none at all if a later
 engine version moves the event further than a minute, in which case the rule quietly finds nothing
@@ -162,7 +169,7 @@ struct StationCalendar: Codable, Equatable {
 Stored under `slackwater.stationCalendars` in the App Group suite.
 
 **What lands in it**, resolved through the same `alertOccurrences` with a fixed trigger list per
-station kind, `lead: 0` and no daylight filter:
+station kind, `lead: 0` and no sun window:
 
 | Station kind | Events |
 |---|---|
@@ -425,7 +432,8 @@ control edits that draft:
   opened from the Alerts screen that already repeats offers only "Every …": there is no moment
   left to bind back to, and the Alerts screen has no strip to pick one from.
 - **Remind me**: at the time, 15 min, 30 min, 1 h, 3 h, 1 day. A new rule starts at 30 min.
-- **Daylight only.**
+- **Sun**: Any time, Daylight, Golden hour, Blue hour. "Low tide at golden hour" is a low that
+  falls inside the morning or evening golden hour.
 - **On**, and **Delete**, for an existing rule.
 - **Save.** Without Premium it opens the dedicated Support Slackwater sheet and nothing is written.
   Notification permission is requested on the first save, never at launch; a denial still saves
@@ -455,7 +463,7 @@ occurrence. It never does arithmetic, never sees a date, and never answers a que
 @Generable struct TideSentenceDraft {   // and Current…, Derived…, with their own trigger enum
     var trigger: TideSentenceTrigger
     var repeats: Bool                 // "every" / "whenever" against "the next" / "tomorrow's"
-    var daylightOnly: Bool
+    var sun: SunSentenceWindow?       // daylight, goldenHour, blueHour; nil is any time
     var leadMinutes: Int?             // "an hour before"; nil keeps the sheet's 30
     var day: AlertRelativeDay?        // nil means the first occurrence from now
 }
@@ -556,7 +564,7 @@ alert that never fires.
 
 - `Slackwater/AlertRule.swift` — `AlertRule`, `AlertTrigger`, the store, event names
 - `Slackwater/AlertStationCalendar.swift` — `StationCalendar`, its store, the per-kind trigger list
-- `Slackwater/AlertOccurrences.swift` — `alertOccurrences`, the crossing search, the daylight filter
+- `Slackwater/AlertOccurrences.swift` — `alertOccurrences`, the crossing search, the sun-window filter
 - `Slackwater/AlertPlan.swift` — `deliveryPlan`, copy, calendar event identity
 - `Slackwater/AlertScheduler.swift`, `Slackwater/AlertCalendar.swift`, `Slackwater/AlertNotifications.swift` — the run and its writers
 - `Slackwater/AlertLiveActivities.swift` — plan 2, the activity writer
@@ -594,7 +602,7 @@ No engine or Almanac version change.
 - Occurrences — one case per trigger on the fixtures `SlackWindowTests` and `TideShortcutTests`
   already use. Merged runs yield one occurrence; a hairline slack yields a `noWindow` occurrence;
   the first opening agrees with `SlackWindowShortcutQuery.next`; crossings interpolate and respect
-  direction; daylight filtering holds across a DST transition day; an eclipse lands on
+  direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.
 - `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
   drops the rule then; clearing `once` makes the same rule repeat.
@@ -619,13 +627,13 @@ No engine or Almanac version change.
   (`alertSheetApply`) is pure too: a rule replaces the draft under the draft's own id; anything
   else keeps the draft and says why.
 - The model, where it runs — two tests exercise the on-device model on the common phrasings
-  (trigger, repeats, daylight) and skip where there is none. The simulator borrows the Mac's
+  (trigger, repeats, sun) and skip where there is none. The simulator borrows the Mac's
   model, so they run on a developer's machine and skip on hosted runners.
 
 **Phrasings, on a device** with Apple Intelligence: `SlackwaterTests/Fixtures/alert-phrasings.md`
 lists the sentences per station kind with the rule each should make, walked by hand before a
 release that touches the instructions. The bar is every sentence landing on the right trigger and
-repeat choice; lead, day and daylight may need a tap.
+repeat choice; lead, day and the sun window may need a tap.
 
 **A drift test** reschedules from two different 10-minute windows and requires the same instants to
 within a minute, for every trigger read off a sampled series — the ones whose results could move

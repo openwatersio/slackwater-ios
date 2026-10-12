@@ -124,7 +124,13 @@ struct AlertSheet: View {
                     Picker("Remind me", selection: $rule.lead) {
                         ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
                     }
-                    Toggle("Daylight only", isOn: $rule.daylightOnly)
+                    Picker("Sun", selection: $rule.sun) {
+                        Text("Any time", comment: "Sun menu choice: no filter on the time of day.").tag(SunWindow?.none)
+                        Text("In daylight", comment: "Sun menu choice in the alert sheet: sunrise to sunset.").tag(SunWindow?.some(.daylight))
+                        Text("Golden hour").tag(SunWindow?.some(.goldenHour))
+                        Text("Blue hour").tag(SunWindow?.some(.blueHour))
+                    }
+                    .accessibilityIdentifier("alert-sheet-sun")
                     if !canSave {
                         Text("This moment has passed", comment: "Under the alert sheet's When section, when the chosen moment is already behind us.")
                             .font(.footnote)
@@ -202,8 +208,8 @@ struct AlertSheet: View {
         let station = WidgetStationLoader.station(from: record)
         let threshold = slackThresholdKn
         let outcome = alertSentenceOutcome(draft, stationID: rule.stationID, now: appNow(), tz: station.tz) {
-            trigger, daylight, from, to in
-            alertOccurrences(AlertRule(stationID: rule.stationID, trigger: trigger, daylightOnly: daylight),
+            trigger, sun, from, to in
+            alertOccurrences(AlertRule(stationID: rule.stationID, trigger: trigger, sun: sun),
                              station: station, position: record.alertPosition,
                              from: from, to: to, threshold: threshold).map(\.event).first { $0 > from }
         }

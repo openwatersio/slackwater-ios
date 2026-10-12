@@ -30,6 +30,21 @@ enum DerivedSentenceTrigger: Equatable {
     case slack, lunarEclipse
 }
 
+/// `SunWindow` as the model fills it; a separate type because `@Generable` is a macro.
+@Generable
+enum SunSentenceWindow: Equatable {
+    case daylight, goldenHour, blueHour
+}
+
+func alertSunWindow(_ s: SunSentenceWindow?) -> SunWindow? {
+    switch s {
+    case nil: nil
+    case .daylight: .daylight
+    case .goldenHour: .goldenHour
+    case .blueHour: .blueHour
+    }
+}
+
 // The three drafts share their fields; `@Generable` is a macro on concrete types, so they are
 // spelled out and meet in `AlertSentenceDraft`.
 @Generable
@@ -38,8 +53,8 @@ struct TideSentenceDraft {
     var trigger: TideSentenceTrigger
     @Guide(description: "true for 'every', 'each', 'whenever', 'all'; false for 'the next', 'tomorrow's', 'this', or one particular time")
     var repeats: Bool
-    @Guide(description: "true when the person says during the day, in daylight, daytime, while it is light, or between sunrise and sunset")
-    var daylightOnly: Bool
+    @Guide(description: "daylight for during the day, in daylight, daytime, while it is light, between sunrise and sunset; goldenHour for golden hour, golden light, low sun; blueHour for blue hour, twilight, dusk, dawn; null when no part of the day is named")
+    var sun: SunSentenceWindow?
     @Guide(description: "Minutes of warning the person asked for, or null when they did not say")
     var leadMinutes: Int?
     @Guide(description: "Which day the person named, or null for the next occurrence")
@@ -52,8 +67,8 @@ struct CurrentSentenceDraft {
     var trigger: CurrentSentenceTrigger
     @Guide(description: "true for 'every', 'each', 'whenever', 'all'; false for 'the next', 'tomorrow's', 'this', or one particular time")
     var repeats: Bool
-    @Guide(description: "true when the person says during the day, in daylight, daytime, while it is light, or between sunrise and sunset")
-    var daylightOnly: Bool
+    @Guide(description: "daylight for during the day, in daylight, daytime, while it is light, between sunrise and sunset; goldenHour for golden hour, golden light, low sun; blueHour for blue hour, twilight, dusk, dawn; null when no part of the day is named")
+    var sun: SunSentenceWindow?
     @Guide(description: "Minutes of warning the person asked for, or null when they did not say")
     var leadMinutes: Int?
     @Guide(description: "Which day the person named, or null for the next occurrence")
@@ -66,8 +81,8 @@ struct DerivedSentenceDraft {
     var trigger: DerivedSentenceTrigger
     @Guide(description: "true for 'every', 'each', 'whenever', 'all'; false for 'the next', 'tomorrow's', 'this', or one particular time")
     var repeats: Bool
-    @Guide(description: "true when the person says during the day, in daylight, daytime, while it is light, or between sunrise and sunset")
-    var daylightOnly: Bool
+    @Guide(description: "daylight for during the day, in daylight, daytime, while it is light, between sunrise and sunset; goldenHour for golden hour, golden light, low sun; blueHour for blue hour, twilight, dusk, dawn; null when no part of the day is named")
+    var sun: SunSentenceWindow?
     @Guide(description: "Minutes of warning the person asked for, or null when they did not say")
     var leadMinutes: Int?
     @Guide(description: "Which day the person named, or null for the next occurrence")
@@ -79,7 +94,7 @@ struct DerivedSentenceDraft {
 struct AlertSentenceDraft: Equatable {
     var trigger: AlertTrigger
     var repeats: Bool
-    var daylightOnly: Bool
+    var sun: SunWindow?
     var leadMinutes: Int?
     var day: AlertRelativeDay?
 }
@@ -129,7 +144,7 @@ func alertSentenceDraft(_ d: TideSentenceDraft, imperial: Bool) -> AlertSentence
     case .risesPast(let h): .tideCrossing(heightM: metres(h, imperial: imperial), rising: true)
     case .fallsPast(let h): .tideCrossing(heightM: metres(h, imperial: imperial), rising: false)
     }
-    return AlertSentenceDraft(trigger: trigger, repeats: d.repeats, daylightOnly: d.daylightOnly,
+    return AlertSentenceDraft(trigger: trigger, repeats: d.repeats, sun: alertSunWindow(d.sun),
                               leadMinutes: d.leadMinutes, day: d.day)
 }
 
@@ -140,13 +155,13 @@ func alertSentenceDraft(_ d: CurrentSentenceDraft, imperial: Bool) -> AlertSente
     case .maxEbb: .currentPeak(flood: false)
     case .lunarEclipse: .eclipse
     }
-    return AlertSentenceDraft(trigger: trigger, repeats: d.repeats, daylightOnly: d.daylightOnly,
+    return AlertSentenceDraft(trigger: trigger, repeats: d.repeats, sun: alertSunWindow(d.sun),
                               leadMinutes: d.leadMinutes, day: d.day)
 }
 
 func alertSentenceDraft(_ d: DerivedSentenceDraft, imperial: Bool) -> AlertSentenceDraft {
     AlertSentenceDraft(trigger: d.trigger == .slack ? .slack : .eclipse, repeats: d.repeats,
-                       daylightOnly: d.daylightOnly, leadMinutes: d.leadMinutes, day: d.day)
+                       sun: alertSunWindow(d.sun), leadMinutes: d.leadMinutes, day: d.day)
 }
 
 /// The span a sentence's occurrence is searched in. No day: from now across the notification
@@ -168,9 +183,9 @@ func alertSentenceWindow(day: AlertRelativeDay?, now: Date, tz: TimeZone) -> (fr
 /// Draft → rule. The occurrence finder is a parameter so this stays testable without a station;
 /// the sheet passes `alertOccurrences` over the real one.
 func alertSentenceOutcome(_ draft: AlertSentenceDraft, stationID: String, now: Date, tz: TimeZone,
-                          nextOccurrence: (AlertTrigger, Bool, Date, Date) -> Date?) -> AlertSentenceOutcome {
+                          nextOccurrence: (AlertTrigger, SunWindow?, Date, Date) -> Date?) -> AlertSentenceOutcome {
     let window = alertSentenceWindow(day: draft.day, now: now, tz: tz)
-    let next = nextOccurrence(draft.trigger, draft.daylightOnly, window.from, window.to).map(alertMinute)
+    let next = nextOccurrence(draft.trigger, draft.sun, window.from, window.to).map(alertMinute)
     if !draft.repeats && next == nil { return .nothingAhead(namedDay: draft.day != nil) }
     // The sheet offers six leads; a sentence's "45 minutes" lands on the nearest, and a tie
     // breaks toward more warning — the safer error on the water.
@@ -179,7 +194,7 @@ func alertSentenceOutcome(_ draft: AlertSentenceDraft, stationID: String, now: D
         return alertLeads.reversed().min { abs($0 - asked) < abs($1 - asked) }!
     } ?? alertNewRuleLead
     let rule = AlertRule(stationID: stationID, trigger: draft.trigger, once: draft.repeats ? nil : next,
-                         lead: lead, daylightOnly: draft.daylightOnly)
+                         lead: lead, sun: draft.sun)
     return .rule(rule, boundMoment: next)
 }
 
@@ -194,19 +209,19 @@ func alertSentenceInstructions(kind: StationCalendarKind, imperial: Bool) -> Str
         return """
         You turn one sentence into an alert at a tide station. The sentence is about this place only.
         What can be alerted on here: low tide, high tide, the water rising past a height, the water falling past a height, a lunar eclipse, and two for a mixed tide: the lowest low of the day and the highest high of the day. Heights are in \(unit).
-        Pick the closest trigger. Never invent one. A plain low, low tide, high, high tide or high water is low tide or high tide. A number of \(unit) with under, below, over, past or above is the water falling past or rising past that height. Only "lowest low", "lower low", "low low", "highest high", "higher high" or "high high" is the lowest low of the day or the highest high of the day. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null. "In daylight", "during the day", "daytime", "while it is light" is daylightOnly true; a sentence without such words is daylightOnly false.
+        Pick the closest trigger. Never invent one. A plain low, low tide, high, high tide or high water is low tide or high tide. A number of \(unit) with under, below, over, past or above is the water falling past or rising past that height. Only "lowest low", "lower low", "low low", "highest high", "higher high" or "high high" is the lowest low of the day or the highest high of the day. "The next", "this", "when does it", "when is", "when will", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null. "In daylight", "during the day", "daytime", "while it is light" is sun daylight; "golden hour" is sun goldenHour; "blue hour", "dusk", "dawn", "twilight" is sun blueHour; a sentence naming no part of the day is sun null.
         """
     case .current:
         return """
         You turn one sentence into an alert at a tidal current station. The sentence is about this place only.
         What can be alerted on here: the slack window opening (when the current is slow enough to get through), max flood, max ebb, a lunar eclipse.
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
+        Pick the closest trigger. Never invent one. "The next", "this", "when does it", "when is", "when will", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null. "In daylight", "during the day", "daytime", "while it is light" is sun daylight; "golden hour" is sun goldenHour; "blue hour", "dusk", "dawn", "twilight" is sun blueHour; a sentence naming no part of the day is sun null.
         """
     case .derived:
         return """
         You turn one sentence into an alert at a tidal gate whose slacks are known but whose speeds are not. The sentence is about this place only.
         What can be alerted on here: slack, a lunar eclipse.
-        Pick the closest trigger. Never invent one. "The next", "this", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null.
+        Pick the closest trigger. Never invent one. "The next", "this", "when does it", "when is", "when will", or a named day is once: repeats is false. "Every", "each", "whenever", "all" is repeats true. "Today" is day today and "tomorrow" is day tomorrow; no day named is day null. "In daylight", "during the day", "daytime", "while it is light" is sun daylight; "golden hour" is sun goldenHour; "blue hour", "dusk", "dawn", "twilight" is sun blueHour; a sentence naming no part of the day is sun null.
         """
     }
 }

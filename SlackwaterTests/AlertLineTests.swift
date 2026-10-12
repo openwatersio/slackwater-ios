@@ -70,7 +70,7 @@ final class AlertLineTests: XCTestCase {
         XCTAssertEqual(rule.lead, alertNewRuleLead)
         XCTAssertEqual(rule.trigger, .slack)
         XCTAssertTrue(rule.enabled)
-        XCTAssertFalse(rule.daylightOnly)
+        XCTAssertNil(rule.sun)
     }
 
     // MARK: the Rest tap's draft

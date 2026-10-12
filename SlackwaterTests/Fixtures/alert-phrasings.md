@@ -2,7 +2,7 @@
 
 Walked by hand on a device with Apple Intelligence before a release that touches
 `alertSentenceInstructions` (docs/alerts.md §10). The bar: trigger and repeat right on every
-line; lead, day and daylight may need a tap. The automated subset is
+line; lead, day and the sun window may need a tap. The automated subset is
 `AlertSentenceTests.testTheModelParsesTheCommonPhrasings`.
 
 ## Tide station (feet)
@@ -19,7 +19,13 @@ line; lead, day and daylight may need a tap. The automated subset is
 | the higher high tomorrow | Higher high tide | no | tomorrow |
 | the low low tide | Lower low tide | no | |
 | when is the next high | High tide | no | |
-| every low tide between sunrise and sunset | Low tide | yes | daylight (the model drops this one; the toggle needs a tap) |
+| every low tide between sunrise and sunset | Low tide | yes | daylight (the model drops this one; the Sun row needs a tap) |
+| low tide before sunset | Low tide | no | daylight, a fair reading |
+| the next low tide at golden hour | Low tide | no | golden hour |
+| every high tide in the golden hour | High tide | yes | golden hour |
+| low tide at blue hour | Low tide | no | blue hour |
+| next low tide at dusk | Low tide | no | blue hour (the model says daylight; the Sun row needs a tap) |
+| every lower low in the golden light | Lower low tide | yes | golden hour |
 | ping me 30 minutes before every low tide in daylight | Low tide | yes | lead 30 min, daylight |
 | when is high water tomorrow | High tide | no | tomorrow (the model drops the day now and then) |
 | is there a lunar eclipse coming | Lunar eclipse | no | |

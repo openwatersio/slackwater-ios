@@ -44,8 +44,7 @@ func sunWindowEdges(_ window: SunWindow, from: Date, to: Date,
 }
 
 /// The spans of `window` at a position, padded a day either side of the range so a time
-/// near either end still finds its span — `daylightSpans`' contract, and for `.daylight`
-/// its exact result. Each opening edge pairs with the next closing one, so a band the Sun
+/// near either end still finds its span. Each opening edge pairs with the next closing one, so a band the Sun
 /// stays inside across midnight (a −4° to −4° blue night at 60° N in June) is one span.
 /// ponytail: a day with no edge at all (the Sun parked inside or outside the band) has no
 /// span, as a polar day has no daylight span.

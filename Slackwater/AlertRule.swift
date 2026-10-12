@@ -26,8 +26,48 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var once: Date?
     /// Seconds before the event that the notification fires.
     var lead: TimeInterval = 0
-    var daylightOnly = false
+    /// Keep only occurrences inside this band of the Sun's day; nil is any time.
+    var sun: SunWindow?
     var enabled = true
+
+    init(id: UUID = UUID(), stationID: String, trigger: AlertTrigger, once: Date? = nil,
+         lead: TimeInterval = 0, sun: SunWindow? = nil, enabled: Bool = true) {
+        self.id = id; self.stationID = stationID; self.trigger = trigger
+        self.once = once; self.lead = lead; self.sun = sun; self.enabled = enabled
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled }
+
+    // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
+    // It is still read as a fallback, and written for the two windows it can say; a golden- or
+    // blue-hour rule leaves it out, so an older build cannot read the rule and keeps it as is
+    // (`AlertRuleStore.unreadable`) instead of firing it at any hour and saving it that way.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        stationID = try c.decode(String.self, forKey: .stationID)
+        trigger = try c.decode(AlertTrigger.self, forKey: .trigger)
+        once = try c.decodeIfPresent(Date.self, forKey: .once)
+        lead = try c.decode(TimeInterval.self, forKey: .lead)
+        sun = try c.decodeIfPresent(SunWindow.self, forKey: .sun)
+            ?? (try c.decodeIfPresent(Bool.self, forKey: .daylightOnly) == true ? .daylight : nil)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(stationID, forKey: .stationID)
+        try c.encode(trigger, forKey: .trigger)
+        try c.encodeIfPresent(once, forKey: .once)
+        try c.encode(lead, forKey: .lead)
+        try c.encodeIfPresent(sun, forKey: .sun)
+        switch sun {
+        case nil, .daylight: try c.encode(sun == .daylight, forKey: .daylightOnly)
+        case .goldenHour, .blueHour: break
+        }
+        try c.encode(enabled, forKey: .enabled)
+    }
 }
 
 @MainActor final class AlertRuleStore: ObservableObject {

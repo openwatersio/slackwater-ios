@@ -12,13 +12,13 @@ final class AlertSheetTests: XCTestCase {
     }
 
     func testChoosingEveryClearsTheMomentAndDoesNotRepeatRestoresIt() {
-        let once = AlertRule(stationID: "a", trigger: .slack, once: moment, lead: 900, daylightOnly: true)
+        let once = AlertRule(stationID: "a", trigger: .slack, once: moment, lead: 900, sun: .daylight)
 
         let every = alertRuleRepeating(once, true, boundMoment: moment)
         XCTAssertNil(every.once)
         XCTAssertEqual(every.id, once.id)
         XCTAssertEqual(every.lead, 900)
-        XCTAssertTrue(every.daylightOnly)
+        XCTAssertEqual(every.sun, .daylight)
 
         XCTAssertEqual(alertRuleRepeating(every, false, boundMoment: moment).once, moment)
     }
@@ -34,7 +34,7 @@ final class AlertSheetTests: XCTestCase {
         // Review Focus 3: the pressed minute goes; the sentence's occurrence is the new binding.
         let pressed = AlertRule(stationID: "a", trigger: .tideExtreme(high: false), once: moment, lead: 1_800)
         let event = moment.addingTimeInterval(7 * 3_600)
-        let fromSentence = AlertRule(stationID: "a", trigger: .tideExtreme(high: true), once: event, lead: 900, daylightOnly: true)
+        let fromSentence = AlertRule(stationID: "a", trigger: .tideExtreme(high: true), once: event, lead: 900, sun: .goldenHour)
 
         let r = alertSheetApply(.rule(fromSentence, boundMoment: event), to: pressed, boundMoment: moment)
 
@@ -42,7 +42,7 @@ final class AlertSheetTests: XCTestCase {
         XCTAssertEqual(r.rule.once, event)
         XCTAssertEqual(r.boundMoment, event)
         XCTAssertEqual(r.rule.lead, 900)
-        XCTAssertTrue(r.rule.daylightOnly)
+        XCTAssertEqual(r.rule.sun, .goldenHour)
         XCTAssertEqual(r.rule.id, pressed.id, "the sheet edits one rule; a sentence does not mint a second id")
         XCTAssertNil(r.note)
     }
