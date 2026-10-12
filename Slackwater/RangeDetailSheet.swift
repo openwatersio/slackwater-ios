@@ -15,9 +15,10 @@ struct RangeDetailSheet: View {
     let value: String
     /// "low to high" or "high to low" — which way this swing runs.
     let direction: String
-    /// How many times the yearly change exceeds the largest tidal term, at a
-    /// station the database flags seasonal. Nil everywhere else, which is most
-    /// of the bundle and now still opens this sheet.
+    /// How many times the seasonal curve's peak exceeds the principal tide, at
+    /// a station the database flags seasonal; infinite where that tide is
+    /// zero. Nil everywhere else, which is most of the bundle and now still
+    /// opens this sheet.
     var seasonalRatio: Double? = nil
     /// The place, so the sheet can name the water rather than say "this station".
     let place: String
@@ -207,16 +208,26 @@ struct RangeDetailSheet: View {
                 .font(.callout)
                 .foregroundStyle(SN.foam.opacity(0.75))
             Spacer()
-            // "about 1× the daily tide" is a number that says nothing, and at
-            // the bottom of the band that is exactly what the ratio rounds to.
-            Text(seasonalTimes(ratio) == "1"
-                 ? String(localized: "about the same as the daily tide", comment: "The annual swing is about the size of the daily tide.")
-                 : String(localized: "about \(seasonalTimes(ratio))× the daily tide", comment: "How much larger the annual swing is than the daily tide."))
+            Text(yearlyComparison(ratio))
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.trailing)
         }
         .padding(14)
+    }
+
+    private func yearlyComparison(_ ratio: Double) -> String {
+        // The database publishes this station's principal tide as zero: there
+        // is no multiple to state, only that the tide is below detection.
+        guard ratio.isFinite else {
+            return String(localized: "far larger than the daily tide, which is too small to measure",
+                          comment: "The annual swing, at water whose daily tide is too small to measure.")
+        }
+        // "about 1× the daily tide" is a number that says nothing, and at
+        // the bottom of the band that is exactly what the ratio rounds to.
+        return seasonalTimes(ratio) == "1"
+            ? String(localized: "about the same as the daily tide", comment: "The annual swing is about the size of the daily tide.")
+            : String(localized: "about \(seasonalTimes(ratio))× the daily tide", comment: "How much larger the annual swing is than the daily tide.")
     }
 
     /// Two paragraphs, graded by how far the water has left the tide behind.
