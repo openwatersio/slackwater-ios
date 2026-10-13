@@ -44,8 +44,31 @@ final class AlertLiveActivityTests: XCTestCase {
     }
 
     func testLosingEveryRuleEndsEverything() {
-        // Review Focus 3: no Premium means no live rules in the plan, and pending ones go.
+        // Review Focus 3: every pending activity is ended whatever the rules, so losing Premium
+        // (an empty plan) clears them; an active one in its window is the sweep's only keeper.
         let r = LiveActivityRecord(key: "p", ruleID: UUID(), pending: true, event: now.addingTimeInterval(60), end: nil)
         XCTAssertEqual(liveActivitiesToEnd([r], liveRuleIDs: [], now: now), ["p"])
+    }
+
+    func testTheCountdownRangeNeverRunsBackwards() {
+        // Review: a render after `event` with `isStale` not yet true must not trap a ClosedRange.
+        let late = liveActivityCountdown(now: now.addingTimeInterval(30), event: now)
+        XCTAssertEqual(late.lowerBound, now); XCTAssertEqual(late.upperBound, now)
+        let early = liveActivityCountdown(now: now.addingTimeInterval(-30), event: now)
+        XCTAssertEqual(early.lowerBound, now.addingTimeInterval(-30))
+    }
+
+    func testOnlyEntriesStillAheadOfTheClockAreRequested() {
+        // Review: the plan filtered on the pass's start time; a slow resolve can reach the writer
+        // after `fire`, and a past start must not be requested.
+        func entry(fireIn seconds: TimeInterval) -> AlertEntry {
+            let fire = now.addingTimeInterval(seconds)
+            return AlertEntry(stationID: "a",
+                              occurrence: AlertOccurrence(ruleID: UUID(), event: fire.addingTimeInterval(1_800), fire: fire),
+                              copy: AlertCopy(title: "t", body: "b"), url: nil,
+                              place: AlertPlace(name: "a", tz: .current))
+        }
+        let ahead = entry(fireIn: 60), passed = entry(fireIn: -1)
+        XCTAssertEqual(liveActivityEntriesAhead([passed, ahead], of: now).map(\.occurrence.key), [ahead.occurrence.key])
     }
 }
