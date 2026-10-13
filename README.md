@@ -10,10 +10,9 @@ before you leave the dock.
 - Offline charts and station search
 - No account, no ads and no tracking
 
-Slackwater is free and currently available as a public beta for iOS 26 and
-later.
+Slackwater is free to download on the App Store for iOS 26 and later.
 
-**[Get Slackwater on TestFlight](https://testflight.apple.com/join/5gwh791N)**
+**[Download Slackwater on the App Store](https://apps.apple.com/app/slackwater-tides-current/id6813654837)**
 
 See screenshots, explore stations and learn how the predictions work at
 **[slackwater.xyz](https://slackwater.xyz)**.
