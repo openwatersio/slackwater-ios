@@ -5344,6 +5344,172 @@
         }
       }
     },
+    "The reminder time has passed" : {
+      "comment" : "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påmindelsestidspunktet er passeret"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Erinnerungszeit ist vorbei"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora del recordatorio ya pasó"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muistutusaika on ohi"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'heure du rappel est passée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'ora del promemoria è passata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知予定時刻を過ぎています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 시각이 지났습니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsestidspunktet er passert"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De herinneringstijd is voorbij"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsetiden har passerat"
+          }
+        }
+      }
+    },
+    "The reminder time has passed; the countdown starts now" : {
+      "comment" : "Under the alert sheet's When section, when the moment is ahead but less than the lead away.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påmindelsestidspunktet er passeret; nedtællingen starter nu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Erinnerungszeit ist vorbei; der Countdown beginnt jetzt"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora del recordatorio ya pasó; la cuenta atrás empieza ahora"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muistutusaika on ohi; lähtölaskenta alkaa nyt"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'heure du rappel est passée; le compte à rebours commence maintenant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'ora del promemoria è passata; il conto alla rovescia inizia ora"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知予定時刻を過ぎています。カウントダウンは今から始まります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 시각이 지났습니다. 카운트다운이 지금 시작됩니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsestidspunktet er passert; nedtellingen starter nå"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De herinneringstijd is voorbij; het aftellen begint nu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou; a contagem regressiva começa agora"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou; a contagem decrescente começa agora"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsetiden har passerat; nedräkningen börjar nu"
+          }
+        }
+      }
+    },
     "When this gate runs hardest" : {
       "comment" : "Current sheet section: the months this gate sees its strongest water.",
       "localizations" : {
@@ -31964,6 +32130,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Öppna"
+          }
+        }
+      }
+    },
+    "Open · %@" : {
+      "comment" : "Live Activity line while a slack window is open; the rest is the notification's body.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åben · %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offen · %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abierto · %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avoinna · %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvert · %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperto · %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通過可 · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통과 가능 · %@"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpent · %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open · %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aberto · %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aberto · %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppet · %@"
           }
         }
       }

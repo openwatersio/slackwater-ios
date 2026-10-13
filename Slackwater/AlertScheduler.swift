@@ -22,6 +22,8 @@ struct ResolvedAlerts: Sendable {
     var calendarStations: [UUID: String] = [:]
     /// Keyed by station id.
     var places: [String: AlertPlace] = [:]
+    /// Keyed by station id: which glyph a Live Activity draws.
+    var kinds: [String: StationCalendarKind] = [:]
     /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
     /// device, or an id that left the catalog.
     var unresolved: Set<UUID> = []
@@ -44,6 +46,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             continue
         }
         resolved.places[rule.stationID] = record.alertPlace
+        resolved.kinds[rule.stationID] = record.calendarKind
         resolved.occurrences += alertOccurrences(rule, station: WidgetStationLoader.station(from: record),
                                                  position: record.alertPosition,
                                                  from: now, to: until, threshold: threshold)
@@ -55,6 +58,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             continue
         }
         resolved.places[stationID] = record.alertPlace
+        resolved.kinds[stationID] = record.calendarKind
         let station = WidgetStationLoader.station(from: record)
         for trigger in calendarTriggers(for: record.calendarKind) {
             // A throwaway rule per trigger. Its id only has to be unique within this run:
@@ -159,7 +163,15 @@ struct AlertStatusSnapshot: Equatable {
 
         AlertCalendar.apply(entries(plan.calendar, includeLead: false, includePlace: false),
                             subscribed: subscriptions, skipping: resolved.unresolvedStations, now: now)
-        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, includePlace: true))
+        // Candidates first: an occurrence the system takes as a scheduled activity is delivered by
+        // that activity's start alert, so it leaves the notification list for this run (spec §5.3).
+        let kinds = resolved.kinds
+        let placed = await AlertLiveActivities.apply(
+            entries(plan.liveActivities, includeLead: false, includePlace: true),
+            water: { kinds[$0] == .tide ? .tide : .current },
+            liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial, now: now)
+        await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
+                                               includeLead: true, includePlace: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,

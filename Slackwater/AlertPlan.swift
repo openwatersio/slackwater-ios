@@ -8,11 +8,26 @@ enum AlertHorizon {
     static let notifications: TimeInterval = 14 * 86_400
     /// iOS keeps only the soonest 64 pending requests an app holds.
     static let notificationLimit = 64
+    /// A Live Activity starts at `fire` and iOS ends it after eight hours, so only the last
+    /// half hour counts down in the Island; longer leads stay a plain notification (spec §5.3).
+    static let liveActivityLead: TimeInterval = 1_800
 }
 
 struct DeliveryPlan: Equatable {
     var calendar: [AlertOccurrence] = []
     var notifications: [AlertOccurrence] = []
+    /// Candidates for a scheduled Live Activity, in fire order: the writer places as many as
+    /// the system takes and the ones it placed leave `notifications` for that run.
+    var liveActivities: [AlertOccurrence] = []
+    /// Eligible notifications past the 64th, in order, so a slot an activity frees is filled.
+    var overflow: [AlertOccurrence] = []
+}
+
+/// What the notification writer gets once the activity writer has placed `placed`: the
+/// eligible list without them, capped again at what iOS keeps.
+func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOccurrence] {
+    Array((plan.notifications + plan.overflow).filter { !placed.contains($0.key) }
+        .prefix(AlertHorizon.notificationLimit))
 }
 
 /// Which occurrences the calendar publishes and which become notifications. The two have
@@ -40,7 +55,12 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
         let fire: Date
     }
     var seen = Set<Perceived>()
-    let notifications = occurrences
+    // Set inside its own lead — 15 minutes before a low with the 30-minute lead — the reminder
+    // time is behind us but the moment is not: it is delivered now, not never.
+    let deliverable: [AlertOccurrence] = occurrences.map { o in
+        o.fire < now && o.event > now ? o.firing(at: now) : o
+    }
+    let notifications = deliverable
         // Same fire time: the `once` rule keeps it. That rule has exactly one occurrence, so
         // losing it would leave the Alerts screen reading "Nothing coming up" against a rule
         // that is about to be delivered by its repeating twin; the repeating rule has the rest
@@ -50,13 +70,15 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
                              : a.fire < b.fire
         }
         .filter { o in
-            guard let rule = live[o.ruleID], o.fire > now,
+            guard let rule = live[o.ruleID], o.fire >= now,
                   o.fire <= now.addingTimeInterval(AlertHorizon.notifications) else { return false }
             return seen.insert(Perceived(stationID: rule.stationID, trigger: rule.trigger,
                                          event: o.event, fire: o.fire)).inserted
         }
-    return DeliveryPlan(calendar: calendar,
-                        notifications: Array(notifications.prefix(AlertHorizon.notificationLimit)))
+    let planned = Array(notifications.prefix(AlertHorizon.notificationLimit))
+    let candidates = planned.filter { o in (live[o.ruleID]?.lead ?? .infinity) <= AlertHorizon.liveActivityLead }
+    return DeliveryPlan(calendar: calendar, notifications: planned, liveActivities: candidates,
+                        overflow: Array(notifications.dropFirst(AlertHorizon.notificationLimit)))
 }
 
 /// Each rule's last scheduled notification, for the Alerts screen's "Scheduled through".
