@@ -62,7 +62,7 @@ struct AlertLiveActivity: Widget {
     private func timer(_ c: ActivityViewContext<AlertLiveActivityAttributes>) -> some View {
         let a = c.attributes
         switch liveActivityFace(a, stale: c.isStale) {
-        case .countdown: Text(timerInterval: Date.now...a.event, countsDown: true)
+        case .countdown: Text(timerInterval: liveActivityCountdown(now: .now, event: a.event), countsDown: true)
         case .open: Text(timerInterval: a.event...(a.end ?? a.event), countsDown: true)
         case .moment: Text(a.event.formatted(date: .omitted, time: .shortened))
         }

@@ -31,3 +31,9 @@ func liveActivityFace(_ a: AlertLiveActivityAttributes, stale: Bool) -> AlertLiv
     guard stale else { return .countdown }
     return a.end != nil && !a.noWindow ? .open : .moment
 }
+
+/// The countdown timer's range. A render that lands after `event` before `isStale` has
+/// flipped would trap a `ClosedRange`, so the lower bound never passes the event.
+func liveActivityCountdown(now: Date, event: Date) -> ClosedRange<Date> {
+    min(now, event)...event
+}

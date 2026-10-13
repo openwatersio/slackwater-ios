@@ -245,7 +245,8 @@ reopening the app at the dock.
 `Activity.request(attributes:content:pushType:style:alertConfiguration:start:)` schedules a Live
 Activity for a date and the system starts it then, app in the background. A scheduled start
 must carry an `alertConfiguration`, and that alert is the notification: it fires at `fire` with
-the §5.2 title and body. The occurrence that gets an activity is dropped from the notification
+the §5.2 title and body, less the lead's "in 30 min", because the same line stays on the face
+past the event. The occurrence that gets an activity is dropped from the notification
 writer, so nothing buzzes twice. Not an alarm: AlarmKit's countdown is templated, breaks through
 Silent and Focus, and is where App Review looks, so it stays the opt-in transit alarm under
 Next (§12).
@@ -282,6 +283,10 @@ never disagree and the widget never links the rule types (its target does not li
 which `AlertRule` needs through `SunWindow`), plus the facts the timers draw from: `event`,
 `end`, `noWindow`, `heightM`, the units, the station kind for the glyph, the rule id and the
 occurrence key for the sweep, and the URL.
+
+A run from the background (a fit finishing, a tier change) may find the system refusing to
+schedule; the sweep has already ended that run's pending activities, and every candidate is
+delivered as a notification until the next foreground run places them again.
 
 **Ending.** Nothing ends an activity on time while the app is closed. Past its window it sits on
 the Lock Screen with a stopped timer until the user swipes it, the app next foregrounds and the
