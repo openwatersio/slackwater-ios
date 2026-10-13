@@ -65,6 +65,11 @@ struct AlertOccurrence: Equatable, Sendable {
     var heightM: Double? = nil
 
     var key: String { "\(ruleID.uuidString).\(Int(event.timeIntervalSince1970))" }
+
+    /// The same occurrence with its reminder moved to `fire`.
+    func firing(at fire: Date) -> AlertOccurrence {
+        AlertOccurrence(ruleID: ruleID, event: event, fire: fire, end: end, noWindow: noWindow, heightM: heightM)
+    }
 }
 
 /// What copy names: the station and the zone its times read in.
