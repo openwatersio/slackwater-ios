@@ -20,7 +20,17 @@ struct AlertLiveActivityAttributes: ActivityAttributes, Sendable {
     let noWindow: Bool
     let heightM: Double?
     let imperial: Bool
+    /// The station's zone: the face formats `event` itself, and the phone may be elsewhere.
+    let tz: TimeZone
     let url: URL?
+}
+
+/// The stale face of a moment with no window: its time in the station's zone and, for a tide,
+/// its height — the same reading the notification line gave.
+func liveActivityMoment(_ a: AlertLiveActivityAttributes, locale: Locale = .autoupdatingCurrent) -> String {
+    let time = a.event.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: a.tz).locale(locale))
+    guard let h = a.heightM else { return time }
+    return "\(time) · \(formatHeight(h, imperial: a.imperial)) \(heightUnit(imperial: a.imperial))"
 }
 
 /// Which of the two faces a context draws: counting down to `event`, then across the window

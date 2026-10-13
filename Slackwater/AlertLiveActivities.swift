@@ -54,7 +54,7 @@ enum AlertLiveActivities {
                 key: o.key, ruleID: o.ruleID, water: water(entry.stationID),
                 title: entry.copy.title, line: entry.copy.body,
                 event: o.event, end: o.end, noWindow: o.noWindow, heightM: o.heightM,
-                imperial: imperial, url: entry.url)
+                imperial: imperial, tz: entry.place.tz, url: entry.url)
             let content = ActivityContent(state: AlertLiveActivityAttributes.ContentState(), staleDate: o.event)
             let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: entry.copy.title),
                                            body: LocalizedStringResource(stringLiteral: entry.copy.body), sound: .default)

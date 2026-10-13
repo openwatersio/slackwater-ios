@@ -47,12 +47,7 @@ struct AlertLiveActivity: Widget {
         switch liveActivityFace(a, stale: c.isStale) {
         case .countdown: Text(a.line)
         case .open: Text("Open · \(a.line)", comment: "Live Activity line while a slack window is open; the rest is the notification's body.")
-        case .moment:
-            if let h = a.heightM {
-                Text("\(a.event.formatted(date: .omitted, time: .shortened)) · \(formatHeight(h, imperial: a.imperial)) \(heightUnit(imperial: a.imperial))")
-            } else {
-                Text(a.event.formatted(date: .omitted, time: .shortened))
-            }
+        case .moment: Text(liveActivityMoment(a))
         }
     }
 
@@ -64,7 +59,7 @@ struct AlertLiveActivity: Widget {
         switch liveActivityFace(a, stale: c.isStale) {
         case .countdown: Text(timerInterval: liveActivityCountdown(now: .now, event: a.event), countsDown: true)
         case .open: Text(timerInterval: a.event...(a.end ?? a.event), countsDown: true)
-        case .moment: Text(a.event.formatted(date: .omitted, time: .shortened))
+        case .moment: Text(a.event.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: a.tz)))
         }
     }
 }

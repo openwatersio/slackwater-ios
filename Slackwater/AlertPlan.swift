@@ -19,6 +19,15 @@ struct DeliveryPlan: Equatable {
     /// Candidates for a scheduled Live Activity, in fire order: the writer places as many as
     /// the system takes and the ones it placed leave `notifications` for that run.
     var liveActivities: [AlertOccurrence] = []
+    /// Eligible notifications past the 64th, in order, so a slot an activity frees is filled.
+    var overflow: [AlertOccurrence] = []
+}
+
+/// What the notification writer gets once the activity writer has placed `placed`: the
+/// eligible list without them, capped again at what iOS keeps.
+func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOccurrence] {
+    Array((plan.notifications + plan.overflow).filter { !placed.contains($0.key) }
+        .prefix(AlertHorizon.notificationLimit))
 }
 
 /// Which occurrences the calendar publishes and which become notifications. The two have
@@ -63,7 +72,8 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
         }
     let planned = Array(notifications.prefix(AlertHorizon.notificationLimit))
     let candidates = planned.filter { o in (live[o.ruleID]?.lead ?? .infinity) <= AlertHorizon.liveActivityLead }
-    return DeliveryPlan(calendar: calendar, notifications: planned, liveActivities: candidates)
+    return DeliveryPlan(calendar: calendar, notifications: planned, liveActivities: candidates,
+                        overflow: Array(notifications.dropFirst(AlertHorizon.notificationLimit)))
 }
 
 /// Each rule's last scheduled notification, for the Alerts screen's "Scheduled through".
