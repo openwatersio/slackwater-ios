@@ -70,7 +70,7 @@ final class DeliveryPlanTests: XCTestCase {
         let plan = deliveryPlan(rules: [rule, rule], occurrences: [o],
                                calendarOccurrences: [], now: now, premium: true)
 
-        XCTAssertEqual(plan, DeliveryPlan(calendar: [], notifications: [o]))
+        XCTAssertEqual(plan, DeliveryPlan(calendar: [], notifications: [o], liveActivities: [o]))
     }
 
     func testTwoRulesOnTheSameMomentDeliverOneNotification() {
@@ -150,5 +150,25 @@ final class DeliveryPlanTests: XCTestCase {
 
         XCTAssertEqual(through[tide.id], now.addingTimeInterval(40 * 86_400 - 600))
         XCTAssertEqual(through[pass.id], now.addingTimeInterval(7_200))
+    }
+
+    func testLiveActivityCandidatesAreTheNotificationsWithAShortLeadInFireOrder() {
+        let soon = AlertRule(stationID: "a", trigger: .slackWindowOpens, lead: 1_800)
+        let far = AlertRule(stationID: "a", trigger: .slack, lead: 3_600)
+        let later = occurrence(soon, eventIn: 7_200), sooner = occurrence(soon, eventIn: 3_600)
+        let longLead = occurrence(far, eventIn: 6_000)   // fires at +2400, between the two
+
+        let plan = deliveryPlan(rules: [soon, far], occurrences: [later, longLead, sooner],
+                                calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.liveActivities, [sooner, later], "lead over 30 minutes keeps a plain notification")
+        XCTAssertEqual(plan.notifications, [sooner, longLead, later], "the notification list is untouched here; the writer's result trims it")
+    }
+
+    func testWithoutPremiumThereAreNoLiveActivityCandidates() {
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let plan = deliveryPlan(rules: [rule], occurrences: [occurrence(rule, eventIn: 3_600)],
+                                calendarOccurrences: [], now: now, premium: false)
+        XCTAssertEqual(plan.liveActivities, [])
     }
 }

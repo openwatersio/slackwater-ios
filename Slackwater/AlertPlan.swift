@@ -8,11 +8,17 @@ enum AlertHorizon {
     static let notifications: TimeInterval = 14 * 86_400
     /// iOS keeps only the soonest 64 pending requests an app holds.
     static let notificationLimit = 64
+    /// A Live Activity starts at `fire` and iOS ends it after eight hours, so only the last
+    /// half hour counts down in the Island; longer leads stay a plain notification (spec §5.3).
+    static let liveActivityLead: TimeInterval = 1_800
 }
 
 struct DeliveryPlan: Equatable {
     var calendar: [AlertOccurrence] = []
     var notifications: [AlertOccurrence] = []
+    /// Candidates for a scheduled Live Activity, in fire order: the writer places as many as
+    /// the system takes and the ones it placed leave `notifications` for that run.
+    var liveActivities: [AlertOccurrence] = []
 }
 
 /// Which occurrences the calendar publishes and which become notifications. The two have
@@ -55,8 +61,9 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
             return seen.insert(Perceived(stationID: rule.stationID, trigger: rule.trigger,
                                          event: o.event, fire: o.fire)).inserted
         }
-    return DeliveryPlan(calendar: calendar,
-                        notifications: Array(notifications.prefix(AlertHorizon.notificationLimit)))
+    let planned = Array(notifications.prefix(AlertHorizon.notificationLimit))
+    let candidates = planned.filter { o in (live[o.ruleID]?.lead ?? .infinity) <= AlertHorizon.liveActivityLead }
+    return DeliveryPlan(calendar: calendar, notifications: planned, liveActivities: candidates)
 }
 
 /// Each rule's last scheduled notification, for the Alerts screen's "Scheduled through".
