@@ -170,7 +170,7 @@ struct AlertStatusSnapshot: Equatable {
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
             liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial, now: now)
-        await AlertNotifications.apply(entries(plan.notifications.filter { !placed.contains($0.key) },
+        await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
