@@ -55,7 +55,12 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
         let fire: Date
     }
     var seen = Set<Perceived>()
-    let notifications = occurrences
+    // Set inside its own lead — 15 minutes before a low with the 30-minute lead — the reminder
+    // time is behind us but the moment is not: it is delivered now, not never.
+    let deliverable: [AlertOccurrence] = occurrences.map { o in
+        o.fire < now && o.event > now ? o.firing(at: now) : o
+    }
+    let notifications = deliverable
         // Same fire time: the `once` rule keeps it. That rule has exactly one occurrence, so
         // losing it would leave the Alerts screen reading "Nothing coming up" against a rule
         // that is about to be delivered by its repeating twin; the repeating rule has the rest
@@ -65,7 +70,7 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
                              : a.fire < b.fire
         }
         .filter { o in
-            guard let rule = live[o.ruleID], o.fire > now,
+            guard let rule = live[o.ruleID], o.fire >= now,
                   o.fire <= now.addingTimeInterval(AlertHorizon.notifications) else { return false }
             return seen.insert(Perceived(stationID: rule.stationID, trigger: rule.trigger,
                                          event: o.event, fire: o.fire)).inserted

@@ -21,10 +21,11 @@ func liveActivitiesToEnd(_ records: [LiveActivityRecord], liveRuleIDs: Set<UUID>
     }.map(\.key)
 }
 
-/// The entries whose start is still ahead of the clock. The plan filtered on the pass's start
-/// time; a slow resolve can reach the writer after `fire`, and a past start must not be requested.
-func liveActivityEntriesAhead(_ entries: [AlertEntry], of now: Date) -> [AlertEntry] {
-    entries.filter { $0.occurrence.fire > now }
+/// The entries whose event is still ahead of the clock. The plan filtered on the pass's start
+/// time; a slow resolve can reach the writer later, and an event already behind must not be
+/// requested. One whose reminder time is behind but whose event is not starts at once.
+func liveActivityEntriesAhead(_ entries: [AlertEntry], of now: Date, running: Set<String> = []) -> [AlertEntry] {
+    entries.filter { $0.occurrence.event > now && !running.contains($0.occurrence.key) }
 }
 
 /// Off the main actor on purpose: `Activity` is not `Sendable`, so ending one from an actor
@@ -47,8 +48,11 @@ enum AlertLiveActivities {
         }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return [] }
 
-        var placed = Set<String>()
-        for entry in liveActivityEntriesAhead(entries, of: Date()) {
+        // An activity the sweep kept is running for its occurrence already; that one is placed.
+        let running = Set(ours.map(\.attributes.key)).subtracting(ending)
+        var placed = running
+        let clock = Date()
+        for entry in liveActivityEntriesAhead(entries, of: clock, running: running) {
             let o = entry.occurrence
             let attributes = AlertLiveActivityAttributes(
                 key: o.key, ruleID: o.ruleID, water: water(entry.stationID),
@@ -59,8 +63,14 @@ enum AlertLiveActivities {
             let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: entry.copy.title),
                                            body: LocalizedStringResource(stringLiteral: entry.copy.body), sound: .default)
             do {
-                _ = try Activity.request(attributes: attributes, content: content, pushType: nil,
-                                         style: .standard, alertConfiguration: alert, start: o.fire)
+                if o.fire > clock {
+                    _ = try Activity.request(attributes: attributes, content: content, pushType: nil,
+                                             style: .standard, alertConfiguration: alert, start: o.fire)
+                } else {
+                    // Inside its lead already: the person just set it and is looking at the
+                    // app, so it starts now and nothing buzzes.
+                    _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
+                }
                 placed.insert(o.key)
             } catch is ActivityAuthorizationError {
                 // `targetMaximumExceeded` at the fifth, or activities off for the app: everything
