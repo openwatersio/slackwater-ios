@@ -80,7 +80,13 @@ final class AlertLiveActivityTests: XCTestCase {
                               copy: AlertCopy(title: "t", body: "b"), url: nil,
                               place: AlertPlace(name: "a", tz: .current))
         }
-        let ahead = entry(fireIn: 60), passed = entry(fireIn: -1)
-        XCTAssertEqual(liveActivityEntriesAhead([passed, ahead], of: now).map(\.occurrence.key), [ahead.occurrence.key])
+        let ahead = entry(fireIn: 60), inside = entry(fireIn: -1), passed = entry(fireIn: -3_600)
+        // `inside` fired a second ago but its event is 30 minutes off: it starts now. `passed`
+        // is behind on both counts and goes.
+        XCTAssertEqual(liveActivityEntriesAhead([passed, inside, ahead], of: now).map(\.occurrence.key),
+                       [inside.occurrence.key, ahead.occurrence.key])
+        // An activity already running for `inside` means it is not requested twice.
+        XCTAssertEqual(liveActivityEntriesAhead([inside, ahead], of: now, running: [inside.occurrence.key]).map(\.occurrence.key),
+                       [ahead.occurrence.key])
     }
 }

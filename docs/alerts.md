@@ -260,7 +260,9 @@ any trigger: whichever is soonest. No new UI decides this.
 
 **Only the last half hour.** An activity starts at `fire` and iOS ends it at eight hours, so an
 occurrence gets one only when its rule's lead is 30 minutes or less; a longer lead stays a plain
-notification.
+notification. An occurrence whose `fire` is already behind and whose event is ahead (set inside
+its lead) is requested without a start and without an alert: it appears at once, and the person
+who just saved it is looking at the app.
 
 **Static content, system timers.** The app has no background execution (§6), so the content
 state is fixed when the activity is scheduled and nothing updates it. Everything that moves is a
@@ -323,7 +325,10 @@ thread, plans, and hands the plan to thin writers.
 
 - Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier.
   The tier gates turning a station on (§7.4), not what an existing subscription publishes.
-- Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64.
+- Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64. A rule set
+  inside its own lead — 15 minutes before a low with the 30-minute lead — has its reminder time
+  behind it and its moment ahead: `fire` is moved to now, so it is delivered now rather than
+  never. The sheet says so under Remind me.
 - Live Activities: the candidates are the notification occurrences with a lead of 30 minutes or
   less, in fire order (§5.3). The writer places as many as the system takes, and the ones it
   placed leave the notification writer's list in that run; one it cannot place stays a
