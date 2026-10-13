@@ -27,6 +27,7 @@
 import Foundation
 import JavaScriptCore
 import SlackwaterKit
+import os
 
 let isCurrentMode = CommandLine.arguments.contains("--current")
 let isFileMode = CommandLine.arguments.contains("--samples")
@@ -81,6 +82,7 @@ try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectorie
 let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
 let iso = ISO8601DateFormatter()
 
+@MainActor
 func cachedGet(_ path: String, key: String) throws -> Data {
     let file = cacheDir.appendingPathComponent(key)
     if let data = try? Data(contentsOf: file) { return data }
@@ -91,14 +93,13 @@ func cachedGet(_ path: String, key: String) throws -> Data {
     // chunk that failed.
     for attempt in 0..<6 {
         let sem = DispatchSemaphore(value: 0)
-        var result: Data?
-        var status = 0
+        let response = OSAllocatedUnfairLock(initialState: (data: Optional<Data>.none, status: 0))
         URLSession.shared.dataTask(with: URL(string: base + path)!) { data, resp, _ in
-            result = data
-            status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            response.withLock { $0 = (data, (resp as? HTTPURLResponse)?.statusCode ?? 0) }
             sem.signal()
         }.resume()
         sem.wait()
+        let (result, status) = response.withLock { $0 }
         if status == 200, let data = result {
             try data.write(to: file)
             Thread.sleep(forTimeInterval: 2.5)  // polite: same spacing as the app
@@ -149,6 +150,7 @@ let fitEnd = Date(timeIntervalSince1970: today)
 let valStart = Date(timeIntervalSince1970: today + 28 * dayS)
 let valEnd = Date(timeIntervalSince1970: today + 35 * dayS)
 
+@MainActor
 func fetchSeries(_ code: String, _ from: Date, _ to: Date) throws -> [(t: Double, v: Double)] {
     var out: [(Double, Double)] = []
     var t = from
@@ -215,6 +217,7 @@ struct Obs { let time: Date; let kind: CurrentEventKind; let speed: Double }
 
 /// IwlsEvent -> Obs, shared by live IWLS fetch and file-input mode (both
 /// decode the same wcp1-events shape).
+@MainActor
 func toObservations(_ rawEvents: [IwlsEvent]) -> [Obs] {
     rawEvents.compactMap { e in
         guard let t = iso.date(from: e.eventDate) ?? isoFrac.date(from: e.eventDate) else { return nil }
@@ -233,6 +236,7 @@ func med(_ xs: [Double]) -> Double? {
     return s.count % 2 == 1 ? s[s.count / 2] : (s[s.count / 2 - 1] + s[s.count / 2]) / 2
 }
 
+@MainActor
 func runCurrentValidation() throws -> Int32 {
     // Flood/ebb axis from CHS metadata — required to project wcsp1/wcdp1 into
     // a signed along-channel velocity. No axis, no fit.
@@ -282,6 +286,7 @@ func runCurrentValidation() throws -> Int32 {
 /// Joins the shared fit/score path in runFit() below — same JSCore fit, same
 /// CurrentStation prediction, same scoring bars, byte-identical for the same
 /// sample bytes. Validation window is the events file's own span, never Date().
+@MainActor
 func runFileMode() throws -> Int32 {
     guard let samplesPath = flagValue("--samples"),
           let eventsPath = flagValue("--events"),
@@ -329,6 +334,7 @@ func runFileMode() throws -> Int32 {
 /// Shared fit -> CurrentStation -> scoring path (M47), fed either by live
 /// IWLS (runCurrentValidation) or by files (runFileMode). Must never diverge
 /// by mode — that's the whole parity guarantee file-input mode rests on.
+@MainActor
 func runFit(name: String, flood: Double, ebb: Double,
             projected: [(t: Double, v: Double)], projected60: [(t: Double, v: Double)],
             observed: [Obs], valStart: Date, valEnd: Date,
