@@ -47,7 +47,7 @@ struct AlertLiveActivity: Widget {
         switch liveActivityFace(a, stale: c.isStale) {
         case .countdown: Text(a.line)
         case .open: Text("Open · \(a.line)", comment: "Live Activity line while a slack window is open; the rest is the notification's body.")
-        case .moment: Text(liveActivityMoment(a))
+        case .moment: Text(liveActivityMoment(a)).monospacedDigit()
         }
     }
 
