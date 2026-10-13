@@ -28,4 +28,24 @@ final class AlertLiveActivityTests: XCTestCase {
         // Review Focus 5: a hairline slack has an `end` of nil and `noWindow`; never "Open".
         XCTAssertEqual(liveActivityFace(attrs(end: nil, noWindow: true), stale: true), .moment)
     }
+
+    func testTheSweepEndsPendingPastAndOrphanedActivitiesOnly() {
+        let keep = UUID(), gone = UUID()
+        let records = [
+            LiveActivityRecord(key: "pending", ruleID: keep, pending: true, event: now.addingTimeInterval(3_600), end: nil),
+            LiveActivityRecord(key: "active-open", ruleID: keep, pending: false, event: now.addingTimeInterval(-600), end: now.addingTimeInterval(1_200)),
+            LiveActivityRecord(key: "active-countdown", ruleID: keep, pending: false, event: now.addingTimeInterval(900), end: nil),
+            LiveActivityRecord(key: "closed", ruleID: keep, pending: false, event: now.addingTimeInterval(-7_200), end: now.addingTimeInterval(-3_600)),
+            LiveActivityRecord(key: "moment-passed", ruleID: keep, pending: false, event: now.addingTimeInterval(-60), end: nil),
+            LiveActivityRecord(key: "orphan", ruleID: gone, pending: false, event: now.addingTimeInterval(-60), end: now.addingTimeInterval(1_800)),
+        ]
+        XCTAssertEqual(Set(liveActivitiesToEnd(records, liveRuleIDs: [keep], now: now)),
+                       ["pending", "closed", "moment-passed", "orphan"])
+    }
+
+    func testLosingEveryRuleEndsEverything() {
+        // Review Focus 3: no Premium means no live rules in the plan, and pending ones go.
+        let r = LiveActivityRecord(key: "p", ruleID: UUID(), pending: true, event: now.addingTimeInterval(60), end: nil)
+        XCTAssertEqual(liveActivitiesToEnd([r], liveRuleIDs: [], now: now), ["p"])
+    }
 }
