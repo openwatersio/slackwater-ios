@@ -171,4 +171,18 @@ final class DeliveryPlanTests: XCTestCase {
                                 calendarOccurrences: [], now: now, premium: false)
         XCTAssertEqual(plan.liveActivities, [])
     }
+
+    func testOverflowBeyondSixtyFourFillsTheSlotsPlacementFrees() {
+        // Review: five candidates placed as activities free five notification slots; the next
+        // five eligible occurrences take them instead of being dropped.
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let hourly = (1...69).map { occurrence(rule, eventIn: Double($0) * 3_600) }
+        let plan = deliveryPlan(rules: [rule], occurrences: hourly, calendarOccurrences: [], now: now, premium: true)
+        XCTAssertEqual(plan.notifications, Array(hourly.prefix(64)))
+        XCTAssertEqual(plan.overflow, Array(hourly[64...]))
+
+        let placed = Set(hourly.prefix(5).map(\.key))
+        XCTAssertEqual(plannedNotifications(plan, placed: placed), Array(hourly[5...]))
+        XCTAssertEqual(plannedNotifications(plan, placed: []), Array(hourly.prefix(64)))
+    }
 }
