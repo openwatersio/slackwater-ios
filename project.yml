@@ -19,7 +19,7 @@ settings:
     # app ships — a per-target pair here silently drifts the two Info.plists
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
-    MARKETING_VERSION: 1.14.0
+    MARKETING_VERSION: 1.15.0
     CURRENT_PROJECT_VERSION: 42
     SWIFT_VERSION: "6.0"
     SWIFT_EMIT_LOC_STRINGS: YES
