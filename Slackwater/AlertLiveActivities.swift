@@ -21,6 +21,12 @@ func liveActivitiesToEnd(_ records: [LiveActivityRecord], liveRuleIDs: Set<UUID>
     }.map(\.key)
 }
 
+/// The entries whose start is still ahead of the clock. The plan filtered on the pass's start
+/// time; a slow resolve can reach the writer after `fire`, and a past start must not be requested.
+func liveActivityEntriesAhead(_ entries: [AlertEntry], of now: Date) -> [AlertEntry] {
+    entries.filter { $0.occurrence.fire > now }
+}
+
 /// Off the main actor on purpose: `Activity` is not `Sendable`, so ending one from an actor
 /// would be a send across its boundary. Nothing here touches app state.
 enum AlertLiveActivities {
@@ -42,9 +48,7 @@ enum AlertLiveActivities {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return [] }
 
         var placed = Set<String>()
-        for entry in entries {
-            // A slow pass can reach here after `fire`; a past start is refused.
-            guard entry.occurrence.fire > now else { continue }
+        for entry in liveActivityEntriesAhead(entries, of: Date()) {
             let o = entry.occurrence
             let attributes = AlertLiveActivityAttributes(
                 key: o.key, ruleID: o.ruleID, water: water(entry.stationID),
