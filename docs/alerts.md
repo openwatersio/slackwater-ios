@@ -149,7 +149,7 @@ threshold changes every `.slackWindowOpens` occurrence (§6).
 |---|---|---|---|
 | EventKit, one calendar per station | station subscriptions | 90 days | Premium |
 | One-shot local notification | rules | 14 days, soonest 64 | Premium |
-| Scheduled Live Activity, its start alert replacing the notification | rules | soonest few, plan 2 | Premium |
+| Scheduled Live Activity, its start alert replacing the notification | rules | soonest few with a lead of 30 min or less | Premium |
 
 Every delivered item opens the station at the event: `shareURL(forStationID:at:tz:)` with the
 event instant, falling back to `deepLink(forStationID:)` for a station with no published slug.
@@ -240,7 +240,7 @@ A rejected CHS current model is an explicit invalidation, rather than a temporar
 
 ### 5.3 Live Activities
 
-Plan 2, after the on-device spike (§11). The last half hour before an occurrence, and a slack
+The last half hour before an occurrence, and a slack
 window while it is open, live in the Dynamic Island and on the Lock Screen so the boater is not
 reopening the app at the dock.
 
@@ -260,6 +260,10 @@ in order and stops at the first `ActivityAuthorizationError`, and every occurren
 place stays an ordinary notification. N is never hard-coded. A `once` rule, a repeating rule,
 any trigger: whichever is soonest. No new UI decides this.
 
+**Only the last half hour.** An activity starts at `fire` and iOS ends it at eight hours, so an
+occurrence gets one only when its rule's lead is 30 minutes or less; a longer lead stays a plain
+notification.
+
 **Static content, system timers.** The app has no background execution (§6), so the content
 state is fixed when the activity is scheduled and nothing updates it. Everything that moves is a
 timer the system draws: `Text(timerInterval:)` down to `event`, then across `event…end`.
@@ -276,8 +280,11 @@ A tide extreme, a peak and a derived slack have no `end`: the stale face names t
 the height, and the activity is ended on the next run. `noWindow` never shows "Open". The tap
 opens the station at the event through the same URL every delivery carries.
 
-The attributes are the occurrence's facts, nothing rendered: station name, trigger, `event`,
-`end`, `noWindow`, `heightM`, the threshold, the units, the URL.
+The attributes carry the notification's own title and body line, so the Island and the banner
+never disagree and the widget never links the rule types (its target does not link Almanac,
+which `AlertRule` needs through `SunWindow`), plus the facts the timers draw from: `event`,
+`end`, `noWindow`, `heightM`, the units, the station kind for the glyph, the rule id and the
+occurrence key for the sweep, and the URL.
 
 **Ending.** Nothing ends an activity on time while the app is closed. Past its window it sits on
 the Lock Screen with a stopped timer until the user swipes it, the app next foregrounds and the
@@ -286,8 +293,8 @@ documented here rather than worked around. A run ends every activity of ours tha
 scheduled but not started, or whose window has closed, before requesting the plan's; a rule
 removed takes its activity with it.
 
-The watch Smart Stack would come with `.supplementalActivityFamilies([.small])` and is not in
-plan 2.
+The watch Smart Stack would come with `.supplementalActivityFamilies([.small])` and is not
+built.
 
 ## 6. Scheduling
 
@@ -295,7 +302,7 @@ plan 2.
 struct DeliveryPlan: Equatable {
     var calendar: [AlertOccurrence]        // from station subscriptions
     var notifications: [AlertOccurrence]   // from rules
-    var liveActivities: [AlertOccurrence]  // plan 2: the soonest of `notifications`, moved here (§5.3)
+    var liveActivities: [AlertOccurrence]  // candidates: the short-lead subset of `notifications` (§5.3)
 }
 
 func deliveryPlan(rules: [AlertRule], subscriptions: [StationCalendar],
@@ -315,9 +322,10 @@ thread, plans, and hands the plan to thin writers.
 - Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier.
   The tier gates turning a station on (§7.4), not what an existing subscription publishes.
 - Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64.
-- Live Activities, plan 2: the soonest of those, as many as the system takes (§5.3). The two
-  lists never share an occurrence; one the activity writer cannot place goes back to the
-  notification writer in the same run.
+- Live Activities: the candidates are the notification occurrences with a lead of 30 minutes or
+  less, in fire order (§5.3). The writer places as many as the system takes, and the ones it
+  placed leave the notification writer's list in that run; one it cannot place stays a
+  notification.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - Rules whose `once` is in the past are removed.
@@ -573,7 +581,8 @@ Online gates predict only from a network fetch ([chs-data-model](chs-data-model.
 - `Slackwater/AlertOccurrences.swift` — `alertOccurrences`, the crossing search, the sun-window filter
 - `Slackwater/AlertPlan.swift` — `deliveryPlan`, copy, calendar event identity
 - `Slackwater/AlertScheduler.swift`, `Slackwater/AlertCalendar.swift`, `Slackwater/AlertNotifications.swift` — the run and its writers
-- `Slackwater/AlertLiveActivities.swift` — plan 2, the activity writer
+- `Slackwater/AlertLiveActivities.swift` — the sweep decision and the activity writer
+- `Slackwater/AlertLiveActivityAttributes.swift` — the attributes and the face, compiled into the app and the widget
 - `Slackwater/AlertOffer.swift` — what a press resolves to, and the draft a new rule starts from
 - `Slackwater/AlertLine.swift` — the line under the strip, which rule it reads, its three states,
   and the next occurrence a Rest tap binds to
@@ -584,14 +593,13 @@ Online gates predict only from a network fetch ([chs-data-model](chs-data-model.
 - `Slackwater/AlertsView.swift`, `Slackwater/CalendarStationsView.swift` — the lists
 - `Slackwater/TimelineScrubber.swift` — the press recognizer and the "Set an alert" action
 - `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `stripPressed` and `stripAlertAction` closures, nil without an `alertOffer`, the line's place between the strip card and `links`, and the sheet's presentation
-- `SlackwaterWidgets/AlertLiveActivity.swift` — plan 2, the attributes and the three presentations;
-  the attributes are shared with the app through the `PortableSources` template
+- `SlackwaterWidgets/AlertLiveActivity.swift` — the Lock Screen, Island and minimal presentations
 
-Occurrences run in the app, which already links Almanac; the widget extension gains Live Activity
-UI in plan 2 and no dependency now.
+Occurrences run in the app, which already links Almanac; the widget extension draws the activity
+from its attributes and gains no dependency.
 
 **`project.yml`**, app target `info.properties`: `NSCalendarsFullAccessUsageDescription`, plus
-`NSSupportsLiveActivities` in plan 2. Neither is an entitlement, so the Manual-signed Release
+`NSSupportsLiveActivities`. Neither is an entitlement, so the Manual-signed Release
 provisioning profiles stay as they are.
 
 `FoundationModels` is imported by the app target only. The deployment target already carries it,
@@ -612,10 +620,10 @@ No engine or Almanac version change.
 - `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
   drops the rule then; clearing `once` makes the same rule repeat.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
-  free plan keeps every subscribed calendar and no notifications. Plan 2: the activity list is
-  the soonest of the notification list and the two never overlap; an occurrence the writer
-  cannot place returns to the notifications; a removed rule's activity goes; `staleDate` is the
-  event; copy per trigger for each face.
+  free plan keeps every subscribed calendar and no notifications. The activity candidates are
+  the notification list's short-lead subset in fire order, none without Premium; the sweep ends
+  a pending, closed, passed or orphaned activity and keeps an active one in its window; the face
+  counts down, opens a window, or names a moment, never "Open" for `noWindow`.
 - Station calendars — the trigger list per station kind; a tide station's day holds its highs and
   lows and nothing else; the tier gate on turning a station on; the turn-off's event count.
 - Copy — place-first notification titles against place-less calendar titles; bodies per trigger;
@@ -652,9 +660,10 @@ Alerts and Calendar identify their Premium requirement at the top. For free user
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; two stations' calendars land separately and open the app at the event; a comfort-speed
 change rewrites the windows; turning a station off takes its events with it; losing Premium clears
-pending notifications and leaves the calendars alone. Plan 2: an activity scheduled, the app
-force-quit, starts at `fire` with its alert and no second notification; each face renders in the
-Island and on the Lock Screen; the window face flips at the event.
+pending notifications and leaves the calendars alone. An activity scheduled, the app force-quit,
+starts at `fire` with its alert and no second notification; each face renders in the Island and
+on the Lock Screen; the window face flips at the event; a 1-day lead gets a notification and no
+activity; the sixth short-lead alert stays a notification.
 
 ## 11. Spikes before the Live Activity plan
 
@@ -670,7 +679,7 @@ Island and on the Lock Screen; the window face flips at the event.
 **Plan 1:** rules, occurrences, the plan, station calendars, the notification writer, the long
 press, the Alerts screen, Settings → Calendar.
 
-**Plan 2, after spike 1:** scheduled Live Activities for the soonest occurrences (§5.3).
+**Plan 2:** scheduled Live Activities for the soonest short-lead occurrences (§5.3). Landed.
 
 **Plan 3:** the alert line, the one sheet, and the sentence (§7). Landed in two steps: first the
 line and the sheet with the field hidden, which retired the popover and gave every phone the
