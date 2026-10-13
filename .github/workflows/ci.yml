@@ -213,6 +213,9 @@ jobs:
           sh scripts/test-failed-selectors.test.sh
           python3 scripts/localization.test.py
 
+      - name: Build fitting validator
+        run: swift build -c release --package-path tools/FitValidation
+
       # MapLibre is a binary download, not a compile — the cache saves the
       # fetch, not a build. The generated xcodeproj and its Package.resolved
       # are not committed, so key on project.yml, where the package pins live.
