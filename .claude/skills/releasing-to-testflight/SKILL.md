@@ -38,10 +38,24 @@ rejected upload.** Nothing renumbers it for you.
 
 1. Merge version changes before Nightly builds the binary. Read the highest build with `node scripts/asc.mjs builds`, keep `CURRENT_PROJECT_VERSION` above it, and keep `MARKETING_VERSION` above 1.0.
 2. Confirm the nightly workflow and the offline `--full` suite passed for the commit.
-3. Run `Promote Nightly to Beta` on `main` with the nightly build number.
-4. Review the generated notes, promotion record, commit, nightly tag, and `.github/testflight-beta-groups.txt` in the release pull request. Replace the generic `Worth testing:` paragraph when the release needs specific checks.
-5. Have another maintainer merge the pull request to approve promotion (`CONTRIBUTING.md`). The merge adds the existing binary to the configured groups, submits beta review once, creates `v<MARKETING_VERSION>` at the nightly commit, and annotates the nightly prerelease.
-6. Confirm the promotion workflow passed, then run `node scripts/asc.mjs builds`. The selected version and build must be `VALID` and list the expected groups.
+3. Run `Promote Nightly to Beta` on `main` with the nightly build number. It sets the TestFlight notes, adds the existing binary to the groups in `.github/testflight-beta-groups.txt`, and submits beta review. Commit `docs/release-notes/<version>-<build>.md` first when the release needs notes other than the collected PR titles.
+4. Confirm the promotion workflow passed, then run `node scripts/asc.mjs builds`. The selected version and build must be `VALID` and list the expected groups.
+
+## After App Review
+
+Work that waits on an App Store milestone, in any openwatersio repo, is tracked in the [Slackwater releases](https://github.com/orgs/openwatersio/projects/4) project. Each item has a **Release** and a **Waits for**: Submission, Approval, or App Store release. When a milestone happens, filter on both and clear the list. Website changes wait as draft pull requests. App changes are opened after the milestone, so CI builds them against the latest `main`.
+
+**When App Review approves a version**, its train closes: App Store Connect rejects further uploads to it with errors 90186 and 90062, and Nightly fails until `MARKETING_VERSION` moves.
+
+1. Set `MARKETING_VERSION` to the next minor version, run `xcodegen generate` and `zsh scripts/nightly.test.sh`, and merge. #713 opened 1.15.0 this way.
+2. Once main CI passes, run a fresh Nightly. Rerunning a failed job reuses the old commit.
+3. File the issue for the next version's train and add it to the project, waiting for Approval.
+
+**When the version is live on the App Store:**
+
+1. Tag `v<MARKETING_VERSION>` at the released build's commit, the `nightly-<version>-<build>` tag of the build App Review approved. The submitted build can change during review (1.14.0 went in as 47 and shipped as 61), so read the build from App Store Connect, not from the notes.
+2. Publish its GitHub release as the full, latest release, titled `<version> (<build>)`. The body is `docs/release-notes/<version>.md` without the `Worth testing:` paragraph, which is for beta testers. Update that file to name the released build.
+3. Merge the website pull requests waiting on the release.
 
 ## Known answers
 
@@ -52,7 +66,7 @@ Settled, so they don't get re-litigated:
 | Does ASC accept a *lower* pre-release train? | It accepts it and no tester can install it. Builds 22 (0.6.0) and 23 (0.7.0) both went `VALID`, both reached `IN_BETA_TESTING` on the internal group — and the TestFlight app kept offering 1.0 (21), because it offers the highest version train it holds and does not even list the lower ones under Previous Builds. Two releases went nowhere this way. **`MARKETING_VERSION` must stay above 1.0** until the accidental 1.0 train (builds 1–21) is retired. |
 | Why do builds 1–21 sit under a `1.0` train? | They shipped the plist literal. The eventual real 1.0 needs a build number above 21. |
 | A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
-| Does a Nightly-only upload get a GitHub release? | **No.** The promotion pull request merge creates the final release. Every nightly upload remains a prerelease until selected. |
+| Does a Nightly-only upload get a GitHub release? | **Only a prerelease.** Every Nightly upload gets a `nightly-<version>-<build>` prerelease. The full `v<version>` release is made by hand once the version is live on the App Store; see After App Review. |
 | Why does Nightly need no promotion? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **External groups sit behind public links**, so a build reaches them only after the promotion workflow attaches it and Apple approves beta review. |
 | Which external groups does a release go to? | Exactly the groups in `.github/testflight-beta-groups.txt`. The workflow compares that list with App Store Connect before preparing and promoting a release. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |
