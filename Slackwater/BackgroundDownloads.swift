@@ -2,23 +2,46 @@
 //
 // What iOS grants, and the three limits that shape everything around this:
 //   - The task must be submitted from the FOREGROUND in response to a person's
-//     action. The "Yes" on the download strip is that action; no separate
-//     consent dialog is needed or wanted.
+//     action. Accepting downloads or reopening an unfinished accepted run
+//     supplies that action.
 //   - LOCKING THE DEVICE STOPS EXECUTION. Apple treats this as a framework
 //     bug, but it reproduces on shipping builds. Nothing here may promise
 //     completion, and the queue must treat a stop as "resume next time".
 //   - Swiping the app away cancels the task with NO callback, and a person can
 //     cancel from the Live Activity, which invokes the same expiration handler
-//     as a system kill with no reason code. State is therefore always derived
-//     from queue progress, never from "I submitted a task".
+//     as a system kill with no reason code. Unfinished work comes from queue
+//     progress; the submission identifier only prevents duplicate tasks.
 //
 // None of this is reachable in the Simulator: BGTaskScheduler answers
 // .unavailable there, so it is verified by hand on a device.
 @preconcurrency import BackgroundTasks
 import Foundation
 import os
+import UIKit
+
+struct BackgroundDownloadSubmission {
+    private(set) var identifier: String?
+
+    mutating func begin(tier: DownloadTier, allCurrentsSelected: Bool = false,
+                        queue: ChsQueue, onlineActive: Bool = false, isForeground: Bool) -> String? {
+        let fittedActive = tier != .inView ? queue.active : allCurrentsSelected && queue.jobs.contains {
+            $0.isCurrent && ($0.status == .pending || $0.status == .downloading)
+        }
+        let selectedOnlineActive = (tier != .inView || allCurrentsSelected) && onlineActive
+        guard isForeground, fittedActive || selectedOnlineActive, identifier == nil else { return nil }
+        let id = UUID().uuidString
+        identifier = id
+        return id
+    }
+
+    mutating func finish(_ identifier: String) {
+        // Expiry and poll completion can arrive on either side of a new submission.
+        if self.identifier == identifier { self.identifier = nil }
+    }
+}
 
 enum BackgroundDownloads {
+    @MainActor private static var submission = BackgroundDownloadSubmission()
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "io.openwaters.slackwater",
                                         category: "BackgroundDownloads")
 
@@ -29,24 +52,29 @@ enum BackgroundDownloads {
 
     /// Register a fresh concrete identifier and submit it. Continued-processing
     /// registrations are exempt from the register-before-launch rule, so this
-    /// belongs at the tap and not in the App's init. A fresh id per call is
+    /// belongs at foreground acceptance or resume, not in the App's init. A fresh id per call is
     /// required: registering the same identifier twice in one session is a
     /// fatal exception, not an error.
     @MainActor static func submitIfPossible() {
+        guard submission.identifier == nil else { return }
         let service = ChsFitService.shared
         let queue = service.queue
         let online = service.onlineDownloads
-        guard queue.active || online.active else { return }
-        let id = pattern.replacingOccurrences(of: "*", with: UUID().uuidString)
+        guard let identifier = submission.begin(tier: service.tier,
+            allCurrentsSelected: service.allCurrentsSelected,
+            queue: queue, onlineActive: online.active,
+            isForeground: UIApplication.shared.applicationState == .active) else { return }
+        let id = pattern.replacingOccurrences(of: "*", with: identifier)
 
         // The scheduler's default queue is background; this callback must not inherit MainActor.
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: id,
                                                          using: nil) { @Sendable task in
             guard let task = task as? BGContinuedProcessingTask else {
                 task.setTaskCompleted(success: false)
+                Task { @MainActor in submission.finish(identifier) }
                 return
             }
-            run(task)
+            run(task, identifier: identifier)
         }
         guard registered else {
             // The one failure the derived-identifier design exists to
@@ -58,6 +86,7 @@ enum BackgroundDownloads {
             // indistinguishable from "the feature does nothing" unless it
             // is logged here.
             logger.error("BGTaskScheduler registration failed for \(id, privacy: .public)")
+            submission.finish(identifier)
             return
         }
 
@@ -76,6 +105,7 @@ enum BackgroundDownloads {
             // run continues regardless — but a permitted-identifiers
             // mismatch must leave a trace somewhere, and this is it.
             logger.error("BGTaskScheduler submit failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+            submission.finish(identifier)
         }
     }
 
@@ -127,7 +157,7 @@ enum BackgroundDownloads {
         }
     }
 
-    private static func run(_ task: BGContinuedProcessingTask) {
+    private static func run(_ task: BGContinuedProcessingTask, identifier: String) {
         // Set FIRST: the system may expire the task before any other setup
         // finishes, and an expiry with no handler set is silent. "First" on
         // its own still races the poll task below into existence — see
@@ -135,7 +165,10 @@ enum BackgroundDownloads {
         // `setTaskCompleted` below is safe to call from exactly one place
         // either way.
         let gate = ExpiryGate()
-        task.expirationHandler = { gate.expire() }
+        task.expirationHandler = {
+            gate.expire()
+            Task { @MainActor in submission.finish(identifier) }
+        }
 
         let started = gate.attach {
             Task { @MainActor in
@@ -171,6 +204,7 @@ enum BackgroundDownloads {
                     try? await Task.sleep(for: .seconds(2))
                 }
                 task.setTaskCompleted(success: !Task.isCancelled)
+                submission.finish(identifier)
             }
         }
         guard started else {
