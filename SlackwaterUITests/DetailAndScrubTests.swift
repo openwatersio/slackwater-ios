@@ -582,15 +582,13 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// Over a fast tide the pill explains the yellow line: the rate, in the
     /// ramp's colour, instead of the next turn. Landing on a turn first (the
     /// commentary tap) and then dragging about three hours on puts the scrub
-    /// mid-run, where the magnet parks it on the run's fastest point — a snap
-    /// stop — so the pill reads the peak rate.
+    /// mid-run, near the run's fastest point, so the pill reads the rate.
     ///
-    /// Eastport, not Boston: the magnet only has a fastest point to park on
-    /// when the run clears the ramp's first anchor (0.6 m/hr — a slower run
-    /// grows no flow arrow, and the drag snaps to a turn instead, where the
-    /// pill names the stop). Boston's weaker limb dips under the anchor at
-    /// neaps; Eastport's worst-case limb (M2 − S2 − N2) stays well over it,
-    /// any day of the lunar month.
+    /// Eastport, not Boston: the pill names a rate only once it clears the
+    /// ramp's first anchor (0.6 m/hr — slower, it names the next stop).
+    /// Boston's weaker limb dips under the anchor at neaps; Eastport's
+    /// worst-case limb (M2 − S2 − N2) stays well over it, any day of the
+    /// lunar month.
     func testFastTideCommentaryNamesTheRate() throws {
         let app = launch("-seedGate", "-networkKillSwitch")
         openSearch(app, "eastport")
@@ -608,26 +606,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // nothing left to stage. Quiet, it parks on the next TURN, and
         // mid-run is a drag away. The hold releases the drag at rest: a
         // flicked release keeps UIScrollView momentum, which carries the
-        // scrub about a half-cycle on, and the magnet then parks it on the
-        // next turn — slack water — instead.
+        // scrub about a half-cycle on, toward the next turn — slack water.
         //
-        // That drag is measured in POINTS against the magnet, never as a
-        // fraction of the strip (#289). The tap has just parked the
-        // centerline exactly ON a stop, and the magnet pulls it back onto any
-        // stop within `Timeline.magnetPts` — so a drag shorter than that
-        // radius is a no-op that re-reads the very label it was staged to
-        // change. The `dx: 0.4` this replaces was ~40 pt on a phone, inside
-        // the 46 pt radius, and had been sized when `Timeline.pph` was still
-        // 12: it silently shrank under the magnet when the NEAPS pass widened
-        // the strip to 18, and only ever passed on the days the tap happened
-        // to land somewhere already fast.
-        //
-        // Three hours clears the radius with room (54 pt at 18 pt/hr) and is
-        // about a quarter-cycle from a turn, which is where a semidiurnal run
-        // runs fastest — the run Eastport always grows (the doc comment
-        // above). Both numbers are the app's own and a UI test cannot link
-        // them, so they are spelled out here and asserted below rather than
-        // trusted.
+        // That drag is measured in POINTS, never as a fraction of the strip
+        // (#289): a fraction's hours change with the device's width. Three
+        // hours is about a quarter-cycle from a turn, which is where a
+        // semidiurnal run runs fastest — the run Eastport always grows (the
+        // doc comment above). The points per hour are the app's own and a UI
+        // test cannot link them, so they are spelled out here and the move is
+        // asserted below rather than trusted.
         let pointsPerHour: CGFloat = 18     // Timeline.pph
         let dragHours: CGFloat = 3
         let namesTheRate = #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#
@@ -642,11 +629,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             settleScrub(app)
             XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
                       "the commentary did not come back after the drag")
-            // The failure #289 was actually about: a drag inside the magnet
-            // snaps straight back, and the label mismatch below then reads as
+            // Without this, a drag that never moved the scrub reads below as
             // "the commentary is wrong" rather than "the scrub never moved".
             XCTAssertNotEqual(scrubClock(app), parked,
-                              "the drag did not clear the magnet — the scrub is still parked on \(parked)")
+                              "the drag did not move the scrub — it is still parked on \(parked)")
         }
         XCTAssert(pill.label.range(of: namesTheRate, options: .regularExpression) != nil,
                   "over a fast tide the commentary names the rate: '\(pill.label)'")

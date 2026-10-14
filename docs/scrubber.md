@@ -242,7 +242,7 @@ When Reduce Motion is enabled, do not animate pill opacity. Controls should rema
 
 ### 6.5 Taps
 
-A tap on the plot or event-time row brings the tapped instant to the centerline. If a magnetic target is strictly within 46 units of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
+A tap on the plot or event-time row brings the tapped instant to the centerline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
 
 In the day/date/sun row, a sunrise or sunset tap centers that event; a date tap opens the host's date picker. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centered on daylight (§14); this mismatch is recorded in §18.
 
@@ -250,7 +250,7 @@ Every tap stops opening motion, momentum, and an earlier settle before acting. O
 
 #### 6.5.1 Press and hold
 
-A press held on the plot or event-time row resolves like a tap (the magnet within 46 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host's alert line under the strip names the parked moment, and the strip runs its reading line on down to it while the press holds (docs/alerts.md §7.1). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host and opens its alert sheet in one step, since there is no line to go and find. A strip whose host has no alerts (a list card) carries neither the recognizer nor the action.
+A press held on the plot or event-time row resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host's alert line under the strip names the parked moment, and the strip runs its reading line on down to it while the press holds (docs/alerts.md §7.1). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host and opens its alert sheet in one step, since there is no line to go and find. A strip whose host has no alerts (a list card) carries neither the recognizer nor the action.
 
 ## 7. Magnetic settling
 
@@ -261,7 +261,7 @@ The magnet runs only after a person-driven scroll comes fully to rest:
 
 It does not pull during a drag, and it does not repeatedly quantize free scrubbing.
 
-Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 46 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is about 2 h 33 m. A target already within half a logical unit is treated as already parked. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
+Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. The event-time row's labels and the next- and previous-event actions land exactly on a known point, so the magnet does not have to. A target already within half a logical unit is treated as already parked. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
 
 The reference target set is the sorted, de-duplicated union of all applicable in-window moments:
 
@@ -277,7 +277,7 @@ Animate a magnetic settle with the platform's standard short scroll animation, t
 
 ## 8. Programmatic movement and interruption
 
-The direct scrubber controls may request an exact target. A direct-control target is not subject to the 46-unit capture radius.
+The direct scrubber controls may request an exact target. A direct-control target is not subject to the 4.5-unit capture radius.
 
 An animated request must:
 
@@ -693,8 +693,8 @@ These scenarios define the minimum behavior shared by all platforms.
 
 ### Snapping and commands
 
-6. **Near target:** Resting 30 units from a tide extreme animates to its exact instant.
-7. **Outside capture:** Resting 46 or more units from every target remains where released.
+6. **Near target:** Resting 3 units (10 minutes) from a tide extreme animates to its exact instant.
+7. **Outside capture:** Resting 4.5 or more units from every target remains where released, including 40 minutes before a low.
 8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation.
 9. **Commentary during fling:** Activating commentary stops the fling and lands on the named target; no later momentum frame overwrites the request.
 10. **Now during settle:** Activating Now cancels a magnetic animation, refreshes now, lands home, and removes the Now pill.
@@ -728,7 +728,7 @@ These scenarios define the minimum behavior shared by all platforms.
 
 27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
-29. **Plot tap:** A tap selects its moment or a magnetic target within 46 units and lands on a reachable center time.
+29. **Plot tap:** A tap selects its moment or a magnetic target within 4.5 units and lands on a reachable center time.
 30. **Date or sun tap:** A date tap stops motion and opens the picker; a sun tap centers that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.

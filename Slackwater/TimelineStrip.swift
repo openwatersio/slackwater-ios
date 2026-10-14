@@ -41,7 +41,7 @@ enum Timeline {
     /// purpose, at the smallest width that still clears half a phone.
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
-    static let magnetPts: CGFloat = 46    // snap radius around the centerline
+    static let magnetPts: CGFloat = pph / 4    // a quarter hour: just off an event takes it, between stays free
     static let accessibilityStep: TimeInterval = 300    // one VoiceOver increment
     static let pillTarget: CGFloat = 44    // a pill's semantic hit target; the capsule is ~30
     /// No scrub change for this long is a strip at rest, and the chrome — commentary, the Now

@@ -395,7 +395,7 @@ What a press resolves to, from where it landed:
 
 | Where | Resolves to |
 |---|---|
-| Within `Timeline.magnetPts` (46 pt) of a `snapTimes` stop | that event |
+| Within `Timeline.magnetPts` (4.5 pt, 15 minutes) of a `snapTimes` stop | that event |
 | Within ±1 s of a `WindowEclipse.contacts` moment | `.eclipse` |
 | Anywhere else in the plot or time row | that instant, and what the curve reads there |
 | The day row | nothing — that row belongs to the week picker's tap |

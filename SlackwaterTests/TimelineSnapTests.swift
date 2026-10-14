@@ -12,7 +12,15 @@ final class TimelineSnapTests: XCTestCase {
     func testMagnetTargetPullsTheNearestStopInReach() throws {
         let tl = try friday()
         let stop = try XCTUnwrap(tl.snapTimes.dropFirst(3).first)
-        XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop) + 20), stop)
+        XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop) + 3), stop)
+    }
+
+    /// A press picks an alert's moment, so 40 minutes before a stop is not the stop.
+    func testMagnetTargetLeavesAMomentBetweenStops() throws {
+        let tl = try friday()
+        let pairs = zip(tl.snapTimes, tl.snapTimes.dropFirst())
+        let gap = try XCTUnwrap(pairs.max { $0.1.timeIntervalSince($0.0) < $1.1.timeIntervalSince($1.0) })
+        XCTAssertNil(tl.magnetTarget(nearX: tl.x(gap.1.addingTimeInterval(-40 * 60))))
     }
 
     func testMagnetTargetIgnoresStopsOutOfReach() throws {
