@@ -101,8 +101,11 @@ struct CrownScrubStrip: View {
     }
 
     private func settle() {
-        guard let target = data.magnetTarget(nearX: data.x(Self.time(atCrown: crown))) else { return }
+        let x = data.x(Self.time(atCrown: crown))
+        guard let target = data.magnetTarget(nearX: x) else { return }
         let move = { scrubTime = target; crown = Self.crown(target) }
+        // Already on the stop: the exact instant, with no landing to feel.
+        guard abs(data.x(target) - x) > 0.5 else { return move() }
         if reduceMotion { move() } else { withAnimation(.snappy) { move() } }
         landed += 1
     }

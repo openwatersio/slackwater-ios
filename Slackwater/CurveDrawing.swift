@@ -222,7 +222,7 @@ enum CurveDrawing {
 
     static func isDot(_ run: Path) -> Bool {
         let xs = vertices(run).map(\.x)
-        return (xs.max() ?? 0) - (xs.min() ?? 0) < CurveStyle.dotRadius * 2
+        return CurveStyle.runDrawsAsDot(width: (xs.max() ?? 0) - (xs.min() ?? 0))
     }
 
     static func runCentre(_ run: Path) -> CGPoint {

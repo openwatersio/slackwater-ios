@@ -56,6 +56,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
+    /// Bumped with every selection the page sets, so the strip moves for it.
+    @State private var moveRequests = 0
     /// The moment a long press parked (§7.1). Cleared the moment the strip moves off it.
     @State private var pressedMoment: Date? = nil
     @State private var alertSubject: AlertSheetSubject? = nil
@@ -163,6 +165,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
+            .environment(\.stripMoveRequests, moveRequests)
             .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
             .environment(\.stripIsPressed, pressedMoment != nil)
             // VoiceOver's "Set an alert" has no line to go and find: it parks the moment and
@@ -229,6 +232,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     // a spring-forward day would otherwise open at 13:00.
                     let week = Timeline.window(anchor: picked)
                     if scrubTime < week.start || scrubTime > week.end {
+                        moveRequests += 1
                         scrubTime = noonLocal(picked, tz)
                     }
                     onPicked(picked)
@@ -279,6 +283,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// `linkedAnchor`'s — the picker's rule inverted, so a jump to later today
     /// doesn't re-key the schedule off today.
     private func jump(to t: Date) {
+        moveRequests += 1
         scrubTime = t
         if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
             anchor = day
@@ -289,16 +294,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // here, and opens its first build on `scrubTime` rather than now.
             anchor = todayLocal(tz)
         }
-    }
-
-    /// `jump(to:)` with the animated ride the tour's demo depends on. The
-    /// token bump comes FIRST so the strip's `jumpToken` is already different
-    /// by the time `scrubTime`'s change reaches `updateUIView` — reversed,
-    /// the offset write can land in the pass before the token and the strip
-    /// teleports.
-    private func glide(to t: Date) {
-        TourCoach.shared.requestGlide()
-        jump(to: t)
     }
 
     /// Advance the tour, gliding first where the next mark needs the strip
@@ -314,7 +309,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         default: nil
         }
         guard let target else { return }
-        glide(to: target)
+        jump(to: target)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(600))
             tourArrived = true
@@ -382,7 +377,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
                              tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
-                             scrubTime: scrubTime, onTap: { scrubTime = $0 },
+                             scrubTime: scrubTime, onTap: { moveRequests += 1; scrubTime = $0 },
                              sunLocation: StationItem.byId[favoriteId])
         }
         .background(SN.cardFill)
@@ -476,6 +471,15 @@ extension EnvironmentValues {
         get { self[StripStationIDKey.self] }
         set { self[StripStationIDKey.self] = newValue }
     }
+    /// The scaffold's count of selections it set: the strip moves only when asked.
+    var stripMoveRequests: Int {
+        get { self[StripMoveRequestsKey.self] }
+        set { self[StripMoveRequestsKey.self] = newValue }
+    }
+}
+
+private struct StripMoveRequestsKey: EnvironmentKey {
+    static let defaultValue = 0
 }
 
 /// What the line's sheet opens on.

@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. The first-run tour: which coach mark is showing, which
-// station it belongs to, and the token the strip watches to animate a glide.
+// station it belongs to.
 //
 // App-level state read directly by the views that need it, the way
 // `LinkedInstant` is (GateView.swift) — deliberately NOT a parameter, because
@@ -22,8 +22,6 @@ let seenTourKey = "slackwater.seenTour"
     /// The station id the running tour belongs to. A detail for any other
     /// station must not draw its marks.
     var station: String?
-    /// Bumped to ask the strip for an animated ride; see `glide(to:)`.
-    var glideToken = 0
 
     /// First launch has armed the tour but no detail has claimed it yet.
     private(set) var armed = false
@@ -83,8 +81,6 @@ let seenTourKey = "slackwater.seenTour"
         armed = false
         UserDefaults.standard.set(true, forKey: seenTourKey)
     }
-
-    func requestGlide() { glideToken += 1 }
 
     private func next(after step: Step) -> Step? {
         Step.allCases

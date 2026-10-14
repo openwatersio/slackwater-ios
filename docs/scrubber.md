@@ -28,7 +28,7 @@ The following are deliberately outside this specification because they are separ
 - station header, favourite control, navigation, provenance, and related-station links; and
 - loading, download, and error cards shown instead of the scrubber.
 
-This specification covers their selection handoff to the scrubber. Date taps open the picker. A picked day moves the selection to its station-local noon, unless the selection already lies inside `Timeline.window(anchor:)` for that day (48 hours before its midnight through 180 hours after), in which case it stays. Shared links and schedule-row and sheet jumps land on their exact instant. The schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
+This specification covers their selection handoff to the scrubber. Date taps open the picker. A picked day moves the selection to its station-local noon, unless the selection already lies inside `Timeline.window(anchor:)` for that day (48 hours before its midnight through 180 hours after), in which case it stays. Shared links and schedule-row and sheet jumps land on their exact instant. Each of these moves the strip by the rule in §8. The schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
 
 ## 2. Product idea
 
@@ -126,9 +126,9 @@ Anything meaning “calendar day,” “midnight,” or “noon” must use a ca
 
 Constituent-backed tide and current details (harmonic, subordinate, or fitted on the device) and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
 
-The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, opening, and settling are quiet (except during a tap's ride, §18). Repeated backward flings can temporarily reach the loaded edge; the strip clamps until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use: iOS keeps the published chunks plus one each side, and mounts only the 900-unit drawing tiles in view plus one each side.
+The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, the opening, every animated move (§8), and settling are quiet. Repeated backward flings can temporarily reach the loaded edge; the strip stops there until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use: iOS keeps the published chunks plus one each side, and mounts only the 900-unit drawing tiles in view plus one each side.
 
-Chunks are counted in seven-day steps from the schedule anchor in force when the store starts, not from a calendar-week boundary: ordinarily the station-local midnight of the day the detail opened, the linked day when a shared link opens the detail outside today's window, and the current schedule anchor when a refined model or a new slack threshold rebuilds the store. The first build synchronously covers 48 hours either side of the opening instant. An explicit jump (picker, Now, or shared link) synchronously builds half a viewport either side of its target and publishes at once, without waiting for a quiet moment.
+Chunks are counted in seven-day steps from the schedule anchor in force when the store starts, not from a calendar-week boundary: ordinarily the station-local midnight of the day the detail opened, the linked day when a shared link opens the detail outside today's window, and the current schedule anchor when a refined model or a new slack threshold rebuilds the store. The first build synchronously covers 48 hours either side of the opening instant. An explicit jump (picker, Now, or shared link) synchronously builds half a viewport either side of its target and publishes at once, without waiting for a quiet moment. When a publish moves the window's start, the strip first shifts its offset so the same instant stays under the centreline, then moves to the jump's target by §8.
 
 A Canadian tide preview exists only when every gap between its downloaded samples is 30 minutes or less and every sample is finite; a single longer gap rejects the whole preview, which is never trimmed to a contiguous run. It must never extend, extrapolate, or offer a date outside those samples. A preview is shown only while its samples cover the current instant; its strip spans exactly those samples, its schedule stays anchored on today, and it never re-anchors on settle. The week bar and date taps offer no picker. Now and every selection are clamped into the samples.
 
@@ -142,9 +142,9 @@ windowEnd   = anchor + 180 hours
 duration    = 228 elapsed hours
 ```
 
-The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values. The online detail never re-anchors on settle. Drags, taps, presses, and accessibility steps stay within its fixed window; commentary activation can land past its end (§18).
+The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values. The online detail never re-anchors on settle. Every selection stays within its fixed window: drags stop at its edges, and every programmatic move clamps to them (§8).
 
-Every advertised target should have half a viewport of valid content on both sides. Continuous details meet this by building data around each target. The online window pads 12 hours past its schedule week, which is enough for a phone-width viewport. Where a viewport is wider than its window allows, including at either end of a Canadian tide preview, taps, presses, and accessibility steps clamp to the content edge and show the time actually under the centreline, never an unreachable target. Explicit picker and shared-link destinations must have their data ready before centring; a first build for a shared link uses the linked instant rather than the ordinary opening destination.
+Every advertised target should have half a viewport of valid content on both sides. Continuous details meet this by building data around each target. The online window pads 12 hours past its schedule week, which is enough for a phone-width viewport. Where a viewport is wider than its window allows, including at either end of a Canadian tide preview, every programmatic move (§8) clamps to the content edge and shows the time actually under the centreline, never an unreachable target. Explicit picker and shared-link destinations must have their data ready before centring; a first build for a shared link uses the linked instant rather than the ordinary opening destination.
 
 The schedule remains seven local calendar days anchored independently of the continuous strip. After a selection stays unchanged for 600 ms outside `Timeline.window(anchor:)`, the three continuous details re-anchor the schedule to the selected local day without moving the graph. The 48-hour look-back belongs to the existing anchor and does not trigger this re-anchor. Now restores the schedule to today's station-local midnight.
 
@@ -230,7 +230,7 @@ On an ordinary opening at now:
 
 The motion is an affordance: it teaches that the graph moves beneath a fixed reader without adding instructional copy.
 
-The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row when it is recognized after its half second; a touch-down alone does not. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
+The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row when it is recognized after its half second; a touch-down alone does not. A host request (§8) cancels it too and moves to its own target. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
 
 With Reduce Motion enabled, skip the opening motion and land directly on now. The watch place page opens directly on now with no opening motion.
 
@@ -244,13 +244,13 @@ The graph must track a horizontal drag one-to-one:
 - the lead, sky, and riding dot update in the same rendered frame; and
 - releasing with velocity continues with the platform's native-feeling horizontal momentum.
 
-At a loaded edge a drag rubber-bands with the platform's ordinary overscroll. During overscroll the selected time follows the centre past the data, except on a Canadian tide preview, which keeps the selection clamped to its samples. The riding dot and an online-current lead hold the edge sample. Predicted tide and current leads (harmonic, subordinate, or fitted) keep computing the engine value at the selected instant, and a derived-gate lead keeps reading its phase from its slack list. When the strip springs back to rest the magnet evaluates as usual. The iOS reference uses `UIScrollView`'s default bounce and deceleration rate.
+A loaded edge is a hard stop. A drag or fling stops there with no rubber-band overscroll, so the centre never passes the first or last loaded instant and the selected time never runs past the data. The magnet evaluates as usual when the strip comes to rest against an edge. The iOS reference turns off `UIScrollView`'s bounce and keeps its default deceleration rate.
 
 The full strip height is the direct-manipulation surface, except where the lead's text sits (§18) and, while the strip is at rest, where the commentary and Now pills sit; a drag or tap that starts on a resting pill goes to the pill. There is no separate grab handle and no visible native scrollbar. Taps select a time or open the date picker (§6.5). Pinch zoom and variable time scale are not part of this control; horizontal scale remains 18 logical units/hour.
 
 The scrubber commonly sits inside a vertically scrolling page. Use native gesture arbitration or directional locking so a clearly vertical gesture scrolls the page and a clearly horizontal gesture scrubs time. Do not add a full-screen drag recognizer that steals vertical navigation or an edge-back gesture.
 
-There is no haptic tick for ordinary samples or magnetic targets in the reference behavior. The watch is the exception: the Digital Crown's own per-detent ticks are off, and one light haptic plays when a settle lands on a magnetic target, because a wrist has no finger on glass to feel the landing.
+There is no haptic tick for ordinary samples or magnetic targets in the reference behavior. The watch is the exception: the Digital Crown's own per-detent ticks are off, and one light haptic plays when a settle moves onto a magnetic target, because a wrist has no finger on glass to feel the landing. A rest already within half a unit of a target takes its exact instant with no haptic.
 
 ### 6.4 Rest and pill visibility
 
@@ -262,11 +262,11 @@ When Reduce Motion is enabled, the pills and line appear and disappear without a
 
 ### 6.5 Taps
 
-A tap anywhere above the day row (the top pad outside the lead's text and the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
+A tap anywhere above the day row (the top pad outside the lead's text and the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. The tap then moves the strip by §8: it clamps to a reachable scroll offset and derives the final selected instant from that offset, so the lead and curve agree at loaded edges.
 
 In the day/date/sun row, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centred on daylight (§14); this mismatch is recorded in §18.
 
-Every tap stops opening motion, momentum, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. Time taps use the ordinary settling animation; Reduce Motion or travel below 0.5 unit lands directly.
+Every tap stops opening motion, momentum, a ride, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. A time tap rides to its target like any other programmatic move and marks the strip busy for the chunk store until it lands; Reduce Motion or travel below 0.5 unit lands directly.
 
 #### 6.5.1 Press and hold
 
@@ -281,14 +281,14 @@ The magnet runs only after a person-driven scroll comes fully to rest:
 
 It does not pull during a drag, and it does not repeatedly quantize free scrubbing.
 
-Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. Schedule-list rows and the next- and previous-event actions land exactly on their event, so the magnet does not have to. A tap on an event-time label is an ordinary plot tap: it takes the event only within 4.5 units of the event's own x. A target within half a logical unit starts no animation, and `selectedTime` keeps the released centre value, up to 100 seconds off the target's own instant. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
+Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. Schedule-list rows and the next- and previous-event actions land exactly on their event, so the magnet does not have to. A tap on an event-time label is an ordinary plot tap: it takes the event only within 4.5 units of the event's own x. A target within half a logical unit starts no animation, but `selectedTime` still takes the target's exact instant. A target past the reachable range lands at the nearest reachable centre and reads the time there, as every move does (§8). If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
 
 The reference target set is the sorted, de-duplicated union of all applicable in-window moments:
 
 - tide high and low extrema;
 - the fastest-rate instant of each tide run that reaches the rate-warning scale;
 - current maxima and slack instants;
-- measured slack-window openings and closings;
+- the opening and closing of each merged measured slack run, or for a run drawn as a dot (§13.2) its centre alone, which replaces the slack instant and any other event inside the run;
 - sunrise and sunset;
 - the first penumbral and umbral contacts, greatest eclipse, and the last umbral and penumbral contacts of each lunar eclipse that has a contact or its greatest eclipse above the station's horizon (a penumbral eclipse has no umbral contacts);
 - the first and last contacts and greatest eclipse of each locally visible solar eclipse, plus its second and third contacts when it is total or annular; and
@@ -300,19 +300,18 @@ Animate a magnetic settle with the platform's standard short scroll animation, t
 
 The direct scrubber controls may request an exact target. A direct-control target is not subject to the 4.5-unit capture radius.
 
-An animated request must:
+Every move made for code rather than a finger follows one rule: commentary, Now, foreground return at home, the first-run tour, plot and sun taps, presses, accessibility steps and actions, the date picker, shared links, schedule rows, and sheet jumps.
 
-1. cancel the opening motion;
-2. stop any active momentum without first accepting another momentum frame;
-3. cancel an in-progress magnetic animation and forget its old destination;
-4. animate the requested target beneath the centreline; and
-5. park `selectedTime` on the exact requested instant at completion.
+1. The newest request wins. It cancels the opening motion, a hinge follow, momentum (without first accepting another momentum frame), an animated ride, and a magnetic settle, and forgets their destinations.
+2. The target clamps to a reachable content offset, and the selected instant is read back from that offset: the requested instant when it can sit under the centreline, otherwise the instant at the nearest reachable centre.
+3. When the travel is at least half a logical unit and at most seven elapsed days, and Reduce Motion is off, the strip animates to the target and parks `selectedTime` on the exact landed instant at completion. Otherwise it lands directly, without compressing weeks into a short animation. Presses and accessibility steps and actions always land directly (§6.5.1, §15). A move that starts from an offset outside newly published data, such as after a picked week replaced the window, also lands directly.
+4. Every animated move marks the strip busy for the chunk store while it runs, so a left-edge publish never lands mid-animation (§4.2).
 
-Scroll feedback during that animation must not cancel the request. A rendered selection can trail the current offset; the destination remains the requested instant until the animation finishes or an explicit interaction interrupts it.
+A host moves the strip only by an explicit request. Commentary, Now, foreground return, the picker, shared links, schedule rows, sheet jumps, the first-run tour, and a Canadian tide preview's clamp into its samples each set the selection and raise a request together. A selection that changes without a request never starts a move, so scroll feedback during a ride cannot cancel it: a rendered selection can trail the current offset, and the destination remains the requested instant until the animation finishes or a newer request or a drag interrupts it.
 
-A finger that is still down retains control. Do not fight an active drag with an external state update. The iOS reference has one exception: a drag on the first-run tour's stars step advances the tour on its first frame, and the moon step's animated ride starts while the finger is still down.
+A finger that is still down retains control. A request that arrives during an active drag waits; when the finger lifts, it replaces the drag's momentum and moves by the rule above, and a newer request replaces a waiting one. On the first-run tour, a drag on the stars step advances the tour on its first frame, so the moon step's ride starts when that finger lifts. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour.
 
-Reduce Motion, a target less than 0.5 logical units away, or travel greater than seven elapsed days lands directly without animation. Now, commentary, foreground return at home, and the first-run tour ride the strip to their destination when the travel is seven days or less. Picker, shared-link, schedule-row, and sheet selections land directly at any distance, without compressing weeks into a short animation. A host-set selection less than one unit from the current centre changes the reading without moving the strip. A host-set selection that arrives during the opening, or during an animated ride (Now, commentary, foreground return, the tour, or a tap), is ignored; the motion finishes on its own destination. One that arrives during momentum or a magnetic settle after a drag stops that motion and lands directly. The first-run tour moves the selection with the same animated ride as commentary and obeys the same interruption rules. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour.
+When nothing is moving and no request is waiting, but the offset and the selection disagree by more than one unit, the strip lands directly on the selection without animation.
 
 When the viewport width changes—rotation, split screen, or browser resize—recompute the offset so the existing `selectedTime` remains under the new centreline. Cancel momentum or a magnetic settle if needed. The resize must not change `selectedTime`, replay the opening, or briefly publish the wrong centre value.
 
@@ -411,7 +410,7 @@ Fast-tide commentary has no symbol.
 
 The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`. The decorative symbol is hidden from accessibility.
 
-All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Sun candidates and measured-current water candidates must be more than one second after the selection, so landing on a stop advances the pill. Tide and derived gates take their first water stop strictly after the selection and drop it if it is within one second, so a selection less than a second before a high, low, or derived slack names the next sun event, or nothing, instead of the following water stop. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop. When a sun event and a water stop share an instant, the sun event is named. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
+All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Every candidate, water or sun, is the first stop more than one second after the selection, so landing on a stop advances the pill, and it must lie between the first and last drawn sample: water events kept beyond the strip for event search and sun events from day chrome beyond the data never count. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop, and activation moves there by §8. When a sun event and a water stop share an instant, the sun event is named. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
 
 #### Tide commentary
 
@@ -430,13 +429,13 @@ Tint this text, and the lead glyph above it, with the rate-ramp colour lifted to
 
 Walk strictly forward—more than one second after `selectedTime`—through these significant stops:
 
-1. a measured slack window opening, named `Slack`;
+1. a merged measured slack run's opening, named `Slack`;
 2. its closing, named `Flood` or `Ebb` from the velocity one second after it (zero counts as `Flood`); and
 3. `Max flood` and `Max ebb`.
 
-A slack instant is never a stop of its own: its window's opening names it.
+A run drawn as a dot (§13.2) is one stop instead: its centre, named `Slack`, with no closing. A slack instant is never a stop of its own: its run's opening, or its dot's centre, names it.
 
-A window ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
+A run ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
 
 The next current stop competes with sunrise and sunset. A derived gate compares its next slack instant with the sun events; it never offers a current maximum.
 
@@ -459,7 +458,7 @@ The pill row is inset 16 units from each viewport edge. Now uses the `arrow.left
 
 The arrow is both instruction and spatial truth. Activating Now refreshes the reference `now`, ensures its data window is active, and moves that instant beneath the centreline. After landing, the pill disappears.
 
-The Now request must win over momentum or a magnetic animation. Because both pills are hidden and inert while the strip moves (§6.4), this rule governs external requests that move the selection while the strip coasts: a scene reactivation that returns to now, and a schedule-row tap, which lands on its own event.
+Now moves by §8, so it wins over the opening, momentum, a ride, or a magnetic animation. Because both pills are hidden and inert while the strip moves (§6.4), this matters for requests that arrive while the strip coasts: a scene reactivation that returns to now, and a schedule-row tap, which goes to its own event.
 
 ## 11. Fixed centre overlay
 
@@ -594,7 +593,7 @@ Draw in this order:
 4. the dashed zero reference line;
 5. the base curve and its magnitude thread;
 6. measured slack runs, each a stroke or, when shorter than a turn dot, a dot;
-7. run-opening times;
+7. run-opening times, or a dot's centre time;
 8. derived-gate slack dots and peak readings; and
 9. the absolute-now dot.
 
@@ -609,9 +608,9 @@ Draw the curve in graph blue at 2.5 units. Down its middle, draw a two-unit abso
 
 An online sampled series derives its events from the samples. A slack falls at an exact-zero sample or at the linear crossing between opposite-sign samples. A maximum is the largest-magnitude sample of each signed run, without interpolation; the partial runs at the series ends also yield a maximum at their largest sample. Events are kept up to six hours beyond the fixed window.
 
-A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. A slack outside the sampled series, or between two above-threshold samples of the same sign, has no window and draws nothing. Window openings and closings are magnetic. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band.
+A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. A slack outside the sampled series, or between two above-threshold samples of the same sign, has no window and draws nothing. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band. Each run's opening and closing is magnetic, except for a run drawn as a dot.
 
-A merged run narrower than a turn dot's five-unit diameter draws as that dot instead of a stroke: the derived gate's five-unit go-colour slack dot with its 2.5-unit clear halo, centred on the curve at the run's horizontal midpoint. At 18 units an hour that is a window shorter than about 17 minutes. The line is not cut around the run; the dot's halo erases the curve, fill, and shading beneath it as a turn dot's does (§12.2), and a past dot takes the 45% event-mark fade rather than the stroke's past opacity. A stroke that short would read as a blot rather than a duration. Station cards draw the same dot at their own scale.
+A merged run narrower than a turn dot's five-unit diameter draws as that dot instead of a stroke: the derived gate's five-unit go-colour slack dot with its 2.5-unit clear halo, centred on the curve at the run's horizontal midpoint. At 18 units an hour that is a window shorter than about 17 minutes. The line is not cut around the run; the dot's halo erases the curve, fill, and shading beneath it as a turn dot's does (§12.2), and a past dot takes the 45% event-mark fade rather than the stroke's past opacity. A stroke that short would read as a blot rather than a duration. Decide this from the run's duration at the strip's 18 units an hour, with the same width test the drawing uses, so data code never needs the drawn geometry. A dot is one moment: its centre is the run's only magnetic target (§7), commentary stop (§10.1), and event time, and it replaces the slack instant inside it. Station cards draw the same dot at their own scale.
 
 Current maxima are drawn as context rather than as marks:
 
@@ -620,7 +619,7 @@ Current maxima are drawn as context rather than as marks:
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The event-time row contains each merged slack run's opening, whether the run draws as a stroke or a dot. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
+The event-time row contains each merged slack run's opening, or for a run drawn as a dot its centre. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
 
 ### 13.3 Schematic derived current
 
@@ -683,7 +682,7 @@ Expose one adjustable timeline control with:
 - increment/decrement actions that move later/earlier by five minutes; and
 - named actions for next and previous magnetic target when the platform supports custom actions (`Next event`, `Previous event`), plus `Set an alert` on detail strips (§6.5.1).
 
-The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input. Adjustments and next/previous actions land directly with no travel and stop any opening motion; a target past the window's edge parks at the nearest reachable centre. Next and previous ignore a target within one second of the current time; with no target, the action reports failure and nothing moves. The watch strip is one adjustable element with the same five-minute steps and next/previous event actions; its steps are not clamped to the loaded span, and a next or previous action with no target does nothing without reporting failure.
+The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input. Adjustments and next/previous actions are programmatic moves (§8) that always land directly with no travel and stop any opening motion; a target past the window's edge parks at the nearest reachable centre. Next and previous ignore a target within one second of the current time; with no target, the action reports failure and nothing moves. The watch strip is one adjustable element with the same five-minute steps and next/previous event actions; its steps are not clamped to the loaded span, and a next or previous action with no target does nothing without reporting failure.
 
 Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now is announced `Return to now`. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller. iOS sets a 44-point semantic row height; the capsules are always wider than 44 points.
 
@@ -713,11 +712,11 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 ### iOS reference
 
-The reference uses a horizontal `UIScrollView` (`TimelineScrubber.swift`) hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centring suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the animated opening so the selected time and sky follow every frame. On a device with a trailing status rail, the strip and sky draw on under the rail while the scroll viewport, and so the centreline, stays inside the safe area.
+The reference uses a horizontal `UIScrollView` (`TimelineScrubber.swift`) hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centring suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. The pills draw over the scroll view but cannot keep a touch from its recognizers, so the strip's tap recognizer declines a touch that starts on a resting pill. A display-link drives the animated opening so the selected time and sky follow every frame. On a device with a trailing status rail, the strip and sky draw on under the rail while the scroll viewport, and so the centreline, stays inside the safe area.
 
 ### watchOS
 
-The watch place page (`SlackwaterWatch/PlaceDetail.swift`) hosts `CrownScrubStrip` (`SlackwaterWatch/CrownScrubStrip.swift`), which draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on. A Crown settle rides a snappy animation to the magnet target (direct under Reduce Motion) and plays a light impact haptic, including under Reduce Motion. The Crown's range is the loaded span's start to end, so the centre can reach the data's very edge. Now is a bottom-bar `xmark` button in place of the list button, shown only when scrubbed away; it moves with the same snappy animation unless Reduce Motion is on or the travel exceeds seven days. The watch mounts two tiles around the centre, marks the selection with a 14-unit white ring, fits its vertical scale as if its viewport were 200 units wide (about 11 hours), and hosts tide, predicted-current (harmonic, subordinate, and fitted), and derived-gate places but not online currents. On its 52-unit plot, current peak readings hang across the zero line. The sky backdrop runs behind the reading card from the top of the screen to the plot floor, with its horizon 16 units below the plot's top.
+The watch place page (`SlackwaterWatch/PlaceDetail.swift`) hosts `CrownScrubStrip` (`SlackwaterWatch/CrownScrubStrip.swift`), which draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on. A Crown settle rides a snappy animation to the magnet target's exact instant (direct under Reduce Motion) and plays a light impact haptic, including under Reduce Motion; a rest already within half a unit of the target takes its exact instant directly, with no haptic. The Crown's range is the loaded span's start to end, so the centre can reach the data's very edge. Now is a bottom-bar `xmark` button in place of the list button, shown only when scrubbed away; it moves with the same snappy animation unless Reduce Motion is on or the travel exceeds seven days. The watch mounts two tiles around the centre, marks the selection with a 14-unit white ring, fits its vertical scale as if its viewport were 200 units wide (about 11 hours), and hosts tide, predicted-current (harmonic, subordinate, and fitted), and derived-gate places but not online currents. On its 52-unit plot, current peak readings hang across the zero line. The sky backdrop runs behind the reading card from the top of the screen to the plot floor, with its horizon 16 units below the plot's top.
 
 ### Android
 
@@ -746,7 +745,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 ### Opening and manipulation
 
 1. **Ordinary opening:** Given a complete current window and Reduce Motion off, opening starts two hours behind now, reaches now in 650 ms, and ends with the lead time equal to the centre time.
-2. **Interrupted opening:** A drag, tap, or plot press during the opening cancels it; the drag continues from the strip's position when it began, without jumping to now.
+2. **Interrupted opening:** A drag, tap, plot press, or host request during the opening cancels it; the drag continues from the strip's position when it began, without jumping to now.
 3. **First drag:** The first drag after opening changes the lead and riding dot during the gesture, before release or snap.
 4. **Direction:** Dragging content left advances selected time; dragging it right moves selected time backward.
 5. **Momentum:** A flick continues natively, updates the lead during motion, then evaluates the magnet once.
@@ -755,24 +754,24 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 6. **Near target:** Resting 3 units (10 minutes) from a tide extreme animates to its exact instant.
 7. **Outside capture:** Resting 4.5 or more units from every target remains where released, including 40 minutes before a low.
-8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation.
-9. **Commentary during fling:** A commentary request issued during a fling (the visible pill is inert while the strip moves, §6.4) stops the fling and lands on the named target; no later momentum frame overwrites the request.
-10. **Now during settle:** A return to now that arrives during a magnetic animation, such as a scene reactivation (the visible pill is inert while the strip moves, §6.4), cancels the animation, refreshes now, lands home, and removes the Now pill.
-11. **Reduce Motion:** Opening, commentary, Now, and a drag-end magnetic settle land directly with no travel, and the pill row appears without an opacity animation.
+8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation, and the lead shows the target's exact instant.
+9. **Request during motion:** A commentary request issued during a fling (the visible pill is inert while the strip moves, §6.4), or a schedule-row tap during a ride or the opening, stops that motion and goes to its own target; no later momentum or ride frame overwrites the request. A request during a drag waits for the finger to lift.
+10. **Now during settle:** A return to now that arrives during a magnetic animation or a ride, such as a scene reactivation (the visible pill is inert while the strip moves, §6.4), cancels the animation, refreshes now, lands home, and removes the Now pill.
+11. **Reduce Motion:** Opening, commentary, Now, taps, picker, shared-link, schedule-row, and sheet selections, and a drag-end magnetic settle land directly with no travel, and the pill row appears without an opacity animation.
 
 ### Geometry and time
 
 12. **Resize:** Rotate or resize after scrubbing. The lead time and centre time remain equal and unchanged.
 13. **Cross midnight:** Scrubbing continuously across midnight changes the day chrome without discontinuity or a page transition.
 14. **DST:** On a transition week, the civil day occupies 23 or 25 hours at the same 18-unit/hour scale; sunrise, sunset, and noon remain correct locally.
-15. **Window edge:** No event label is clipped at an edge, and no direct control advertises a target that cannot be centred over valid data.
+15. **Window edge:** No event label is clipped at an edge. No direct control or commentary advertises a target that cannot be centred over valid data, and every programmatic move lands on a reachable centre. A drag stops at the loaded edge without overscroll.
 
 ### Track meaning
 
 16. **Tide turn:** At an exact high, the lead says High, the high's reading hangs below its dot, and the commentary advances to the following event.
 17. **Fast tide:** At 0.6 m/hr or faster, the line and commentary share the same ramp position and activating commentary goes to that run's fastest point.
 18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and changes phase at the half-open closing, and never says Slack outside a window (§9.2).
-19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged run narrower than a turn dot draws as the go-colour dot with its halo, not a stroke, and its opening prints in the event-time row.
+19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged run narrower than a turn dot draws as the go-colour dot with its halo, not a stroke, and its centre is its event time, its only magnetic target, and its one commentary stop.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
 21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill and no speed thread, and only known slack instants get green dots; there is no dashed zero line.
 22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the absolute-now dot.
@@ -788,12 +787,12 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
-29. **Plot tap:** A tap selects its moment or a magnetic target strictly within 4.5 units and lands on a reachable centre time.
+29. **Plot tap:** A tap selects its moment or a magnetic target strictly within 4.5 units and rides to a reachable centre time, holding left-edge chunk publishes until it lands.
 30. **Date or sun tap:** A date tap stops motion and opens the picker where the host can change dates; a sun tap centres that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
 33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it.
-34. **Far destination:** A shared link opens at its requested instant, and a picked week at station-local noon of the picked day unless the selection already lies inside that week's window, with data on both sides. A Now jump over seven days lands without travel and restores the current schedule.
+34. **Far destination:** A shared link opens at its requested instant, and a picked week at station-local noon of the picked day unless the selection already lies inside that week's window, with data on both sides. A picked day, link, or Now within seven days of travel rides there; over seven days it lands without travel. Now restores the current schedule.
 35. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
 36. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
 37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and every solar contact is a magnetic target.
@@ -805,12 +804,8 @@ These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
 - The online-current detail and a Canadian tide preview have no alerts, but their strips still install the press recognizer and the VoiceOver "Set an alert" action (§6.5.1). A press parks its moment with a medium haptic and shows no alert line; the action reports success and does nothing. Every iOS strip is hosted by the detail scaffold, whose press and alert-action closures are never absent, so no iOS strip omits them.
-- On fixed windows (online current, Canadian tide preview), commentary can name a stop in the last half viewport or beyond the drawn data: an online current keeps water events six hours past its window, and both take sunrise and sunset from day chrome that runs to the end of the eighth day after the anchor. Activation lands on that instant (a preview first clamps it into its samples) without clamping to a reachable offset, so the strip parks partly over empty space. Plot taps, presses, and the VoiceOver actions clamp; commentary and other external scrubs, such as schedule rows, do not, with or without Reduce Motion. This fails scenario 15.
-
-- The 0.3-hour edge margin (§12.3) is 5.4 units, less than half the width of an event time or hanging reading. A mark between about 0.3 and 1.5 hours from either end of the loaded window therefore draws its time and reading cut by the strip edge. This is visible at both ends of an online-current window and a Canadian tide preview, and at a continuous strip's loaded edge until it extends. This also fails scenario 15. The margin should cover half the widest label.
+- The 0.3-hour edge margin (§12.3) is 5.4 units, less than half the width of an event time or hanging reading. A mark between about 0.3 and 1.5 hours from either end of the loaded window therefore draws its time and reading cut by the strip edge. This is visible at both ends of an online-current window and a Canadian tide preview, and at a continuous strip's loaded edge until it extends. This fails scenario 15. The margin should cover half the widest label.
 - Night and daylight bands pair sun events by civil day rather than by succession. Where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset precedes its sunrise, so that day gets no daylight tint, a night band that covers the whole day and overlaps the previous night, and a day name centred in the night. Night shading should span each sunset to the sunrise that follows it, and daylight tint each sunrise to the sunset that follows it.
-
-- A tap's animated ride does not mark the strip busy for the chunk store, so a left-edge publish that lands mid-ride shifts the coordinate origin under the animation; the curve and reading jump until the ride parks and the next update re-centres. The other animated paths (opening, hinge follow, Now and commentary rides, drag magnet) mark it busy.
 
 - The lead card overlays the strip without opting out of hit testing, so a drag or tap that starts on the lead's text (state, value, unit, or clock) does not reach the strip. The rest of the top pad scrubs normally.
 

@@ -28,12 +28,13 @@ struct DerivedGateDetailView: View {
     private var port: TideStationRecord { record.port }
     private var tz: TimeZone { gate.tz }
     private var phase: DerivedPhase { record.engineGate.phase(at: scrubTime, slacks: slacks) }
-    private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
     /// The stop the pill names and its tap walks to: the next slack, or the
     /// sun's next rise or set when that comes first.
     private var nextStop: CommentaryStop? {
-        nextCommentaryStop(nextSlack.map { commentaryEventStop("Slack", at: $0.time) },
-                           sun: timeline?.days ?? [], after: scrubTime)
+        let drawn = timeline?.drawnSpan
+        return nextCommentaryStop(firstCommentaryStop(slacks, at: \.time, after: scrubTime, drawn: drawn)
+                                    .map { commentaryEventStop("Slack", at: $0.time) },
+                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
     }
 
     var body: some View {

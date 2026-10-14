@@ -105,8 +105,8 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
     return runs
 }
 
-/// The moments a current axis prints: each run's opening, the time a planner
-/// is aiming at (spec §4 rule 7). Sorted.
+/// The moments a station card's current axis prints: each run's opening, the
+/// time a planner is aiming at (spec §4 rule 7). Sorted.
 func currentAxisMoments(runs: [WindowRun]) -> [Date] {
     runs.map(\.start).sorted()
 }
