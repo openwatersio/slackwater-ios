@@ -34,10 +34,9 @@ func tideCrossings(_ samples: [(time: Date, height: Double)], level: Double, ris
     return found
 }
 
-/// The opening of every merged slack run, with its close — the moments `currentAxisMoments`
-/// prints — plus the instant of any slack no run covers (`end == nil`). Series and events are
-/// padded 6 h beyond the range so a window straddling either end is whole; the caller clips
-/// to the range.
+/// The opening of every merged slack run, with its close, plus the instant of any slack no run
+/// covers (`end == nil`). Series and events are padded 6 h beyond the range so a window
+/// straddling either end is whole; the caller clips to the range.
 func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)

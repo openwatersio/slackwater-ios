@@ -32,6 +32,8 @@ struct TideDetailView: View {
     /// The strip viewport's width, reported by the strip — the span the
     /// scale governor fits the curve against.
     @State private var viewportPts: CGFloat = 0
+    /// Bumped when a preview clamp moves the selection, so the strip moves for it.
+    @State private var clampRequests = 0
 
     private var timeline: TimelineData? { store?.timeline ?? previewTimeline }
     private var activePreview: ChsTidePreview? { store == nil ? preview ?? displayedPreview : nil }
@@ -66,7 +68,11 @@ struct TideDetailView: View {
     /// The stop the pill names and its tap walks to: the next turn, or the
     /// sun's next rise or set when that comes first.
     private var nextStop: CommentaryStop? {
-        nextCommentaryStop(nextExtreme.map {
+        let drawn = timeline?.drawnSpan
+        let turn = timeline.flatMap {
+            firstCommentaryStop($0.tideExtremes, at: \.time, after: scrubTime, drawn: drawn)
+        }
+        return nextCommentaryStop(turn.map {
             let high = $0.kind == .high
             return CommentaryStop(time: $0.time,
                                   label: high
@@ -77,7 +83,7 @@ struct TideDetailView: View {
                                     : String(localized: "Low tide", comment: "VoiceOver tide-event label."),
                                   systemImage: high ? "arrow.up" : "arrow.down")
         },
-                           sun: timeline?.days ?? [], after: scrubTime)
+                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
     }
     /// What the pill says: the rate while the tide is fast — it explains the
     /// yellow line under it — else the next stop.
@@ -115,7 +121,7 @@ struct TideDetailView: View {
                             onPicked: { picked in
                                 if let coverage = activePreview?.coverage {
                                     anchor = todayLocal(tz)
-                                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                                    clamp(into: coverage)
                                 } else { store?.jump(to: scrubTime, anchor: picked) }
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
@@ -138,7 +144,8 @@ struct TideDetailView: View {
                                                    commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
                                                    scrollGate: store?.gate ?? previewGate,
-                                                   onViewportWidth: { viewportPts = $0 })
+                                                   onViewportWidth: { viewportPts = $0 },
+                                                   moveRequests: clampRequests)
                                     .overlay(alignment: .top) { lead(sky: sky) }
                             },
                             links: { tl, jump in
@@ -191,7 +198,7 @@ struct TideDetailView: View {
                 if let preview, let coverage = preview.coverage {
                     displayedPreview = preview
                     anchor = todayLocal(tz)
-                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                    clamp(into: coverage)
                     let record = record, now = live, day = anchor
                     let built = await Task.detached(priority: .userInitiated) {
                         TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
@@ -219,8 +226,7 @@ struct TideDetailView: View {
             }
             .onChange(of: scrubTime) { _, t in
                 if let coverage = activePreview?.coverage {
-                    let clamped = min(max(t, coverage.lowerBound), coverage.upperBound)
-                    if t != clamped { scrubTime = clamped }
+                    clamp(into: coverage)
                 } else { store?.focus(t, viewportPts: viewportPts) }
             }
             // The schedule follows a scrub that has settled somewhere outside
@@ -420,6 +426,13 @@ struct TideDetailView: View {
     private func exactHeight(at t: Date) -> Double {
         if let preview = activePreview { return preview.height(at: t) ?? 0 }
         return record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+    }
+
+    private func clamp(into coverage: ClosedRange<Date>) {
+        let clamped = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+        guard clamped != scrubTime else { return }
+        clampRequests += 1
+        scrubTime = clamped
     }
 
     private func returnToNow() {

@@ -74,8 +74,9 @@ import SlackwaterKit
             updated.updateUIView(sv, coordinator: co)
             XCTAssertTrue(writes.isEmpty, "applying a window, external time, or jump must not publish inside updateUIView")
             XCTAssertEqual(scrub, requested)
-            XCTAssertEqual(shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(requested),
-                           0, accuracy: 300)
+            // A request within a week rides; a window shift alone keeps the centre.
+            let destination = co.magnetTarget ?? shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(destination.timeIntervalSince(requested), 0, accuracy: 300)
         }
         sv.contentOffset.x += 40
         XCTAssertEqual(writes.count, 1, "ordinary scrolling must publish after the view update returns")
@@ -637,13 +638,12 @@ import SlackwaterKit
             .contains("오전 \u{2007}7:05"))
     }
 
-    /// An external scrub — a tapped commentary pill, return-to-now — rides the
-    /// magnet's animated path so the curve eases under the centerline, except
+    /// A programmatic move — a pill, return-to-now, a schedule row, a tap —
+    /// rides the animated path so the curve eases under the centerline, except
     /// under Reduce Motion, where it lands directly. A source scan, not a
-    /// behaviour test: the branch lives in `updateUIView`, which needs a real
-    /// `UIScrollView` and a live `UIAccessibility`, and this target can inject
-    /// neither. The UI suite covers what a scrub actually does; this only
-    /// guards the accessibility branch from being simplified away.
+    /// behaviour test: the branch needs a live `UIAccessibility`, which this
+    /// target cannot inject. The UI suite covers what a scrub actually does;
+    /// this only guards the accessibility branch from being simplified away.
     ///
     /// The branch asks `landsInstantly`, which is the Reduce Motion question
     /// with `-uiTestQuiet` folded in, so `assertLandsInstantly` below keeps
@@ -651,16 +651,16 @@ import SlackwaterKit
     func testExternalScrubHonoursReduceMotion() throws {
         let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
-        guard let start = lines.firstIndex(where: { $0.contains("if co.seenJump != jumpToken {") }),
-              let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
-        else { return XCTFail("the jump branch was not found — this tripwire needs retargeting") }
-        let jump = lines[start...offset].joined(separator: "\n")
+        guard let start = lines.firstIndex(where: { $0.contains("func move(_ sv: UIScrollView, to target: Date") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("syncGate(sv)") })
+        else { return XCTFail("the move was not found — this tripwire needs retargeting") }
+        let move = lines[start...end].joined(separator: "\n")
         assertLandsInstantlyAsksAboutReduceMotion(source)
-        XCTAssertTrue(jump.contains("landsInstantly"),
-                      "the jump must ask about Reduce Motion before animating")
-        XCTAssertTrue(jump.contains("co.magneting = false"),
-                      "the direct landing clears the magnet rather than riding it")
-        XCTAssertTrue(jump.contains("animated: true"),
+        XCTAssertTrue(move.contains("landsInstantly"),
+                      "the move must ask about Reduce Motion before animating")
+        XCTAssertTrue(move.contains("sv.contentOffset = CGPoint(x: offset, y: 0)"),
+                      "the direct landing sets the offset rather than riding to it")
+        XCTAssertTrue(move.contains("animated: true"),
                       "and the ordinary path animates the travel")
     }
 
@@ -678,7 +678,7 @@ import SlackwaterKit
         assertLandsInstantlyAsksAboutReduceMotion(source)
         XCTAssertTrue(magnet.contains("landsInstantly"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
-        XCTAssertTrue(magnet.contains("park(sv, at: target)"),
+        XCTAssertTrue(magnet.contains("move(sv, to: target, ride: false)"),
                       "the direct landing parks on the target itself")
     }
 
@@ -756,6 +756,157 @@ import SlackwaterKit
                        "the commentary jump must finish on its destination despite scroll feedback")
         XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
                        0, accuracy: 300, "the curve must finish under the same selected time")
+    }
+
+    /// The host's state, which the strip's own writes land in, as SwiftUI's would.
+    private final class Selection {
+        var time: Date
+        init(_ time: Date) { self.time = time }
+    }
+
+    /// In a window, so its animated scrolls run.
+    private func mountedStrip(_ data: TimelineData, _ sel: Selection, now: Date,
+                              gate: ScrollGate? = nil, opening: Bool = false, pills: [CGRect] = [])
+        -> (window: UIWindow, sv: UIScrollView, co: TimelineScrubber.Coordinator, strip: (Int) -> TimelineScrubber) {
+        let geo = TimelineGeo(data: data)
+        let strip = { (token: Int) in
+            TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                             scrubTime: Binding(get: { sel.time }, set: { sel.time = $0 }),
+                             jumpToken: token, scrollGate: gate, restingPills: pills)
+        }
+        let co = TimelineScrubber.Coordinator(strip(0))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        let sv = TimelineScrubber.ScrubScrollView(frame: window.bounds)
+        sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        sv.bounces = false
+        sv.delegate = co
+        window.addSubview(sv)
+        window.isHidden = false
+        co.centerIfNeeded(sv, animated: opening)
+        return (window, sv, co, strip)
+    }
+
+    private func settle(_ co: TimelineScrubber.Coordinator) async throws {
+        for _ in 0..<150 where co.magneting || co.nudging { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(20))
+    }
+
+    /// A rest a hair off a stop reads the stop's own time without a redundant animation.
+    func testADragEndingWithinHalfAUnitOfAStopLandsOnItExactly() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let stop = try XCTUnwrap(data.snapTimes.first { $0 > now.addingTimeInterval(12 * 3600) })
+        let sel = Selection(stop.addingTimeInterval(0.2 * 3600 / Double(Timeline.pph)))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let offset = m.sv.contentOffset.x
+        m.co.scrollViewWillBeginDragging(m.sv)
+        m.co.scrollViewDidEndDragging(m.sv, willDecelerate: false)
+        XCTAssertEqual(sel.time, stop, "the magnet lands on the stop's own instant")
+        XCTAssertEqual(m.sv.contentOffset.x, offset, "and moves nothing to get there")
+        XCTAssertFalse(m.co.magneting)
+    }
+
+    /// The newest request wins, or a schedule row tapped mid-ride would be dropped.
+    func testAHostSelectionDuringARideOrTheOpeningWins() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+
+        let sel = Selection(now.addingTimeInterval(-6 * 3600))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let first = now.addingTimeInterval(-3 * 3600)
+        sel.time = first
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertTrue(m.co.magneting, "a commentary request rides")
+        XCTAssertEqual(m.co.magnetTarget, first)
+        let second = now.addingTimeInterval(4 * 3600)
+        sel.time = second
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.magnetTarget, second, "a schedule row mid-ride replaces the ride's destination")
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, second)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(second),
+                       0, accuracy: 300)
+        // A time set without a request only resyncs a quiet strip, directly.
+        let unasked = second.addingTimeInterval(3600)
+        sel.time = unasked
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertFalse(m.co.magneting, "only a request rides")
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(unasked),
+                       0, accuracy: 300)
+
+        let opening = Selection(Timeline.introStart(for: now))
+        let o = mountedStrip(data, opening, now: now, opening: true)
+        defer { o.window.isHidden = true; o.co.stopIntro() }
+        XCTAssertNotNil(o.co.introDisplayLink, "the opening is running")
+        let linked = now.addingTimeInterval(9 * 3600)
+        opening.time = linked
+        o.strip(1).updateUIView(o.sv, coordinator: o.co)
+        XCTAssertNil(o.co.introDisplayLink, "a shared link stops the opening")
+        try await settle(o.co)
+        XCTAssertEqual(opening.time, linked)
+    }
+
+    /// An unreachable target would leave the reading disagreeing with the curve under the line.
+    func testAnExternalSelectionPastTheEdgeIsClampedAndReadBack() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(data.start.addingTimeInterval(30 * 3600))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let reachable = data.time(atX: m.sv.bounds.width / 2)
+        sel.time = data.start.addingTimeInterval(-2 * 3600)
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        if m.co.magneting { XCTAssertEqual(m.co.magnetTarget, reachable, "the ride heads for the edge, not past it") }
+        try await settle(m.co)
+        XCTAssertEqual(m.sv.contentOffset.x, 0, accuracy: 0.5)
+        XCTAssertEqual(sel.time, reachable, "the reading is the reachable time, not the request")
+
+        // The far end, with nothing to ride: a direct landing reads back too.
+        m.co.move(m.sv, to: data.end.addingTimeInterval(3600), ride: false)
+        XCTAssertEqual(sel.time, data.time(atX: data.totalWidth - m.sv.bounds.width / 2))
+    }
+
+    /// One touch on a resting pill reaches the strip's tap recognizer too; scrubbing to the tapped instant would overwrite the pill's request.
+    func testATapOnARestingPillLeavesThePillsRequestStanding() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let pill = CGRect(x: 140, y: 124, width: 120, height: Timeline.pillTarget)
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, pills: [pill])
+        defer { m.window.isHidden = true }
+        let target = now.addingTimeInterval(2 * 3600)
+        // The pill's action runs first, then the strip's tap for the same touch.
+        sel.time = target
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + pill.midX, y: pill.midY))
+        XCTAssertEqual(sel.time, target, "the strip's tap must leave the pill's selection alone")
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, target)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(target),
+                       0, accuracy: 300, "the strip moves to the stop the pill names")
+
+        // Off the pill, the same tap scrubs as ever.
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
+        try await settle(m.co)
+        XCTAssertLessThan(sel.time, target, "a tap left of the pill brings an earlier moment to the line")
+    }
+
+    /// A left-edge publish mid-ride would move the origin under the animation.
+    func testATapRideMarksTheStoreBusy() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let gate = ScrollGate()
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, gate: gate)
+        defer { m.window.isHidden = true }
+        let geo = TimelineGeo(data: data)
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 380, y: geo.bodyTop + 20))
+        XCTAssertTrue(m.co.magneting, "a tap across most of the viewport rides")
+        XCTAssertFalse(gate.isQuiet, "the ride holds the store's left edge")
+        try await settle(m.co)
+        XCTAssertTrue(gate.isQuiet, "and releases it on landing")
     }
 
     /// #280: rotation keeps `contentOffset.x` while the viewport width
@@ -898,23 +1049,28 @@ import SlackwaterKit
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
 
-        let slacks = d.currentEvents.filter { $0.kind == .slack && $0.time >= d.start && $0.time <= d.end }
+        // A slack inside a run drawn as a dot is the dot's stop, its centre.
+        let dots = d.slackRuns.filter(\.isDot)
+        let slacks = d.currentEvents.filter { e in
+            e.kind == .slack && e.time >= d.start && e.time <= d.end && !dots.contains { $0.contains(e.time) }
+        }
         XCTAssertFalse(slacks.isEmpty, "no slacks at this station — pick another fixture")
         for e in slacks {
             XCTAssert(stops.contains(e.time),
                       "the strip labels slack at \(e.time) but the magnet cannot stop there")
         }
         // Maxes are labelled too, and they are snap stops for the same reason.
-        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end {
+        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end
+            && !dots.contains(where: { $0.contains(e.time) }) {
             XCTAssert(stops.contains(e.time),
                       "the strip labels a max at \(e.time) but the magnet cannot stop there")
         }
 
-        let windows = d.slackWindows.filter { $0.start >= d.start && $0.end <= d.end }
-        XCTAssertFalse(windows.isEmpty, "no windows at this station — pick another fixture")
-        for window in windows {
-            XCTAssert(stops.contains(window.start))
-            XCTAssert(stops.contains(window.end))
+        let runs = d.slackRuns.filter { $0.start >= d.start && $0.end <= d.end }
+        XCTAssertFalse(runs.isEmpty, "no windows at this station — pick another fixture")
+        for run in runs {
+            XCTAssert(stops.contains(run.axisMoment), "the strip prints \(run.axisMoment) but the magnet cannot stop there")
+            for moment in run.snapMoments { XCTAssert(stops.contains(moment)) }
         }
     }
 
@@ -1124,9 +1280,9 @@ import SlackwaterKit
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
         let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
                                           anchor: todayLocal(station.tz), threshold: 1)
-        let window = try XCTUnwrap(timeline.slackWindows.first)
-        XCTAssertTrue(timeline.snapTimes.contains(window.start))
-        XCTAssertTrue(timeline.snapTimes.contains(window.end))
+        let run = try XCTUnwrap(timeline.slackRuns.first { !$0.isDot })
+        XCTAssertTrue(timeline.snapTimes.contains(run.start))
+        XCTAssertTrue(timeline.snapTimes.contains(run.end))
     }
 
     /// The window is half-open: parked on its opening the water is still

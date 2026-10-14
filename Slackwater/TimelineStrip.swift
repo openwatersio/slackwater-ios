@@ -317,17 +317,36 @@ struct TimelineData {
         start.addingTimeInterval(Double(x / Timeline.pph) * 3600)
     }
 
-    /// The stop a settled scrub at `x` pulls onto: the nearest within
-    /// `Timeline.magnetPts`, and none when it is already there. Both hosts,
-    /// the phone's scroll view and the watch's Crown, snap by this.
+    /// Includes a stop the rest already sits on, so the phone and the Crown both land on its exact instant.
     func magnetTarget(nearX x: CGFloat) -> Date? {
         var best: (time: Date, dx: CGFloat)?
         for t in snapTimes {
             let dx = abs(self.x(t) - x)
             if dx < (best?.dx ?? .greatestFiniteMagnitude) { best = (t, dx) }
         }
-        guard let best, best.dx < Timeline.magnetPts, best.dx > 0.5 else { return nil }
+        guard let best, best.dx < Timeline.magnetPts else { return nil }
         return best.time
+    }
+
+    /// The first and last drawn sample. Commentary names only stops inside it.
+    var drawnSpan: ClosedRange<Date>? {
+        if let a = tidePoints.first?.time, let b = tidePoints.last?.time { return a...b }
+        if let a = currentPoints.first?.time, let b = currentPoints.last?.time { return a...b }
+        return nil
+    }
+
+    /// The measured slack windows as the strip draws them: merged into runs.
+    var slackRuns: [WindowRun] {
+        mergeWindows(slackWindows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+    }
+
+    /// A run drawn as a dot is one stop at its centre, and the events inside it go with it.
+    static func currentSnapTimes(events: [CurrentEvent],
+                                 windows: [(slack: Date, start: Date, end: Date)]) -> [Date] {
+        let runs = mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+        let dots = runs.filter(\.isDot)
+        return events.map(\.time).filter { t in !dots.contains { $0.contains(t) } }
+            + runs.flatMap(\.snapMoments)
     }
     func day(of t: Date) -> TimelineDay? {
         days.last { $0.start <= t }
@@ -502,10 +521,9 @@ struct TimelineData {
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
-        let snaps = Array(Set(currentEvents.map(\.time) + sunTimes
+        let snaps = Array(Set(currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
                               + eclipses.flatMap(\.contacts)
-                              + solarEclipses.flatMap(\.contacts)
-                              + windows.flatMap { [$0.start, $0.end] }))
+                              + solarEclipses.flatMap(\.contacts)))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
@@ -595,10 +613,9 @@ struct TimelineData {
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentEvents.map(\.time) + sunTimes
+                              + currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
                               + eclipses.flatMap(\.contacts)
-                              + solarEclipses.flatMap(\.contacts)
-                              + windows.flatMap { [$0.start, $0.end] }))
+                              + solarEclipses.flatMap(\.contacts)))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
@@ -609,6 +626,18 @@ struct TimelineData {
                             slackThreshold: threshold,
                             speedsAreSchematic: gate != nil)
     }
+}
+
+extension WindowRun {
+    /// From the duration at the strip's scale, so data code agrees with the drawing without a Path.
+    var isDot: Bool {
+        CurveStyle.runDrawsAsDot(width: CGFloat(end.timeIntervalSince(start) / 3600) * Timeline.pph)
+    }
+    var centre: Date { start.addingTimeInterval(end.timeIntervalSince(start) / 2) }
+    /// A dot is one moment, so the magnet stops only at its centre.
+    var snapMoments: [Date] { isDot ? [centre] : [start, end] }
+    /// The event-time row prints where the run's mark is: a dot's centre, a stroke's opening.
+    var axisMoment: Date { isDot ? centre : start }
 }
 
 // MARK: - Vertical geometry (prototype geo())
@@ -1088,7 +1117,7 @@ struct TimelineCanvas: View {
         // Merged over the whole window — runs join across a seam, and the
         // axis labels must see every one of them or they would disagree from
         // tile to tile. Only the drawn segments are cut to the tile.
-        let allRuns = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
+        let allRuns = data.slackRuns
         let runs = allRuns.filter { $0.end >= t0 && $0.start <= t1 }
         // The run segments, built before the line because the line clips
         // itself around them. Walks THIS TILE's samples, not the window's,
@@ -1136,7 +1165,7 @@ struct TimelineCanvas: View {
         let onStrip = { (t: Date) in
             t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
         }
-        axisTimes(ctx, currentAxisMoments(runs: allRuns).filter(onStrip), t0, t1)
+        axisTimes(ctx, allRuns.map(\.axisMoment).sorted().filter(onStrip), t0, t1)
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.

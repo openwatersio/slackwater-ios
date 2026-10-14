@@ -184,6 +184,8 @@ enum CurveStyle {
     /// The slack run's stroke: a step fatter than the line, so the go mark
     /// reads as a segment laid over it rather than a recolour of it.
     static let runWidth: CGFloat = 3.5
+    /// A slack run narrower than a turn dot would read as a blot, so it draws as the dot.
+    static func runDrawsAsDot(width: CGFloat) -> Bool { width < dotRadius * 2 }
     static let nowDotDiameter: CGFloat = 7
     /// Clearance beyond a dot or slack run's end.
     static let haloGap: CGFloat = 2.5

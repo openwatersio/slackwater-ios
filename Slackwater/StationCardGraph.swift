@@ -232,7 +232,7 @@ nonisolated struct StationCardGraph: View {
 
             CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
 
-            // The axis names each run's opening — the same moments the detail strip prints.
+            // The axis names each run's opening.
             if includesZero && showsTimes {
                 for when in currentAxisMoments(runs: windows) {
                     let cx = x(when)

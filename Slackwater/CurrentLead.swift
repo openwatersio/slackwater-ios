@@ -30,30 +30,35 @@ struct CurrentLead: View {
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
-    /// The stops the commentary walks: a window opening, its closing (the
-    /// run that begins), each max, and the sun's next rise or set when it
-    /// beats all of them.
+    /// The stops the commentary walks: a slack run's opening, its closing
+    /// (the run that begins), each max, and the sun's next rise or set when
+    /// it beats all of them. A run drawn as a dot is one stop, its centre.
     var nextSignificant: CommentaryStop? {
         var stops: [(time: Date, text: String)] = []
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
-        for w in timeline.slackWindows {
-            stops.append((w.start, "Slack"))
-            // A window that runs to the series' end never closes, so no run
+        for run in timeline.slackRuns {
+            if run.isDot {
+                stops.append((run.centre, "Slack"))
+                continue
+            }
+            stops.append((run.start, "Slack"))
+            // A run that reaches the series' end never closes, so no run
             // begins there. Direction is read a second past the edge.
-            if w.end < seriesEnd {
-                let v = timeline.velocityAt(w.end.addingTimeInterval(1))
-                stops.append((w.end, v >= 0 ? "Flood" : "Ebb"))
+            if run.end < seriesEnd {
+                let v = timeline.velocityAt(run.end.addingTimeInterval(1))
+                stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
             }
         }
         for e in timeline.currentEvents where e.kind != .slack {
             stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
         }
+        let drawn = timeline.drawnSpan
         // The tilde belongs to the water's numbers, not to the sun's clock,
         // so it goes on here rather than in `commentary`.
-        let water = stops.filter { $0.time > scrubTime.addingTimeInterval(1) }
+        let water = stops.filter { commentaryCanName($0.time, after: scrubTime, drawn: drawn) }
             .min { $0.time < $1.time }
             .map { commentaryEventStop($0.text, at: $0.time, prefix: tilde) }
-        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime)
+        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime, drawn: drawn)
     }
 
     var commentary: CommentaryContent? {

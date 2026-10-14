@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. Direct tests for slackWindow (SlackWindow.swift):
 // interpolated sub-threshold span, clamping, and the no-window cases.
+import SwiftUI
 import XCTest
 @testable import Slackwater
 import SlackwaterKit
@@ -86,6 +87,42 @@ final class SlackWindowTests: XCTestCase {
         let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
         let runs = [WindowRun(start: s(500), end: s(700)), WindowRun(start: s(50), end: s(340))]
         XCTAssertEqual(currentAxisMoments(runs: runs), [s(50), s(500)])
+    }
+
+    /// A dot is one mark, so it is one magnet stop and one event time, at its centre.
+    func testADotRunIsOneMomentAtItsCentre() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let s = { (sec: Double) in t0.addingTimeInterval(sec) }
+        let dot = WindowRun(start: s(200), end: s(800))
+        XCTAssertTrue(dot.isDot)
+        XCTAssertEqual(dot.centre, s(500))
+        XCTAssertEqual(dot.snapMoments, [s(500)])
+        XCTAssertEqual(dot.axisMoment, s(500))
+
+        let wide = WindowRun(start: s(10_000), end: s(12_000))
+        XCTAssertFalse(wide.isDot)
+        XCTAssertEqual(wide.snapMoments, [s(10_000), s(12_000)])
+        XCTAssertEqual(wide.axisMoment, s(10_000))
+
+        let snaps = TimelineData.currentSnapTimes(
+            events: [CurrentEvent(time: s(600), speed: 0, kind: .slack),
+                     CurrentEvent(time: s(5000), speed: 2, kind: .maxFlood),
+                     CurrentEvent(time: s(11_000), speed: 0, kind: .slack)],
+            windows: [(slack: s(600), start: s(200), end: s(800)),
+                      (slack: s(11_000), start: s(10_000), end: s(12_000))])
+        XCTAssertEqual(snaps.sorted(), [s(500), s(5000), s(10_000), s(11_000), s(12_000)])
+    }
+
+    /// Data that disagreed with the drawing would name two stops around one dot, or one stop on a stroke.
+    func testTheDotTestMatchesTheDrawnRun() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        for seconds in [60.0, 990, 999, 1001, 1010, 3600] {
+            let run = WindowRun(start: t0, end: t0.addingTimeInterval(seconds))
+            var path = Path()
+            path.move(to: CGPoint(x: 100, y: 40))
+            path.addLine(to: CGPoint(x: 100 + CGFloat(seconds / 3600) * Timeline.pph, y: 40))
+            XCTAssertEqual(CurveDrawing.isDot(path), run.isDot, "a \(seconds) s run")
+        }
     }
 
     /// A fast reversal whose bracketing samples are both outside the band, at

@@ -796,19 +796,30 @@ func commentaryContent(_ stop: CommentaryStop, from scrub: Date,
                              accessibilityLabel: String(localized: "\(stop.spokenLabel ?? stop.label) in \(spokenDuration)", comment: "VoiceOver label for the next tide, current, or sun event. Values are the event and a localized duration."))
 }
 
+/// Over a second ahead so landing on a stop advances the pill, and on the drawn samples so its tap stays on the data.
+func commentaryCanName(_ t: Date, after scrub: Date, drawn: ClosedRange<Date>?) -> Bool {
+    guard let drawn else { return false }
+    return t > scrub.addingTimeInterval(1) && drawn.contains(t)
+}
+
+/// The first of `stops`, in time order, that the commentary may name.
+func firstCommentaryStop<S: Sequence>(_ stops: S, at time: (S.Element) -> Date,
+                                      after scrub: Date, drawn: ClosedRange<Date>?) -> S.Element? {
+    stops.first { commentaryCanName(time($0), after: scrub, drawn: drawn) }
+}
+
 /// The stop the commentary names and its tap walks to: the water's next stop,
 /// or the sun's next rise or set when that comes first. Dark is an event a
 /// reader plans around the same way they plan around a slack.
 func nextCommentaryStop(_ water: CommentaryStop?,
                         sun days: [TimelineDay],
-                        after scrub: Date) -> CommentaryStop? {
-    // Strictly after the scrub, so landing on a stop advances to the next.
-    let cutoff = scrub.addingTimeInterval(1)
+                        after scrub: Date,
+                        drawn: ClosedRange<Date>?) -> CommentaryStop? {
     let sun = days
         .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
         .compactMap { time, word in time.map { commentaryEventStop(word, at: $0) } }
     return (sun + [water].compactMap { $0 })
-        .filter { $0.time > cutoff }
+        .filter { commentaryCanName($0.time, after: scrub, drawn: drawn) }
         .min { $0.time < $1.time }
 }
 

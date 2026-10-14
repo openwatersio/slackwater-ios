@@ -33,10 +33,12 @@ final class TimelineSnapTests: XCTestCase {
         XCTAssertNil(tl.magnetTarget(nearX: mid))
     }
 
-    func testMagnetTargetIsNilWhenAlreadyParked() throws {
+    /// A rest a hair off a stop still takes it, so the reading is the stop's own instant.
+    func testMagnetTargetHoldsAStopItAlreadySitsOn() throws {
         let tl = try friday()
         let stop = try XCTUnwrap(tl.snapTimes.dropFirst(3).first)
-        XCTAssertNil(tl.magnetTarget(nearX: tl.x(stop) + 0.2))
+        XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop) + 0.2), stop)
+        XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop)), stop)
     }
 
     func testReanchorOnlyOutsideTheWindow() throws {
