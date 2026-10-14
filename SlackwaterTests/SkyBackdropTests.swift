@@ -5,6 +5,48 @@ import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    func testBodiesMoveContinuouslyAcrossRiseAndSet() throws {
+        let observer = try Observer(latitudeDeg: 48.4237, longitudeDeg: -123.3027)
+        let f = ISO8601DateFormatter()
+        let start = try XCTUnwrap(f.date(from: "2032-04-23T07:00:00Z"))
+        let end = try XCTUnwrap(f.date(from: "2032-04-29T07:00:00Z"))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        var days: [TimelineDay] = []
+        var day = start
+        while day < end {
+            let next = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: day))
+            let sun = try sunEvents(from: day, to: next, observer: observer)
+            let moon = try moonEvents(from: day, to: next, observer: observer)
+            days.append(TimelineDay(offset: days.count, start: day,
+                                    sunrise: sun.first { $0.kind == .rise }?.time,
+                                    sunset: sun.first { $0.kind == .set }?.time,
+                                    moonrise: moon.first { $0.kind == .rise }?.time,
+                                    moonset: moon.first { $0.kind == .set }?.time))
+            day = next
+        }
+        for day in days.dropFirst().dropLast() {
+            for event in [day.sunrise, day.sunset, day.moonrise, day.moonset].compactMap({ $0 }) {
+                let before = SkyState(time: event.addingTimeInterval(-1), latitude: 48.4237,
+                                      longitude: -123.3027, days: days)
+                let after = SkyState(time: event.addingTimeInterval(1), latitude: 48.4237,
+                                     longitude: -123.3027, days: days)
+                for (a, b, spanA, spanB, pad) in [
+                    (before.sun, after.sun, before.sunSpan, after.sunSpan, sunDiscRadius),
+                    (before.moon, after.moon, before.moonSpan, after.moonSpan, moonGlyphSize / 2)
+                ] {
+                    let a = try XCTUnwrap(a), b = try XCTUnwrap(b)
+                    let size = CGSize(width: 402, height: 240)
+                    let p = skyPoint(azimuth: a.azDeg, altitude: a.altDeg, latitude: 48.4237,
+                                     span: spanA, pad: pad, size: size)
+                    let q = skyPoint(azimuth: b.azDeg, altitude: b.altDeg, latitude: 48.4237,
+                                     span: spanB, pad: pad, size: size)
+                    XCTAssertLessThan(hypot(p.x - q.x, p.y - q.y), 1, f.string(from: event))
+                }
+            }
+        }
+    }
+
     func testSolarEclipseDrawsTheMoonOverTheSunAndDarkensTheSky() throws {
         // 2017-08-21 from Victoria BC: about nine tenths of the sun covered at 17:21 UTC.
         let peak = try XCTUnwrap(ISO8601DateFormatter().date(from: "2017-08-21T17:21:00Z"))

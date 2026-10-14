@@ -94,9 +94,7 @@ func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
     return channel(16) << 16 | channel(8) << 8 | channel(0)
 }
 
-/// Where a body crosses the horizon: the azimuths at its last rise at or
-/// before a moment and its first set at or after it. By day that is today's
-/// pair; by night the pair brackets the night, and the body is off screen.
+/// The horizon crossings of the nearest complete rise-to-set arc.
 struct HorizonSpan: Equatable {
     let riseAz: Double
     let setAz: Double
@@ -229,10 +227,17 @@ struct SkyState {
 
     private static func span(rises: [Date], sets: [Date], at time: Date,
                              altAz: (Date) throws -> AltAz) -> HorizonSpan? {
-        guard let rise = rises.last(where: { $0 <= time }),
-              let set = sets.first(where: { $0 >= time }),
-              let riseAz = try? altAz(rise).azDeg,
-              let setAz = try? altAz(set).azDeg else { return nil }
+        let arcs = sets.compactMap { set -> (rise: Date, set: Date)? in
+            guard let rise = rises.last(where: { $0 < set }) else { return nil }
+            return (rise, set)
+        }
+        func distance(_ arc: (rise: Date, set: Date)) -> TimeInterval {
+            max(arc.rise.timeIntervalSince(time), time.timeIntervalSince(arc.set), 0)
+        }
+        // Switch arcs below the horizon, so the visible disc and halo never jump at a crossing.
+        guard let arc = arcs.min(by: { distance($0) < distance($1) }),
+              let riseAz = try? altAz(arc.rise).azDeg,
+              let setAz = try? altAz(arc.set).azDeg else { return nil }
         return HorizonSpan(riseAz: riseAz, setAz: setAz)
     }
 
