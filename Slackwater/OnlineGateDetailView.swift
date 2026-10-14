@@ -157,7 +157,11 @@ struct OnlineGateDetailView: View {
                             })
             .onAppear {
                 let today = todayLocal(tz)
-                if anchor == .distantPast { anchor = today }
+                if anchor == .distantPast {
+                    // A fold rebuilds this view: hang the window from the folded day so the strip can land on it.
+                    let folded = FoldHandoff.pending(gate.id)
+                    anchor = folded.map { Timeline.reanchor(settledAt: $0, anchor: today, tz: tz) ?? today } ?? today
+                }
                 fetchState = ChsFitService.shared.onlineState(gate.id)
                 if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
                 rebuild()

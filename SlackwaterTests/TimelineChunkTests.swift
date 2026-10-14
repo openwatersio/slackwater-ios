@@ -397,6 +397,18 @@ import SlackwaterKit
         XCTAssertEqual(store.timeline?.anchor, far)
     }
 
+    /// A detail rebuilt by a fold starts its store on the folded moment, so a
+    /// moment months from now is in the first data the strip lands on.
+    @MainActor func testAStoreStartedOnAFoldedMomentHoldsIt() {
+        let anchor = todayLocal(friday.tz)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = friday.tz
+        let folded = cal.date(byAdding: .month, value: 3, to: anchor)!
+        let store = TimelineWindowStore(source: .tide(friday))
+        store.start(anchor: anchor, now: appNow(), focus: folded)
+        XCTAssertEqual(store.timeline?.contains(folded), true)
+    }
+
     /// Return-to-now over chunks already on screen must still publish its anchor (#305).
     @MainActor func testStoreJumpRepublishesTheAnchorOverTheSameChunks() {
         let today = vancouverMidnight(2026, 8, 11)

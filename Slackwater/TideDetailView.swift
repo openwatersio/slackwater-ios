@@ -173,7 +173,7 @@ struct TideDetailView: View {
                 if anchor == .distantPast { anchor = todayLocal(tz) }
                 if preview == nil, store == nil {
                     let s = TimelineWindowStore(source: .tide(record))
-                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
+                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : FoldHandoff.pending(record.id))
                     store = s
                 }
                 RecentsStore.shared.record(record.id)

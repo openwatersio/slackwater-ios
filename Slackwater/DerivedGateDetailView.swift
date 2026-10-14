@@ -100,7 +100,7 @@ struct DerivedGateDetailView: View {
                     let linked = anchor != .distantPast
                     if !linked { anchor = todayLocal(tz) }
                     let s = TimelineWindowStore(source: .gate(record))
-                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
+                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : FoldHandoff.pending(gate.id))
                     store = s
                     refreshSlacks()
                 }

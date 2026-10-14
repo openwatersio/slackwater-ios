@@ -39,6 +39,14 @@ import UIKit
     /// The rebuild lands well within this of the hinge update before it; anything older is a different visit.
     static let freshFor: TimeInterval = 2
 
+    /// The moment a rebuilt detail builds its first data around, so the strip's
+    /// `take` finds it loaded. Does not consume the slot. Nil on now: the
+    /// ordinary build already covers it.
+    static func pending(_ stationID: String, at now: TimeInterval = CACurrentMediaTime()) -> Date? {
+        guard let m = slot, m.stationID == stationID, now - m.at <= freshFor, !m.live else { return nil }
+        return m.time
+    }
+
     static func take(_ stationID: String, at now: TimeInterval) -> Moment? {
         defer { slot = nil }
         guard let m = slot, m.stationID == stationID, now - m.at <= freshFor else { return nil }
@@ -484,7 +492,7 @@ struct TimelineScrubber: UIViewRepresentable {
             defer { didInitialCenter = true }
             ScrubTrace.record("center", sv)
             // Rebuilt by a fold: come back on the moment the strip was folded on,
-            // not on now. A picked week the rebuilt detail no longer shows opens as usual.
+            // not on now. The detail built its data around it (`FoldHandoff.pending`).
             if let id = parent.stationID, let fold = FoldHandoff.take(id, at: CACurrentMediaTime()) {
                 let moment = fold.live ? parent.now : fold.time
                 if moment >= parent.data.start, moment <= parent.data.end {

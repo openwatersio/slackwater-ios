@@ -152,7 +152,7 @@ struct CurrentDetailView: View {
                     // or the first build covers now and the strip clamps it away.
                     let linked = anchor != .distantPast
                     if !linked { anchor = todayLocal(tz) }
-                    resetStore(focus: linked ? scrubTime : nil)
+                    resetStore(focus: linked ? scrubTime : FoldHandoff.pending(record.itemId))
                 }
                 RecentsStore.shared.record(record.itemId)
                 if record.isChs { chsModel = ChsModelStore.loadCurrent(record.id) }

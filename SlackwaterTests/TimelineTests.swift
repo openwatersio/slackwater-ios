@@ -217,6 +217,20 @@ import SlackwaterKit
         XCTAssertEqual(FoldHandoff.take("a", at: 100.5)?.time, moment.time)
     }
 
+    /// The rebuilt detail reads the folded moment before its strip takes it, so
+    /// its first data is built around a moment far from now.
+    func testAPendingFoldIsReadWithoutTakingIt() {
+        defer { FoldHandoff.slot = nil }
+        let moment = FoldHandoff.Moment(stationID: "a", time: Date(timeIntervalSince1970: 0), live: false, closing: false, at: 100)
+        FoldHandoff.slot = moment
+        XCTAssertEqual(FoldHandoff.pending("a", at: 100.5), moment.time)
+        XCTAssertNotNil(FoldHandoff.slot, "pending leaves the moment for the strip's take")
+        XCTAssertNil(FoldHandoff.pending("b", at: 100.5), "another station's strip")
+        XCTAssertNil(FoldHandoff.pending("a", at: 100 + FoldHandoff.freshFor + 1), "a different visit")
+        FoldHandoff.slot = .init(stationID: "a", time: moment.time, live: true, closing: false, at: 100)
+        XCTAssertNil(FoldHandoff.pending("a", at: 100.5), "on now, the ordinary build already covers it")
+    }
+
     /// A fold rebuilds the detail. Closing lands the cover screen's strip on the
     /// folded moment; opening starts ahead of it and the hinge brings it back.
     @MainActor func testAFoldHandsTheMomentToTheRebuiltStrip() async {
