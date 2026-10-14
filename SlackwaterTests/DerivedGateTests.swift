@@ -5,7 +5,7 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class DerivedGateTests: XCTestCase {
+@MainActor final class DerivedGateTests: XCTestCase {
     let malibu = ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }
 
     // MARK: - Bundled identity (chs-gates.json, generated from the registry)

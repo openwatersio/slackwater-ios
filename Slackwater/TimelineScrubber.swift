@@ -7,6 +7,44 @@ import UIKit
 
 // MARK: - The scroll host: native pan + momentum, magnet on settle
 
+/// Land on the target instead of riding an animated `setContentOffset` there.
+///
+/// Reduce Motion asks for it. `-uiTestQuiet` needs it: with UIKit's animations
+/// off the scroll view arrives in the same frame and never calls
+/// `scrollViewDidEndScrollingAnimation`, which is the callback that parks
+/// `scrubTime` on the stop and clears `magneting`. Left on the animated path,
+/// the first magnet after a scrub wedges the coordinator for the life of the
+/// detail — `magnet` returns early ever after, and every later scrub leaves
+/// the readout exactly where it was.
+@MainActor private var landsInstantly: Bool {
+    UIAccessibility.isReduceMotionEnabled || uiTestQuiet
+}
+
+/// The moment a detail's strip was on when the iPhone Duo's hinge moved.
+/// Folding swaps the phone stack for the split view (or back) and SwiftUI
+/// rebuilds the detail with it, so the strip that comes back would open on
+/// now. One slot: a phone shows one detail.
+@MainActor enum FoldHandoff {
+    struct Moment {
+        let stationID: String
+        let time: Date
+        /// The strip was on now, so the new one lands on now too.
+        let live: Bool
+        /// Last seen closed: the cover screen takes over, with no opening to follow.
+        let closing: Bool
+        let at: TimeInterval
+    }
+    static var slot: Moment?
+    /// The rebuild lands well within this of the hinge update before it; anything older is a different visit.
+    static let freshFor: TimeInterval = 2
+
+    static func take(_ stationID: String, at now: TimeInterval) -> Moment? {
+        defer { slot = nil }
+        guard let m = slot, m.stationID == stationID, now - m.at <= freshFor else { return nil }
+        return m
+    }
+}
+
 struct TimelineScrubber: UIViewRepresentable {
     let data: TimelineData
     let geo: TimelineGeo
@@ -31,6 +69,12 @@ struct TimelineScrubber: UIViewRepresentable {
     /// host has nothing to open — a list card's strip — and then the strip carries neither the
     /// press recognizer nor the matching VoiceOver action.
     var onLongPress: (() -> Void)? = nil
+    /// VoiceOver's stand-in for the press: the host both parks the moment and opens its sheet.
+    /// Nil wherever `onLongPress` is.
+    var onAlertAction: (() -> Void)? = nil
+    /// The detail's station. Nil on a list card, which neither follows the
+    /// Duo's hinge nor hands its moment across a fold.
+    var stationID: String? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -59,6 +103,13 @@ struct TimelineScrubber: UIViewRepresentable {
             accessibilityTraits = .adjustable
         }
         required init?(coder: NSCoder) { fatalError("not from a nib") }
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            let hit = super.hitTest(point, with: event)
+            if event?.type == .touches {
+                ScrubTrace.record("hit point=\(point) target=\(String(describing: hit))", self)
+            }
+            return hit
+        }
         override func layoutSubviews() {
             super.layoutSubviews()
             onLayout?()
@@ -75,6 +126,8 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.showsHorizontalScrollIndicator = false
         sv.alwaysBounceVertical = false
         sv.contentInsetAdjustmentBehavior = .never
+        // The strip's SwiftUI mask clips instead, so it can reach into a trailing bleed.
+        sv.clipsToBounds = false
         sv.delegate = context.coordinator
         // Nothing mounted until the first update with a real width — the
         // opening data can already span two chunks, and mounting every tile
@@ -96,6 +149,18 @@ struct TimelineScrubber: UIViewRepresentable {
             sv.addGestureRecognizer(press)
         }
         sv.addGestureRecognizer(tap)
+        // The iOS 27.1 SDK's UIKit, the first with `UIHingeInteraction`. CI builds
+        // with an older Xcode, where the type does not exist to name.
+        #if canImport(UIKit, _version: 9127.0.85)
+        if #available(iOS 27.1, *), stationID != nil {
+            sv.addInteraction(UIHingeInteraction { [weak coordinator = context.coordinator] _, update in
+                guard let hinge = update.hinge else { return }
+                coordinator?.hingeDidChange(closed: hinge.status == .closed,
+                                            fullyOpen: hinge.status == .fullyOpen,
+                                            angle: Double(hinge.angle))
+            })
+        }
+        #endif
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -104,7 +169,13 @@ struct TimelineScrubber: UIViewRepresentable {
     }
 
     func updateUIView(_ sv: UIScrollView, context: Context) {
-        let co = context.coordinator
+        updateUIView(sv, coordinator: context.coordinator)
+    }
+
+    func updateUIView(_ sv: UIScrollView, coordinator co: Coordinator) {
+        co.updatingView = true
+        defer { co.updatingView = false }
+        ScrubTrace.record("update requested=\(scrubTime.timeIntervalSince1970) jump=\(jumpToken)", sv)
         co.parent = self
         // Rendered from the CURRENT offset; when a branch below moves the
         // offset, the scroll callback it fires refreshes again from the
@@ -150,6 +221,7 @@ struct TimelineScrubber: UIViewRepresentable {
         // UIKit stops a deceleration, and it cancels a magnet in flight too.
         let desired = data.x(scrubTime) - sv.bounds.width / 2
         if co.seenJump != jumpToken {
+            ScrubTrace.record("jump desired=\(desired)", sv)
             // A tapped pill mid-fling: the guard below would drop the jump and
             // the next scroll callback would write the fling's time back over
             // the tap. Stop the fling and the magnet, then ride the magnet's
@@ -166,12 +238,14 @@ struct TimelineScrubber: UIViewRepresentable {
             co.stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
             let travel = abs(desired - sv.contentOffset.x)
-            if UIAccessibility.isReduceMotionEnabled || travel < 0.5
+            if landsInstantly || travel < 0.5
                 || travel > CGFloat(Timeline.snapJumpHours) * Timeline.pph {
                 co.magneting = false
                 sv.contentOffset = CGPoint(x: desired, y: 0)
             } else {
                 co.magneting = true
+                // Scroll feedback must not cancel the external jump before its destination lands.
+                co.nudging = true
                 co.magnetTarget = scrubTime
                 sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
             }
@@ -179,6 +253,7 @@ struct TimelineScrubber: UIViewRepresentable {
             return
         }
         if abs(desired - sv.contentOffset.x) > 1, !sv.isDragging, !co.nudging {
+            ScrubTrace.record("external desired=\(desired)", sv)
             if sv.isDecelerating || co.magneting {
                 sv.setContentOffset(sv.contentOffset, animated: false)
                 co.cancelMagnet()
@@ -208,6 +283,24 @@ struct TimelineScrubber: UIViewRepresentable {
         var introStartedAt: CFTimeInterval?
         var introRange: (start: Date, destination: Date)?
         weak var introScrollView: UIScrollView?
+        /// The Duo is opening under this strip: the moment it lands on, and
+        /// how far the hinge has come.
+        struct HingeFollow {
+            let moment: Date
+            let live: Bool
+            /// `Timeline.hingeLead`, shortened where the window ends first.
+            let lead: TimeInterval
+            var startAngle: Double?
+            var progress = 0.0
+            /// The hinge has opened past where this strip first saw it.
+            var moved = false
+            var shown: Date
+            var lastUpdate: TimeInterval
+            var lastFrame: TimeInterval?
+        }
+        var hingeFollow: HingeFollow?
+        var hingeDisplayLink: CADisplayLink?
+        weak var hingeScrollView: UIScrollView?
         /// Where the animated scroll — the magnet's snap or a pill's jump — is
         /// headed; parked on exactly when the animation ends.
         var magnetTarget: Date?
@@ -217,6 +310,9 @@ struct TimelineScrubber: UIViewRepresentable {
         /// scroll callback it fires must not write `scrubTime` back from
         /// layout.
         var reanchoring = false
+        /// Applying SwiftUI's state can synchronously fire the scroll delegate,
+        /// including when loaded chunks move the timeline's left edge.
+        var updatingView = false
         /// Everything the drawn strip depends on — and notably NOT
         /// `scrubTime`. The canvas is the same picture at every offset: a pan
         /// moves it, it does not change it. Assigning `rootView` per scroll
@@ -303,6 +399,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let width = sv.bounds.width
             defer { laidOutWidth = width }
             guard didInitialCenter, width > 0, abs(width - laidOutWidth) > 0.5, !nudging else { return }
+            ScrubTrace.record("reanchor", sv)
             if sv.isDecelerating || magneting {
                 sv.setContentOffset(sv.contentOffset, animated: false)
                 cancelMagnet()
@@ -335,12 +432,13 @@ struct TimelineScrubber: UIViewRepresentable {
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
                 },
             ]
-            // The press and hold, as an action: the moment is already on the centerline, so
-            // the host opens the popup for it exactly as it would after a press.
-            if let onLongPress = parent.onLongPress {
+            // The press and hold, as an action. A sighted press turns the line under the strip
+            // and leaves the tap to the user; VoiceOver has nothing to go and find, so the host
+            // opens the sheet for the centerline moment in the same step (docs/alerts.md §7.1).
+            if let onAlertAction = parent.onAlertAction {
                 sv.accessibilityCustomActions?.append(
                     UIAccessibilityCustomAction(name: String(localized: "Set an alert", comment: "VoiceOver chart action.")) { _ in
-                        onLongPress(); return true
+                        onAlertAction(); return true
                     })
             }
         }
@@ -380,8 +478,25 @@ struct TimelineScrubber: UIViewRepresentable {
         /// exact opening state slides to now. Any other state (for example a
         /// picked week after an online timeline reload) centres without an
         /// intro. Reduce Motion likewise lands directly on now.
-        func centerIfNeeded(_ sv: UIScrollView) {
+        func centerIfNeeded(_ sv: UIScrollView, animated: Bool = !landsInstantly) {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
+            defer { didInitialCenter = true }
+            ScrubTrace.record("center", sv)
+            // Rebuilt by a fold: come back on the moment the strip was folded on,
+            // not on now. A picked week the rebuilt detail no longer shows opens as usual.
+            if let id = parent.stationID, let fold = FoldHandoff.take(id, at: CACurrentMediaTime()) {
+                let moment = fold.live ? parent.now : fold.time
+                if moment >= parent.data.start, moment <= parent.data.end {
+                    laidOutWidth = sv.bounds.width
+                    if fold.closing || !animated {
+                        sv.contentOffset = CGPoint(x: parent.data.x(moment) - sv.bounds.width / 2, y: 0)
+                        Task { @MainActor [weak self] in self?.parent.scrubTime = moment }
+                    } else {
+                        startHingeFollow(sv, moment: moment, live: fold.live)
+                    }
+                    return
+                }
+            }
             let start = parent.scrubTime
             let isIntro = abs(start.timeIntervalSince(Timeline.introStart(for: parent.now))) < 2
             let destination = isIntro ? parent.now : start
@@ -389,13 +504,12 @@ struct TimelineScrubber: UIViewRepresentable {
             let destinationX = parent.data.x(destination) - sv.bounds.width / 2
 
             // Offset assignment can call the delegate synchronously. Keep
-            // `didInitialCenter` false until the opening position is in place,
-            // so layout never mutates SwiftUI state.
+            // `didInitialCenter` false through both opening offsets, including
+            // the instant landing, so layout never mutates SwiftUI state.
             sv.contentOffset = CGPoint(x: isIntro ? startX : destinationX, y: 0)
-            didInitialCenter = true
             laidOutWidth = sv.bounds.width
             guard isIntro else { return }
-            guard !UIAccessibility.isReduceMotionEnabled else {
+            guard animated else {
                 sv.contentOffset = CGPoint(x: destinationX, y: 0)
                 Task { @MainActor [weak self] in self?.parent.scrubTime = destination }
                 return
@@ -427,32 +541,102 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
+        /// Stops the hinge follow too: anything that interrupts one opening
+        /// animation interrupts the other.
         func stopIntro() {
             introDisplayLink?.invalidate()
             introDisplayLink = nil
             introStartedAt = nil
             introRange = nil
             introScrollView = nil
+            hingeDisplayLink?.invalidate()
+            hingeDisplayLink = nil
+            hingeFollow = nil
+            hingeScrollView = nil
             nudging = false
         }
 
+        /// Every hinge update. A moving hinge leaves this strip's moment for the
+        /// strip the fold is about to rebuild, and an opening one drives the follow.
+        func hingeDidChange(closed: Bool, fullyOpen: Bool, angle: Double) {
+            guard let id = parent.stationID else { return }
+            let t = CACurrentMediaTime()
+            if var f = hingeFollow {
+                let start = f.startAngle ?? angle
+                f.startAngle = start
+                // Never backwards: a settled follow stays settled.
+                let progress = fullyOpen ? 1 : max(f.progress, Timeline.hingeProgress(angle: angle, from: start))
+                f.moved = f.moved || progress > f.progress
+                f.progress = progress
+                f.lastUpdate = t
+                hingeFollow = f
+            }
+            guard !fullyOpen else { return }
+            FoldHandoff.slot = .init(stationID: id,
+                                     time: hingeFollow?.moment ?? parent.scrubTime,
+                                     live: hingeFollow?.live ?? !scrubbedAway(parent.scrubTime, from: parent.now),
+                                     closing: closed, at: t)
+        }
+
+        private func startHingeFollow(_ sv: UIScrollView, moment: Date, live: Bool) {
+            let room = parent.data.end.timeIntervalSince(moment) - Timeline.centerPad * 3600
+            let lead = max(0, min(Timeline.hingeLead, room))
+            let shown = moment.addingTimeInterval(lead)
+            hingeFollow = HingeFollow(moment: moment, live: live, lead: lead,
+                                      shown: shown, lastUpdate: CACurrentMediaTime())
+            sv.contentOffset = CGPoint(x: parent.data.x(shown) - sv.bounds.width / 2, y: 0)
+            nudging = true
+            parent.scrollGate?.isQuiet = false
+            hingeScrollView = sv
+            let link = CADisplayLink(target: self, selector: #selector(advanceHinge))
+            hingeDisplayLink = link
+            link.add(to: .main, forMode: .common)
+        }
+
+        @objc private func advanceHinge(_ link: CADisplayLink) {
+            guard let sv = hingeScrollView, var f = hingeFollow else {
+                stopIntro()
+                return
+            }
+            if Timeline.hingeSettled(moved: f.moved, idle: link.timestamp - f.lastUpdate) { f.progress = 1 }
+            let target = f.moment.addingTimeInterval(f.lead * (1 - f.progress))
+            // Eased toward the hinge, not set from it: updates arrive at about
+            // 30 Hz, and the simulator's fold control jumps between postures.
+            let dt = f.lastFrame.map { link.timestamp - $0 } ?? 0
+            f.lastFrame = link.timestamp
+            f.shown = f.shown.addingTimeInterval(target.timeIntervalSince(f.shown) * (1 - exp(-dt / 0.1)))
+            hingeFollow = f
+            guard f.progress >= 1, abs(f.shown.timeIntervalSince(f.moment)) < 60 else {
+                sv.contentOffset = CGPoint(x: parent.data.x(f.shown) - sv.bounds.width / 2, y: 0)
+                return
+            }
+            sv.contentOffset = CGPoint(x: parent.data.x(f.moment) - sv.bounds.width / 2, y: 0)
+            parent.scrubTime = f.moment
+            stopIntro()
+            parent.scrollGate?.isQuiet = true
+        }
+
         func scrollViewDidScroll(_ sv: UIScrollView) {
+            ScrubTrace.record("scroll", sv)
             publishCenter(sv)
             refreshCanvas(sv)
-            guard sv.bounds.width > 0, didInitialCenter, !reanchoring else { return }
+            guard sv.bounds.width > 0, didInitialCenter, !reanchoring, !updatingView else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
         /// A touch during the opening slide leaves the scrubber exactly where
         /// the user grabbed it.
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
+            ScrubTrace.record("pan-began", sv)
             stopIntro()
             parent.scrollGate?.isQuiet = false
         }
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate: Bool) {
+            ScrubTrace.record("pan-ended", sv)
             if !willDecelerate { magnet(sv) }
             syncGate(sv)
         }
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
+            ScrubTrace.record("deceleration-ended", sv)
             magnet(sv)
             syncGate(sv)
         }
@@ -466,7 +650,10 @@ struct TimelineScrubber: UIViewRepresentable {
             magneting = false
             nudging = false
             // Park exactly on the stop, so readouts show the event's own time.
-            if let t = magnetTarget { magnetTarget = nil; parent.scrubTime = t }
+            if let t = magnetTarget {
+                magnetTarget = nil
+                if !updatingView { parent.scrubTime = t }
+            }
             syncGate(sv)
         }
 
@@ -499,7 +686,7 @@ struct TimelineScrubber: UIViewRepresentable {
             // Stop a fling first, then ride the magnet's animated path — the
             // same landing a tapped pill gets (updateUIView's jump branch).
             sv.setContentOffset(sv.contentOffset, animated: false)
-            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+            if landsInstantly || abs(desired - sv.contentOffset.x) < 0.5 {
                 park(sv, at: landing)
             } else {
                 magneting = true
@@ -515,11 +702,11 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
-        /// A press and hold: park its moment on the centerline and let the scaffold open the
-        /// popup there. Instant, not the tap's animated magnet ride — a press names one moment,
-        /// and a popup opening over a sliding strip could not say what it was about until the
-        /// slide landed. The day row belongs to the picker's tap and answers a press with
-        /// nothing.
+        /// A press and hold: park its moment on the centerline and tell the scaffold, whose line
+        /// under the strip names it (§7.1). Instant, not the tap's animated magnet ride — a press
+        /// names one moment, and a line changing under a sliding strip could not say what it was
+        /// about until the slide landed. The day row belongs to the picker's tap and answers a
+        /// press with nothing.
         @objc func handlePress(_ g: UILongPressGestureRecognizer) {
             guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
             let p = g.location(in: sv)
@@ -585,7 +772,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let desired = CGPoint(x: parent.data.x(target) - sv.bounds.width / 2, y: 0)
             // Reduce Motion: park on the stop directly, the same landing a
             // tap or a pill gets.
-            if UIAccessibility.isReduceMotionEnabled {
+            if landsInstantly {
                 park(sv, at: target)
                 return
             }
@@ -623,9 +810,13 @@ struct TimelineScrubStrip: View {
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
+    @Environment(\.stripTrailingBleed) private var trailingBleed
+    @Environment(\.stripStationID) private var stationID
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.openAlertPopup) private var openAlertPopup
+    @Environment(\.stripPressed) private var stripPressed
+    @Environment(\.stripIsPressed) private var pressed
+    @Environment(\.stripAlertAction) private var stripAlertAction
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -635,8 +826,14 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker, onLongPress: openAlertPopup)
+                         onPickDate: openWeekPicker, onLongPress: stripPressed,
+                         onAlertAction: stripAlertAction,
+                         stationID: stationID)
             .frame(height: geo.height)
+            // Stretched, not widened: the scroll view keeps its bounds, so the
+            // centerline stays at the visible center while the drawing runs
+            // on under the iPhone Duo's status rail.
+            .mask { Rectangle().padding(.trailing, -trailingBleed) }
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
             // and writing the caller's state there is "Modifying state during
@@ -666,7 +863,7 @@ struct TimelineScrubStrip: View {
             // reachable only through `jumpToken`, which is this view's own
             // @State — so the tour asks for it through the observable rather
             // than through a parameter, which would fan out to every detail
-            // view (CLAUDE.md).
+            // view.
             .onChange(of: TourCoach.shared.glideToken) { _, _ in
                 jumpToken += 1
             }
@@ -746,6 +943,13 @@ struct TimelineScrubStrip: View {
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
                     .opacity(settled && commentary != nil ? 1 : 0)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
+                // Held: the reading line runs on through the time and day rows to the alert
+                // line under the strip, which names the parked moment (docs/alerts.md §7.1).
+                if pressed {
+                    Rectangle().fill(.white.opacity(0.18))
+                        .frame(width: 1, height: geo.height - geo.bodyBottom)
+                        .position(x: w / 2, y: geo.bodyBottom + (geo.height - geo.bodyBottom) / 2)
+                }
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas
@@ -816,5 +1020,49 @@ struct TimelineScrubStrip: View {
         from = nil
         to = nil
         startedAt = nil
+    }
+}
+
+// Native state travels with CI's screenshot artifacts when the Malibu test opts in (#613).
+@MainActor private enum ScrubTrace {
+    #if DEBUG && targetEnvironment(simulator)
+    static let path: URL? = {
+        guard let i = CommandLine.arguments.firstIndex(of: "-scrubTrace"),
+              CommandLine.arguments.indices.contains(i + 1) else { return nil }
+        return URL(fileURLWithPath: CommandLine.arguments[i + 1])
+    }()
+    static var lines: [String] = []
+    static var pending = false
+    static let writer = DispatchQueue(label: "scrub-trace", qos: .utility)
+    #endif
+
+    static func record(_ event: @autoclosure () -> String, _ sv: UIScrollView) {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let path, lines.count < 2000 else { return }
+        let co = sv.delegate as? TimelineScrubber.Coordinator
+        var gestures: [String] = []
+        var view: UIView? = sv
+        while let current = view {
+            gestures += (current.gestureRecognizers ?? []).map {
+                "\(ObjectIdentifier(current)):\(type(of: $0))=\($0.state.rawValue)"
+            }
+            view = current.superview
+        }
+        lines.append("\(Date().timeIntervalSince1970) \(event()) view=\(ObjectIdentifier(sv)) frame=\(sv.convert(sv.bounds, to: nil)) offset=\(sv.contentOffset) size=\(sv.contentSize) enabled=\(sv.isScrollEnabled) dragging=\(sv.isDragging) decelerating=\(sv.isDecelerating) translation=\(sv.panGestureRecognizer.translation(in: sv)) time=\(co?.parent.scrubTime.timeIntervalSince1970 ?? 0) jump=\(co?.seenJump ?? -1) centered=\(co?.didInitialCenter ?? false) nudging=\(co?.nudging ?? false) magnet=\(co?.magneting ?? false) reanchoring=\(co?.reanchoring ?? false) gestures=\(gestures)")
+        guard !pending else { return }
+        pending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            record("snapshot", sv)
+            pending = false
+            let snapshot = lines
+            writer.async {
+                do {
+                    try snapshot.joined(separator: "\n").write(to: path, atomically: true, encoding: .utf8)
+                } catch {
+                    print("Could not save scrub trace: \(error)")
+                }
+            }
+        }
+        #endif
     }
 }

@@ -64,16 +64,19 @@ export const categoryRels = (l) => ({
 });
 
 // One entry per directory scripts/screenshots.sh writes. The display types
-// are the API's names for the 6.9" iPhone and 13" iPad slots; the sizes are
+// are the API's names for the iPhone, iPad and Watch slots; the sizes are
 // what Apple accepts for each, portrait or landscape.
 export const SCREENSHOT_SETS = [
+  { dir: 'iphone-6.3', type: 'APP_IPHONE_61', sizes: [[1206, 2622], [1179, 2556]] },
   { dir: 'iphone-6.9', type: 'APP_IPHONE_67', sizes: [[1320, 2868], [1290, 2796], [1260, 2736]] },
   { dir: 'ipad-13', type: 'APP_IPAD_PRO_3GEN_129', sizes: [[2064, 2752], [2048, 2732]] },
+  { dir: 'watch', type: 'APP_WATCH_ULTRA', sizes: [[422, 514], [410, 502]] },
 ];
 
 // Width and height from a PNG's IHDR chunk.
 export function pngSize(buf) {
-  if (buf.readUInt32BE(12) !== 0x49484452) throw new Error('not a PNG');
+  if (buf.length < 33 || !buf.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))
+    || buf.readUInt32BE(8) !== 13 || buf.readUInt32BE(12) !== 0x49484452) throw new Error('not a PNG');
   return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
 }
 

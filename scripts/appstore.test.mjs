@@ -143,3 +143,21 @@ test('the accessibility flags claim exactly the labels the metadata doc answers 
   }
   assert.deepEqual(Object.keys(accessibility).sort(), Object.values(keys).flat().sort());
 });
+
+
+test('PNG validation refuses a forged or truncated header before upload', () => {
+  const forged = png(1320, 2868);
+  forged[0] = 0;
+  assert.throws(() => pngSize(forged), /not a PNG/);
+  assert.throws(() => pngSize(Buffer.alloc(20)), /not a PNG/);
+});
+
+test('the medium iPhone and Watch screenshot directories accept their native sizes', () => {
+  for (const [dirName, width, height] of [['iphone-6.3', 1206, 2622], ['watch', 422, 514]]) {
+    const set = SCREENSHOT_SETS.find((s) => s.dir === dirName);
+    assert.ok(set, `${dirName} must be uploaded`);
+    const dir = mkdtempSync(join(tmpdir(), 'shots-'));
+    writeFileSync(join(dir, '01.png'), png(width, height));
+    assert.equal(screenshotFiles(dir, set.sizes).length, 1);
+  }
+});

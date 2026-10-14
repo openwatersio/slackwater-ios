@@ -89,12 +89,12 @@ func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource)
 /// Owns the fill bundle and the refresh timer. One instance per `MapStyler`;
 /// `attach` re-runs on every style load because the
 /// source object belongs to the style that loaded it.
-final class CurrentFillRenderer {
-    static let sourceID = "current-fill"
-    static let patchSourceID = "current-fill-patches"
-    static let directionLayerID = "current-directions"
-    static let patchDirectionLayerID = "current-directions-patches"
-    static let directionImageID = "current-direction-arrow"
+@MainActor final class CurrentFillRenderer {
+    nonisolated static let sourceID = "current-fill"
+    nonisolated static let patchSourceID = "current-fill-patches"
+    nonisolated static let directionLayerID = "current-directions"
+    nonisolated static let patchDirectionLayerID = "current-directions-patches"
+    nonisolated static let directionImageID = "current-direction-arrow"
 
     private weak var map: MLNMapView?
     private var source: MLNShapeSource?
@@ -107,7 +107,7 @@ final class CurrentFillRenderer {
     private let dodd = DoddMapFlowProvider()
     private var timer: Timer?
     private var evaluating = false
-    deinit {
+    isolated deinit {
         timer?.invalidate()
     }
 
@@ -135,7 +135,9 @@ final class CurrentFillRenderer {
         if patches == nil { patches = PatchField() }
         refresh()
         guard timer == nil, field != nil || patches != nil else { return }
-        let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in self?.refresh() }
+        let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }
@@ -157,12 +159,15 @@ final class CurrentFillRenderer {
             let patchCells = patches?.cells(at: when) ?? []
             let fillFeatures = currentCellFeatures(
                 fillCells, excludingDirectionsIn: patchCells)
-            var patchFeatures = currentCellFeatures(patchCells)
-            if let flow = dodd.flow(at: when) {
-                patchFeatures.append(currentDirectionFeature(
-                    at: flow.center, bearingDeg: flow.bearingDeg))
-            }
-            DispatchQueue.main.async {
+            let patchFeatures = {
+                var features = currentCellFeatures(patchCells)
+                if let flow = dodd.flow(at: when) {
+                    features.append(currentDirectionFeature(
+                        at: flow.center, bearingDeg: flow.bearingDeg))
+                }
+                return features
+            }()
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.evaluating = false
                 self.source?.shape = MLNShapeCollectionFeature(shapes: fillFeatures)

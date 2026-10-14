@@ -1,23 +1,23 @@
 import XCTest
 @testable import Slackwater
 
-final class UnitsCloudTests: XCTestCase {
+@MainActor final class UnitsCloudTests: XCTestCase {
     private var defaults: UserDefaults!
     private var suite: String!
     private var cloud: MemoryUnitsCloud!
     private var reloads = 0
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         suite = "UnitsCloudTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)!
         cloud = MemoryUnitsCloud()
         reloads = 0
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suite)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func sync() -> UnitsCloud {
@@ -54,6 +54,7 @@ final class UnitsCloudTests: XCTestCase {
     }
 
     func testFreshInstallDoesNotUploadDefaults() {
+        XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "en_FR")), "metric")
         let sync = sync()
         withExtendedLifetime(sync) {
             XCTAssertTrue(cloud.writes.isEmpty)
@@ -158,6 +159,48 @@ final class UnitsCloudTests: XCTestCase {
             XCTAssertNil(defaults.object(forKey: unitsKey))
             XCTAssertEqual(reloads, 0)
         }
+    }
+
+    func testComfortCurrentSyncsOnlyInRangeNumbers() {
+        let key = AppGroup.slackWindowSpeedKey
+        let sync = sync()
+        sync.set(1.2, forKey: key)
+        sync.set(42.0, forKey: key)
+        sync.set("1.2", forKey: key)
+        XCTAssertEqual(cloud.values[key] as? Double, 1.2)
+        XCTAssertEqual(cloud.writeCount, 1)
+        XCTAssertEqual(defaults.double(forKey: key), 1.2)
+        XCTAssertEqual(reloads, 1)
+
+        sync.set(1.3, forKey: key, reloading: false)
+        XCTAssertEqual(cloud.values[key] as? Double, 1.3)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3)
+        XCTAssertEqual(reloads, 1, "the stepper's steps leave the reload to its settle")
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        XCTAssertEqual(defaults.double(forKey: key), 1.3, "an unrelated change must not revert a step")
+
+        cloud.values[key] = 0.8
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        XCTAssertEqual(defaults.double(forKey: key), 0.8)
+        cloud.values[key] = 11.0
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        withExtendedLifetime(sync) {
+            XCTAssertEqual(defaults.double(forKey: key), 0.8)
+            XCTAssertEqual(cloud.writeCount, 2, "adopting a remote value must not echo it")
+            XCTAssertEqual(reloads, 2)
+        }
+    }
+
+    func testSavedComfortCurrentSeedsAnEmptyCloud() {
+        let key = AppGroup.slackWindowSpeedKey
+        defaults.set(0.7, forKey: key)
+        let sync = sync()
+        expectation(for: NSPredicate { [cloud] _, _ in
+            cloud?.values[key] as? Double == 0.7
+        }, evaluatedWith: nil)
+        cloud.notify(NSUbiquitousKeyValueStoreInitialSyncChange)
+        waitForExpectations(timeout: 3)
+        withExtendedLifetime(sync) { XCTAssertEqual(reloads, 0) }
     }
 
     func testCloudDisabledStillSavesLocalEdits() {

@@ -34,28 +34,6 @@ func tideCrossings(_ samples: [(time: Date, height: Double)], level: Double, ris
     return found
 }
 
-/// Sunrise → sunset spans at a position, padded a day either side of the range so an
-/// event near either end still finds its day. One Almanac search for the whole range.
-/// ponytail: a polar day with no rise or set has no span, so it reads as night.
-func daylightSpans(from: Date, to: Date, lat: Double, lon: Double) -> [ClosedRange<Date>] {
-    guard let observer = try? Observer(latitudeDeg: lat, longitudeDeg: lon),
-          let events = try? sunEvents(from: from.addingTimeInterval(-86_400),
-                                      to: to.addingTimeInterval(86_400), observer: observer)
-    else { return [] }
-    var spans: [ClosedRange<Date>] = []
-    var rise: Date?
-    for event in events {
-        switch event.kind {
-        case .rise: rise = event.time
-        case .set:
-            if let r = rise { spans.append(r...event.time) }
-            rise = nil
-        default: break
-        }
-    }
-    return spans
-}
-
 /// The opening of every merged slack run, with its close, plus the bare instant of any
 /// slack no run covers (`end == nil`) — the moments `currentAxisMoments` prints. Series
 /// and events are padded 6 h beyond the range so a window straddling either end is whole;
@@ -132,10 +110,22 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     case (.slack, .derived(let g, _, _)):
         found = g.slacks(from: from, to: to)
             .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
-    case (.tideExtreme(let high), .tide(let s, _, _)):
-        found = s.extremes(from: from, to: to)
+    case (.tideExtreme(let high, let ofDay), .tide(let s, let tz, _)):
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        // A day's rank needs the whole station day, 23 to 25 hours long, so that query runs
+        // midnight to midnight. The plain query stays as asked: the engine's heights shift in
+        // the eighth decimal with the range.
+        let span = ofDay == true
+            ? cal.startOfDay(for: from)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: to)) ?? to)
+            : from...to
+        var extremes = s.extremes(from: span.lowerBound, to: span.upperBound)
             .filter { $0.kind == (high ? .high : .low) }
-            .map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
+        if ofDay == true {
+            extremes = Dictionary(grouping: extremes, by: { cal.startOfDay(for: $0.time) }).values
+                .compactMap { $0.max { high ? $0.height < $1.height : $0.height > $1.height } }
+                .sorted { $0.time < $1.time }
+        }
+        found = extremes.map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
     case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
         let samples = s.heights(from: alertSampleGrid(from), to: to, step: 600).map { (time: $0.time, height: $0.height) }
         found = tideCrossings(samples, level: level, rising: rising)
@@ -168,8 +158,8 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
             found = []
         }
     }
-    if rule.daylightOnly {
-        let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)
+    if let sun = rule.sun {
+        let spans = sunWindowSpans(sun, from: from, to: to, lat: position.lat, lon: position.lon)
         found = found.filter { f in spans.contains { $0.contains(f.event) } }
     }
     return found.map {

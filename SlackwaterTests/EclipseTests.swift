@@ -408,7 +408,7 @@ final class EclipseTests: XCTestCase {
     func testTheSolarEclipseMergesIntoTheSchedule() throws {
         let (tl, e) = try solarEclipseTimeline()
         let row = try XCTUnwrap(eclipseEntries(tl).first { $0.time == e.start })
-        XCTAssertEqual(row.pill, .eclipse)
+        XCTAssertEqual(row.pill, .solarEclipse)
         XCTAssertEqual(row.value, chartTime(e.peak, tl.tz))
     }
 

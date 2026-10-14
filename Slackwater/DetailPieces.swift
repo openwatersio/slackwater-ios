@@ -94,9 +94,7 @@ func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
     return channel(16) << 16 | channel(8) << 8 | channel(0)
 }
 
-/// Where a body crosses the horizon: the azimuths at its last rise at or
-/// before a moment and its first set at or after it. By day that is today's
-/// pair; by night the pair brackets the night, and the body is off screen.
+/// The horizon crossings of the nearest complete rise-to-set arc.
 struct HorizonSpan: Equatable {
     let riseAz: Double
     let setAz: Double
@@ -171,6 +169,8 @@ struct SkyState {
     let moon: AltAz?
     let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
+    /// The sky glyph's rotation toward the sun, in this backdrop's frame (`moonTilt`).
+    let moonLightAngle: Double
     /// Every catalog star Almanac could place, with where it stands: built
     /// once per scrub frame here so the twinkle redraws don't recompute it.
     let stars: [(star: Star, at: AltAz)]
@@ -209,6 +209,10 @@ struct SkyState {
             }
         } ?? []
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
+        // `skyPoint` puts east on the right in both hemispheres, which in the
+        // north is the sky's mirror image; the limb is mirrored with it so it
+        // still faces the sun drawn beside it.
+        moonLightAngle = observer.flatMap { moonTilt(at: time, observer: $0, mirrored: latitude >= 0) } ?? 0
         illumination = try? moonIllumination(time)
         obscuration = observer.flatMap { try? solarObscuration(at: time, observer: $0) } ?? 0
         sunSpan = observer.flatMap { obs in
@@ -223,10 +227,17 @@ struct SkyState {
 
     private static func span(rises: [Date], sets: [Date], at time: Date,
                              altAz: (Date) throws -> AltAz) -> HorizonSpan? {
-        guard let rise = rises.last(where: { $0 <= time }),
-              let set = sets.first(where: { $0 >= time }),
-              let riseAz = try? altAz(rise).azDeg,
-              let setAz = try? altAz(set).azDeg else { return nil }
+        let arcs = sets.compactMap { set -> (rise: Date, set: Date)? in
+            guard let rise = rises.last(where: { $0 < set }) else { return nil }
+            return (rise, set)
+        }
+        func distance(_ arc: (rise: Date, set: Date)) -> TimeInterval {
+            max(arc.rise.timeIntervalSince(time), time.timeIntervalSince(arc.set), 0)
+        }
+        // Switch arcs below the horizon, so the visible disc and halo never jump at a crossing.
+        guard let arc = arcs.min(by: { distance($0) < distance($1) }),
+              let riseAz = try? altAz(arc.rise).azDeg,
+              let setAz = try? altAz(arc.set).azDeg else { return nil }
         return HorizonSpan(riseAz: riseAz, setAz: setAz)
     }
 
@@ -234,16 +245,6 @@ struct SkyState {
     var shadow: Double { eclipse?.shadow(at: time) ?? 0 }
     /// Penumbral shading right now — what a penumbral eclipse has instead.
     var wash: Double { eclipse?.wash(at: time) ?? 0 }
-
-    var moonLightAngle: Double {
-        guard let sun, let moon else { return 0 }
-        let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
-        let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
-        // The sun's tangent direction at the moon stays continuous across the screen's azimuth seam.
-        let horizontal = cos(sunAlt) * sin(deltaAz) * (latitude >= 0 ? -1.0 : 1.0)
-        let vertical = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
-        return atan2(-vertical, horizontal)
-    }
 
     /// The altitude the sky is lit for — the sun's, darkened by any eclipse.
     var litAltitude: Double { eclipsedSunAltitude(sun?.altDeg ?? -18, obscuration: obscuration) }
@@ -399,6 +400,19 @@ func moonLitPath(fraction: Double, radius r: CGFloat) -> Path {
     return c >= 0 ? near.union(terminator) : near.subtracting(terminator)
 }
 
+/// The rotation, in radians, that turns a `MoonGlyph(waxing: true)`, lit from
+/// +x, so its bright limb points the way the Moon's does from here at `time`.
+/// Almanac's bright limb less the parallactic angle is the limb's angle from
+/// the zenith, counterclockwise as the observer faces the Moon. SwiftUI's y
+/// runs down and its rotation turns clockwise, so straight up is −90° and the
+/// angle subtracts. `mirrored` is for a frame drawn as the sky's mirror image.
+/// Nil outside Almanac's supported years.
+func moonTilt(at time: Date, observer: Observer, mirrored: Bool = false) -> Double? {
+    guard let o = try? moonOrientation(at: time, observer: observer) else { return nil }
+    let fromZenith = (o.brightLimbAngleDeg - o.parallacticAngleDeg) * .pi / 180
+    return mirrored ? fromZenith - .pi / 2 : -.pi / 2 - fromZenith
+}
+
 /// The umbral shadow's offset for a disc of radius `r`: tangent at zero
 /// coverage (2r), concentric once the moon is covered. `coverage` is a
 /// fraction of the moon's DIAMETER — what Almanac's `magUmbral` means — and
@@ -548,7 +562,8 @@ func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> St
 
 /// The moon glyph: the lit region over a dark disc that stays
 /// semi-transparent to show the sky. Lit on the right while waxing, the
-/// northern convention; the sky passes `waxing: true` and rotates toward the sun.
+/// northern convention, for the calendar glyphs. The sky backdrop and the Moon
+/// sheet's head pass `waxing: true` and rotate it by `moonTilt`.
 ///
 /// `umbra` and `wash` add the eclipse on top of all that, and only on top:
 /// at zero the glyph is exactly what it draws for every other night.
@@ -857,6 +872,7 @@ struct SummaryTiles: View {
     /// about moons, not about what makes one station's range worth explaining.
     var primaryDetail: (() -> AnyView)? = nil
     var primarySymbol: String? = nil
+    var primaryValueColor: Color = .white
     /// The illumination the SKY already computed, rather than a second lookup
     /// per frame for the same instant (#299).
     let moon: MoonIllumination?
@@ -896,7 +912,7 @@ struct SummaryTiles: View {
         HStack(alignment: .top, spacing: 12) {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            accessibility: primary.label, detail: primaryDetail) {
+                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail) {
                     if let primarySymbol {
                         Image(systemName: primarySymbol).foregroundStyle(SN.foam.opacity(0.55))
                     }

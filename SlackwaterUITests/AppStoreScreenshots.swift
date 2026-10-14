@@ -12,11 +12,10 @@
 // it. Frames are numbered because App Store Connect orders an upload by
 // filename.
 //
-// Two standing constraints on what may appear. Premium is out of the Release
-// build (#470), so the walk never opens Settings or the widgets gallery —
-// the only two places PREMIUM_ENABLED surfaces anything, and both are on in
-// the Debug build these tests run against. And nothing here may imply
-// navigation use.
+// Two standing constraints on what may appear. The walk never opens Settings
+// or the widgets gallery, the only two places PREMIUM_ENABLED surfaces
+// anything, so the listing shows the free app (#470). And nothing here may
+// imply navigation use.
 import XCTest
 
 final class AppStoreScreenshots: ShotWalk {
@@ -32,8 +31,8 @@ final class AppStoreScreenshots: ShotWalk {
     /// One favorite, not `ShotWalk`'s two. A phone fits four cards above the
     /// FAB row, and the frame is about the three groups being on screen
     /// together — a second favorite pushes the Near Me header under the FABs.
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         seededFavorites = "noaa/9444900"
     }
 

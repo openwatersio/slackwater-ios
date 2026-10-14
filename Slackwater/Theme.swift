@@ -47,15 +47,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// A detail can supply its scrub-time sky without changing the scaffold's
     /// generic signature.
     var topBackdrop: AnyView? = nil
-    /// What a long press on the strip offers to alert on (spec §7.1). Nil — the online
-    /// gate — means a press does nothing.
+    /// What the strip offers to alert on for the centerline's moment (spec §7.1). Nil — the
+    /// online gate, a CHS tide preview — means no line and a press does nothing.
     var alertOffer: AlertTrigger? = nil
     @State private var topHeight: CGFloat = 0
     /// The tour's glide has settled, which swaps the stars copy from the
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
-    @State private var showAlertPopup = false
+    /// The moment a long press parked (§7.1). Cleared the moment the strip moves off it.
+    @State private var pressedMoment: Date? = nil
+    @State private var alertSubject: AlertSheetSubject? = nil
+    @ObservedObject private var alertRules = AlertRuleStore.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -129,9 +133,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         }
                     }
                     .padding(.bottom, 42)
+                    // The iPhone Duo's status rail is a trailing-only
+                    // inset: the sky bleeds under it, the content stays clear.
+                    .padding(.leading, geo.safeAreaInsets.leading)
+                    .padding(.trailing, geo.safeAreaInsets.trailing)
                 }
+                // The ScrollView ignoring the inset is not enough: in a split
+                // view it still sizes its content short of the rail.
+                .ignoresSafeArea(edges: .horizontal)
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: [.top, .horizontal])
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
                 // A dedicated GeometryReader, not the outer `geo`: `geo` sits
                 // inside the safe area, but this ScrollView ignores the top
@@ -148,8 +159,28 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
-            .environment(\.openWeekPicker, { showPicker = true })
-            .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
+            .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
+            .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
+            .environment(\.stripStationID, favoriteId)
+            .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
+            .environment(\.stripIsPressed, pressedMoment != nil)
+            // VoiceOver's "Set an alert" has no line to go and find: it parks the moment and
+            // opens the sheet in one step.
+            .environment(\.stripAlertAction, {
+                guard let alertOffer else { return }
+                pressedMoment = scrubTime
+                openAlertSheet(alertOffer, pressedAt: scrubTime)
+            })
+            // A scrub, fling, return-to-now or shared link after a press drops the line back to
+            // Rest; compared by minute so the strip's own settle does not.
+            .onChange(of: scrubTime) { _, t in
+                if let p = pressedMoment, alertMinute(p) != alertMinute(t) { pressedMoment = nil }
+            }
+            .sheet(item: $alertSubject) { subject in
+                AlertSheet(rule: subject.rule, stationName: name,
+                           boundMoment: subject.boundMoment, isNew: subject.isNew,
+                           focusSentence: subject.focusSentence)
+            }
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
             // link lands while this detail is already up — a second link to the
@@ -218,7 +249,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 // anchor (TourMarkLayer) — so scroll to `.stars`' id for it
                 // too. Smaller than publishing a second id for the same spot.
                 let scrollID = step == .moon ? .stars : step
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
                     scrollProxy.scrollTo(scrollID, anchor: .center)
                 }
             }
@@ -298,18 +329,17 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // strip's own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
-                // `.rect(.bounds)` anchors to the strip's own bounds — the centerline the press
-                // just parked its moment on sits inside it. `.presentationCompactAdaptation(.popover)`
-                // keeps it an arrow-anchored card on iPhone instead of adapting to a sheet.
-                .popover(isPresented: $showAlertPopup, attachmentAnchor: .rect(.bounds),
-                         arrowEdge: .top) {
-                    if let alertOffer {
-                        AlertPopup(stationID: favoriteId, offer: alertOffer,
-                                   moment: scrubTime, tz: tz, stationName: name)
-                            .presentationCompactAdaptation(.popover)
-                    }
-                }
-
+            // Under the strip, above the links (§7.1). Absent while there is nothing to alert on:
+            // an online gate, or a CHS station still a preview — the download notice has the
+            // space then.
+            if let alertOffer {
+                AlertLine(state: alertLineState(alertRules.rules, stationID: favoriteId,
+                                                offer: alertOffer, at: scrubTime,
+                                                pressed: pressedMoment != nil, now: appNow()),
+                          offer: alertOffer, tz: tz,
+                          action: { openAlertSheet(alertOffer, pressedAt: pressedMoment) })
+                    .padding(.horizontal, 16)
+            }
             links(tl, jump)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
@@ -317,9 +347,31 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         .padding(.bottom, 12)
     }
 
+    /// What the line opens: the rule it reads, else a new rule for the pressed moment, else one
+    /// for the offer's next occurrence — on an unscrubbed tide strip, the next low (§7.1).
+    private func openAlertSheet(_ offer: AlertTrigger, pressedAt: Date?) {
+        switch alertLineState(alertRules.rules, stationID: favoriteId, offer: offer,
+                              at: scrubTime, pressed: pressedAt != nil, now: appNow()) {
+        case .set(let rule):
+            alertSubject = AlertSheetSubject(rule: rule, boundMoment: rule.once, isNew: false)
+        case .pressed(let moment):
+            alertSubject = AlertSheetSubject(rule: alertNewRule(stationID: favoriteId, offer: offer, at: moment),
+                                             boundMoment: alertMinute(moment), isNew: true)
+        case .rest:
+            // Nothing ahead in the horizon: the draft repeats, since there is no moment to bind.
+            let next = alertNextOccurrence(stationID: favoriteId, offer: offer, after: appNow(),
+                                           threshold: slackThresholdKn)
+            let draft = next.map { alertNewRule(stationID: favoriteId, offer: offer, at: $0) }
+                ?? AlertRule(stationID: favoriteId, trigger: offer, lead: alertNewRuleLead)
+            alertSubject = AlertSheetSubject(rule: draft, boundMoment: next.map(alertMinute), isNew: true,
+                                             focusSentence: true)
+        }
+    }
+
     private func scheduleCard(_ tl: TimelineData) -> some View {
         VStack(spacing: 0) {
             WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: { showPicker = true })
+                .disabled(!canPickDate)
             Divider().overlay(Color.white.opacity(0.08))
             // Both dates, never one: `anchor` keys the day groups (it is what
             // `days` offsets are relative to), `today` only says Today/Tomorrow.
@@ -329,7 +381,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
                              tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
-                             scrubTime: scrubTime, onTap: { scrubTime = $0 })
+                             scrubTime: scrubTime, onTap: { scrubTime = $0 },
+                             sunLocation: StationItem.byId[favoriteId])
         }
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -391,27 +444,79 @@ struct WeekRangeBar: View {
 /// three views deep in every detail, and none of the layers between it and the
 /// scaffold has anything to say about dates.
 private struct OpenWeekPickerKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
+    static let defaultValue: @MainActor () -> Void = {}
 }
 
 extension EnvironmentValues {
-    var openWeekPicker: () -> Void {
+    var openWeekPicker: @MainActor () -> Void {
         get { self[OpenWeekPickerKey.self] }
         set { self[OpenWeekPickerKey.self] = newValue }
     }
+    /// How far the strip may draw past its trailing edge: the iPhone
+    /// Duo's status rail, which the scaffold pads its content clear of.
+    var stripTrailingBleed: CGFloat {
+        get { self[StripTrailingBleedKey.self] }
+        set { self[StripTrailingBleedKey.self] = newValue }
+    }
+}
+
+private struct StripTrailingBleedKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+/// The station a detail's strip belongs to, so a fold hands its moment only
+/// to the same station's rebuilt strip. Nil outside a detail.
+private struct StripStationIDKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var stripStationID: String? {
+        get { self[StripStationIDKey.self] }
+        set { self[StripStationIDKey.self] = newValue }
+    }
+}
+
+/// What the line's sheet opens on.
+struct AlertSheetSubject: Identifiable {
+    let rule: AlertRule
+    let boundMoment: Date?
+    let isNew: Bool
+    /// The Rest tap opens on the sentence field; a press opens on its moment (§7.2).
+    var focusSentence = false
+    var id: UUID { rule.id }
 }
 
 /// How the strip tells the scaffold it was pressed and held. Same reasoning as
 /// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
 /// have nothing to say about alerts.
-private struct OpenAlertPopupKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
+private struct StripPressedKey: EnvironmentKey {
+    static let defaultValue: @MainActor () -> Void = {}
+}
+
+/// Whether the scaffold holds a pressed moment, so the strip can run its reading line down to
+/// the alert line that names it.
+private struct StripIsPressedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet.
+private struct StripAlertActionKey: EnvironmentKey {
+    static let defaultValue: @MainActor () -> Void = {}
 }
 
 extension EnvironmentValues {
-    var openAlertPopup: () -> Void {
-        get { self[OpenAlertPopupKey.self] }
-        set { self[OpenAlertPopupKey.self] = newValue }
+    var stripPressed: @MainActor () -> Void {
+        get { self[StripPressedKey.self] }
+        set { self[StripPressedKey.self] = newValue }
+    }
+    var stripAlertAction: @MainActor () -> Void {
+        get { self[StripAlertActionKey.self] }
+        set { self[StripAlertActionKey.self] = newValue }
+    }
+    var stripIsPressed: Bool {
+        get { self[StripIsPressedKey.self] }
+        set { self[StripIsPressedKey.self] = newValue }
     }
 }
 
@@ -591,12 +696,6 @@ struct StationDetailNote: View {
     }
 }
 
-// `ProvisionalBadge` — the ⚠️ disc that used to sit beside the region on a
-// provisional card — is gone (#93). One marking per state: the fast answer is
-// now `CardStatus.refining`'s strip, which says the word and the tolerance
-// instead of leaving the reader to decode a triangle. Its contrast measurement
-// (docs/testflight.md) still governs, and CardStatus.tint cites it.
-
 // MARK: - Detail-to-detail navigation
 
 /// Detail views push the paired port's own detail through this, not a
@@ -604,11 +703,11 @@ struct StationDetailNote: View {
 /// goes dead below the strip in the iPad split detail column while tap
 /// gestures keep working (see MultiDaySchedule's row comment).
 private struct OpenTideDetailKey: EnvironmentKey {
-    static let defaultValue: (TideStationRecord) -> Void = { _ in }
+    static let defaultValue: @MainActor (TideStationRecord) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openTideDetail: (TideStationRecord) -> Void {
+    var openTideDetail: @MainActor (TideStationRecord) -> Void {
         get { self[OpenTideDetailKey.self] }
         set { self[OpenTideDetailKey.self] = newValue }
     }
@@ -622,11 +721,11 @@ extension EnvironmentValues {
 /// online gate's nearest-shipped link and the downloads-row tap both go
 /// through this, rather than each carrying its own single-case key.
 private struct OpenChsRouteKey: EnvironmentKey {
-    static let defaultValue: (ChsRoute) -> Void = { _ in }
+    static let defaultValue: @MainActor (ChsRoute) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openChsRoute: (ChsRoute) -> Void {
+    var openChsRoute: @MainActor (ChsRoute) -> Void {
         get { self[OpenChsRouteKey.self] }
         set { self[OpenChsRouteKey.self] = newValue }
     }
@@ -636,11 +735,11 @@ extension EnvironmentValues {
 /// discovery link can land on a NOAA current, a CHS port or a gate, and each
 /// pushes a different route. Same closure-not-NavigationLink reasoning.
 private struct OpenStationItemKey: EnvironmentKey {
-    static let defaultValue: (StationItem) -> Void = { _ in }
+    static let defaultValue: @MainActor (StationItem) -> Void = { _ in }
 }
 
 extension EnvironmentValues {
-    var openStationItem: (StationItem) -> Void {
+    var openStationItem: @MainActor (StationItem) -> Void {
         get { self[OpenStationItemKey.self] }
         set { self[OpenStationItemKey.self] = newValue }
     }
@@ -651,11 +750,11 @@ extension EnvironmentValues {
 /// station at the zoom they pass — not a NavigationLink or Button, same
 /// press-tracking hazard in the iPad split detail column.
 private struct OpenMapFocusedKey: EnvironmentKey {
-    static let defaultValue: (StationItem, Double) -> Void = { _, _ in }
+    static let defaultValue: @MainActor (StationItem, Double) -> Void = { _, _ in }
 }
 
 extension EnvironmentValues {
-    var openMapFocused: (StationItem, Double) -> Void {
+    var openMapFocused: @MainActor (StationItem, Double) -> Void {
         get { self[OpenMapFocusedKey.self] }
         set { self[OpenMapFocusedKey.self] = newValue }
     }
@@ -809,9 +908,9 @@ struct SeriesFilterChips: View {
 /// name is the database's to change between catalog releases. Keyed by name,
 /// a pick was orphaned by every rename; as an id it survives them, and the
 /// group it answers for is found again from the id at read time.
-final class ChosenStationsStore: ObservableObject {
+@MainActor final class ChosenStationsStore: ObservableObject {
     static let shared = ChosenStationsStore()
-    static let cloudPrefix = "slackwater.pick."
+    nonisolated static let cloudPrefix = "slackwater.pick."
 
     @Published private(set) var ids: Set<String>
 
@@ -822,26 +921,31 @@ final class ChosenStationsStore: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: cloud, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.adopt(cloud) } }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let cloud = FavoritesCloud.store else { return }
+                self?.adopt(cloud)
+            }
+        }
         cloud.synchronize()
-        MainActor.assumeIsolated { self.adopt(cloud) }
+        self.adopt(cloud)
     }
 
     /// The picks on disk; an older place-keyed shape is written back as the array on the next change.
-    static func load(_ defaults: UserDefaults) -> Set<String> {
+    nonisolated static func load(_ defaults: UserDefaults) -> Set<String> {
         chosenStationIDs(defaults)
     }
 
     /// The pick that answers for a group of namesakes, nearest first: the
     /// first member chosen. Two can be chosen at once only after a rename
     /// merged two places, and the nearer is what the chooser would show anyway.
-    static func chosen(in group: [StationItem], from ids: Set<String>) -> StationItem? {
+    nonisolated static func chosen(in group: [StationItem], from ids: Set<String>) -> StationItem? {
         group.first { ids.contains($0.id) }
     }
 
     /// `ids` with `item` picked for its place: the other members of the place
     /// leave, so a pick stays one per place under the names of the day.
-    static func choosing(_ item: StationItem, in ids: Set<String>) -> Set<String> {
+    nonisolated static func choosing(_ item: StationItem, in ids: Set<String>) -> Set<String> {
         let place = Set((StationItem.byPlace[item.placeKey] ?? [item]).map(\.id))
         return ids.subtracting(place).union([item.id])
     }
@@ -849,7 +953,7 @@ final class ChosenStationsStore: ObservableObject {
     /// One KVS key per place, so two devices picking for the same place
     /// resolve last-writer-wins with no merge code (see FavoritesCloud). Keys
     /// cap at 64 bytes and a place key can run past that, so it is hashed.
-    static func cloudKey(_ placeKey: String) -> String {
+    nonisolated static func cloudKey(_ placeKey: String) -> String {
         // FNV-1a: stable across launches and devices, unlike `hashValue`.
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in placeKey.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
@@ -858,7 +962,7 @@ final class ChosenStationsStore: ObservableObject {
 
     /// The picked ids, out of `dictionaryRepresentation`. The key is only a
     /// collision slot; a pick for a station no longer bundled drops out.
-    static func picks(_ raw: [String: Any]) -> Set<String> {
+    nonisolated static func picks(_ raw: [String: Any]) -> Set<String> {
         var out = Set<String>()
         for (key, value) in raw where key.hasPrefix(cloudPrefix) {
             guard let id = value as? String, StationItem.byId[id] != nil else { continue }

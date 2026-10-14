@@ -22,15 +22,15 @@ struct DownloadStrip: View {
             // capture that creates the cohort never fired and nothing ever
             // downloaded. A zero-height row is a view; EmptyView is a hole.
             Color.clear.frame(height: 0)
-        case let .working(done, total):
+        case let .working(done, total, progress):
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Downloading nearby stations")
+                        Text("Downloading")
                         Spacer()
                         Text("\(done) of \(total)").monospacedDigit()
                     }
-                    ProgressView(value: Double(done), total: Double(max(total, 1)))
+                    ProgressView(value: progress, total: 10)
                 }
             }
             .buttonStyle(.plain)
@@ -41,7 +41,11 @@ struct DownloadStrip: View {
             HStack(spacing: 12) {
                 // A count, never a duration: locking the phone stops the work,
                 // so a time here would be a promise the app cannot keep.
-                Text("Download \(count) more?")
+                Button(action: onOpen) {
+                    Text("Download \(count) more?")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("download-strip-open")
                 Spacer(minLength: 8)
                 // Marks, not words: the question is already the sentence, and
                 // two more words beside it made the row wrap to a second line.

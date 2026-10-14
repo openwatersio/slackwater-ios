@@ -49,8 +49,9 @@ struct ChsDetailView: View {
         Group {
             switch route {
             case .port(let info):
-                if case .fitted(let record) = service.state(info.id) {
-                    TideDetailView(record: record)
+                let preview = service.tidePreviews[info.id].flatMap { $0.coverage?.contains(appNow()) == true ? $0 : nil }
+                if let record = service.tideRecords[info.id] ?? preview.map({ _ in info.previewIdentity }) {
+                    TideDetailView(record: record, preview: service.tideRecords[info.id] == nil ? preview : nil)
                 } else {
                     waiting(name: info.name, region: info.region, favoriteId: info.id, needs: nil)
                 }
@@ -360,16 +361,4 @@ func ordinal(_ n: Int, locale: Locale = .autoupdatingCurrent) -> String {
     formatter.locale = locale
     formatter.numberStyle = .ordinal
     return formatter.string(from: NSNumber(value: n)) ?? String(n)
-}
-
-/// "under a minute" / "about 3 minutes" — deliberately coarse: the estimate is
-/// a pacing constant, and a ticking countdown would claim precision it hasn't.
-func durationPhrase(_ seconds: Double) -> String {
-    if seconds < 90 { return String(localized: "under a minute", comment: "Approximate download duration under ninety seconds.") }
-    let minutes = Int((seconds / 60).rounded())
-    if minutes < 60 { return String(localized: "about \(minutes) minutes", comment: "Approximate duration. The integer is a number of minutes; vary by plural.") }
-    let hours = Int((Double(minutes) / 60).rounded())
-    return hours <= 1
-        ? String(localized: "about an hour", comment: "Approximate duration of one hour.")
-        : String(localized: "about \(hours) hours", comment: "Approximate duration. The integer is a number of hours; vary by plural.")
 }

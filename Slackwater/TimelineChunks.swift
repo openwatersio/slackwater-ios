@@ -30,7 +30,7 @@ import UIKit
 /// The three constituent-backed station kinds. The online gate stays on the
 /// fetched-block builder (`TimelineData.build(onlinePoints:)`) — its data is
 /// bounded by what was downloaded, not by what can be computed.
-enum TimelineSource {
+enum TimelineSource: Sendable {
     case tide(TideStationRecord)
     /// `station`, when given, is the record's engine already resolved from
     /// single records (the watch's widget loader); nil resolves it here.
@@ -107,6 +107,7 @@ struct TimelineChunk {
             days.append(TimelineDay(offset: off, start: dayStart,
                                     sunrise: sun.first { $0.kind == .rise }?.time,
                                     sunset: sun.first { $0.kind == .set }?.time,
+                                    solarNoon: sun.first { $0.kind == .transit }?.time,
                                     moonrise: moon.first { $0.kind == .rise }?.time,
                                     moonset: moon.first { $0.kind == .set }?.time))
             dayStart = dayEnd
@@ -191,7 +192,7 @@ extension TimelineData {
             .filter { seen.insert($0.start).inserted }
             .map { d in
                 TimelineDay(offset: cal.dateComponents([.day], from: anchor, to: d.start).day ?? 0,
-                            start: d.start, sunrise: d.sunrise, sunset: d.sunset,
+                            start: d.start, sunrise: d.sunrise, sunset: d.sunset, solarNoon: d.solarNoon,
                             moonrise: d.moonrise, moonset: d.moonset)
             }
 
@@ -407,7 +408,7 @@ final class ScrollGate {
                 self.pendingPublish = false
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    publishAround(lastFocus)
+                    self.publishAround(self.lastFocus)
                 }
             }
         }

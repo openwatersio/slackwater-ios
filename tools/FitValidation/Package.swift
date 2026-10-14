@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 // Reference harness: fit a CHS station with the frozen JS artifacts
 // (tools/chs-reference in JavaScriptCore), predict the
 // held-out validation window with SlackwaterKit (the app's shipping predictor),

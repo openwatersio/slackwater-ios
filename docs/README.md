@@ -6,6 +6,8 @@ Documentation here describes the current product, maintained operating procedure
 
 | Document | Purpose |
 |---|---|
+| [Station list](list.md) | Home list sections, location states, favorites and recents, the station card, search, and opening a station |
+| [Station detail](detail.md) | Detail page composition, header, tiles, schedule, week picker, provenance, and the waiting, honesty, and unavailable pages |
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
 | [Alerts](alerts.md) | Station calendars and notification rules: triggers, occurrence resolution, delivery horizons, the free/Premium line, and permissions |
@@ -22,6 +24,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
+| [CHS tide validation](validation/chs-tides.md) | Tide fit-window bar, the window sweep, and why 60 days stays |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
 | [Generated resources](../Slackwater/Resources/README.md) | Bundle inputs, generation order, and provenance |
 | [Fill pipeline](../tools/fill-pipeline/README.md) | SSCOFS speed-fill certification, fitting, and packing |
@@ -33,7 +36,7 @@ Documentation here describes the current product, maintained operating procedure
 
 `Slackwater/` contains the app, `SlackwaterWidgets/` the extension, `SlackwaterWatch/` the watch app, and `SlackwaterTests/` and `SlackwaterUITests/` their checks. `project.yml` defines the generated Xcode project. `scripts/` holds build, test, and release entry points; `tools/` holds data generators and maintained validation pipelines. Service-specific code and docs live together under `services/`.
 
-Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and [CLAUDE.md](../CLAUDE.md) for agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
+Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
 
 Strategy, market research, and future product planning live in the private [planning repository](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Reviewed proposals remain available in their PRs: [download tiers #453](https://github.com/openwatersio/slackwater-ios/pull/453) and [catalog delivery #297](https://github.com/openwatersio/slackwater-ios/pull/297). A merged design proposal alone does not mean its behavior ships.
 

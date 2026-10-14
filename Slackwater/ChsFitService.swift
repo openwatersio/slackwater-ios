@@ -21,6 +21,7 @@ enum ChsState {
     case fitting
     case failed       // another attempt would get the same answer
     case fitted(TideStationRecord)
+    case preview(ChsTidePreview)
 }
 
 /// Same four states for a validated current gate — the fitted payload is a
@@ -42,10 +43,12 @@ final class ChsFitService: ObservableObject {
     /// place a station's state can disagree with itself: none.
     @Published private(set) var queue = ChsQueue()
     @Published private(set) var observedSecondsPerRequest = 2.5
+    @Published private(set) var modelRevision = 0
 
     /// Readable (the map's pin-tone resolve reads it beside `currentRecords`);
     /// written only by the fit run.
     private(set) var tideRecords: [String: TideStationRecord] = [:]
+    @Published private(set) var tidePreviews: [String: ChsTidePreview] = [:]
     /// Published: a gate's record is REPLACED in place when the provisional fit
     /// refines to the final one, and any open detail has to follow it.
     @Published private(set) var currentRecords: [String: CurrentStationRecord] = [:]
@@ -119,6 +122,12 @@ final class ChsFitService: ObservableObject {
 
     private var started = false
     private var running = false
+    private var fitTask: Task<Void, Never>?
+#if os(watchOS)
+    private var downloadsActive = false
+#else
+    private var downloadsActive = true
+#endif
     private var retryTimer: Task<Void, Never>?
     private var connectivity: AnyCancellable?
     private var dataMode: AnyCancellable?
@@ -141,6 +150,9 @@ final class ChsFitService: ObservableObject {
     /// `declinedNearby` deliberately does NOT persist — "Not now" holds for
     /// the session, and the manager is the way back in (spec §Asking once).
     @Published private(set) var tier: DownloadTier = .inView
+    @Published private(set) var allCurrentsSelected = false
+    private var tierJobs: [DownloadTier: [ChsJob]] = [:]
+    private var tierOnlineGates: [DownloadTier: [ChsCurrentGateInfo]] = [:]
     @Published private(set) var cohort = DownloadCohort()
     /// "Not now" holds for the session. The manager is the way back in.
     @Published private(set) var declinedNearby = false
@@ -154,7 +166,7 @@ final class ChsFitService: ObservableObject {
     /// The first nine jobs lead; unconstrained paths continue through every station within 150 km.
     static let autoFitPorts = 6
     static let autoFitGates = 3
-    static let autoFitRadiusKm = 150.0
+    nonisolated static let autoFitRadiusKm = 150.0
 
     /// Every CHS station the app could fit, ports and validated gates. The 7
     /// online (fit-reject) gates are excluded here, at the source every job —
@@ -252,6 +264,7 @@ final class ChsFitService: ObservableObject {
         // `.task` a moment after this returns.
         tier = AppGroup.defaults.string(forKey: AppGroup.downloadTierKey)
             .flatMap(DownloadTier.init(rawValue:)) ?? .inView
+        allCurrentsSelected = AppGroup.defaults.bool(forKey: AppGroup.downloadAllCurrentsKey)
         // One directory read, not 1,097 stat calls: which stations already
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
@@ -270,6 +283,9 @@ final class ChsFitService: ObservableObject {
                 // queued so the next connected run refines it, and its cached
                 // chunks mean that costs only the chunks it never fetched.
                 if gate.isProvisional(model) { provisional.insert(job.id) } else { job.status = .ready }
+            } else if !job.isCurrent, files.contains("\(job.id)-tide-preview.json"),
+                      let preview = ChsModelStore.loadTidePreview(job.id) {
+                tidePreviews[job.id] = preview
             } else if !stored {
                 continue  // not downloaded, and the auto-fit set decides below
             }
@@ -307,8 +323,10 @@ final class ChsFitService: ObservableObject {
         files.sorted().filter { file in
             guard file.hasSuffix(".json") else { return false }
             let stem = String(file.dropLast(5))
-            // `-current` and `-online` are the only suffixes ChsModelStore
-            // writes, and both belong to gates; anything else is a port id.
+            if stem.hasSuffix("-tide-preview") {
+                return !ports.contains(String(stem.dropLast("-tide-preview".count)))
+            }
+            // Current fits and fetched windows belong to gates.
             if let suffix = ["-current", "-online"].first(where: { stem.hasSuffix($0) }) {
                 return !gates.contains(String(stem.dropLast(suffix.count)))
             }
@@ -347,25 +365,29 @@ final class ChsFitService: ObservableObject {
     /// ACCRETE: a fix moving from Victoria to Halifax adds Halifax's nearest
     /// ports, and never drops what Victoria already paid for.
     private func adopt(lat: Double, lon: Double) {
-        for job in Self.autoFitSet(lat: lat, lon: lon,
-                                   constrained: Connectivity.shared.constrained,
-                                   tier: tier, cohort: cohort.ids) { queue.add(job) }
+        for choice in [DownloadTier.inView, .nearby, .everything] {
+            tierJobs[choice] = Self.autoFitSet(lat: lat, lon: lon, tier: choice, cohort: cohort.ids)
+            let online = Self.autoPrefetchGates(lat: lat, lon: lon,
+                                                constrained: choice == .inView && Connectivity.shared.constrained)
+            tierOnlineGates[choice] = choice == .nearby ? online.filter {
+                distanceKm($0.latitude, $0.longitude, lat, lon) <= DownloadTier.nearbyRadiusKm
+            } : online
+        }
+        let jobs = tier == .inView && Connectivity.shared.constrained
+            ? Self.autoFitSet(lat: lat, lon: lon, constrained: true, tier: tier, cohort: cohort.ids)
+            : tierJobs[tier] ?? []
+        for job in jobs { queue.add(job) }
+        if allCurrentsSelected {
+            for job in gatesToDownload { queue.add(job) }
+        }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
-        // What accepting would actually GAIN, not what geography holds.
-        // `autoFitSet` is pure distance and never consults the queue, so from
-        // the second launch onward every already-fitted station still counted
-        // — the strip offered "Download 14 more nearby?" for fourteen stations
-        // sitting on disk, and Yes was a dead tap (`add` is a no-op for a
-        // known id, so `pump()` found nothing to do). `.ready` is the only
-        // status that means "you already have this": a `.pending`, `.failed`
-        // or backing-off job is still work the tier would carry out.
-        // `constrained:` matches `adopt`'s own call above — in Low Data Mode
-        // the offer must not be larger than accepting it would queue.
-        remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon,
-                                                constrained: Connectivity.shared.constrained,
-                                                tier: .nearby, cohort: cohort.ids)
-            .count { !cohort.ids.contains($0.id) && queue.status($0.id) != .ready }
+        guard let next = tier.next else {
+            remainingBeyondCohort = 0
+            return
+        }
+        remainingBeyondCohort = (tierJobs[next] ?? [])
+            .count { queue.status($0.id) == nil }
     }
 
     /// The list hands over what it is rendering. Captured once per place; a
@@ -387,29 +409,20 @@ final class ChsFitService: ObservableObject {
         pump()
     }
 
-    /// The user accepted a tier. This is the tap that lets the work continue
-    /// in the background — but only when it actually needs to.
-    ///
-    /// Every caller routes through here: the strip's own accept, the
-    /// manager's "Download more" button, and the manager's tier `Toggle`,
-    /// which fires on both directions of a flip (including down from
-    /// `.everything` to `.nearby`) and can re-fire the same value on a
-    /// redraw. A same-value tap is a true no-op — nothing changed, so
-    /// nothing runs, not even `pump()`. A narrowing tap still needs
-    /// `pump()` (the queue's own walk reacts to `tier` changing) but not a
-    /// new background submission — `BGTaskScheduler` grants a background
-    /// task per *submission*, not per accepted tier, and its pending-request
-    /// ceiling is small. A narrowing flip has strictly less work than the
-    /// task already covers, so submitting on it burns through that ceiling
-    /// for no benefit.
+    // iOS requires a foreground user action before submitting continued background work.
     func accept(_ newTier: DownloadTier) {
         guard newTier != tier else { return }
+        #if os(iOS)
         let widened = Self.widens(from: tier, to: newTier)
+        #endif
         tier = newTier
         AppGroup.defaults.set(newTier.rawValue, forKey: AppGroup.downloadTierKey)
         if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
         pump()
-        if widened { BackgroundDownloads.submitIfPossible(queue: queue) }
+        prefetchOnlineGates(tierOnlineGates[newTier] ?? [])
+#if os(iOS)
+        if widened { BackgroundDownloads.submitIfPossible() }
+#endif
     }
 
     /// `.inView` < `.nearby` < `.everything` — the only ordering that
@@ -428,6 +441,71 @@ final class ChsFitService: ObservableObject {
 
     func declineNearby() { declinedNearby = true }
 
+    func estimatedSeconds(for choice: DownloadTier) -> Double {
+        estimatedSeconds(for: tierJobs[choice] ?? [])
+            + onlineDownloadSummary(tierOnlineGates[choice] ?? []).requestsRemaining
+                * observedSecondsPerRequest
+    }
+
+    private func estimatedSeconds(for jobs: [ChsJob]) -> Double {
+        let queued = Dictionary(uniqueKeysWithValues: queue.jobs.map { ($0.id, $0) })
+        return jobs.reduce(0) { seconds, candidate in
+            let job = queued[candidate.id] ?? candidate
+            guard job.status != .ready else { return seconds }
+            return seconds + max(0, job.requestCount - Double(job.done)) * observedSecondsPerRequest
+        }
+    }
+
+    var allCurrentsSeconds: Double {
+        estimatedSeconds(for: Self.candidates.filter(\.isCurrent))
+            + onlineDownloadSummary(ChsCurrentGateInfo.all.filter(\.isOnline)).requestsRemaining
+                * observedSecondsPerRequest
+    }
+
+    private func onlineRequestCount(_ gate: ChsCurrentGateInfo) -> Double {
+        let span = Self.onlineFetchSpan(anchor: nil, today: todayLocal(gate.tz))
+        return Double(Self.chunkPlan(days: span.end.timeIntervalSince(span.start) / 86_400,
+                                     end: span.end).count * 2 + 1)
+    }
+
+    var onlineDownloads: (ready: Int, total: Int, requestsCompleted: Double,
+                          requestsRemaining: Double, active: Bool) {
+        let gates = allCurrentsSelected ? ChsCurrentGateInfo.all.filter(\.isOnline)
+            : Array(onlineDesired.values)
+        return onlineDownloadSummary(gates)
+    }
+
+    nonisolated static func onlineDownloadIsActive(_ state: OnlineFetchState, queued: Bool,
+                                                   covered: Bool, online: Bool) -> Bool {
+        switch state {
+        case .fetching, .deferred: true
+        case .failed: false
+        case .idle: !covered && (queued || !online)
+        }
+    }
+
+    private func onlineDownloadSummary(_ gates: [ChsCurrentGateInfo])
+        -> (ready: Int, total: Int, requestsCompleted: Double, requestsRemaining: Double, active: Bool) {
+        var ready = 0, completed = 0.0, remaining = 0.0, active = false
+        for gate in gates {
+            let requests = onlineRequestCount(gate)
+            let state = onlineStates[gate.id] ?? .idle
+            let covered = ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil
+            active = active || Self.onlineDownloadIsActive(state,
+                queued: onlineRunning || onlinePending.contains { $0.id == gate.id },
+                covered: covered, online: Connectivity.shared.online)
+            if covered, state != .fetching {
+                ready += 1
+                completed += requests
+                continue
+            }
+            let progress = state == .fetching ? onlineProgress[gate.id] ?? 0 : 0
+            completed += requests * progress / 10
+            remaining += requests * (1 - progress / 10)
+        }
+        return (ready, gates.count, completed, remaining, active)
+    }
+
     /// Re-assert the UI-test hooks over jobs added by a later location fix.
     private func markFailOnly() {
         for id in Self.failOnly { queue.set(id, .failed) }
@@ -438,6 +516,7 @@ final class ChsFitService: ObservableObject {
 
     func state(_ id: String) -> ChsState {
         if let record = tideRecords[id] { return .fitted(record) }
+        if let preview = tidePreviews[id], preview.coverage?.contains(appNow()) == true { return .preview(preview) }
         switch queue.status(id) ?? .pending {
         case .downloading: return .fitting
         case .failed: return .failed
@@ -485,16 +564,22 @@ final class ChsFitService: ObservableObject {
     /// first: these join the queue's proximity order rather than jumping it,
     /// so the passes you are actually near stay ahead of the rest.
     func downloadAllGates() {
+        guard !allCurrentsSelected else { return }
+        allCurrentsSelected = true
+        AppGroup.defaults.set(true, forKey: AppGroup.downloadAllCurrentsKey)
         for job in gatesToDownload { queue.add(job) }
         pump()
         prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
+        #if os(iOS)
+        BackgroundDownloads.submitIfPossible()
+        #endif
     }
 
     /// Start the nearest-first download run once.
     func startIfNeeded() {
         guard !started else { return }
         started = true
-        pump()
+        resumeForForeground()
     }
 
     /// A fix landed (or moved): take the nearest stations there into the
@@ -504,9 +589,9 @@ final class ChsFitService: ObservableObject {
         adopt(lat: lat, lon: lon)
         onlineOrigin = (lat, lon)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
-        pump()
-        prefetchOnlineGates(favoriteGates + Self.autoPrefetchGates(
-            lat: lat, lon: lon, constrained: Connectivity.shared.constrained))
+        prefetchOnlineGates(favoriteGates + (allCurrentsSelected
+            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? []))
+        resumeForForeground()
     }
 
     /// Queue the visible station, then favorites, before the nearby tail.
@@ -597,8 +682,12 @@ final class ChsFitService: ObservableObject {
 
     /// Adds online gates to the serial prefetch queue; transient failures schedule themselves again.
     private func prefetchOnlineGates(_ gates: [ChsCurrentGateInfo]) {
-        guard Connectivity.shared.online else { return }
+#if os(watchOS)
+        // The watch detail requires harmonics; online gates have no fitted model.
+        return
+#else
         for gate in gates { onlineDesired[gate.id] = gate }
+        guard Connectivity.shared.online, !networkKillSwitch else { return }
         var due: [ChsCurrentGateInfo] = []
         for gate in gates where onlineState(gate.id) == .idle {
             if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
@@ -629,6 +718,7 @@ final class ChsFitService: ObservableObject {
             }
             onlineRunning = false
         }
+#endif
     }
 
     /// The station the user just opened jumps the queue — ahead of proximity
@@ -657,18 +747,42 @@ final class ChsFitService: ObservableObject {
 
     /// A background entry into the existing run loop, without `retryNow()`'s
     /// online-state reset.
-    func resumeForBackground() { pump() }
+    func resumeForBackground() {
+        pump()
+        prefetchOnlineGates(Array(onlineDesired.values))
+    }
+
+    func resumeForForeground() {
+        resumeForBackground()
+        #if os(iOS)
+        BackgroundDownloads.submitIfPossible()
+        #endif
+    }
+
+    func setDownloadsActive(_ active: Bool) {
+        downloadsActive = active
+        if active {
+            #if os(watchOS)
+            queue.clearBackoffs()
+            ChsModelTransfer.shared.resetAvailability()
+            #endif
+            pump()
+        } else {
+            fitTask?.cancel()
+            retryTimer?.cancel()
+        }
+    }
 
     private func pump() {
-        guard !running, !networkKillSwitch, Connectivity.shared.online else { return }
+        guard downloadsActive, !running, !networkKillSwitch, Connectivity.shared.online else { return }
         guard queue.nextPending() != nil else { return scheduleRetryPump() }
         running = true
-        Task.detached(priority: .utility) { [self] in await run() }
+        fitTask = Task.detached(priority: .utility) { [self] in await run() }
     }
 
     private func scheduleRetryPump() {
         retryTimer?.cancel()
-        guard let due = queue.earliestRetry() else { return }
+        guard downloadsActive, let due = queue.earliestRetry() else { return }
         retryTimer = Task { [weak self] in
             try? await Task.sleep(for: .seconds(max(due.timeIntervalSinceNow, 1)))
             guard !Task.isCancelled else { return }
@@ -719,56 +833,119 @@ final class ChsFitService: ObservableObject {
     /// Claim the head of the queue. Sync find-then-mark on the main actor, so
     /// the loop can never hand the same job out twice (web offlineSync.worker).
     private func claimNext() -> ChsJob? {
-        guard let job = queue.nextPending() else { return nil }
+        #if os(iOS)
+        let previewed = Set(tidePreviews.filter { $0.value.coverage?.contains(appNow()) == true }.keys)
+        let pending = queue.nextPending(previewedIDs: previewed)
+        #else
+        let pending = queue.nextPending()
+        #endif
+        guard downloadsActive, let job = pending else { return nil }
         queue.set(job.id, .downloading)
         return job
     }
 
     /// The fast answer landed: publish it, keep the job queued (it is not done).
     private func publishProvisional(_ gate: ChsCurrentGateInfo, _ model: ChsModel) {
-        try? ChsModelStore.saveCurrent(model)
+        guard (try? ChsModelStore.saveCurrent(model)) != nil else { return }
         currentRecords[gate.id] = gate.record(with: model)
         provisional.insert(gate.id)
+        modelRevision += 1
     }
 
     private nonisolated func run() async {
         let fetcher = IwlsFetcher()
         let fitter = ChsFitter()
+        #if os(watchOS)
+        var checked: Set<String> = []
+        let pending = await MainActor.run {
+            self.queue.jobs.filter { $0.status == .pending && ($0.retryAfter ?? .distantPast) <= appNow() }
+        }
+        checked.formUnion(pending.map(\.id))
+        try? await copyPhoneModels(pending)
+        let hasPending = await MainActor.run { self.queue.nextPending() != nil }
+        if Task.isCancelled || !hasPending {
+            await MainActor.run {
+                self.running = false
+                self.fitTask = nil
+                self.scheduleRetryPump()
+                if Task.isCancelled { self.pump() }
+            }
+            return
+        }
+        #endif
         guard let list = try? await fetcher.stationList() else {
             await MainActor.run {
-                for job in self.queue.jobs where job.status == .pending {
-                    self.queue.deferRetry(job.id, error: "station list unavailable")
+                if !Task.isCancelled {
+                    for job in self.queue.jobs where job.status == .pending {
+                        self.queue.deferRetry(job.id, error: "station list unavailable")
+                    }
                 }
                 self.running = false
+                self.fitTask = nil
                 self.scheduleRetryPump()
+                if Task.isCancelled { self.pump() }
             }
             return
         }
         while let job = await MainActor.run(body: { self.claimNext() }) {
             do {
+                try Task.checkCancellation()
+                #if os(watchOS)
+                if checked.insert(job.id).inserted {
+                    try await copyPhoneModels([job])
+                    if await MainActor.run(body: { self.queue.job(job.id)?.status == .ready }) { continue }
+                }
+                #endif
                 if job.isCurrent {
                     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.permanent("no bundled gate \(job.id)") }
                     let model = try await fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
-                    try ChsModelStore.saveCurrent(model)
-                    await MainActor.run {
-                        self.currentRecords[gate.id] = gate.record(with: model)
-                        self.provisional.remove(gate.id)
-                        self.queue.set(job.id, .ready)
-                    }
-                    ChsChunkStore.purge(model.iwlsID)
+                    try await land(model, for: job)
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.permanent("no bundled port \(job.id)") }
-                    let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
-                    try ChsModelStore.save(model)
-                    await MainActor.run {
-                        self.tideRecords[info.id] = info.record(with: model)
-                        self.queue.set(job.id, .ready)
+                    #if os(iOS)
+                    let hasPreview = await MainActor.run { self.tidePreviews[job.id]?.coverage?.contains(appNow()) == true }
+                    if !hasPreview {
+                        do {
+                            let station = try Self.resolve(info, in: list)
+                            let start = todayLocal(info.tz).addingTimeInterval(-Timeline.backHours * 3600)
+                            let end = start.addingTimeInterval(7 * 24 * 3600)
+                            // Preview samples are persisted only after coverage validation.
+                            let samples = try await fetcher.wlp(stationID: station.id, chunk: ChsChunk(start: start, end: end), cache: false)
+                            let preview = ChsTidePreview(stationID: info.id, fetchedAt: appNow(), samples: samples.map {
+                                .init(time: Date(timeIntervalSince1970: $0.t / 1000), height: $0.v)
+                            })
+                            guard let coverage = preview.coverage, coverage.contains(appNow()),
+                                  coverage.upperBound >= todayLocal(info.tz).addingTimeInterval(48 * 3600) else {
+                                throw ChsError.transient("Incomplete tide preview")
+                            }
+                            try ChsModelStore.saveTidePreview(preview)
+                            await MainActor.run {
+                                self.tidePreviews[info.id] = preview
+                                self.queue.set(info.id, .pending)
+                                self.modelRevision += 1
+                            }
+#if DEBUG
+                            if IwlsFetcher.fixtureScenario == "tide-preview-final" {
+                                try await IwlsFetcher.waitForFixtureRelease("after-tide-preview")
+                            }
+#endif
+                            continue
+                        } catch {
+                            try Task.checkCancellation()
+                            print("CHS preview \(info.id): \(error)")
+                        }
                     }
-                    ChsChunkStore.purge(model.iwlsID)
+                    #endif
+                    let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
+                    try await land(model, for: job)
                 }
             } catch {
+                if Task.isCancelled {
+                    await MainActor.run { self.queue.set(job.id, .pending) }
+                    break
+                }
                 print("CHS fit FAILED \(job.id): \(error)")
                 await MainActor.run {
                     let reason = Self.reason(error)
@@ -783,9 +960,41 @@ final class ChsFitService: ObservableObject {
         }
         await MainActor.run {
             self.running = false
+            self.fitTask = nil
             self.scheduleRetryPump()
+            if Task.isCancelled { self.pump() }
         }
     }
+
+    private nonisolated func land(_ model: ChsModel, for job: ChsJob) async throws {
+        try Task.checkCancellation()
+        if job.isCurrent { try ChsModelStore.saveCurrent(model) }
+        else { try ChsModelStore.save(model) }
+        await MainActor.run {
+            if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
+                self.currentRecords[job.id] = gate.record(with: model)
+                self.provisional.remove(job.id)
+            } else if let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
+                self.tideRecords[job.id] = info.record(with: model)
+                self.tidePreviews.removeValue(forKey: job.id)
+            }
+            self.queue.set(job.id, .ready)
+            self.modelRevision += 1
+        }
+        ChsChunkStore.purge(model.iwlsID)
+    }
+
+    #if os(watchOS)
+    private nonisolated func copyPhoneModels(_ jobs: [ChsJob]) async throws {
+        let requests = jobs.map { ChsModelRequest(stationID: $0.id, isCurrent: $0.isCurrent) }
+        let models = try await ChsModelTransfer.shared.models(for: requests)
+        for job in jobs {
+            guard let model = models[job.id] else { continue }
+            try await land(model, for: job)
+            print("CHS model copied from phone: \(job.id)")
+        }
+    }
+    #endif
 
     nonisolated static func reason(_ error: Error) -> String {
         switch error {
@@ -879,6 +1088,7 @@ final class ChsFitService: ObservableObject {
                                              start: chunk.start, end: end,
                                              fitDays: ChsCurrentGateInfo.provisionalDays,
                                              speeds: speeds, dirs: dirs, fitter: fitter)
+            try Task.checkCancellation()
             await MainActor.run { self.publishProvisional(gate, model) }
 #if DEBUG
             if IwlsFetcher.fixtureScenario == "provisional-final" {
@@ -1006,8 +1216,27 @@ extension ChsModelStore {
         // defaults across an uninstall — without this a run that flipped the
         // switch on would leave every later run downloading the 150 km set.
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadTierKey)
+        AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
+    }
+}
+
+/// Where a fittable CHS station stands, in precedence order: what is happening
+/// right now beats what is merely true. Replaces the five sentences
+/// `chsPendingMessage` used to build.
+@MainActor func cardStatus(id: String) -> CardStatus {
+    guard let job = ChsFitService.shared.queue.job(id) else {
+        return Connectivity.shared.online ? .notQueued : .notDownloaded
+    }
+    switch job.status {
+    case .downloading: return .downloading
+    case .failed: return .failed
+    case .ready: return .queued
+    case .pending:
+        guard Connectivity.shared.online else { return .offline }
+        if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
+        return .queued
     }
 }

@@ -19,7 +19,7 @@ enum ReportKind: String, CaseIterable, Identifiable {
         switch self {
         case .location: String(localized: "Station is in the wrong place", comment: "Problem-report subject.")
         case .metadata: String(localized: "Station name or details are wrong", comment: "Problem-report subject.")
-        case .height: String(localized: "Tide height looks wrong", comment: "Problem-report subject.")
+        case .height: String(localized: "Predictions look wrong", comment: "Problem-report subject.")
         case .unavailable: String(localized: "I can help with an unavailable station", comment: "Problem-report subject.")
         }
     }
@@ -163,7 +163,7 @@ struct ReportProblemMenu: View {
         }
         .accessibilityLabel("Concerns or Feedback")
         .accessibilityIdentifier("detail-report")
-        .alert("No mail app", isPresented: $copied) {
+        .alert("Mail unavailable", isPresented: $copied) {
             Button("OK") {}
         } message: {
             Text("Your report was copied. Send it to \(supportEmail).")

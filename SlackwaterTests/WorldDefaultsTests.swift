@@ -66,9 +66,9 @@ final class WorldDefaultsTests: XCTestCase {
     func testNearestWidgetStationHonoursAChosenNamesake() throws {
         let d = UserDefaults(suiteName: #function)!
         defer { d.removePersistentDomain(forName: #function) }
-        let sierra = StationItem.all.filter { $0.name == "Sierra Point" }
-        let here = try XCTUnwrap(sierra.first { $0.region == "1.1 nm ENE" })
-        let far = try XCTUnwrap(sierra.first { $0.region == "3.8 nm east" })
+        let here = try XCTUnwrap(StationItem.byId["current:noaa/PCT3921"])
+        let far = try XCTUnwrap(StationItem.byId["current:noaa/SEA0803"])
+        XCTAssertEqual(here.name, far.name, "Juneau Harbor, S of: two current stations by one name")
         d.set([far.id], forKey: AppGroup.chosenStationsKey)
 
         XCTAssertTrue(cacheNearestWidgetStations(

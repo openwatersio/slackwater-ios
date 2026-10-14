@@ -6,6 +6,54 @@ import XCTest
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
+    func testIdleOnlineDownloadsOnlyStayActiveWhenQueuedOrOffline() {
+        XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: false, online: true))
+        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: true, covered: false, online: true))
+        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: false, online: false))
+        XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: true, online: false))
+        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true))
+    }
+
+    @MainActor
+    func testCachedCoverageDoesNotHideAnOnlineRefresh() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
+        })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let span = Timeline.window(anchor: todayLocal(gate.tz))
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        XCTAssertNotNil(ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)))
+        service.beginOnlineFetch(gate)
+        XCTAssertTrue(service.onlineDownloads.active, "cached predictions must not hide an in-flight refresh")
+    }
+
+    @MainActor
+    func testBackgroundProgressIncludesOnlineOnlyWork() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id)?.block(covering: todayLocal($0.tz)) == nil
+        })
+        service.beginOnlineFetch(gate)
+        service.setOnlineProgress(gate.id, done: 1, total: 2)
+        let progress = service.onlineDownloads
+        XCTAssertEqual(progress.total, 1)
+        XCTAssertEqual(progress.ready, 0)
+        XCTAssertTrue(progress.active, "online-only work must keep the background task alive")
+        XCTAssertEqual(progress.requestsCompleted, progress.requestsRemaining)
+        service.noteOnlineFailure(gate.id, error: "no predictions", permanent: true)
+        XCTAssertFalse(service.onlineDownloads.active, "a terminal failure must not hold the task open")
+    }
+
     @MainActor
     func testStationProgressUsesAZeroToTenScale() {
         var station = job("a", 48.4, -123.3)
@@ -21,6 +69,20 @@ final class ChsQueueTests: XCTestCase {
         station.status = .ready
         XCTAssertEqual(station.downloadProgress, 10)
         ChsFitService.shared.resetOnlineStateForTesting()
+    }
+
+    func testQueueProgressWeightsStationsByPlannedRequests() {
+        var tide = job("tide", 48.4, -123.3)
+        tide.status = .ready
+        var current = ChsJob(id: "current", name: "Current", region: "BC", isCurrent: true,
+                             latitude: 48.5, longitude: -123.4, fitDays: 60,
+                             status: .downloading)
+        current.done = 10
+        current.total = 21
+
+        let progress = ChsQueue([tide, current]).requestProgress
+        XCTAssertEqual(progress.completed, 20)
+        XCTAssertEqual(progress.total, 31)
     }
 
     func testOnlyNamedCausesArePermanent() {
@@ -78,7 +140,7 @@ final class ChsQueueTests: XCTestCase {
         q.set("a", .failed)
         q.note("a", error: "IWLS serves no wlp here")
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0),
-                       "Predictions unavailable")
+                       "Download failed")
 
         q.set("a", .ready)
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Available offline")

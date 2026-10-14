@@ -104,8 +104,11 @@ final class IwlsFetcher {
         return CommandLine.arguments[i + 1]
     }()
 
-    static func waitForFixtureRelease(_ checkpoint: String) async throws {
-        guard let token = fixtureToken else { return }
+    static func waitForFixtureRelease(_ checkpoint: String, token: String? = fixtureToken,
+                                      pause: () async throws -> Void = {
+                                          try await Task.sleep(for: .milliseconds(50))
+                                      }) async throws {
+        guard let token else { return }
         let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
         var registration: Int32 = 0
         let status = name.withCString { notify_register_check($0, &registration) }
@@ -113,12 +116,13 @@ final class IwlsFetcher {
             throw ChsError.permanent("could not register UI fixture checkpoint: \(checkpoint)")
         }
         defer { notify_cancel(registration) }
-        for _ in 0..<1_200 {
+        // The test owns the deadline; slow UI navigation must not expire a held fixture.
+        while true {
+            try Task.checkCancellation()
             var state: UInt64 = 0
             if notify_get_state(registration, &state) == NOTIFY_STATUS_OK, state == 1 { return }
-            try await Task.sleep(for: .milliseconds(50))
+            try await pause()
         }
-        throw ChsError.permanent("UI fixture checkpoint timed out: \(checkpoint)")
     }
 
     private static func fixtureStations() -> [IwlsStation] {
@@ -168,9 +172,8 @@ final class IwlsFetcher {
         // parks the claimed job on "Downloading" and the run behind it for the
         // life of the process. Five minutes still clears the 851 KB station
         // list at ~3 KB/s, well under anything a ship link does.
-        // ponytail: a blunt ceiling. The honest fix is not starting a run
-        // while `Connectivity` says there is no path, and re-pumping when one
-        // returns — queue work, not client work.
+        // The phone's path monitor gates the queue. watchOS cannot use that
+        // check (TN3135), so URLSession waits here and the queue retries failures.
         config.timeoutIntervalForResource = 300
         return URLSession(configuration: config)
     }()
@@ -338,20 +341,25 @@ final class IwlsFetcher {
 
     /// wlp for one chunk on the 15-min grid the fit wants. The filter holds
     /// that grid for chunks cached on disk at IWLS's native 1-min rate.
-    func wlp(stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
-        try await cached("wlp", stationID: stationID, chunk: chunk) {
+    func wlp(stationID: String, chunk: ChsChunk, cache: Bool = true) async throws -> [ChsSample] {
+        try await cached("wlp", stationID: stationID, chunk: chunk, cache: cache) {
             $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
         }
     }
 
     private func cached(_ code: String, stationID: String, chunk: ChsChunk,
+                        cache: Bool = true,
                         _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
+        try Task.checkCancellation()
 #if DEBUG
         if Self.usesFixture {
+            if Self.fixtureScenario == "tide-preview-fail", code == "wlp" {
+                throw ChsError.permanent("fixture: additional tide download failed")
+            }
             let key = "\(stationID):\(code)"
             let count = fixtureRequests[key, default: 0]
             fixtureRequests[key] = count + 1
-            if Self.fixtureScenario == "hold-first", count == 0 {
+            if ["hold-first", "tide-preview-final"].contains(Self.fixtureScenario ?? ""), count == 0 {
                 try await Self.waitForFixtureRelease("\(stationID)-first-chunk")
             }
             if Self.fixtureScenario == "no-interrupt", count == 0 {
@@ -363,7 +371,7 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
+        if cache, let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
         let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
@@ -377,7 +385,7 @@ final class IwlsFetcher {
         let samples = transform(raw)
         // Only whole grid chunks are cached: the newest one runs to "now" and
         // would be a different chunk tomorrow.
-        if chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
+        if cache, chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
             ChsChunkStore.save(samples, stationID, code, chunk)
         }
         return samples

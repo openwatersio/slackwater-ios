@@ -1,98 +1,72 @@
-// Slackwater — GPL v3. The Slackwater Premium sheet (spec §3). Quiet by
-// design: the free core is stated first, the ask is support, and there is no
-// trial, discount, or countdown anywhere.
-import StoreKit
+// Slackwater — GPL v3. Purchases have their own sheet, shared by every upgrade entry point.
 import SwiftUI
 
 struct PremiumView: View {
-    @ObservedObject private var store = PremiumStore.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var purchasing = false
-    @State private var purchaseError: String?
+    @ObservedObject private var store = PremiumStore.shared
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("Everything you use today stays free, forever. Premium adds the lock screen — and it's how Slackwater's development gets funded. Buy it because you want it, or because you want to say thanks.")
-                        .font(.callout)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Lock screen widgets — next slack, next turn, the workable window", systemImage: "lock.iphone")
-                        Label("Coming to the same tier: the live slack tile, alerts, go-windows for your boat", systemImage: "arrow.forward.circle")
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Slackwater Premium", systemImage: "sparkles")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(SN.leaf)
+                        Text("Support Slackwater's development.")
+                            .font(.body)
                     }
-                    .font(.footnote)
-
-                    if store.isPremium {
-                        Label("You have Premium — thank you.", systemImage: "checkmark.seal")
-                            .font(.callout.weight(.semibold))
-                    } else {
-                        // ponytail: products is empty whenever StoreKit has nothing to
-                        // sell — no SKUs on App Store Connect yet (build 28), or a
-                        // failed load. Without this the sheet is a pitch and a lone
-                        // Restore button, which reads as broken.
-                        if store.products.isEmpty {
-                            Text("Premium isn't on sale yet — these widgets are still being finished. Everything you use today stays free either way.")
-                                .font(.footnote)
-                                .foregroundStyle(SN.foam.opacity(0.7))
+                    #if PREMIUM_ENABLED
+                        if store.isPremium { PremiumPurchaseControls() }
+                    #endif
+                    VStack(alignment: .leading, spacing: 20) {
+                        if SettingsPlatform.current == .mobile {
+                            benefit("Lock screen — Premium", symbol: "lock.iphone",
+                                    detail: "Tides and currents at a glance on your lock screen.", preview: .lockScreen)
                         }
-                        ForEach(store.products, id: \.id) { product in
-                            Button {
-                                purchaseError = nil
-                                purchasing = true
-                                Task {
-                                    defer { purchasing = false }
-                                    do {
-                                        try await store.purchase(product)
-                                    } catch {
-                                        purchaseError = String(localized: "Purchase didn't go through — try again.", comment: "Premium purchase error.")
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(product.displayName).fontWeight(.semibold)
-                                        if product.id == PremiumStore.lifetimeID {
-                                            Text("Pay once, never again.").font(.caption2)
-                                        }
-                                    }
-                                    Spacer()
-                                    Text(product.displayPrice)
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(purchasing)
-                        }
-                        if let purchaseError {
-                            Text(purchaseError)
-                                .font(.footnote)
-                                .foregroundStyle(SN.foam.opacity(0.7))
-                        }
-                        Button("Restore purchase") {
-                            // Shares `purchasing` with the buy buttons: AppStore.sync()
-                            // raises a system prompt, and two are worse than one.
-                            purchasing = true
-                            Task {
-                                defer { purchasing = false }
-                                await store.restore()
-                            }
-                        }
-                        .font(.footnote)
-                        .disabled(purchasing)
+                        benefit("Favourites calendars", symbol: "calendar",
+                                detail: "See tides and slack windows alongside your plans.", preview: .calendar)
+                        benefit("Alerts", symbol: "bell",
+                                detail: "Get notified before the tides and currents you care about.", preview: .alert)
                     }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18))
+                    #if PREMIUM_ENABLED
+                        if !store.isPremium { PremiumPurchaseControls() }
+                    #endif
                 }
                 .padding(20)
+                .padding(.bottom, 20)
             }
             .background(CanvasBackground())
-            .navigationTitle("Slackwater Premium")
+            .foregroundStyle(SN.foam)
+            .navigationTitle(store.isPremium
+                             ? String(localized: "Slackwater supporter")
+                             : String(localized: "Support Slackwater"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(SN.canvas, for: .navigationBar)
-            .toolbar { ToolbarItem(placement: .cancellationAction) {
-                Button("Done") { dismiss() }
-                    .foregroundStyle(SN.leaf)
-            } }
-            .task { await store.loadProducts() }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(SN.leaf)
+                        .accessibilityIdentifier("premium-done")
+                }
+            }
         }
-        .preferredColorScheme(.dark)
+    }
+
+    private func benefit(_ title: LocalizedStringKey, symbol: String,
+                         detail: LocalizedStringKey, preview: PremiumFeaturePreview.Feature) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PremiumFeaturePreview(feature: preview)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol).frame(width: 24).foregroundStyle(SN.leaf)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.subheadline).foregroundStyle(SN.foam.opacity(0.7))
+                }
+            }
+        }
     }
 }

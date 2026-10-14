@@ -42,6 +42,12 @@ final class DownloadTierTests: XCTestCase {
         XCTAssertEqual(DownloadTier.nearbyRadiusKm, 25)
     }
 
+    func testTiersAdvanceThroughBothOffers() {
+        XCTAssertEqual(DownloadTier.inView.next, .nearby)
+        XCTAssertEqual(DownloadTier.nearby.next, .everything)
+        XCTAssertNil(DownloadTier.everything.next)
+    }
+
     func testCohortIsCapturedOnceAndIgnoresLaterReRanking() {
         var cohort = DownloadCohort()
         XCTAssertTrue(cohort.capture(ids: ["a", "b"], heroID: "a"))
@@ -130,7 +136,13 @@ final class DownloadTierTests: XCTestCase {
         queue.set("a", .ready)
         XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
                                           declined: false, remaining: 14),
-                       .working(done: 1, total: 2))
+                       .working(done: 1, total: 2, progress: 5))
+
+        queue.set("b", .downloading)
+        queue.setProgress("b", done: 5, total: 10)
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .working(done: 1, total: 2, progress: 7.5))
     }
 
     func testStripAsksOnceTheCohortIsSettled() {
@@ -138,6 +150,29 @@ final class DownloadTierTests: XCTestCase {
         XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
                                           declined: false, remaining: 14),
                        .asking(count: 14))
+    }
+
+    func testStripStaysVisibleForANonCohortDownloadAtTheInViewTier() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("detail", 48.44, -123.38))
+        queue.set("detail", .downloading)
+        queue.setProgress("detail", done: 5, total: 10)
+
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .working(done: 1, total: 2, progress: 7.5))
+    }
+
+    func testRestoredWiderTierShowsAnActiveQueueWithoutACohort() {
+        let cohort = DownloadCohort()
+        var queue = ChsQueue([job("restored", 48.44, -123.38)])
+        queue.set("restored", .downloading)
+        queue.setProgress("restored", done: 5, total: 10)
+
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .nearby,
+                                          declined: false, remaining: 14),
+                       .working(done: 0, total: 1, progress: 5))
     }
 
     func testStripIsAbsentWhenDeclined() {
@@ -154,22 +189,39 @@ final class DownloadTierTests: XCTestCase {
                        .absent)
     }
 
-    func testStripDoesNotAskAgainOnceAWiderTierIsAccepted() {
+    func testStripAsksForEverythingOnceNearbyIsSettled() {
         let (cohort, queue) = settledQueue()
         XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .nearby,
                                           declined: false, remaining: 14),
-                       .absent,
-                       "the question belongs to the in-view tier only")
+                       .asking(count: 14))
     }
 
-    func testWorkingCountsUndownloadableStationsAsAlreadyDone() {
+    func testStripStaysVisibleWhileNearbyDownloads() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("b", 48.44, -123.38))
+        queue.set("b", .downloading)
+        queue.setProgress("b", done: 5, total: 10)
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .nearby,
+                                          declined: false, remaining: 14),
+                       .working(done: 1, total: 2, progress: 7.5))
+    }
+
+    func testStripEndsAfterTheWidestTier() {
+        let (cohort, queue) = settledQueue()
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .everything,
+                                          declined: false, remaining: 14),
+                       .absent)
+    }
+
+    func testWorkingCounterOnlyIncludesDownloadableStations() {
         var cohort = DownloadCohort()
         _ = cohort.capture(ids: ["chs-a", "noaa-b"], heroID: "chs-a")
         let queue = ChsQueue([job("chs-a", 48.43, -123.37)])
         XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
                                           declined: false, remaining: 5),
-                       .working(done: 1, total: 2),
-                       "the NOAA station has no job, so it is done, not pending")
+                       .working(done: 0, total: 1, progress: 0),
+                       "the NOAA station has no job, so it is outside the queue counter")
     }
 
     @MainActor

@@ -10,6 +10,73 @@ import UIKit
 import XCTest
 
 final class OfflineCoverageTests: ScreenshotTestCase {
+    func testCanadianDownloadChecklistAddsWork() {
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                         "-networkKillSwitch", "-chsFitOnly",
+                         "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        openDownloads(app)
+        save(app, "canadian-download-checklist.png")
+        XCTAssert(app.staticTexts["Canadian tides and currents"].exists)
+        XCTAssert(app.staticTexts["Canadian data requirements mean we download tide and current predictions individually."].exists)
+        let nearby = app.buttons["download-tier-in-view"].firstMatch
+        let within25 = app.buttons["download-tier-nearby-accept"].firstMatch
+        let within150 = app.buttons["download-tier-everything-toggle"].firstMatch
+        let currents = app.buttons["download-all-currents"].firstMatch
+        XCTAssert(nearby.isSelected)
+        XCTAssertFalse(within25.isSelected)
+        XCTAssertFalse(within150.isSelected)
+        XCTAssertFalse(currents.isSelected)
+        within25.tap()
+        XCTAssert(waitFor(within25, "isSelected == true"))
+        within150.tap()
+        XCTAssert(waitFor(within150, "isSelected == true"))
+        let farGate = app.descendants(matching: .any)["download-row-chs-weynton-passage"].firstMatch
+        XCTAssertFalse(farGate.exists)
+        currents.tap()
+        XCTAssert(waitFor(currents, "isSelected == true"))
+        XCTAssert(farGate.appears(within: 5), "all currents must include gates beyond 150 km")
+        save(app, "canadian-download-checklist-selected.png")
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-chsResetModels" }
+        app.launch()
+        openDownloads(app)
+        XCTAssert(within25.isSelected)
+        XCTAssert(within150.isSelected)
+        XCTAssert(currents.isSelected)
+        XCTAssert(farGate.appears(within: 5), "unfinished downloads must resume after relaunch")
+    }
+
+    func testCanadianDownloadChoicesFitTranslations() {
+        for (language, locale) in [("fr-CA", "fr_CA"), ("de", "de_DE")] {
+            let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                             "-networkKillSwitch", "-fixLat", "48.4235", "-fixLon", "-123.3705",
+                             "-AppleLanguages", "(\(language))", "-AppleLocale", locale)
+            let indicator = app.buttons["offline-status"].firstMatch
+            scrollTo(indicator, in: app)
+            indicator.tap()
+            XCTAssert(app.descendants(matching: .any)["downloads-manager"].firstMatch.appears(within: 5))
+            for id in ["download-tier-in-view", "download-tier-nearby-accept",
+                       "download-tier-everything-toggle", "download-all-currents"] {
+                XCTAssert(app.buttons[id].firstMatch.isHittable, "\(language): \(id) is outside the checklist")
+            }
+            save(app, "canadian-downloads-\(language).png")
+            app.terminate()
+        }
+    }
+
+    func testDownloadOfferOpensExplanation() {
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+                         "-networkKillSwitch", "-chsFitOnly", "chs-victoria,chs-race-passage",
+                         "-chsFailOnly", "chs-victoria",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let offer = app.buttons["download-strip-open"].firstMatch
+        XCTAssert(offer.appears(within: 10))
+        offer.tap()
+        XCTAssert(app.navigationBars["Downloads"].appears(within: 5))
+        XCTAssert(app.staticTexts["Canadian tides and currents"].exists)
+    }
+
     // The CHS pending card speaks plain language — held pending by the network
     // kill switch (no fit can start, honest offline stand-in). Both station
     // kinds in one launch: a plain CHS tide port (Victoria) and a DERIVED gate
@@ -44,6 +111,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     // The seeded reference renders Malibu's shape-only path without live IWLS.
     func testM46MalibuDerivedGateSeededOffline() throws {
         let app = launch("-seedGate", "-networkKillSwitch",
+                         "-scrubTrace", "\(shotDir)/malibu-scrub-\(UUID().uuidString).log",
                          "-seedTideModel", "chs-point-atkinson")
 
         openSearch(app, "malibu")
@@ -167,7 +235,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-selkirk-water"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded deferred row is missing")
-        XCTAssert(reachInSheet(row, in: app), "the deferred row never became hittable")
+        scrollTo(row, in: app)
         XCTAssert(row.label.contains("Retrying in"), "deferred row says: \(row.label)")
         XCTAssertFalse(row.buttons["Retry"].exists)
         save(app, "resilient-downloads-after.png")
@@ -175,6 +243,32 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         row.tap()
         XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].appears(within: 5),
                   "tapping the row did not open the station")
+    }
+
+    func testIPadDeferredRowOpensAfterScrollingPastIt() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad Downloads sheet clipping")
+        }
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-selkirk-water",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        openDownloads(app)
+        let row = app.buttons["download-row-chs-selkirk-water"].firstMatch
+        XCTAssert(row.appears(within: 5))
+        let manager = app.scrollViews["downloads-manager"].firstMatch
+        manager.buttons["download-all-currents"].tap()
+        for _ in 0..<4 {
+            manager.swipeUp(velocity: .slow)
+            if row.frame.maxY < manager.frame.minY { break }
+        }
+        XCTAssertLessThan(row.frame.maxY, manager.frame.minY,
+                          "the regression setup must scroll past Selkirk Water")
+        save(app, "deferred-row-scrolled-past.png")
+
+        scrollTo(row, in: app)
+        row.tap()
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].appears(within: 5),
+                  "the recovered row did not open the station")
     }
 
     func testRetryNowAppearsWhileSomethingIsDeferred() throws {
@@ -185,7 +279,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openDownloads(app)
         let retry = app.buttons["downloads-retry-now"].firstMatch
         XCTAssert(retry.appears(within: 5), "a deferred job should offer Retry now")
-        XCTAssert(reachInSheet(retry, in: app), "Retry now never became hittable")
+        scrollTo(retry, in: app)
     }
 
     /// #205: far from Canadian water, nothing downloads and the manager is
@@ -441,9 +535,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // trim — 15 days of slack either side survives both), so target that
         // date directly instead of a grid index: leading-blank/spillover
         // cells shift what a fixed `boundBy` index means across month
-        // layouts (this repo's CLAUDE.md documents exactly that failure
-        // class). Calendar-based add, not `addingTimeInterval` — see
-        // "Calendar days are not 86,400 seconds".
+        // layouts. Add calendar days so DST does not shift the target date.
         let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45,
                                                            to: Self.fixtureDate)!
         let targetLabelFormatter = DateFormatter()

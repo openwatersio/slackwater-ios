@@ -30,6 +30,20 @@ test("no station without commercial-use rights ships", () => {
   assert.deepEqual(bad.map((s) => s.id), []);
 });
 
+// A publisher new to the bundle fails here until AboutView credits it, as its
+// licence may require.
+test("every publisher that ships is credited in About", () => {
+  const credits = {
+    "US National Oceanic and Atmospheric Administration": "NOAA",
+    "TICON-4": "TICON-4",
+    "Kartverket / Norwegian Mapping Authority, Hydrographic Service": "© Kartverket",
+  };
+  const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
+  const source = new Map(allStations.map((s) => [s.id, s.source?.name]));
+  const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
+  assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
+});
+
 // TICON rows yield to anything already kept; NOAA-vs-NOAA pairs are NOAA's
 // call and were shipping before this filter existed.
 test("no TICON station sits within the dedupe radius of another station", () => {

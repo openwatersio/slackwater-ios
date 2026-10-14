@@ -5,8 +5,10 @@
 //
 // Licensing posture (chs-online-design §2): the app ships identity we authored.
 // CHS predictions are fetched by each user under DFO's own terms, fitted
-// on-device, stored locally, and never re-served. No CHS data is bundled.
+// on-device, stored on the user's devices, and never publicly re-served.
+// Fitted models can be copied privately to the user's paired watch. No CHS data is bundled.
 import Foundation
+import Synchronization
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
 struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
@@ -83,7 +85,7 @@ struct UnavailableStation: Decodable, Identifiable, Hashable, StationIdentity {
 
 /// A harmonic model fitted on this device from IWLS predictions (`wlp` for a
 /// tide port, `wcsp1`/`wcdp1` for a current gate) — the only CHS-derived
-/// artifact, and it never leaves the device. One shape for both series; the
+/// artifact, reusable on the user's paired watch. One shape for both series; the
 /// optionals are nil for a tide port, and stay optional so every model file
 /// either pre-merge shape ever wrote to a device still decodes.
 struct ChsModel: Codable {
@@ -119,7 +121,11 @@ struct ChsModel: Codable {
 /// keeps the default no-op and only `SlackwaterApp.init()` assigns the real
 /// trigger.
 enum WidgetReload {
-    static var trigger: () -> Void = {}
+    private static let hook = Mutex<@Sendable () -> Void>({})
+    static var trigger: @Sendable () -> Void {
+        get { hook.withLock { $0 } }
+        set { hook.withLock { $0 = newValue } }
+    }
 }
 
 /// One JSON file per station under Application Support/ChsModels — keyed by
@@ -149,8 +155,11 @@ enum ChsModelStore {
     }
 
     static func save<T: Encodable>(_ value: T, id: String, suffix: String) throws {
+        try Task.checkCancellation()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(value).write(to: url(id, suffix: suffix), options: .atomic)
+        let data = try JSONEncoder().encode(value)
+        try Task.checkCancellation()
+        try data.write(to: url(id, suffix: suffix), options: .atomic)
         // The one place every model write funnels through — tide (suffix
         // ""), current (suffix "-current") and online-window (suffix
         // "-online") saves all land here, so one call covers all three
@@ -159,7 +168,10 @@ enum ChsModelStore {
     }
 
     static func load(_ stationID: String) -> ChsModel? { load(stationID, suffix: "") }
-    static func save(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "") }
+    static func save(_ model: ChsModel) throws {
+        try save(model, id: model.stationID, suffix: "")
+        try? FileManager.default.removeItem(at: url(model.stationID, suffix: "-tide-preview"))
+    }
 }
 
 extension ChsModelStore {
@@ -187,6 +199,11 @@ extension StationItem {
 }
 
 extension ChsStationInfo {
+    var previewIdentity: TideStationRecord {
+        TideStationRecord(id: id, name: name, region: region, aliases: aliases,
+                          latitude: latitude, longitude: longitude, timezone: timezone,
+                          chartDatum: "LLWLT", datumOffset: 0, constituents: [])
+    }
     /// A fitted CHS station renders through the exact same record/engine/view
     /// path as a bundled NOAA station — provenance shows only in the footer.
     func record(with model: ChsModel) -> TideStationRecord {
@@ -196,6 +213,17 @@ extension ChsStationInfo {
             chartDatum: "LLWLT",  // CHS chart datum: Lower Low Water, Large Tide
             datumOffset: model.offset,
             constituents: model.constituents)
+    }
+}
+
+extension ChsModelStore {
+    static func loadTidePreview(_ id: String) -> ChsTidePreview? {
+        let preview: ChsTidePreview? = load(id, suffix: "-tide-preview")
+        return preview?.stationID == id ? preview : nil
+    }
+
+    static func saveTidePreview(_ preview: ChsTidePreview) throws {
+        try save(preview, id: preview.stationID, suffix: "-tide-preview")
     }
 }
 

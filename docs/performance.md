@@ -12,7 +12,7 @@ This document records measured user-facing performance. It is an evidence log, n
 - Re-measure after every optimization. A stack that explains one run does not
   prove the next bottleneck.
 
-On a simulator, sample immediately after launch as described in [CLAUDE.md](../CLAUDE.md):
+On a simulator, sample immediately after launch as described in [CONTRIBUTING.md](../CONTRIBUTING.md#launch-performance):
 
 ```sh
 sample <pid> 4 1 -mayDie

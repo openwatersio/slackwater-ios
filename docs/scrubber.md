@@ -28,7 +28,7 @@ The following are deliberately outside this specification because they are separ
 - station header, favourite control, navigation, provenance, and related-station links; and
 - loading, download, and error cards shown instead of the scrubber.
 
-This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are separate contracts.
+This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
 
 ## 2. Product idea
 
@@ -104,15 +104,19 @@ An implementation must keep these concepts separate:
 
 The reference implementation samples `now` when the detail opens, when Now is activated, and when the app returns to the foreground. On foreground return, compare the selection with the old `now` using the 200-second home threshold. If it was home, refresh `now` and return the selection and schedule to the current instant using the ordinary Now movement. If it was scrubbed away, refresh only `now`; preserve the selected instant and planning position. Foreground return must not replay the opening motion.
 
+`now` never advances on a timer while the view stays open. A minute tick, or a `TimelineView`-driven `live`, was considered and declined: Slackwater is not a charting app, and nobody holds a detail open long enough for the marker to go visibly stale. Resampling on foreground return covers the real case. Implement one only if a reader asks for it.
+
 All visible civil-time language uses the station's time zone, never the device's time zone. Horizontal geometry uses elapsed time. A daylight-saving transition therefore produces a 23- or 25-hour civil day while the curve remains continuous.
 
 Anything meaning “calendar day,” “midnight,” or “noon” must use a calendar in the station's time zone. It must not be implemented as a multiple of 86,400 seconds.
 
 ### 4.2 Loaded window and schedule
 
-Tide, harmonic-current, and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
+Fitted tide, harmonic-current, and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
 
 The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, opening, and settling are quiet. Repeated backward flings can temporarily reach the loaded edge; the strip clamps until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use.
+
+A Canadian tide preview is bounded by its contiguous downloaded samples. It must never extend, extrapolate, or offer a date outside those samples. The additional-download notice retains the station’s progress meter and available-through date while the remaining model downloads, centered below the scrubber and above the summary cards. Its generic accuracy explanation is shared with current gates that already have usable early models. Download and status notices must never write over the scrubber. When the full tide model lands, the continuous store starts around the selected instant without navigating away or replaying the opening motion.
 
 Official online-current details remain bounded by downloaded coverage. Their displayed window is defined by `Timeline.window(anchor:)`:
 
@@ -238,7 +242,7 @@ When Reduce Motion is enabled, do not animate pill opacity. Controls should rema
 
 ### 6.5 Taps
 
-A tap on the plot or event-time row brings the tapped instant to the centerline. If a magnetic target is strictly within 46 units of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
+A tap on the plot or event-time row brings the tapped instant to the centerline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
 
 In the day/date/sun row, a sunrise or sunset tap centers that event; a date tap opens the host's date picker. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centered on daylight (§14); this mismatch is recorded in §18.
 
@@ -246,7 +250,7 @@ Every tap stops opening motion, momentum, and an earlier settle before acting. O
 
 #### 6.5.1 Press and hold
 
-A press held on the plot or event-time row resolves like a tap (the magnet within 46 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host opens the alert popup over the centerline (docs/alerts.md §7). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host exactly as a press does. A strip whose host has no popup to open (a list card) carries neither the recognizer nor the action.
+A press held on the plot or event-time row resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host's alert line under the strip names the parked moment, and the strip runs its reading line on down to it while the press holds (docs/alerts.md §7.1). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host and opens its alert sheet in one step, since there is no line to go and find. A strip whose host has no alerts (a list card) carries neither the recognizer nor the action.
 
 ## 7. Magnetic settling
 
@@ -257,7 +261,7 @@ The magnet runs only after a person-driven scroll comes fully to rest:
 
 It does not pull during a drag, and it does not repeatedly quantize free scrubbing.
 
-Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 46 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is about 2 h 33 m. A target already within half a logical unit is treated as already parked. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
+Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. The event-time row's labels and the next- and previous-event actions land exactly on a known point, so the magnet does not have to. A target already within half a logical unit is treated as already parked. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
 
 The reference target set is the sorted, de-duplicated union of all applicable in-window moments:
 
@@ -273,7 +277,7 @@ Animate a magnetic settle with the platform's standard short scroll animation, t
 
 ## 8. Programmatic movement and interruption
 
-The direct scrubber controls may request an exact target. A direct-control target is not subject to the 46-unit capture radius.
+The direct scrubber controls may request an exact target. A direct-control target is not subject to the 4.5-unit capture radius.
 
 An animated request must:
 
@@ -282,6 +286,8 @@ An animated request must:
 3. cancel an in-progress magnetic animation and forget its old destination;
 4. animate the requested target beneath the centreline; and
 5. park `selectedTime` on the exact requested instant at completion.
+
+Scroll feedback during that animation must not cancel the request. A rendered selection can trail the current offset; the destination remains the requested instant until the animation finishes or an explicit interaction interrupts it.
 
 A finger that is still down retains control. Do not fight an active drag with an external state update.
 
@@ -597,8 +603,8 @@ For a lunar eclipse visible from the station, draw only a small `🌘` at greate
 The backdrop behind the lead responds continuously to `selectedTime` and station coordinates:
 
 - interpolate sky colours from solar altitude;
-- position sun and moon against their visible horizon spans;
-- show the moon's illuminated limb and current lunar eclipse shadow;
+- position sun and moon against the nearest complete rise-to-set horizon span, keeping that span through both crossings so the disc and halo enter and leave continuously; switch spans midway between set and the following rise, while the body is below the horizon;
+- show the moon's illuminated limb and current lunar eclipse shadow, with the bright limb at its angle from the zenith (Almanac's bright-limb angle less the parallactic angle). Sun and moon sit east on the right, a mirror image of the sky in the northern hemisphere, so there the limb is mirrored too and keeps facing the drawn sun;
 - during a solar eclipse, keep the moon visible over the sun and darken the sky according to the locally obscured fraction;
 - reveal stars as the sky darkens; and
 - switch foreground ink between light foam and deep navy for contrast.
@@ -647,11 +653,11 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 ### iOS reference
 
-The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during every offset update. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the opening so the selected time and sky follow every frame.
+The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centering suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the animated opening so the selected time and sky follow every frame.
 
 ### watchOS
 
-The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
+The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
 
 ### Android
 
@@ -687,8 +693,8 @@ These scenarios define the minimum behavior shared by all platforms.
 
 ### Snapping and commands
 
-6. **Near target:** Resting 30 units from a tide extreme animates to its exact instant.
-7. **Outside capture:** Resting 46 or more units from every target remains where released.
+6. **Near target:** Resting 3 units (10 minutes) from a tide extreme animates to its exact instant.
+7. **Outside capture:** Resting 4.5 or more units from every target remains where released, including 40 minutes before a low.
 8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation.
 9. **Commentary during fling:** Activating commentary stops the fling and lands on the named target; no later momentum frame overwrites the request.
 10. **Now during settle:** Activating Now cancels a magnetic animation, refreshes now, lands home, and removes the Now pill.
@@ -722,7 +728,7 @@ These scenarios define the minimum behavior shared by all platforms.
 
 27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
-29. **Plot tap:** A tap selects its moment or a magnetic target within 46 units and lands on a reachable center time.
+29. **Plot tap:** A tap selects its moment or a magnetic target within 4.5 units and lands on a reachable center time.
 30. **Date or sun tap:** A date tap stops motion and opens the picker; a sun tap centers that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
@@ -737,6 +743,7 @@ These scenarios define the minimum behavior shared by all platforms.
 These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
+- The online-current detail has no alerts, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 

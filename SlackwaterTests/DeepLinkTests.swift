@@ -70,4 +70,10 @@ final class DeepLinkTests: XCTestCase {
                        URL(string: "slackwater://station/noaa%2F9454616"))
         XCTAssertEqual(accessoryDeepLink(entry(premium: false)), URL(string: "slackwater://premium"))
     }
+
+    func testLoadingAccessoryDoesNotOpenPremiumForASubscriber() {
+        let entry = SlackwaterEntry(date: .distantPast, snapshot: nil, card: nil,
+                                    premium: true, stationID: nil, isPlaceholder: true)
+        XCTAssertNil(accessoryDeepLink(entry))
+    }
 }

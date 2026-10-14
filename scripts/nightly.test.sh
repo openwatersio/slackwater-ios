@@ -16,6 +16,7 @@ git -C "$REPO" config user.name 'Nightly Test'
 git -C "$REPO" config user.email nightly@example.test
 mkdir -p "$REPO/scripts"
 cp "$ROOT/scripts/nightly.sh" "$REPO/scripts/nightly.sh"
+cp "$ROOT/scripts/nightly-validation.py" "$REPO/scripts/nightly-validation.py"
 
 cat > "$REPO/project.yml" <<'EOF'
 settings:
@@ -52,6 +53,12 @@ if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
   build=$(< "$NIGHTLY_STATE/asc-build")
   groups='[Nightly]'
   [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Beta]'
+  # The first N listings show the build before its group assignment.
+  pending=$(cat "$NIGHTLY_STATE/unassigned" 2>/dev/null || print 0)
+  if (( pending > 0 )); then
+    groups='[]'
+    print $(( pending - 1 )) > "$NIGHTLY_STATE/unassigned"
+  fi
   [[ -z $build ]] || print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
 else
   print -u2 "unexpected node call: $*"
@@ -62,6 +69,18 @@ EOF
 cat > "$FAKEBIN/gh" <<'EOF'
 #!/bin/zsh
 set -euo pipefail
+if [[ "$1" == api ]]; then
+  python3 - "$NIGHTLY_REPO" "$*" <<'PYGH'
+import json, os, subprocess, sys
+sha = subprocess.check_output(["git", "-C", sys.argv[1], "rev-parse", "HEAD"], text=True).strip()
+if "workflows/ci.yml" in sys.argv[2]:
+    print(json.dumps([{"workflow_runs": [{"id": 123, "run_attempt": 1, "head_sha": sha, "head_branch": "main", "event": "push", "status": "completed", "conclusion": os.environ.get("NIGHTLY_CI_CONCLUSION", "success")}]}]))
+else:
+    names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "rest") for d in ("", " · iPad")]
+    print(json.dumps([{"jobs": [{"id": i, "run_attempt": 1, "name": n, "status": "completed", "conclusion": "success"} for i, n in enumerate(names)]}]))
+PYGH
+  exit
+fi
 [[ "$1 $2" == 'release create' ]] || { print -u2 "unexpected gh call: $*"; exit 1; }
 tag=$3
 shift 3
@@ -75,6 +94,8 @@ chmod +x "$FAKEBIN/node" "$FAKEBIN/gh"
 export PATH="$FAKEBIN:$PATH"
 export NIGHTLY_STATE=$STATE
 export NIGHTLY_REPO=$REPO
+export GITHUB_REPOSITORY=example/slackwater
+export NIGHTLY_POLL_SECONDS=0
 fail() { print -u2 "check failed: $1"; exit 1; }
 nightly() { (cd "$REPO" && zsh scripts/nightly.sh) }
 new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
@@ -83,6 +104,9 @@ new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
 # tags the commit it built.
 : > "$STATE/asc-build"
 head=$(git -C "$REPO" rev-parse HEAD)
+# A refusal is a quiet skip, not a red run.
+NIGHTLY_CI_CONCLUSION=failure nightly | grep -q '::warning::Nightly blocked' || fail "refusal was not a warning"
+[[ ! -e "$STATE/events" ]] || fail "published before full validation"
 nightly
 diff -u <(printf 'upload:39\nrelease:nightly-1.13.0-39\n') "$STATE/events"
 [[ $(git -C "$REPO" rev-parse HEAD) == $head ]]
@@ -102,10 +126,22 @@ tail -2 "$STATE/events" | diff -u - <(printf 'upload:40\nrelease:nightly-1.13.0-
 grep -q 'Another feature' "$REPO/build/nightly-notes.md"
 ! grep -q 'Feature after release' "$REPO/build/nightly-notes.md" || fail 'notes repeat commits from before the last tag'
 
+# A build listed before its group assignment is waited for, then tagged.
+new_commit 'Late group'
+print 3 > "$STATE/unassigned"
+nightly
+tail -2 "$STATE/events" | diff -u - <(printf 'upload:41\nrelease:nightly-1.13.0-41\n')
+
 # A build that reaches an external group is not tagged.
 new_commit 'Third feature'
 ! NIGHTLY_WRONG_GROUP=yes nightly || fail 'a build in an external group passed'
-! grep -q 'release:nightly-1.13.0-41' "$STATE/events" || fail 'a build in an external group was tagged'
+! grep -q 'release:nightly-1.13.0-42' "$STATE/events" || fail 'a build in an external group was tagged'
+
+# A group that never shows still fails.
+new_commit 'Never assigned'
+print 99 > "$STATE/unassigned"
+! nightly || fail 'a build with no group passed'
+rm "$STATE/unassigned"
 
 ! grep -q 'test-called' "$STATE/events" || fail 'nightly ran the test suite'
 print 'nightly release checks passed'

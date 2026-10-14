@@ -6,6 +6,7 @@ struct AddPlace: View {
     let fix: WatchLocation.Fix?
     @Binding var path: [BrowseRoute]
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var downloads = ChsFitService.shared
     @State private var query = ""
     @State private var results: [StationItem] = []
     /// The query the results answer, so a finished empty search can say so.
@@ -55,7 +56,7 @@ struct AddPlace: View {
         }
         .navigationTitle(Text("Add Place", comment: "Watch list row that opens place search."))
         // The anchor too: a fix that lands mid-search re-ranks the results.
-        .task(id: "\(query)|\(anchor.lat)|\(anchor.lon)") {
+        .task(id: "\(query)|\(anchor.lat)|\(anchor.lon)|\(downloads.modelRevision)") {
             let q = query, a = anchor
             guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; searched = q; return }
             let found = await Task.detached(priority: .userInitiated) {

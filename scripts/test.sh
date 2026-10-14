@@ -46,7 +46,7 @@ fi
 # with "Cannot launch simulated executable: no file found at .../Slackwater.app"
 # — zero assertion failures, which reads as a real regression and isn't one.
 # Same shape if you kill a run and then clean its DerivedData. Builds take this
-# lock too (CLAUDE.md has the recipe).
+# lock too (CONTRIBUTING.md, "Local test runs", has the recipe).
 #
 # Other worktrees' runs are not waited for. Runs on separate devices with
 # separate DerivedData do not disturb each other: measured 2026-10-01, two runs
@@ -94,8 +94,8 @@ fi
 
 # SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
 # ONE device so the fast lane stays iPhone-only (see .github/workflows/ci.yml).
-# It is not concurrency protection: separate devices don't stop concurrent runs
-# from killing each other (see the lock comment at the top), the lock does.
+# Separate devices still share this worktree's DerivedData, so its lock also
+# covers runs with different device selections (see the lock comment above).
 #
 # Fast is iPhone-only. Measured on build 27: the iPad leg costs 1169 s and is
 # the ONLY place three tests run (testM44IPadSplit,
@@ -109,8 +109,8 @@ fi
 # a location permission grant, a simulated fix, an App Group plist — and
 # `xcodebuild test` clones inherit all of it. That costs correctness in both
 # directions (tests that fail only here, tests that pass only here, both
-# documented in CLAUDE.md), and it costs TIME. Measured 2026-09-09, same two
-# tests, same commit:
+# documented in CONTRIBUTING.md, "UI test state"), and it costs TIME.
+# Measured 2026-09-09, same two tests, same commit:
 #
 #   testReturnToNowFromHistory        264 s used device   24 s erased   25 s CI
 #   testFastTideCommentaryNamesTheRate 141 s used device   22 s erased   28 s CI
@@ -233,29 +233,75 @@ for i in {1..$#sims}; do
   (( workers < 2 )) && workers=2
   (( workers > 4 )) && workers=4
   workers=${SLACKWATER_WORKERS:-$workers}
+  parallel=(-parallel-testing-worker-count "$workers")
+  # SLACKWATER_NO_CLONE runs on the named device itself, which the caller has
+  # already booted. Every xcodebuild clone boots cold, and a cold iPad clone
+  # on a 3-core hosted runner kept the first test's launch from drawing a
+  # frame for 90 s; the timeout rerun got a fresh cold clone and failed the
+  # same way. CI only: locally that device may be the one you use by hand.
+  [[ -n "${SLACKWATER_NO_CLONE:-}" ]] && parallel=(-parallel-testing-enabled NO)
   if [[ -n "${SLACKWATER_XCTESTRUN:-}" ]]; then
     action=(test-without-building -xctestrun "$SLACKWATER_XCTESTRUN")
   else
     action=(test -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
   fi
+  mkdir -p build
+  rawlog="${bundle%.xcresult}.log"
+  # XCTest must bound a blocked launch, including in downloaded test products (#580).
+  set +e
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
-    -parallel-testing-worker-count "$workers" \
+    "${parallel[@]}" \
     -collect-test-diagnostics "$diagnostics" \
+    -test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 \
     "${selection[@]}" \
     -resultBundlePath "$bundle" \
-    | tail -40
+    2>&1 | tee "$rawlog" | tail -40
+  command_status=$pipestatus[1]
+  set -e
   # A shard that runs NOTHING exits 0 and reports green — which is the failure
   # mode sharding introduces, and the one nobody would notice. A typo in
   # SLACKWATER_ONLY, a class renamed out from under the matrix, and the lane
   # goes green faster than ever while testing nothing. So count what ran.
   ran=$(xcrun xcresulttool get test-results summary --path "$bundle" 2>/dev/null \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("passedTests",0)+d.get("failedTests",0))' 2>/dev/null || echo 0)
+    | python3 -c 'import json,sys
+try:
+    d=json.load(sys.stdin)
+    ran=d["passedTests"]+d["failedTests"]
+    summary={k:d[k] for k in ("title","result","startTime","finishTime","passedTests","failedTests","skippedTests","totalTestCount") if k in d}
+    summary["status"]="available"
+except (ValueError,KeyError,TypeError):
+    ran="unavailable"
+    summary={"status":"unavailable"}
+with open(sys.argv[1],"w") as f: json.dump(summary,f); f.write("\n")
+if ran=="unavailable": sys.exit(1)
+print(ran)' "${bundle%.xcresult}.summary.json" 2>/dev/null || echo unavailable)
+  if [[ "$ran" == unavailable ]]; then
+    echo "warning: test results unavailable on $sim — see $rawlog" >&2
+  fi
+  # XCUITest waits for the app to report its animations complete before every
+  # synthesized event and every query, and spends 60 s on the wait when that
+  # report never comes. A shard doing it repeatedly is measuring the timeout
+  # and not the app (#556) — and it reads as nothing but a slow runner, since
+  # the run still passes. Say it out loud.
+  #
+  # Out of the bundle's store, not the output above: xcodebuild prints the
+  # activity text only when it runs the tests serially, and this script always
+  # runs clones. `grep -o`, because the store is one long line.
+  # `|| true` inside the pipe: grep exits 1 on no match, which under
+  # `set -o pipefail` would fail the assignment and abort the run.
+  idle=$({ grep -ao "animations complete notification not received" \
+    "$bundle/database.sqlite3" 2>/dev/null || true; } | wc -l | tr -d ' ')
+  if (( idle )); then
+    echo "warning: $idle XCUITest idle timeouts on $sim, 60 s each (#556)"
+  fi
+  echo "=== $MODE · $sim: $((SECONDS - start))s · $ran tests ==="
+  (( command_status == 0 )) || exit "$command_status"
   if [[ "$ran" == "0" ]]; then
     echo "error: no tests ran on $sim — check SLACKWATER_ONLY/SLACKWATER_SKIP" >&2
     exit 1
   fi
-  echo "=== $MODE · $sim: $((SECONDS - start))s · $ran tests ==="
+  [[ "$ran" != unavailable ]] || exit 1
 done
 
 # Not fatal: the run may well be clean, and the person editing is entitled to.

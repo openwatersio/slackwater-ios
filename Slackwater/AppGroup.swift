@@ -15,7 +15,8 @@ enum AppGroup {
     /// installed device to read this), so migration is the caller's job:
     /// `SlackwaterApp.init()` runs `migrateIfNeeded` explicitly, first thing,
     /// before anything touches FavoritesStore/RecentsStore/ChsFitService.
-    static let defaults: UserDefaults = {
+    // UserDefaults synchronizes its own access: https://developer.apple.com/documentation/foundation/userdefaults
+    nonisolated(unsafe) static let defaults: UserDefaults = {
         validateEntitlement(
             containerURL: FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id
@@ -80,6 +81,7 @@ enum AppGroup {
     /// switch has to still be on next launch, and an accepted tier has to
     /// resume the work it started.
     static let downloadTierKey = "slackwater.downloadTier"
+    static let downloadAllCurrentsKey = "slackwater.downloadAllCurrents"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
     /// Alert rules (docs/alerts.md §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.

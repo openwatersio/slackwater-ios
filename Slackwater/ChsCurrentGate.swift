@@ -59,11 +59,6 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable, StationIdentity {
     /// error cleared the floor (both encoded in the bundle by gen-chs-gates).
     var offersProvisional: Bool { fitDays > Self.provisionalDays && provisionalSlackMinutes != nil }
 
-    /// Rough wall-clock for the refinement leg — the chunks between 60 d and
-    /// the full window, two series each, at the fetcher's 2.5 s pacing. Feeds
-    /// "stay connected about N more minutes"; coarse by design.
-    var refineSeconds: Double { ((fitDays - Self.provisionalDays) / 7).rounded(.up) * 2 * 2.5 }
-
     static let all: [ChsCurrentGateInfo] = bundled("chs-current-gates")
 }
 
@@ -116,7 +111,8 @@ extension ChsModelStore {
         return store
     }
 
-    private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
+    // Every access holds onlineCacheLock, including decoding and replacement.
+    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 
@@ -137,7 +133,7 @@ func prefetchAnchor(after window: ChsOnlineWindow, tz: TimeZone) -> Date {
 /// the fetch's anchor, `Timeline.window`'s back-pad behind it — and it grows
 /// as later fetches merge in (`merging`). So a stale window is a coverage
 /// question, not a staleness heuristic — see `covers`.
-struct ChsOnlineWindow: Codable {
+struct ChsOnlineWindow: Codable, Sendable {
     var schemaVersion = 1
     let stationID: String
     let iwlsName: String
@@ -262,13 +258,8 @@ struct ChsOnlineStore: Codable {
 /// because the number in it is THIS gate's measured 60-day slack error, never a
 /// generic hedge. Register: what it is, how wrong it can be, what to do.
 extension ChsCurrentGateInfo {
-    /// "±35 min" — the badge-sized version.
-    var provisionalTolerance: String {
-        String(localized: "±\(provisionalSlackMinutes ?? 0) min", comment: "Measured slack-current timing tolerance in minutes; 'min' remains invariant.")
-    }
-
     var provisionalHeadline: String {
-        String(localized: "Fitted from the last \(Int(Self.provisionalDays)) days — slack at \(name) can be off by up to ~\(provisionalSlackMinutes ?? 0) min.", comment: "Provisional current-model warning. Values are fitting days, station name, and measured timing error; vary days by plural.")
+        String(localized: "Slack at \(name) can be off by \(provisionalSlackMinutes ?? 0) min.", comment: "Provisional current-model warning. Values are place name and its measured slack-current timing uncertainty in minutes.")
     }
 
     /// Is this stored model the fast answer rather than the full model?

@@ -16,7 +16,7 @@ private let timelineRevisions = Atomic<UInt64>(0)
 /// The free `rampT(_:anchors:)` (SlackWindow.swift), which `Timeline`'s own
 /// `rampT` overloads hide inside the enum. A module-qualified call names the
 /// module, and the phone and the watch build this file into different ones.
-private let rampAlongAnchors: (Double, [Double]) -> Double = rampT(_:anchors:)
+private let rampAlongAnchors: @Sendable (Double, [Double]) -> Double = rampT(_:anchors:)
 
 enum Timeline {
     /// Points per hour. Widened from 12 in the NEAPS pass: the tide track's
@@ -41,7 +41,7 @@ enum Timeline {
     /// purpose, at the smallest width that still clears half a phone.
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
-    static let magnetPts: CGFloat = 46    // snap radius around the centerline
+    static let magnetPts: CGFloat = pph / 4    // a quarter hour: just off an event takes it, between stays free
     static let accessibilityStep: TimeInterval = 300    // one VoiceOver increment
     static let pillTarget: CGFloat = 44    // a pill's semantic hit target; the capsule is ~30
     /// No scrub change for this long is a strip at rest, and the chrome — commentary, the Now
@@ -54,6 +54,27 @@ enum Timeline {
     static func introTime(from start: Date, to now: Date, elapsed: TimeInterval) -> Date {
         let progress = max(0, min(1, elapsed / introDuration))
         return start.addingTimeInterval(now.timeIntervalSince(start) * progress)
+    }
+    /// Opening an iPhone Duo scrubs the strip back from this far past the
+    /// moment it was folded on, landing on that moment as the hinge reaches
+    /// flat: about half a tide, so a high or low sweeps by.
+    static let hingeLead: TimeInterval = 6 * 3600
+    /// No hinge update for this long is a hinge at rest. Short of flat, the
+    /// strip finishes on the moment rather than sit on a future reading.
+    static let hingeSettle: TimeInterval = 0.25
+    /// The rebuilt strip arrives near the posture switch, before the opening
+    /// really gets going: the simulator's fold control goes quiet for 0.67 s
+    /// there. Until the hinge moves past where the strip first saw it, give it
+    /// this long instead.
+    static let hingeFirstMove: TimeInterval = 1
+    static func hingeSettled(moved: Bool, idle: TimeInterval) -> Bool {
+        idle > (moved ? hingeSettle : hingeFirstMove)
+    }
+    /// How far through the opening the hinge is: 0 at the angle the strip
+    /// first saw, 1 at flat (π radians).
+    static func hingeProgress(angle: Double, from start: Double) -> Double {
+        guard start < .pi else { return 1 }
+        return max(0, min(1, (angle - start) / (.pi - start)))
     }
 
     /// How much an online gate fetches in one go. Four times the strip it
@@ -181,6 +202,7 @@ struct TimelineDay {
     let start: Date          // local midnight
     let sunrise: Date?
     let sunset: Date?
+    var solarNoon: Date? = nil
     /// A lunar day runs 24h50m, so a calendar day can lack either one.
     let moonrise: Date?
     let moonset: Date?
@@ -402,6 +424,7 @@ struct TimelineData {
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .rise }?.time,
                                sunset: sun.first { $0.kind == .set }?.time,
+                               solarNoon: sun.first { $0.kind == .transit }?.time,
                                moonrise: moon.first { $0.kind == .rise }?.time,
                                moonset: moon.first { $0.kind == .set }?.time)
         }
@@ -490,6 +513,25 @@ struct TimelineData {
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
                             slackWindows: windows, slackThreshold: threshold)
+    }
+
+    static func build(preview: ChsTidePreview, tide: TideStationRecord, now: Date, anchor: Date) -> TimelineData? {
+        guard let coverage = preview.coverage else { return nil }
+        let start = coverage.lowerBound, end = coverage.upperBound
+        let chrome = dayChrome(tz: tide.tz, lat: tide.latitude, lon: tide.longitude, anchor: anchor, now: now)
+        let points = preview.heights(from: start, to: end, step: 600)
+        let rates = preview.rates(from: start, to: end, step: 600)
+        let extremes = preview.extremes(from: start, to: end)
+        let eclipses = windowEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
+        let solar = windowSolarEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
+        let sun = chrome.days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
+        let snaps = Array(Set(extremes.map(\.time) + tideFlowArrows(rates).map(\.time) + sun
+                              + eclipses.flatMap(\.contacts) + solar.flatMap(\.contacts)))
+            .filter { coverage.contains($0) }.sorted()
+        return TimelineData(tz: tide.tz, anchor: anchor, today: chrome.today, start: start, end: end,
+                            days: chrome.days, tidePoints: points, tideRates: rates, tideExtremes: extremes,
+                            currentPoints: [], currentEvents: [], snapTimes: snaps,
+                            eclipses: eclipses, solarEclipses: solar, slackWindows: [])
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
@@ -1153,7 +1195,7 @@ func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack, eclipse
+    case high, low, flood, ebb, slack, eclipse, solarEclipse
 }
 
 struct ScheduleEntry: Identifiable {
@@ -1183,7 +1225,7 @@ func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
         .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
     let solar = tl.solarEclipses
         .filter { tl.scheduleRange.contains($0.start) }
-        .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
+        .map { ScheduleEntry(time: $0.start, pill: .solarEclipse, value: chartTime($0.peak, tl.tz)) }
     return lunar + solar
 }
 
@@ -1205,7 +1247,11 @@ struct MultiDaySchedule: View {
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
+    var sunLocation: StationItem? = nil
     @State private var expandedOffset: Int? = 0
+    @State private var sunDay: SunDaySelection?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1237,31 +1283,14 @@ struct MultiDaySchedule: View {
                             Text(relativeDayLabel(group.start, tz, today: today))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(SN.foam.opacity(0.9))
-                            if let day = days.first(where: { $0.offset == group.offset }) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    if let rise = day.sunrise {
-                                        HStack(spacing: 3) {
-                                            Image(systemName: "sunrise")
-                                            Text(chartTime(rise, tz))
-                                        }
-                                            .foregroundStyle(SN.sunrise)
-                                            .accessibilityLabel("Sunrise \(chartTime(rise, tz))")
-                                    }
-                                    if let set = day.sunset {
-                                        HStack(spacing: 3) {
-                                            Image(systemName: "sunset")
-                                            Text(chartTime(set, tz))
-                                        }
-                                            .foregroundStyle(SN.sunset)
-                                            .accessibilityLabel("Sunset \(chartTime(set, tz))")
-                                    }
-                                }
-                                .font(.caption2.monospaced())
-                                .accessibilityElement(children: .combine)
-                                .accessibilityIdentifier("day-sun-d\(group.offset)")
-                            }
+                            Text(monthDay(group.start, tz))
+                                .font(.caption2)
+                                .foregroundStyle(SN.foam.opacity(0.55))
                         }
                         Spacer(minLength: 0)
+                        if !expanded, let day = days.first(where: { $0.offset == group.offset }) {
+                            sunTimes(day)
+                        }
                         Image(systemName: "chevron.down")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.55))
@@ -1272,7 +1301,11 @@ struct MultiDaySchedule: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation { expandedOffset = expanded ? nil : group.offset }
+                        // A nil animation is the no-motion path: the rows
+                        // appear at once rather than sliding open (#602).
+                        withAnimation(reduceMotion ? nil : .default) {
+                            expandedOffset = expanded ? nil : group.offset
+                        }
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityAddTraits(.isButton)
@@ -1283,6 +1316,17 @@ struct MultiDaySchedule: View {
 
                     if expanded {
                         VStack(spacing: 0) {
+                            if let day = days.first(where: { $0.offset == group.offset }), sunLocation != nil {
+                                expandedSunTimes(day)
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                                .onTapGesture { sunDay = SunDaySelection(id: day.start) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
+                                Divider().overlay(Color.white.opacity(0.055))
+                            }
                             ForEach(group.items) { e in
                                 let on = e.id == nearestID
                                 // A tap gesture, not a Button: Button press tracking
@@ -1302,7 +1346,7 @@ struct MultiDaySchedule: View {
                                         .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                     pillView(e)
                                         // Room for the eclipse label at accessibility sizes.
-                                        .frame(width: 120, alignment: .trailing)
+                                        .frame(minWidth: 120, alignment: .trailing)
                                 }
                                 .padding(.vertical, 9)
                                 .padding(.leading, 14)
@@ -1327,6 +1371,52 @@ struct MultiDaySchedule: View {
             }
         }
         .padding(.vertical, 6)
+        .sheet(item: $sunDay) { day in
+            if let sunLocation {
+                SunDetailSheet(at: day.id, latitude: sunLocation.latitude,
+                               longitude: sunLocation.longitude, tz: tz, onJump: onTap)
+            }
+        }
+    }
+
+    private struct SunDaySelection: Identifiable {
+        let id: Date
+    }
+
+    private func sunTimes(_ day: TimelineDay) -> some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            Label(day.sunrise.map { chartTime($0, tz) } ?? "—", systemImage: "sunrise")
+                .foregroundStyle(SN.sunrise)
+                .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
+            Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
+                .foregroundStyle(SN.sunset)
+                .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
+        }
+        .font(.caption2.monospacedDigit())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("day-sun-d\(day.offset)")
+    }
+
+    private func expandedSunTimes(_ day: TimelineDay) -> some View {
+        let large = dynamicTypeSize.isAccessibilitySize
+        let layout = large ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
+            Label(day.sunrise.map { chartTime($0, tz) } ?? "—", systemImage: "sunrise")
+                .foregroundStyle(SN.sunrise)
+                .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Label(day.solarNoon.map { chartTime($0, tz) } ?? "—", systemImage: "sun.max")
+                .foregroundStyle(SN.sun)
+                .accessibilityLabel(Text("Solar noon"))
+                .accessibilityValue(day.solarNoon.map { chartTime($0, tz) } ?? "—")
+                .frame(maxWidth: .infinity, alignment: large ? .leading : .center)
+            Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
+                .foregroundStyle(SN.sunset)
+                .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
+                .frame(maxWidth: .infinity, alignment: large ? .leading : .trailing)
+        }
+        .font(.caption2.monospacedDigit())
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -1394,16 +1484,22 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
-        case .eclipse:
+        case .eclipse, .solarEclipse:
             // Copper, and light text on it rather than navy: this is the one
             // row in the list that is not about water. The KIND (partial,
             // total, penumbral) is deliberately absent — the column caps at
             // 100pt for "WSW FLOOD" and "🌘 PENUMBRAL ECLIPSE" does not fit.
             // The kind belongs to the Moon sheet, which has room for it.
             HStack(spacing: 3) {
-                Text(verbatim: "🌘")
-                    .accessibilityHidden(true)
-                Text("Eclipse")
+                if e.pill == .solarEclipse {
+                    Image(systemName: "sun.max.fill")
+                        .accessibilityHidden(true)
+                    Text("Solar Eclipse")
+                } else {
+                    Text(verbatim: "🌘")
+                        .accessibilityHidden(true)
+                    Text("Eclipse")
+                }
             }
                 .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)

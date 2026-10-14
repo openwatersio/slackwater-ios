@@ -32,14 +32,17 @@ struct StationListView: View {
     @State private var query = ""
     @State private var showSettings = false
     @State private var showDownloads = false
-    @State private var showWidgetsGallery = false
+    @ObservedObject private var premium = PremiumStore.shared
+    @State private var showPremium = false
     @State private var searching = false
     @State private var results: [StationItem] = []
+    @State private var completedSearch: SearchInput?
     /// Tides/Currents narrowing, nil = everything. One persisted value for
     /// Near Me, search and every detail's Nearby, so a pick carries between
     /// them; `SeriesFilterChips` writes it.
     @AppStorage(seriesFilterKey) private var seriesFilter: StationSeries?
     @FocusState private var searchFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
     /// One-shot: set by the detail-header title tap (issue #32) or the Nearby
@@ -73,7 +76,7 @@ struct StationListView: View {
     /// tap that sets the second without clearing the first.
     @State private var mapPreview: MapPreview?
     @Environment(\.openURL) private var openURL
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     /// Read for the map's identity, not for this view's own text: the pins'
     /// readings are baked into the GeoJSON, so a speed-unit change has to
     /// rebuild the source. Observing it here is what republishes the body.
@@ -188,23 +191,18 @@ struct StationListView: View {
         // sheet or pushed screen the tap came from, so a detail that opened
         // the sheet stays under the newly pushed route on the back stack —
         // correct behavior, not a side effect to work around.
-        .environment(\.openChsRoute, openChsRoute)
+        .environment(\.openChsRoute, { openChsRoute($0) })
         // Same attachment point, same reasoning — the detail header lives
         // inside a pushed detail in both layouts, so ordinary ancestor
         // inheritance from here is enough; no `.sheet` re-forward needed
         // because a station detail never appears inside Settings or Downloads.
-        .environment(\.openMapFocused, openMapFocused)
+        .environment(\.openMapFocused, { openMapFocused($0, $1) })
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
-        // Re-forwarded here too: Settings pushes `OfflineManagerList` in its
-        // OWN `NavigationStack` (SettingsView.swift), and that push inherits
-        // fine — but SettingsView itself is this `.sheet`'s ROOT content, so
-        // without this it's SettingsView's environment that's broken, not
-        // OfflineManagerList's. Same boundary as the comment below.
         .sheet(isPresented: $showSettings) {
-            SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, openChsRoute)
+            SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, { openChsRoute($0) })
         }
         // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
         // a separate presentation hierarchy that only crosses SYSTEM
@@ -214,13 +212,16 @@ struct StationListView: View {
         // `dismiss()` fired, the following `openChsRoute(route)` silently did
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
-        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
-        // No environment re-forward needed here (unlike showSettings/showDownloads
-        // above): the gallery's only nested presentation is PremiumView, which
-        // reads no custom environment key. If it ever grows a station link, mind
-        // the reforwarding gotcha those two sheets document.
-        .sheet(isPresented: $showWidgetsGallery) { WidgetsGalleryView() }
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, { openChsRoute($0) }) }
+        .sheet(isPresented: $showPremium) {
+            PremiumView()
+        }
         .onOpenURL(perform: handleDeepLink)
+        .onContinueUserActivity(stationActivityType) { activity in
+            guard let id = activity.userInfo?["stationID"] as? String,
+                  let url = deepLink(forStationID: id) else { return }
+            handleDeepLink(url)
+        }
         // A tapped alert carries the same station link a share does.
         .onReceive(AlertTap.shared.$url) { url in
             guard let url else { return }
@@ -472,11 +473,13 @@ struct StationListView: View {
                     ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
                 selected: mapPreview?.selection,
-                onSelect: { item in withAnimation(.snappy) { mapPreview = .station(item) } },
-                onSelectUnavailable: { station in
-                    withAnimation(.snappy) { mapPreview = .unavailable(station) }
+                onSelect: { item in
+                    withAnimation(reduceMotion ? nil : .snappy) { mapPreview = .station(item) }
                 },
-                onDeselect: { withAnimation(.snappy) { mapPreview = nil } }
+                onSelectUnavailable: { station in
+                    withAnimation(reduceMotion ? nil : .snappy) { mapPreview = .unavailable(station) }
+                },
+                onDeselect: { withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil } }
             )
             // Units belong in the identity for the same reason the slack
             // window does: both are baked into the pin source at build time,
@@ -575,7 +578,7 @@ struct StationListView: View {
         .padding(.bottom, 12)
         .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
             guard drag.translation.height > 40 else { return }
-            withAnimation(.snappy) { mapPreview = nil }
+            withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil }
         })
     }
 
@@ -628,7 +631,7 @@ struct StationListView: View {
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
-    /// both routes: locked accessory widgets → premium, home widgets
+    /// both routes: locked accessory widgets → premium (the Support Slackwater sheet), home widgets
     /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
     /// rather than inline because RootView's pre-gate handoff replays the URL
     /// through it on first appear.
@@ -644,7 +647,7 @@ struct StationListView: View {
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         #if PREMIUM_ENABLED
-        case "premium": showWidgetsGallery = true
+        case "premium": showPremium = true
         #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
@@ -656,7 +659,7 @@ struct StationListView: View {
                 showMap = false
                 showSettings = false
                 showDownloads = false
-                showWidgetsGallery = false
+                showPremium = false
                 searching = false
                 chooser = nil
                 linkedRemovedStationID = id
@@ -760,7 +763,9 @@ struct StationListView: View {
                                       tier: chs.tier, declined: chs.declinedNearby,
                                       remaining: chs.remainingBeyondCohort),
             onOpen: { showDownloads = true },
-            onAccept: { ChsFitService.shared.accept(.nearby) },
+            onAccept: {
+                if let next = chs.tier.next { ChsFitService.shared.accept(next) }
+            },
             onDecline: { ChsFitService.shared.declineNearby() })
             // On CHANGE, not on every body evaluation. Dispatching the
             // capture from inside the builder ran it on every render, and a
@@ -784,15 +789,19 @@ struct StationListView: View {
         // card. Keep the slot mounted while Core Location finds a fix.
         Group {
             if let fix, !heroItems.isEmpty {
-                MyLocationTile(items: heroItems, fix: fix, imperial: imperial) { item in
+                MyLocationTile(items: heroItems, fix: fix, imperial: imperial,
+                               approximate: loc.accuracyAuthorization == .reducedAccuracy) { item in
                     itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
                 }
                     .transition(.opacity)
             } else if loc.authorized {
-                MyLocationLoadingTile()
+                MyLocationLoadingTile(locating: loc.locating, fallback: fallbackLocationText)
                     .transition(.opacity)
             } else if loc.denied {
-                unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionLabel(String(localized: "My Location", comment: "Current-location section heading."))
+                    unavailableCard
+                }
             } else {
                 // .notDetermined past the gate. Two ways in, and NEITHER is a
                 // first run: the gate's "or search" bypass sets seenGate
@@ -802,7 +811,10 @@ struct StationListView: View {
                 // only caller of `request()` — never comes back, and this slot
                 // used to render nothing at all: the whole My Location group
                 // silently vanished with no prompt and no explanation.
-                askCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionLabel(String(localized: "My Location", comment: "Current-location section heading."))
+                    askCard
+                }
             }
         }
         .animation(.easeInOut(duration: 0.25),
@@ -837,8 +849,9 @@ struct StationListView: View {
 
         HStack(alignment: .firstTextBaseline) {
             MonoLabel(text: fix == nil && recents.lastOpened == nil
-                ? "Chesapeake Bay"
-                : String(localized: "Near Me", comment: "Nearby-stations section heading."))
+                        ? "Chesapeake Bay"
+                        : String(localized: "Near Me", comment: "Nearby-stations section heading."),
+                      isHeader: true)
             Spacer(minLength: 8)
             SeriesFilterChips()
         }
@@ -891,7 +904,7 @@ struct StationListView: View {
     }
 
     private func sectionLabel(_ text: String) -> some View {
-        MonoLabel(text: text)
+        MonoLabel(text: text, isHeader: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 26)
             .padding(.top, 14)
@@ -969,12 +982,17 @@ struct StationListView: View {
             .prefix(5))
     }
 
+    private var fallbackLocationText: String {
+        let place = recents.lastOpened?.name ?? "Chesapeake Bay"
+        return String(localized: "Showing places near \(place)", comment: "My Location fallback when there is no device location. The argument is the last-opened place name or the unchanged proper name Chesapeake Bay; displayed distances are from that place.")
+    }
+
     /// Location never answered — same card shape as `unavailableCard`, but the
     /// action is the ask itself, not a trip to Settings: `.notDetermined` is
     /// the one state iOS still lets the app prompt from.
     private var askCard: some View {
-        ChsAmberCard(title: String(localized: "Tides and currents near you", comment: "Location-permission card title."),
-                     headline: String(localized: "Turn on location to put nearby predictions first.", comment: "Location-permission explanation."),
+        ChsAmberCard(title: String(localized: "Location unavailable", comment: "Location-denied card title."),
+                     headline: fallbackLocationText,
                      action: String(localized: "Find tides near me", comment: "Request location permission action."),
                      identifier: "location-ask-card",
                      icon: "location.fill",
@@ -988,7 +1006,7 @@ struct StationListView: View {
     /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
         ChsAmberCard(title: String(localized: "Location unavailable", comment: "Location-denied card title."),
-                     headline: String(localized: "Turn on location in Settings to find nearby tides and currents.", comment: "Location-denied explanation."),
+                     headline: fallbackLocationText,
                      action: String(localized: "Go to Settings", comment: "Open iOS Settings to enable location."),
                      identifier: "location-denied-card",
                      icon: "location.slash",
@@ -1019,6 +1037,36 @@ struct StationListView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                #if PREMIUM_ENABLED
+                    Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
+                    Button {
+                        showPremium = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sparkles").frame(width: 28)
+                                .foregroundStyle(premium.isPremium ? SN.leaf : SN.foam)
+                            if premium.isPremium {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter."))
+                                    Text("You have Premium — thank you.")
+                                        .font(.caption)
+                                        .foregroundStyle(SN.foam.opacity(0.6))
+                                }
+                                .padding(.vertical, 8)
+                            } else {
+                                Text(String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SN.foam.opacity(0.4))
+                        }
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("support-slackwater")
+                #endif
             }
             .font(.body)
             .foregroundStyle(SN.foam)
@@ -1105,6 +1153,7 @@ struct StationListView: View {
     private func openSearch() {
         query = ""       // a new search never inherits the last query
         results = []
+        completedSearch = nil
         searching = true
     }
 
@@ -1138,6 +1187,7 @@ struct StationListView: View {
         // overwrite the answer (CI showed "d" results under "deception").
         guard !Task.isCancelled else { return }
         results = ranked
+        completedSearch = input
     }
 
     private var searchOverlay: some View {
@@ -1149,6 +1199,13 @@ struct StationListView: View {
             CanvasBackground()
             ScrollView {
                     VStack(spacing: 12) {
+                        if results.isEmpty, completedSearch == searchInput {
+                            Text("No matches", comment: "Empty station-search result; the search and series filters remain available.")
+                                .foregroundStyle(SN.foam.opacity(0.62))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 6)
+                                .accessibilityIdentifier("search-no-matches")
+                        }
                         // Nationally a two-letter query matches a thousand
                         // stations. Showing the nearest 60 is the useful
                         // answer; saying so is the honest one — and it says so
@@ -1304,6 +1361,7 @@ struct MyLocationTile<Card: View>: View {
     let items: [StationItem]
     let fix: (lat: Double, lon: Double)
     let imperial: Bool
+    var approximate = false
     @ViewBuilder let card: (StationItem) -> Card
 
     var body: some View {
@@ -1312,9 +1370,12 @@ struct MyLocationTile<Card: View>: View {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."),
+                          color: SN.foam.opacity(0.9), isHeader: true)
                 Spacer(minLength: 8)
-                Text(formatCoord(lat: fix.lat, lon: fix.lon))
+                Text(approximate
+                     ? String(localized: "Approximate location", comment: "My Location status when iOS supplies an approximate rather than precise location; replaces precise-looking coordinates.")
+                     : formatCoord(lat: fix.lat, lon: fix.lon))
                     .font(.caption2.monospaced())
                     .foregroundStyle(SN.foam.opacity(0.55))
                     // Deliberately neither shrunk to fit nor line-limited: the
@@ -1340,13 +1401,17 @@ struct MyLocationTile<Card: View>: View {
 }
 
 struct MyLocationLoadingTile: View {
+    let locating: Bool
+    let fallback: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."),
+                          color: SN.foam.opacity(0.9), isHeader: true)
             }
             // sectionLabel's three paddings (private to this file) — a header
             // over a plain card, not a box (#253).
@@ -1355,10 +1420,15 @@ struct MyLocationLoadingTile: View {
             .padding(.bottom, 4)
 
             HStack(spacing: 12) {
-                ProgressView().tint(SN.leaf)
-                Text("Finding your location…")
-                    .font(.callout)
-                    .foregroundStyle(SN.foam.opacity(0.7))
+                if locating { ProgressView().tint(SN.leaf) }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(locating
+                         ? String(localized: "Finding your location…")
+                         : String(localized: "Location unavailable", comment: "Location-denied card title."))
+                        .font(.callout)
+                    Text(fallback).font(.footnote)
+                }
+                .foregroundStyle(SN.foam.opacity(0.7))
                 Spacer()
             }
             .frame(minHeight: 96)

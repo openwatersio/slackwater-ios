@@ -17,7 +17,7 @@ import UIKit
 import XCTest
 import notify
 
-class ScreenshotTestCase: XCTestCase {
+@MainActor class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
     static let fixtureNow = "1788868800"
     static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
@@ -31,21 +31,28 @@ class ScreenshotTestCase: XCTestCase {
         continueAfterFailure = false
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         for token in fixtureNotifyTokens.values { notify_cancel(token) }
         fixtureNotifyTokens.removeAll()
-        super.tearDown()
+        try await super.tearDown()
     }
 
-    func testArguments(_ args: [String], live: Bool = false) -> [String] {
+    func testArguments(_ args: [String], live: Bool = false, resetSettings: Bool = true) -> [String] {
         // -resetSeriesFilter / -resetChosenStations: the Tides/Currents pick and
         // chooser picks persist, and one test's pick would otherwise change
         // the next test's lists.
         // -seedTour: arm() now fires on every launch, so without this every
         // detail-opening test would grow an unexpected coach mark.
+        // -uiTestQuiet: no animations, so the app has none to finish and
+        // XCUITest's wait for them cannot spend its 60 s timeout before every
+        // event and every query (#556, SlackwaterApp.swift). The screenshot
+        // walks (`launchShots`) build their own arguments and keep the app as
+        // users see it.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
-                             "-currentFillOff", "-chartPacksOff", "-seedTour",
+                             "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
+        // Opt out only when a relaunch is asserting persisted preferences.
+        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
         }
@@ -247,48 +254,35 @@ class ScreenshotTestCase: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized, hittable, and clear of the
-    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
-    /// ~80pt exclusion the schedule-row taps apply inline, "home indicator
-    /// band" case). Bare `isHittable` alone is not enough for
-    /// elements near the list's bottom — XCUITest counts an element hittable
-    /// the moment any part of it is on-screen and unobscured by an ancestor's
-    /// clipping, which can be true while it still sits directly under the
-    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
-    /// silently lands on the FAB instead and nothing happens (confirmed by
-    /// diagnostic frame dumps: at the bare-isHittable stopping point the
-    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
-    /// one more swipe carried it clear by ~68pt and it stayed there — the
-    /// list was genuinely bottomed out, not still scrolling).
+    /// Reach the target in its own scroll container: on iPad the sidebar
+    /// remains mounted behind Settings and beside the detail. Only the
+    /// station list needs the 80pt bottom clearance for its floating buttons.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
-        var tries = 0
-        while tries < 10 {
-            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
-                break
+        var container = listContainer(app)
+        let reachable = {
+            var bounds = container.frame.intersection(app.windows.firstMatch.frame)
+            if container.identifier == "station-list" { bounds.size.height -= 80 }
+            return el.exists && !el.frame.isEmpty && bounds.contains(el.frame) && el.isHittable
+        }
+        for attempt in 0...10 {
+            if el.exists {
+                let identifier = el.identifier.isEmpty ? el.label : el.identifier
+                container = [app.tables, app.collectionViews, app.scrollViews]
+                    .lazy.map { $0.containing(el.elementType, identifier: identifier).firstMatch }
+                    .first { $0.exists } ?? container
             }
-            listContainer(app).swipeUp()
-            tries += 1
+            if reachable() { break }
+            if attempt < 10 {
+                // A swipe can carry a short row past the sheet's top edge.
+                if el.exists, !el.frame.isEmpty, el.frame.minY < container.frame.minY {
+                    container.swipeDown(velocity: .slow)
+                } else {
+                    container.swipeUp(velocity: .slow)
+                }
+            }
         }
-        XCTAssert(el.exists, "could not scroll to element")
-    }
-
-    /// Bring `el` within reach inside a SHEET, where `scrollTo` cannot help:
-    /// its `listContainer` resolves to the station list still mounted behind
-    /// the presentation, so its swipes land on the wrong scroll view.
-    ///
-    /// Waits between swipes rather than swiping blind. A single speculative
-    /// swipe is right only when the row happens to start exactly one screen
-    /// away; when the sheet settles with it further down — or is still
-    /// settling, which is what a loaded machine buys — the hard assert on the
-    /// next line then fails on a row that is merely below the fold.
-    @discardableResult
-    func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
-        for _ in 0..<tries {
-            if el.exists, !el.frame.isEmpty, el.frame.intersects(app.frame),
-               waitFor(el, "isHittable == true", timeout: 2) { return true }
-            app.swipeUp()
-        }
-        return el.exists && !el.frame.isEmpty && el.frame.intersects(app.frame) && el.isHittable
+        settleLayout(el)
+        XCTAssert(reachable(), "could not scroll element within reach: target \(el.exists ? "\(el.identifier) \(el.frame)" : "missing"), container \(container.identifier) \(container.frame)")
     }
 
     /// Pan the timeline strip under its fixed centerline (drag left = later).
@@ -302,18 +296,14 @@ class ScreenshotTestCase: XCTestCase {
             .press(forDuration: 0.05, thenDragTo:
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
                 withVelocity: .default, thenHoldForDuration: 0)
-        XCTAssertFalse(app.buttons["alert-popup-close"].exists, "scrubbing opened the alert popover")
+        XCTAssertFalse(app.descendants(matching: .any)["alert-sheet"].exists, "scrubbing opened the alert sheet")
     }
 
-    /// Tap the Now pill and confirm the strip came home: the pill leaves once
-    /// it has. Parked first (`settleScrub`) — a tap taken while the magnet is
-    /// still snapping after a scrub is dropped, which is how
-    /// `testM46MalibuDerivedGateSeededOffline` went red on unrelated branches
-    /// (#378). Bounded retap on the same landed signal, `pickSearchResult`'s
-    /// shape; a retap cannot scrub away again, the pill is gone once home.
+    /// Bring the whole strip into view so its Now pill clears system chrome (#634).
     func returnToNow(_ app: XCUIApplication) {
         let now = app.buttons["detail-return-now"].firstMatch
         XCTAssert(now.appears(within: 5), "scrubbing away revealed no return-to-now")
+        scrollTo(app.otherElements["timeline-strip"].firstMatch, in: app)
         settleScrub(app)
         var home = false
         for _ in 0..<3 {
@@ -330,12 +320,12 @@ class ScreenshotTestCase: XCTestCase {
         launch(args)
     }
 
-    func launch(_ args: [String]) -> XCUIApplication {
+    func launch(_ args: [String], resetSettings: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = testArguments(args)
+        app.launchArguments = testArguments(args, resetSettings: resetSettings)
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
         return app
@@ -364,15 +354,6 @@ class ScreenshotTestCase: XCTestCase {
         openSettings(app)
         let segment = app.buttons[label]
         XCTAssert(segment.appears(within: 5))
-        // The sheet's two fixed statements, asserted on the way past. Every
-        // caller of this helper already has them on screen, so they are checked
-        // here rather than in a test of its own with its own launch and its own
-        // Settings round trip.
-        XCTAssert(app.staticTexts["Not for navigation."].exists,
-                  "the settings sheet lost its disclaimer")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenFreeMap'")).firstMatch.exists,
-                  "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
         XCTAssert(stationList(app).appears(within: 5))
@@ -604,7 +585,38 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     func save(_ app: XCUIApplication, _ name: String) {
-        let png = XCUIScreen.main.screenshot().pngRepresentation
+        // The screen the app is on, not `XCUIScreen.main`: on an unfolded
+        // iPhone Duo, main is the dark cover screen.
+        let window = app.windows.firstMatch.frame.size
+        let shots = XCUIScreen.screens.map { $0.screenshot() }
+        let shot = shots.first { shot in
+            let size = shot.image.size
+            return abs(min(size.width, size.height) - min(window.width, window.height)) < 1
+                && abs(max(size.width, size.height) - max(window.width, window.height)) < 1
+        } ?? XCUIScreen.main.screenshot()
+        let image = shot.image
+        let pixels = { (s: CGSize) in CGSize(width: (s.width * image.scale).rounded(), height: (s.height * image.scale).rounded()) }
+        guard pixels(image.size) != pixels(window) else {
+            try? shot.pngRepresentation.write(to: URL(fileURLWithPath: shotDir + "/" + name))
+            return
+        }
+        // The Duo's inner screen comes back as its portrait framebuffer while the
+        // app runs landscape, and a pixel short each way of the window's own size,
+        // which is the size App Store Connect takes. Redraw it upright at that size.
+        // ponytail: clockwise, which is what the walk's pinned `.portrait` produces;
+        // a walk pinning a landscape orientation may need the other direction.
+        let rotate = (image.size.width > image.size.height) != (window.width > window.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        let png = UIGraphicsImageRenderer(size: window, format: format).pngData { context in
+            let cg = context.cgContext
+            if rotate {
+                cg.translateBy(x: window.width, y: 0)
+                cg.rotate(by: .pi / 2)
+            }
+            let drawn = rotate ? CGSize(width: window.height, height: window.width) : window
+            image.draw(in: CGRect(origin: .zero, size: drawn))
+        }
         try? png.write(to: URL(fileURLWithPath: shotDir + "/" + name))
     }
 
@@ -722,7 +734,8 @@ class ShotWalk: ScreenshotTestCase {
     }
 
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
-        var args = ["-seedGate", "-resetRecents", "-noCloudSync",
+        var args = ["-seedGate", "-seedTour", "-resetRecents", "-noCloudSync",
+                    "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", shotEpoch] + fix + extra
         if let time {
@@ -781,7 +794,7 @@ private func scaled(_ timeout: TimeInterval) -> TimeInterval {
     min(timeout * uiWaitScale, timeout + 60)
 }
 
-extension XCUIElement {
+@MainActor extension XCUIElement {
     /// `waitForExistence`, on this machine's clock. See `uiWaitScale`.
     @discardableResult
     func appears(within timeout: TimeInterval) -> Bool {

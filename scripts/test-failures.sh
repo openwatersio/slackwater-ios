@@ -8,7 +8,7 @@
 # failed test and nothing else; the assertion text lives in the bundle. CI
 # runs this into the job log and step summary, and reads the same messages to
 # decide whether a shard's failures were all XCUITest's own services timing
-# out (CLAUDE.md, "Reading a CI failure").
+# out (CONTRIBUTING.md, "Reading a CI failure").
 set -eu
 for bundle in "$@"; do
   [ -d "$bundle" ] || continue
