@@ -23,9 +23,12 @@ struct BackgroundDownloadSubmission {
     private(set) var identifier: String?
 
     mutating func begin(tier: DownloadTier, allCurrentsSelected: Bool = false,
-                        hasWork: Bool, isForeground: Bool) -> String? {
-        guard isForeground, hasWork, tier != .inView || allCurrentsSelected,
-              identifier == nil else { return nil }
+                        queue: ChsQueue, onlineActive: Bool = false, isForeground: Bool) -> String? {
+        let fittedActive = tier != .inView ? queue.active : allCurrentsSelected && queue.jobs.contains {
+            $0.isCurrent && ($0.status == .pending || $0.status == .downloading)
+        }
+        let selectedOnlineActive = (tier != .inView || allCurrentsSelected) && onlineActive
+        guard isForeground, fittedActive || selectedOnlineActive, identifier == nil else { return nil }
         let id = UUID().uuidString
         identifier = id
         return id
@@ -59,7 +62,7 @@ enum BackgroundDownloads {
         let online = service.onlineDownloads
         guard let identifier = submission.begin(tier: service.tier,
             allCurrentsSelected: service.allCurrentsSelected,
-            hasWork: queue.active || online.active,
+            queue: queue, onlineActive: online.active,
             isForeground: UIApplication.shared.applicationState == .active) else { return }
         let id = pattern.replacingOccurrences(of: "*", with: identifier)
 
