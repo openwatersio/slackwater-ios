@@ -74,6 +74,16 @@
             ]
           }
         },
+        "gd" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuin a bhios an ath mhuir-làn ann an ${applicationName}",
+              "Dè an uair a bhios an ath mhuir-làn ann an ${applicationName}",
+              "Cuin a bhios muir-làn ann an ${applicationName}"
+            ]
+          }
+        },
         "it" : {
           "stringSet" : {
             "state" : "translated",
@@ -230,6 +240,16 @@
             ]
           }
         },
+        "gd" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuin a bhios an ath mhuir-tràigh ann an ${applicationName}",
+              "Dè an uair a bhios an ath mhuir-tràigh ann an ${applicationName}",
+              "Cuin a bhios muir-tràigh ann an ${applicationName}"
+            ]
+          }
+        },
         "it" : {
           "stringSet" : {
             "state" : "translated",
@@ -369,6 +389,14 @@
             "state" : "translated",
             "values" : [
               "Cathain a bheidh an chéad tréimhse fáfaill eile in ${applicationName}"
+            ]
+          }
+        },
+        "gd" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuin a bhios an ath thràth marbh-shruth ann an ${applicationName}"
             ]
           }
         },
