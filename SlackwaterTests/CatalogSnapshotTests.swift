@@ -1,10 +1,11 @@
 import XCTest
 @testable import Slackwater
 
-final class CatalogSnapshotTests: XCTestCase {
+@MainActor final class CatalogSnapshotTests: XCTestCase {
     private var directory: URL!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
+        try await super.setUp()
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for resource in CatalogSnapshot.resources {
@@ -15,8 +16,9 @@ final class CatalogSnapshotTests: XCTestCase {
         }
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         if let directory { try FileManager.default.removeItem(at: directory) }
+        try await super.tearDown()
     }
 
     private func edit(_ resource: String, _ change: (inout [[String: Any]]) -> Void) throws {

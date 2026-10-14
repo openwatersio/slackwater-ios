@@ -67,6 +67,7 @@ struct StationChooserSheet: View {
     /// Where each match lands on the map, in `place.matches` order.
     @State private var pinPoints: [CGPoint] = []
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(place: StationMatches, anchor: (lat: Double, lon: Double), anchorName: String?,
          onPick: @escaping (StationItem) -> Void) {
@@ -126,7 +127,7 @@ struct StationChooserSheet: View {
                     }
                     // A nil anchor scrolls only as far as the row needs.
                     .onChange(of: selected) { _, id in
-                        withAnimation { proxy.scrollTo(id) }
+                        withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(id) }
                     }
                 }
             }

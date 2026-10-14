@@ -3,6 +3,63 @@
 import XCTest
 
 final class OfflineTransitionTests: ScreenshotTestCase {
+    func testTidePreviewStaysUsableOfflineThenFinishesInOpenDetail() {
+        let (app, token) = fixture("tide-preview-final", "chs-victoria", fix: ("48.4235", "-123.3705"))
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
+        save(app, "tide-waiting.png")
+        releaseFixture(token, "chs-victoria-first-chunk")
+        let preview = app.descendants(matching: .any)["chs-download-notice"].firstMatch
+        XCTAssert(preview.appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-download-notice"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        let strip = app.descendants(matching: .any)["timeline-strip"].firstMatch
+        let moon = app.descendants(matching: .any)["tile-moon"].firstMatch
+        XCTAssertGreaterThanOrEqual(preview.frame.minY, strip.frame.maxY)
+        XCTAssertLessThanOrEqual(preview.frame.maxY, moon.frame.minY)
+        XCTAssertEqual(preview.frame.midX, strip.frame.midX, accuracy: 1)
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+        save(app, "tide-preview.png")
+
+        app.terminate()
+        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        XCTAssert(app.staticTexts["More data will download when you reconnect"].exists)
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+
+        app.terminate()
+        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", UUID().uuidString,
+                                            "-chsFixtureScenario", "tide-preview-fail"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        XCTAssert(app.staticTexts["Additional download failed. Your downloaded predictions remain available."].appears(within: 10))
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+
+        app.terminate()
+        let resumeToken = UUID().uuidString
+        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", resumeToken,
+                                            "-chsFixtureScenario", "hold-first"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        scrubStrip(app)
+        settleScrub(app)
+        let selectedTime = leadReading(app).value as? String
+        releaseFixture(resumeToken, "chs-victoria-first-chunk")
+        XCTAssert(preview.disappears(within: 30))
+        XCTAssertEqual(leadReading(app).value as? String, selectedTime)
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.exists)
+        save(app, "tide-full-model.png")
+    }
+
     private func fixture(_ scenario: String = "terminal", _ ids: String,
                          fix: (String, String)? = nil) -> (XCUIApplication, String) {
         let token = UUID().uuidString
@@ -61,14 +118,15 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         )).firstMatch.exists)
     }
 
-    func testProvisionalGateRefinesInOpenDetail() {
+    func testCurrentDownloadStaysUsableAndFinishesInOpenDetail() {
         let (app, token) = fixture("provisional-final", "chs-dodd-narrows",
                                    fix: ("49.1344", "-123.8171"))
         openSearch(app, "dodd")
-        let badge = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
-        XCTAssert(badge.appears(within: 30))
-        XCTAssert(badge.label.contains("±35 min"))
+        let reading = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '~'")).firstMatch
+        XCTAssert(reading.appears(within: 30))
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Downloading'")).firstMatch.exists)
+        save(app, "current-download.png")
         let tildeReading = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS '~'")).firstMatch
         let tildeCurve = app.descendants(matching: .any).matching(
@@ -76,16 +134,19 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(tildeReading.exists || tildeCurve.exists)
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         let warning = app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'"
+            format: "label == 'Slack at Dodd Narrows can be off by 35 min.'"
         )).firstMatch
         XCTAssert(warning.appears(within: 5))
-        XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'Stay connected'"
-        )).firstMatch.exists)
-        XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'The on-device fit is still refining'"
-        )).firstMatch.exists)
-        XCTAssert(app.progressIndicators["chs-provisional-warning"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Additional data is required to improve accuracy"].exists)
+        let strip = app.descendants(matching: .any)["timeline-strip"].firstMatch
+        let moon = app.descendants(matching: .any)["tile-moon"].firstMatch
+        let notice = app.descendants(matching: .any)["chs-download-notice"].firstMatch
+        let progress = app.progressIndicators["chs-download-notice"].firstMatch
+        XCTAssert(progress.exists)
+        XCTAssertGreaterThanOrEqual(notice.frame.minY, strip.frame.maxY)
+        XCTAssertLessThanOrEqual(notice.frame.maxY, moon.frame.minY)
+        XCTAssertEqual(notice.frame.midX, strip.frame.midX, accuracy: 1)
+        save(app, "current-detail.png")
         releaseFixture(token, "after-provisional")
         XCTAssert(warning.disappears(within: 30))
         assertCurrentDetailRendered(app)
@@ -111,8 +172,10 @@ final class OfflineTransitionTests: ScreenshotTestCase {
                                    fix: ("49.1344", "-123.8171"))
         openDownloads(app)
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(dodd.appears(within: 10))
-        XCTAssert(dodd.label.contains("Downloading"))
+        // The status in the predicate, not read off the row once it appears:
+        // the row can exist a frame before its label says Downloading (#341).
+        XCTAssert(waitFor(dodd, "label CONTAINS 'Downloading'"),
+                  "Dodd Narrows never showed as downloading: \(dodd.label)")
         app.buttons["Done"].tap()
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
@@ -120,11 +183,14 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         releaseFixture(token, "dodd-first-chunk")
-        waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30)
-        XCTAssert(dodd.label.contains("Available offline"))
-        XCTAssert(tofino.label.contains("Downloading"))
+        XCTAssert(waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30),
+                  "Dodd did not become available offline: \(dodd.label)")
+        // The queue starts Tofino after Dodd finishes, not in the same frame (#663).
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Downloading'"),
+                  "Tofino did not start downloading after Dodd: \(tofino.label)")
         releaseFixture(token, "tofino-first-chunk")
-        waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30)
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30),
+                  "Tofino did not become available offline")
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {
@@ -144,12 +210,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let everything = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
         XCTAssert(everything.appears(within: 5))
         everything.tap()
-        // The widest tier has been accepted when the card stops offering it.
-        // Asserted here rather than left to the row waits below, so a tap that
-        // does not land fails as itself instead of as four missing stations —
-        // which is how the Toggle this replaced hid a real bug (#462).
-        XCTAssert(app.descendants(matching: .any)["download-tier-everything-on"]
-            .firstMatch.appears(within: 5), "the widest tier never took")
+        XCTAssert(waitFor(everything, "isSelected == true"), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
@@ -208,7 +269,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(row.appears(within: 10))
-        XCTAssert(row.label.contains("Refining"))
-        XCTAssert(row.label.contains("Fast answer ±35 min"))
+        XCTAssert(row.label.contains("Waiting for signal"))
+        XCTAssertFalse(row.label.contains("Fast answer"))
     }
 }

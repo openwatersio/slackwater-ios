@@ -1,8 +1,43 @@
 import XCTest
+import notify
 import SlackwaterKit
 @testable import Slackwater
 
 final class IwlsFixtureTests: XCTestCase {
+    func testFixtureWaitsForReleaseBeyondTheFormerPollLimit() async throws {
+        let token = UUID().uuidString
+        let name = "org.openwaters.slackwater.ui.\(token).late"
+        var registration: Int32 = 0
+        XCTAssertEqual(name.withCString { notify_register_check($0, &registration) }, UInt32(NOTIFY_STATUS_OK))
+        defer { notify_cancel(registration) }
+        var polls = 0
+        try await IwlsFetcher.waitForFixtureRelease("late", token: token) {
+            polls += 1
+            if polls == 1_201 {
+                XCTAssertEqual(notify_set_state(registration, 1), UInt32(NOTIFY_STATUS_OK))
+            }
+        }
+        XCTAssertEqual(polls, 1_201)
+    }
+
+    func testFixtureWaitCanBeCancelledBeforeRelease() async {
+        let entered = expectation(description: "waiting at checkpoint")
+        let waiter = Task {
+            try await IwlsFetcher.waitForFixtureRelease("cancel", token: UUID().uuidString) {
+                entered.fulfill()
+                try await Task.sleep(for: .seconds(600))
+            }
+        }
+        await fulfillment(of: [entered], timeout: 5)
+        waiter.cancel()
+        do {
+            try await waiter.value
+            XCTFail("cancelled fixture wait returned normally")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func testAnExhaustedRateLimitRemainsRetryableByTheQueue() {
         XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 429)))
         XCTAssert(ChsError.isPermanent(IwlsFetcher.terminalError(status: 404)))

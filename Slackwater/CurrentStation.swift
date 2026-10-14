@@ -284,7 +284,7 @@ private func ratioText(_ r: Double?) -> String { String(format: "%.2f", r ?? 1) 
 
 /// What every current consumer needs: a harmonic `CurrentStation` or a
 /// subordinate reduced from one, behind the same two calls.
-protocol CurrentPredicting {
+protocol CurrentPredicting: Sendable {
     func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint]
     func events(from: Date, to: Date) -> [CurrentEvent]
 }

@@ -1,6 +1,7 @@
 import CoreLocation
 import MapLibre
 import XCTest
+import Synchronization
 @testable import Slackwater
 
 final class CurrentDirectionTests: XCTestCase {
@@ -36,13 +37,13 @@ final class CurrentDirectionTests: XCTestCase {
     }
 
     func testDoddUsesAbsoluteSpeedAndReciprocalEbbBearing() throws {
-        var evaluations = 0
+        let evaluations = Mutex(0)
         let provider = DoddMapFlowProvider(gate: gate, signedSpeed: { _ in
-            evaluations += 1
+            evaluations.withLock { $0 += 1 }
             return -6
         })
         let flow = try XCTUnwrap(provider.flow(at: date))
-        XCTAssertEqual(evaluations, 1)
+        XCTAssertEqual(evaluations.withLock { $0 }, 1)
         XCTAssertEqual(flow.speedKn, 6)
         XCTAssertEqual(flow.bearingDeg, 201)
         XCTAssertEqual(flow.center.latitude, gate.latitude, accuracy: 1e-12)

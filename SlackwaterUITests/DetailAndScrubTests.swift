@@ -7,6 +7,49 @@ import UIKit
 import XCTest
 
 final class DetailAndScrubTests: ScreenshotTestCase {
+    func testScheduleSunDetails() throws {
+        let app = launch("-seedGate", "-locDenied")
+        openFridayHarbor(app)
+        let tomorrow = app.buttons["schedule-day-d1"].firstMatch
+        scrollTo(tomorrow, in: app)
+        save(app, "sun-schedule-collapsed.png")
+        let sun = tomorrow.descendants(matching: .any)["day-sun-d1"].firstMatch
+        XCTAssertTrue(sun.exists)
+        XCTAssertGreaterThan(sun.frame.minX, tomorrow.frame.midX)
+        tomorrow.tap()
+        let row = app.buttons["day-sun-d1"].firstMatch
+        XCTAssertTrue(row.appears(within: 5))
+        scrollTo(row, in: app)
+        XCTAssertTrue(row.label.contains("Solar noon"))
+        save(app, "sun-schedule-expanded.png")
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any)["sun-horizon-dip"].firstMatch.exists)
+        var previousY = -Double.infinity
+        for kind in ["astroDawn", "nauticalDawn", "morningBlueStart", "civilDawn", "morningBlueEnd", "rise",
+                     "morningGoldenEnd", "transit", "eveningGoldenStart", "set", "eveningBlueStart",
+                     "civilDusk", "eveningBlueEnd", "nauticalDusk", "astroDusk"] {
+            let event = app.descendants(matching: .any)["sun-event-\(kind)"].firstMatch
+            XCTAssertTrue(event.exists, kind)
+            XCTAssertGreaterThan(event.frame.minY, previousY, kind)
+            previousY = event.frame.minY
+        }
+        let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
+        XCTAssertGreaterThan(daylight.frame.minY, previousY)
+        save(app, "sun-details.png")
+        // Every row is a destination: the sheet closes and the timeline lands on the row's time.
+        let golden = app.descendants(matching: .any)["sun-event-eveningGoldenStart"].firstMatch
+        let clock = try XCTUnwrap(golden.label.components(separatedBy: ", ").last)
+        XCTAssertNotEqual(scrubClock(app), clock)
+        golden.tap()
+        XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10),
+                      "the sheet stayed up after a jump")
+        XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(clock)'"),
+                      "the timeline did not land on \(clock): \(scrubClock(app))")
+        XCTAssertTrue(row.appears(within: 5))
+    }
+
     func testM1Walkthrough() throws {
         // The app launches on the list — when located it ranks by distance, so
         // reach Friday Harbor through search (deterministic either way).
@@ -15,10 +58,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // loop's budget only reaches Active Pass from a Salish Sea anchor. A
         // dev machine with a custom simulator location (or none) ranks from
         // somewhere else entirely.
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        // Hosted runners have dropped this walk's scrub (#664); the native trace says
+        // whether the drag's hit test reached the strip and whether its pan began.
+        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705",
+                         "-scrubTrace", "\(shotDir)/m1-scrub-\(UUID().uuidString).log")
 
-        // Units live in Settings only (no list pill): reset to feet first —
-        // the setting persists across runs.
+        // Units live in Settings only (no list pill): start this walk in feet.
         setUnits(app, "Feet")
 
         openFridayHarbor(app)
@@ -82,9 +127,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(leadReading(app), "label MATCHES '.*\\\\d m.*'"),
                   "the lead did not re-render in metres: \(leadReading(app).label)")
         save(app, "m1-detail-metric.png")
-        // Leave the store imperial for the other tests.
-        goBack(app)
-        setUnits(app, "Feet")
     }
 
     /// #95: the tide detail says where the water is and how big this swing is
@@ -325,7 +367,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // fix that only handled the shrink would blank the strip on the way
         // home. The range label, not "Today" in the day column: "Today" shows
         // for any anchor up to six days behind today.
-        app.buttons["detail-return-now"].tap()
+        returnToNow(app)
         XCTAssert(waitFor(bar, "label == '\(before)'"),
                   "return-to-now left the bar on '\(bar.label)', not '\(before)'")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
@@ -380,6 +422,18 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(todayRow.appears(within: 5), "today's rows should start expanded")
         XCTAssertGreaterThanOrEqual(tomorrowDay.frame.width, todayRow.frame.width - 1,
                                     "the day header should span the schedule with its chevron trailing")
+        let laterDay = app.buttons.matching(identifier: "schedule-day-d2").firstMatch
+        scrollTo(laterDay, in: app)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = formatter.timeZone
+        let later = calendar.date(byAdding: .day, value: 2, to: Self.fixtureDate)!
+        XCTAssert(laterDay.staticTexts[formatter.string(from: later)].exists,
+                  "a day beyond Tomorrow must show its date")
+        save(app, "schedule-dates.png")
     }
 
     // The fixed centerline stays put while the multi-day strip pans underneath.
@@ -388,6 +442,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
+
+        settleScrub(app)
+        let liveClock = scrubClock(app)
 
         // Pan the strip while its midpoint is visible: the centerline readout moves off "now".
         scrubStrip(app)
@@ -445,11 +502,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // moved the scrub away from the present.
         XCTAssert(app.buttons["Return to now"].firstMatch.appears(within: 5),
                   "readout did not follow the cross-midnight scrub")
-        app.swipeDown()
-
-        // Return to now restores the live reading and hides the control.
-        app.buttons["Return to now"].firstMatch.tap()
-        XCTAssertFalse(app.buttons["Return to now"].firstMatch.appears(within: 2),
+        returnToNow(app)
+        XCTAssertEqual(scrubClock(app), liveClock,
                        "return-to-now did not restore the live readout")
     }
 
@@ -488,45 +542,53 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let device = XCUIDevice.shared
         device.orientation = .portrait
         defer { device.orientation = .portrait }
-        let app = launch("-seedGate")
+        let app = launch("-seedGate", "-scrubInstant", "2026-09-09T09:54:00-07:00")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "timeline strip missing")
-        // Away from now, so nothing but the rotation moves the strip.
-        scrubStrip(app)
-        settleScrub(app)
-        XCTAssertTrue(stripCentre(app).contains(scrubClock(app)),
-                      "before rotating, the curve and readout already disagree")
+        XCTAssertEqual(scrubClock(app), localizedClock("09:54"), "the fixture moment did not land")
+        let before = try assertStripCentre(app)
 
         for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
-            let before = scrubClock(app)
             device.orientation = orientation
             settleLayout(strip)
-            let readout = scrubClock(app), centre = stripCentre(app)
+            let readout = try assertStripCentre(app)
             XCTAssertEqual(readout, before, "rotation changed the readout")
-            XCTAssertTrue(centre.contains(readout),
-                          "after rotating to \(orientation.rawValue) the curve under the "
-                          + "centerline reads \(centre) while the readout says \(readout)")
         }
     }
 
-    /// The localized reading and dated time under the strip's centerline.
-    private func stripCentre(_ app: XCUIApplication) -> String {
-        app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
+    private func assertStripCentre(_ app: XCUIApplication,
+                                   file: StaticString = #filePath, line: UInt = #line) throws -> String {
+        let values = settled {
+            [leadReading(app).value as? String ?? "",
+             app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""]
+        }
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        formatter.defaultDate = Self.fixtureDate
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "MMMd", options: 0, locale: formatter.locale)!
+            + " '·' " + DateFormatter.dateFormat(fromTemplate: "jm", options: 0, locale: formatter.locale)!
+        let readout = try XCTUnwrap(formatter.date(from: values[0]), "unreadable readout: \(values[0])", file: file, line: line)
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdjmz")
+        let spokenTime = values[1].components(separatedBy: ", ").last ?? ""
+        let centre = try XCTUnwrap(formatter.date(from: spokenTime), "unreadable strip: \(values[1])", file: file, line: line)
+        // Half-point offset rounding plus minute-only clocks can differ by up to 160s.
+        XCTAssertEqual(centre.timeIntervalSince(readout), 0, accuracy: 160,
+                       "curve reads \(values[1]) while the readout says \(values[0])", file: file, line: line)
+        return values[0]
     }
 
     /// Over a fast tide the pill explains the yellow line: the rate, in the
     /// ramp's colour, instead of the next turn. Landing on a turn first (the
     /// commentary tap) and then dragging about three hours on puts the scrub
-    /// mid-run, where the magnet parks it on the run's fastest point — a snap
-    /// stop — so the pill reads the peak rate.
+    /// mid-run, near the run's fastest point, so the pill reads the rate.
     ///
-    /// Eastport, not Boston: the magnet only has a fastest point to park on
-    /// when the run clears the ramp's first anchor (0.6 m/hr — a slower run
-    /// grows no flow arrow, and the drag snaps to a turn instead, where the
-    /// pill names the stop). Boston's weaker limb dips under the anchor at
-    /// neaps; Eastport's worst-case limb (M2 − S2 − N2) stays well over it,
-    /// any day of the lunar month.
+    /// Eastport, not Boston: the pill names a rate only once it clears the
+    /// ramp's first anchor (0.6 m/hr — slower, it names the next stop).
+    /// Boston's weaker limb dips under the anchor at neaps; Eastport's
+    /// worst-case limb (M2 − S2 − N2) stays well over it, any day of the
+    /// lunar month.
     func testFastTideCommentaryNamesTheRate() throws {
         let app = launch("-seedGate", "-networkKillSwitch")
         openSearch(app, "eastport")
@@ -544,26 +606,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // nothing left to stage. Quiet, it parks on the next TURN, and
         // mid-run is a drag away. The hold releases the drag at rest: a
         // flicked release keeps UIScrollView momentum, which carries the
-        // scrub about a half-cycle on, and the magnet then parks it on the
-        // next turn — slack water — instead.
+        // scrub about a half-cycle on, toward the next turn — slack water.
         //
-        // That drag is measured in POINTS against the magnet, never as a
-        // fraction of the strip (#289). The tap has just parked the
-        // centerline exactly ON a stop, and the magnet pulls it back onto any
-        // stop within `Timeline.magnetPts` — so a drag shorter than that
-        // radius is a no-op that re-reads the very label it was staged to
-        // change. The `dx: 0.4` this replaces was ~40 pt on a phone, inside
-        // the 46 pt radius, and had been sized when `Timeline.pph` was still
-        // 12: it silently shrank under the magnet when the NEAPS pass widened
-        // the strip to 18, and only ever passed on the days the tap happened
-        // to land somewhere already fast.
-        //
-        // Three hours clears the radius with room (54 pt at 18 pt/hr) and is
-        // about a quarter-cycle from a turn, which is where a semidiurnal run
-        // runs fastest — the run Eastport always grows (the doc comment
-        // above). Both numbers are the app's own and a UI test cannot link
-        // them, so they are spelled out here and asserted below rather than
-        // trusted.
+        // That drag is measured in POINTS, never as a fraction of the strip
+        // (#289): a fraction's hours change with the device's width. Three
+        // hours is about a quarter-cycle from a turn, which is where a
+        // semidiurnal run runs fastest — the run Eastport always grows (the
+        // doc comment above). The points per hour are the app's own and a UI
+        // test cannot link them, so they are spelled out here and the move is
+        // asserted below rather than trusted.
         let pointsPerHour: CGFloat = 18     // Timeline.pph
         let dragHours: CGFloat = 3
         let namesTheRate = #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#
@@ -578,11 +629,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             settleScrub(app)
             XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
                       "the commentary did not come back after the drag")
-            // The failure #289 was actually about: a drag inside the magnet
-            // snaps straight back, and the label mismatch below then reads as
+            // Without this, a drag that never moved the scrub reads below as
             // "the commentary is wrong" rather than "the scrub never moved".
             XCTAssertNotEqual(scrubClock(app), parked,
-                              "the drag did not clear the magnet — the scrub is still parked on \(parked)")
+                              "the drag did not move the scrub — it is still parked on \(parked)")
         }
         XCTAssert(pill.label.range(of: namesTheRate, options: .regularExpression) != nil,
                   "over a fast tide the commentary names the rate: '\(pill.label)'")
@@ -752,15 +802,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             XCTAssert(app.descendants(matching: .any)[id].firstMatch.exists,
                       "\(id) is not in the sheet")
         }
-        // The eclipse list runs off the bottom of a phone screen, so the half
-        // of this sheet that carries the three kinds has no shot otherwise.
-        app.swipeUp()
+        scrollTo(next, in: app)
         save(app, "moon-sheet-eclipses.png")
-        // Both swipes decelerate, and the tap below lands on a row that is
-        // still moving otherwise — the scroll ends with no accessibility
-        // signal, the same gap `settleLayout` exists for (#331).
-        app.swipeDown()
-        settleLayout(next)
 
         next.tap()
 
@@ -824,7 +867,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         report.tap()
         for subject in ["Station is in the wrong place",
                         "Station name or details are wrong",
-                        "Tide height looks wrong"] {
+                        "Predictions look wrong"] {
             XCTAssert(app.descendants(matching: .any)[subject].firstMatch.appears(within: 5),
                       "the report menu is missing: \(subject)")
         }

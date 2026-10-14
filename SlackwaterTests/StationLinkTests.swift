@@ -6,7 +6,7 @@
 import XCTest
 @testable import Slackwater
 
-final class StationLinkTests: XCTestCase {
+@MainActor final class StationLinkTests: XCTestCase {
     private func link(_ string: String) -> StationLink? {
         guard let url = URL(string: string) else { return nil }
         return stationLink(from: url)

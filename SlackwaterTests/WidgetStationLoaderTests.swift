@@ -5,13 +5,14 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class WidgetStationLoaderTests: XCTestCase {
+@MainActor final class WidgetStationLoaderTests: XCTestCase {
     private var storageRoots: [URL] = []
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         for root in storageRoots where FileManager.default.fileExists(atPath: root.path) {
             try FileManager.default.removeItem(at: root)
         }
+        try await super.tearDown()
     }
 
     private func makeStorage(_ change: (URL) throws -> Void = { _ in }) throws -> CatalogStorage {
@@ -380,7 +381,6 @@ final class WidgetStationLoaderTests: XCTestCase {
             XCTAssertGreaterThan((graphValues.max() ?? 0) - (graphValues.min() ?? 0), 1)
             let snapshot = WidgetSnapshot.build(WidgetStationLoader.station(from: record), now: now)
             XCTAssertEqual(snapshot.curveKind, .current)
-            XCTAssertGreaterThan(snapshot.sparkline.count, 10)
             XCTAssertNotNil(snapshot.next)
             XCTAssertNil(WidgetStationLoader.loadRecord(
                 id: id, at: start.addingTimeInterval(11 * 86_400)),

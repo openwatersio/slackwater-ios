@@ -48,17 +48,23 @@ import UserNotifications
 }
 
 final class AlertNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = AlertNotificationDelegate()
+    @MainActor static let shared = AlertNotificationDelegate()
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
 
+    /// The completion-handler form, not `async`: Swift calls an async delegate's handler from the
+    /// cooperative pool, and UIKit aborts when a tap from the background is completed off the main thread.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                didReceive response: UNNotificationResponse) async {
-        guard let text = response.notification.request.content.userInfo[AlertTap.urlKey] as? String,
-              let url = URL(string: text) else { return }
-        await MainActor.run { AlertTap.shared.url = url }
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let text = response.notification.request.content.userInfo[AlertTap.urlKey] as? String
+        // UIKit delivers the tap on the main thread.
+        MainActor.assumeIsolated {
+            if let text, let url = URL(string: text) { AlertTap.shared.url = url }
+        }
+        completionHandler()
     }
 }

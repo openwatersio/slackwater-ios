@@ -17,7 +17,7 @@ jobs:
       (github.event_name == 'pull_request_target' && github.event.action != 'closed') ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
        startsWith(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # This workflow runs on pull_request_target and must NEVER check out or
     # execute pull-request code. The four scopes are the minimum the assistant
     # needs: contents to record signatures in .cla.json on main, pull-requests

@@ -3,7 +3,7 @@ import XCTest
 @testable import Slackwater
 
 /// Colour is state; form is kind. These tests are the rule, executable.
-final class ColourAndFormTests: XCTestCase {
+@MainActor final class ColourAndFormTests: XCTestCase {
 
     /// Resolved sRGB components, so two Colors built the same way compare equal.
     private func rgb(_ color: Color) -> [CGFloat] {

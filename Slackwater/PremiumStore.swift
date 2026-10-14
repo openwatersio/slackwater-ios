@@ -20,7 +20,7 @@ enum PremiumError: LocalizedError {
 final class PremiumStore: ObservableObject {
     static let shared = PremiumStore()
     nonisolated static let yearlyID = "io.openwaters.slackwater.premium.yearly"
-    nonisolated static let lifetimeID = "io.openwaters.slackwater.premium.lifetime"
+    nonisolated static let lifetimeID = "io.openwaters.slackwater.premium.lifetime.v2"
     private nonisolated static let ids = [yearlyID, lifetimeID]
 
     @Published private(set) var isPremium: Bool

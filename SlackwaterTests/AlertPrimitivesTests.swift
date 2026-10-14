@@ -26,7 +26,7 @@ final class AlertPrimitivesTests: XCTestCase {
         // Friday Harbor. US clocks fall back at 02:00 local on 2026-11-01.
         let iso = ISO8601DateFormatter()
         let from = try XCTUnwrap(iso.date(from: "2026-11-01T08:00:00Z"))
-        let spans = daylightSpans(from: from, to: from.addingTimeInterval(86_400), lat: 48.545, lon: -123.013)
+        let spans = sunWindowSpans(.daylight, from: from, to: from.addingTimeInterval(86_400), lat: 48.545, lon: -123.013)
         let noonPST = try XCTUnwrap(iso.date(from: "2026-11-01T20:00:00Z"))
         let predawnPST = try XCTUnwrap(iso.date(from: "2026-11-01T09:30:00Z"))
         XCTAssertTrue(spans.contains { $0.contains(noonPST) })

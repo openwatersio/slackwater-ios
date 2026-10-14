@@ -11,7 +11,7 @@ import SlackwaterKit
 /// a card opens into is the same drawing at a larger scale. What is the
 /// card's own: the four-swing window, the padded auto-fit domain, the axis
 /// row's edge rules, and the VoiceOver summary.
-struct StationCardGraph: View {
+nonisolated struct StationCardGraph: View {
     /// One extreme-to-extreme swing: half the M2 semidiurnal period (12.42 h).
     static let swing: TimeInterval = (12.42 / 2) * 3600
     /// Four swings total, weighted toward the future — the past is context,
@@ -27,9 +27,6 @@ struct StationCardGraph: View {
     /// Vertical headroom above and below the sampled range, as a fraction
     /// of it.
     private static let domainPadFraction = 0.25
-    /// Strip at the bottom reserved for the time axis; the curve plots above
-    /// it so a trough never runs into the labels.
-    private static let axisHeight: CGFloat = 6
     /// An extreme closer than this to a card edge keeps its dot and axis
     /// time but drops its value label; every axis time — extreme or slack
     /// crossing — uses the tighter margin.
@@ -96,6 +93,11 @@ struct StationCardGraph: View {
     /// the line's rate colour. Empty on a current curve, and the preview
     /// sines — the line is then plain blue.
     var rates: [Double] = []
+    var showsReadings = true
+    var showsTimes = true
+    var showsNow = true
+    // Compact widgets need a separate lane for times below the curve and its dots.
+    var timeLabelSpace: CGFloat = 6
 
     var body: some View {
         Canvas { context, size in
@@ -113,7 +115,7 @@ struct StationCardGraph: View {
             lo -= pad; hi += pad
 
             func x(_ t: Date) -> CGFloat { t.timeIntervalSince(start) * xScale }
-            let plotHeight = size.height - Self.axisHeight
+            let plotHeight = max(0, size.height - timeLabelSpace)
             func y(_ v: Double) -> CGFloat { plotHeight * (1 - (v - lo) / (hi - lo)) }
             let nowX = x(now)
 
@@ -199,7 +201,7 @@ struct StationCardGraph: View {
                 }
                 // The extreme's time joins the bottom axis under the axis's
                 // own edge rule — the same one the slack crossing times use.
-                if !isCurrent, dotAt.x >= Self.axisEdgeMargin,
+                if showsTimes, !isCurrent, dotAt.x >= Self.axisEdgeMargin,
                    dotAt.x <= size.width - Self.axisEdgeMargin {
                     context.draw(Text(e.timeText)
                                     .font(.system(size: Self.timeFontSize).monospacedDigit())
@@ -210,7 +212,7 @@ struct StationCardGraph: View {
                 // An extreme hugging the card edge keeps its dot and axis
                 // time but drops its value label — a shifted label detaches
                 // from its dot and reads as belonging to the wrong spot.
-                guard dotAt.x >= Self.labelEdgeMargin,
+                guard showsReadings, dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
                 // The reading hangs off the turn toward the plot middle with
                 // its pointer nearest the dot (current-charts §15.1). The set
@@ -233,7 +235,7 @@ struct StationCardGraph: View {
 
             // The axis names each run's opening, and a bare slack only where
             // no run covers it — the same moments the detail strip prints.
-            if includesZero {
+            if includesZero && showsTimes {
                 for when in currentAxisMoments(runs: windows, slacks: slacks) {
                     let cx = x(when)
                     let fade = when < now ? CurveStyle.pastLabelFade : 1.0
@@ -254,7 +256,7 @@ struct StationCardGraph: View {
             }
 
             // The "now" dot rides the curve one swing in from the left edge.
-            CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now))))
+            if showsNow { CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now)))) }
         }
         .accessibilityLabel("\(Int(((back + forward) / 3600).rounded()))-hour curve")
         .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
@@ -324,12 +326,13 @@ extension TideStationRecord {
 extension CurrentStationRecord {
     /// `tilde` hedges the extreme values (`~3.0 kn`) for a provisional
     /// (60-day) gate, like the reading's own tilde.
-    func cardGraph(at now: Date, unit: String, tilde: Bool = false) -> StationCardGraph {
-        cardGraph(at: now, unit: unit, tilde: tilde, station: engineStation)
+    func cardGraph(at now: Date, unit: String, tilde: Bool = false,
+                   threshold: Double = slackThresholdKn) -> StationCardGraph {
+        cardGraph(at: now, unit: unit, tilde: tilde, station: engineStation, threshold: threshold)
     }
 
     func cardGraph(at now: Date, unit: String, tilde: Bool = false,
-                   station s: any CurrentPredicting) -> StationCardGraph {
+                   station s: any CurrentPredicting, threshold: Double = slackThresholdKn) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
@@ -350,13 +353,13 @@ extension CurrentStationRecord {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes),
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }
 
 extension ChsOnlineWindow {
-    func cardGraph(at now: Date, unit: String) -> StationCardGraph {
+    func cardGraph(at now: Date, unit: String, threshold: Double = slackThresholdKn) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let tz = TimeZone(identifier: timezone) ?? .current
@@ -378,7 +381,7 @@ extension ChsOnlineWindow {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes),
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }

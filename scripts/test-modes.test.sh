@@ -11,15 +11,35 @@ cp "$root/scripts/first-run.sh" "$scratch/repo/scripts/first-run.sh"
 touch "$scratch/repo/scripts/iwls-fixtures.mjs"
 log="$scratch/calls"
 
-for tool in node open xcodegen xcodebuild; do
+for tool in node open xcodegen xcodebuild sysctl; do
   cat > "$scratch/bin/$tool" <<'STUB'
 #!/bin/zsh
+[[ ${0:t} == sysctl ]] && { print 34359738368; exit 0; }
 print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-} perf=${TEST_RUNNER_SLACKWATER_PERF_SCALE:-}" >> "$CALL_LOG"
 [[ ${0:t} == open && $* == '-a DeviceHub' && ${NO_DEVICE_HUB:-0} == 1 ]] && exit 1
 [[ ${0:t} == node && ${FAIL_PREPARE:-0} == 1 ]] && {
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
   exit 1
 }
+# The idle-timeout text lives in the result bundle's store, so a run that
+# spent its time there leaves it where the runner looks.
+if [[ ${0:t} == xcodebuild && ${IDLE_TIMEOUTS:-0} -gt 0 ]]; then
+  prev=""
+  for a in "$@"; do
+    [[ $prev == -resultBundlePath ]] && bundle=$a
+    prev=$a
+  done
+  if [[ -n ${bundle:-} ]]; then
+    mkdir -p "$bundle"
+    repeat $IDLE_TIMEOUTS \
+      print -n -- "animations complete notification not received" >> "$bundle/database.sqlite3"
+  fi
+fi
+if [[ ${0:t} == xcodebuild ]]; then
+  repeat 45 print "raw test output"
+  print -u2 "raw stderr evidence"
+  [[ ${FAIL_XCODEBUILD:-0} == 1 ]] && exit 65
+fi
 exit 0
 STUB
   chmod +x "$scratch/bin/$tool"
@@ -33,7 +53,7 @@ cat > "$scratch/bin/xcrun" <<'STUB'
 print -r -- "xcrun $*" >> "$CALL_LOG"
 case "$1 $2" in
   "simctl create") print "SIM-${3// /_}" ;;
-  "xcresulttool get") print "{\"passedTests\": ${RAN_TESTS:-1}, \"failedTests\": 0}" ;;
+  "xcresulttool get") [[ ${UNAVAILABLE_RESULTS:-0} == 1 ]] && exit 1; [[ ${UNAVAILABLE_RESULTS:-0} == 2 ]] && { print "partial JSON"; exit 0; }; print "{\"passedTests\": ${RAN_TESTS:-1}, \"failedTests\": 0}" ;;
 esac
 exit 0
 STUB
@@ -66,6 +86,7 @@ assert_has "id=SIM-Slackwater_iPhone_17_·_repo"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
 assert_has "-collect-test-diagnostics never"
+assert_has "-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600"
 assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
@@ -108,6 +129,7 @@ assert_lacks "simctl create"
 # A prebuilt run tests the given products and never rebuilds or regenerates.
 SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode
 assert_has "xcodebuild test-without-building -xctestrun products/Plan.xctestrun"
+assert_has "-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600"
 assert_lacks "xcodegen"
 assert_lacks "iwls-fixtures.mjs prepare"
 assert_lacks "-derivedDataPath"
@@ -165,6 +187,13 @@ SLACKWATER_WORKERS=1 run_mode --unit
 assert_has "-parallel-testing-worker-count 1 "
 run_mode --unit
 grep -Eq -- '-parallel-testing-worker-count [234] ' "$log" || { print -u2 -- "default workers outside 2–4"; cat "$log"; exit 1; }
+assert_lacks "-parallel-testing-enabled NO"
+
+# CI tests on the device it booted and warmed, never a cold clone of it.
+SLACKWATER_NO_CLONE=1 SLACKWATER_SIMS='Mine' SLACKWATER_WORKERS=1 \
+  SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode --full
+assert_has "-parallel-testing-enabled NO"
+assert_lacks "-parallel-testing-worker-count"
 
 # The wait scale defaults to 2 locally; CI's explicit value is taken as given.
 run_mode --unit
@@ -190,5 +219,56 @@ assert_has "open -a DeviceHub"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" NO_DEVICE_HUB=1 \
   zsh "$scratch/repo/scripts/first-run.sh" >/dev/null 2>&1
 assert_has "open -a Simulator"
+
+# A run that spent its time on XCUITest's 60 s idle timeout says so. The line
+# is xcodebuild's, `tail -40` drops it, and the result bundle carrying it only
+# travels on a failure — so without this the lane is silently slow (#556).
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 IDLE_TIMEOUTS=3 \
+  zsh "$scratch/repo/scripts/test.sh" --unit)
+[[ $out == *"warning: 3 XCUITest idle timeouts"* ]] \
+  || { print -u2 -- "idle timeouts went unreported"; print -r -- "$out"; exit 1; }
+
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 \
+  zsh "$scratch/repo/scripts/test.sh" --unit)
+[[ $out != *"idle timeouts"* ]] \
+  || { print -u2 -- "a clean run warned anyway"; print -r -- "$out"; exit 1; }
+
+# Failures still leave elapsed output, a raw log including stderr, and a summary.
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 UNAVAILABLE_RESULTS=1 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 65 && $out == *"test results unavailable"* && $out == *"s · unavailable tests"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "failure status or diagnostics lost: $result $out"; exit 1; }
+rawlog="$scratch/repo/build/results-unit-iPhone_17.log"
+[[ $(grep -c '^raw test output$' "$rawlog") == 45 ]] || { print -u2 "raw output was truncated"; exit 1; }
+grep -q '^raw stderr evidence$' "$rawlog"
+grep -q '"status": "unavailable"' "${rawlog%.log}.summary.json"
+
+# A successful command with unreadable results is unavailable, never zero.
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 UNAVAILABLE_RESULTS=1 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 1 && $out == *"test results unavailable"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "unavailable results misreported: $result $out"; exit 1; }
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 UNAVAILABLE_RESULTS=2 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 1 && $out == *"test results unavailable"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "partial results misreported: $result $out"; exit 1; }
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 IDLE_TIMEOUTS=3 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 65 && $out == *"3 XCUITest idle timeouts"* && $out == *"s · 1 tests"* ]] \
+  || { print -u2 -- "failed run skipped diagnostics: $result $out"; exit 1; }
+run_mode --unit
+grep -q '"passedTests": 1' "${rawlog%.log}.summary.json"
 
 print "runner mode checks passed"

@@ -6,13 +6,21 @@ import SlackwaterKit
 
 struct TideDetailView: View {
     let record: TideStationRecord
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    var preview: ChsTidePreview? = nil
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
 
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    /// The ±15-day scan the Range tile's mark and its sheet both read. One per
+    /// station, loaded off the main actor, deliberately not re-anchored by the
+    /// scrub — see `TideStandingStore`.
+    @State private var standings = TideStandingStore()
+    @State private var previewTimeline: TimelineData?
+    @State private var displayedPreview: ChsTidePreview?
+    @State private var previewGate = ScrollGate()
     @State private var chsFittedAt: Date?
     /// The nearest current-series station inside `nearbyStationRadiusKm`, or
     /// nil. Computed once on appear — a catalog scan has no place in a body
@@ -25,7 +33,8 @@ struct TideDetailView: View {
     /// scale governor fits the curve against.
     @State private var viewportPts: CGFloat = 0
 
-    private var timeline: TimelineData? { store?.timeline }
+    private var timeline: TimelineData? { store?.timeline ?? previewTimeline }
+    private var activePreview: ChsTidePreview? { store == nil ? preview ?? displayedPreview : nil }
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -34,7 +43,10 @@ struct TideDetailView: View {
     private var nextExtreme: TideExtreme? {
         timeline?.tideExtremes.first { $0.time > scrubTime }
     }
-    private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
+    private var rising: Bool {
+        if let preview = activePreview { return preview.rateOfChange(at: scrubTime) >= 0 }
+        return nextExtreme.map { $0.kind == .high } ?? true
+    }
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
@@ -99,13 +111,19 @@ struct TideDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
+                            canPickDate: activePreview == nil,
+                            onPicked: { picked in
+                                if let coverage = activePreview?.coverage {
+                                    anchor = todayLocal(tz)
+                                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                                } else { store?.jump(to: scrubTime, anchor: picked) }
+                            },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
-                            alertOffer: tideAlertOffer(
+                            alertOffer: activePreview == nil ? tideAlertOffer(
                                 scrubbedAway: scrubbedAway(scrubTime, from: live),
                                 turnIsHigh: atTurn.map { $0.kind == .high },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                heightM: scrubHeight, rising: rising, imperial: imperial),
+                                heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
                             above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
@@ -119,17 +137,18 @@ struct TideDetailView: View {
                                                    commentary: commentary,
                                                    commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
-                                                   scrollGate: store?.gate,
+                                                   scrollGate: store?.gate ?? previewGate,
                                                    onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(sky: sky) }
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
+                                    if let coverage = activePreview?.coverage {
+                                        ChsDownloadNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
+                                    }
                                     SummaryTiles(primary: range,
-                                                 primaryDetail: rangeDetail,
-                                                 // A year, which is what the tile is
-                                                 // flagging: this water follows one.
-                                                 primarySymbol: record.seasonalRatio == nil ? nil : "calendar",
+                                                 primaryDetail: rangeDetail(jump: jump),
+                                                 primarySymbol: rangeSymbol,
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
@@ -150,12 +169,9 @@ struct TideDetailView: View {
                                 }
                             })
             .onAppear {
-                if store == nil {
-                    // A shared link that landed first has placed the anchor and
-                    // the scrub (ScrubDetailScaffold.jump): open on its moment,
-                    // or the first build covers now and the strip clamps it away.
-                    let linked = anchor != .distantPast
-                    if !linked { anchor = todayLocal(tz) }
+                let linked = anchor != .distantPast
+                if anchor == .distantPast { anchor = todayLocal(tz) }
+                if preview == nil, store == nil {
                     let s = TimelineWindowStore(source: .tide(record))
                     s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
                     store = s
@@ -170,12 +186,49 @@ struct TideDetailView: View {
                     nearbyCurrent = n
                 }
             }
-            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .task(id: preview?.fetchedAt) {
+                if anchor == .distantPast { anchor = todayLocal(tz) }
+                if let preview, let coverage = preview.coverage {
+                    displayedPreview = preview
+                    anchor = todayLocal(tz)
+                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                    let record = record, now = live, day = anchor
+                    let built = await Task.detached(priority: .userInitiated) {
+                        TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
+                    }.value
+                    guard !Task.isCancelled else { return }
+                    previewTimeline = built
+                } else if store == nil {
+                    while !previewGate.isQuiet {
+                        guard (try? await Task.sleep(for: .milliseconds(50))) != nil else { return }
+                    }
+                    guard !Task.isCancelled else { return }
+                    let s = TimelineWindowStore(source: .tide(record))
+                    s.start(anchor: anchor, now: live, focus: scrubTime)
+                    store = s
+                    previewTimeline = nil
+                    chsFittedAt = record.isChs ? ChsModelStore.load(record.id)?.fittedAt : nil
+                }
+                // After the timeline, never before it: the strip is what the
+                // reader is waiting for, and this scan only feeds a tile
+                // caption and the sheet behind it.
+                await standings.load(record: record, around: live)
+                // The year costs about a second and only the sheet shows it,
+                // so it comes after the fortnight and never blocks the strip.
+                await standings.loadYear(record: record, around: live)
+            }
+            .onChange(of: scrubTime) { _, t in
+                if let coverage = activePreview?.coverage {
+                    let clamped = min(max(t, coverage.lowerBound), coverage.upperBound)
+                    if t != clamped { scrubTime = clamped }
+                } else { store?.focus(t, viewportPts: viewportPts) }
+            }
             // The schedule follows a scrub that has settled somewhere outside
             // its window — the strip is endless now, and a list still describing
             // three weeks ago would be a lie. A cancelled sleep is a scrub
             // still in motion, same rest rule as the chrome row's.
             .task(id: scrubTime) {
+                guard activePreview == nil else { return }
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
                 // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
                 if let tl = timeline,
@@ -198,11 +251,37 @@ struct TideDetailView: View {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
         return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
-                // At a seasonal station the caption gives up the direction for
-                // the reason the number is small. The direction is the lesser
-                // fact — the curve and the schedule both show it — and a tile
-                // caption is one line, so the two cannot both be here.
-                record.seasonalRatio.map(seasonalCaption) ?? rangeDirection)
+                // One line, three claimants: `rangeCaption` owns the order.
+                rangeCaption(record: record, swing: swingStanding, direction: rangeDirection))
+    }
+
+    /// Where THIS SWING sits among the fortnight's swings. The tile prints a
+    /// swing, so the tile's mark ranks a swing: a station can have a big range
+    /// on a day whose low is unremarkable, and ranking the level on a tile
+    /// whose value is a range read as a conflation on screen.
+    private var swingStanding: PeakStanding? {
+        guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+        return standings.swing(abs(next.height - prev.height), time: next.time)
+    }
+
+    /// Where the turn ahead sits between the station's own floor and ceiling.
+    /// A different question from the swing's, and it belongs to the sheet's
+    /// max/min section rather than to the tile.
+    private var standing: TideStanding? {
+        nextExtreme.flatMap(standings.standing(at:))
+    }
+
+    /// The glyph beside the tile's label. A calendar where the water follows a
+    /// year, otherwise a to-bar arrow for a marked turn — the same `⤒`/`⤓`
+    /// sense the tile's own value carries: a swing is a distance between two
+    /// turns, not a direction of travel.
+    ///
+    /// Seasonal outranks the mark here for the reason it outranks it in the
+    /// caption: it changes how the whole screen should be read.
+    private var rangeSymbol: String? {
+        if record.seasonalRatio != nil { return "calendar" }
+        guard let swingStanding, swingStanding.marks else { return nil }
+        return "arrow.up.and.down"
     }
 
     /// Which way this swing runs, when there is nothing more pressing to say.
@@ -212,13 +291,23 @@ struct TideDetailView: View {
             : String(localized: "high to low", comment: "Tide-range direction.")
     }
 
-    /// The Range tile's sheet, and the marker on the tile that says it is there.
-    /// Both appear only where the water is seasonal rather than tidal.
-    private var rangeDetail: (() -> AnyView)? {
-        guard let ratio = record.seasonalRatio, let range else { return nil }
-        let place = record.name
-        return { AnyView(RangeDetailSheet(value: range.value, direction: self.rangeDirection,
-                                          seasonalRatio: ratio, place: place)) }
+    /// The Range tile's sheet. It opens wherever there is something behind the
+    /// number: a fortnight to rank this swing against, or water that follows a
+    /// year. A station with neither keeps the inert tile it had.
+    private func rangeDetail(jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
+        guard let range, record.seasonalRatio != nil || swingStanding != nil else { return nil }
+        let place = record.name, ratio = record.seasonalRatio
+        let standing = standing, swing = swingStanding, record = record
+        let months = standings.months
+        let imperial = imperial, unit = unit, now = live
+        return {
+            AnyView(RangeDetailSheet(
+                value: range.value, direction: self.rangeDirection,
+                seasonalRatio: ratio, place: place,
+                standing: standing, swing: swing, months: months,
+                latDatum: record.latDatum, hatDatum: record.hatDatum,
+                imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
+        }
     }
 
     private var leadState: String {
@@ -272,7 +361,11 @@ struct TideDetailView: View {
     // full clause-10 licence statement carries its weight in Settings.
     private var footer: some View {
         DetailFooter(stationID: record.id, scrubTime: scrubTime, tz: tz) {
-            if record.isChs {
+            if activePreview != nil {
+                Text("Official CHS tide predictions, downloaded to this device. Heights are above LLWLT chart datum.")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            } else if record.isChs {
                 Text("\(record.chartDatum) chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
@@ -285,9 +378,11 @@ struct TideDetailView: View {
             } else if record.id.hasPrefix("noaa/") {
                 Text("\(record.chartDatum) chart datum. NOAA harmonic prediction.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
-            } else {
-                Text("\(record.chartDatum) chart datum. TICON-4 harmonic prediction.")
+            } else if let source = record.source {
+                // Kartverket's terms ask to be named wherever its data is used.
+                Text("\(record.chartDatum) chart datum. Harmonic constants from \(source).")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -299,7 +394,9 @@ struct TideDetailView: View {
             StationDetailRow("Station", record.id)
             StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
             StationDetailRow("Time zone", record.timezone)
-            if let ref = record.referenceRecord {
+            if activePreview != nil {
+                StationDetailRow("Prediction", String(localized: "Official CHS predictions"))
+            } else if let ref = record.referenceRecord {
                 StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
                 StationDetailRow("Prediction", "NOAA reference highs and lows, adjusted by published offsets and computed on this device")
             } else {
@@ -321,7 +418,8 @@ struct TideDetailView: View {
     /// Engine-exact height — the same call the old model's committed readout
     /// made, so the now-readout is unchanged by the scrub rework.
     private func exactHeight(at t: Date) -> Double {
-        record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+        if let preview = activePreview { return preview.height(at: t) ?? 0 }
+        return record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
     }
 
     private func returnToNow() {
@@ -333,7 +431,49 @@ struct TideDetailView: View {
         // the store only guarantees now's chunks exist.
         anchor = todayLocal(tz)
         store?.jump(to: live, anchor: anchor)
-        scrubTime = live
+        if let coverage = activePreview?.coverage {
+            scrubTime = min(max(live, coverage.lowerBound), coverage.upperBound)
+        } else { scrubTime = live }
+    }
+}
+
+/// Progress stays local to this notice so each downloaded chunk does not rebuild the timeline.
+struct ChsDownloadNotice: View {
+    let stationID: String
+    var end: Date? = nil
+    let tz: TimeZone
+    var gate: ChsCurrentGateInfo? = nil
+    @ObservedObject private var downloads = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
+
+    var body: some View {
+        let status = cardStatus(id: stationID)
+        VStack(alignment: .center, spacing: 8) {
+            Text("Additional data is required to improve accuracy")
+            StationDownloadProgress(value: downloads.queue.job(stationID)?.downloadProgress ?? 0)
+                .accessibilityValue(Text(status.label))
+            if status == .offline || status == .notDownloaded {
+                Text("More data will download when you reconnect")
+            } else if status == .failed {
+                Text("Additional download failed. Your downloaded predictions remain available.")
+            } else if status == .retrying {
+                CardStatusStrip(status: status)
+            }
+            if let end {
+                Text("Predictions available through \(end.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
+                    .foregroundStyle(SN.foam.opacity(0.7))
+            }
+            if let gate {
+                Text(gate.provisionalHeadline)
+                    .foregroundStyle(SN.amber)
+            }
+        }
+        .font(.caption)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20).padding(.vertical, 8)
+        .accessibilityIdentifier("chs-download-notice")
     }
 }
 

@@ -5,6 +5,48 @@ import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    func testBodiesMoveContinuouslyAcrossRiseAndSet() throws {
+        let observer = try Observer(latitudeDeg: 48.4237, longitudeDeg: -123.3027)
+        let f = ISO8601DateFormatter()
+        let start = try XCTUnwrap(f.date(from: "2032-04-23T07:00:00Z"))
+        let end = try XCTUnwrap(f.date(from: "2032-04-29T07:00:00Z"))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        var days: [TimelineDay] = []
+        var day = start
+        while day < end {
+            let next = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: day))
+            let sun = try sunEvents(from: day, to: next, observer: observer)
+            let moon = try moonEvents(from: day, to: next, observer: observer)
+            days.append(TimelineDay(offset: days.count, start: day,
+                                    sunrise: sun.first { $0.kind == .rise }?.time,
+                                    sunset: sun.first { $0.kind == .set }?.time,
+                                    moonrise: moon.first { $0.kind == .rise }?.time,
+                                    moonset: moon.first { $0.kind == .set }?.time))
+            day = next
+        }
+        for day in days.dropFirst().dropLast() {
+            for event in [day.sunrise, day.sunset, day.moonrise, day.moonset].compactMap({ $0 }) {
+                let before = SkyState(time: event.addingTimeInterval(-1), latitude: 48.4237,
+                                      longitude: -123.3027, days: days)
+                let after = SkyState(time: event.addingTimeInterval(1), latitude: 48.4237,
+                                     longitude: -123.3027, days: days)
+                for (a, b, spanA, spanB, pad) in [
+                    (before.sun, after.sun, before.sunSpan, after.sunSpan, sunDiscRadius),
+                    (before.moon, after.moon, before.moonSpan, after.moonSpan, moonGlyphSize / 2)
+                ] {
+                    let a = try XCTUnwrap(a), b = try XCTUnwrap(b)
+                    let size = CGSize(width: 402, height: 240)
+                    let p = skyPoint(azimuth: a.azDeg, altitude: a.altDeg, latitude: 48.4237,
+                                     span: spanA, pad: pad, size: size)
+                    let q = skyPoint(azimuth: b.azDeg, altitude: b.altDeg, latitude: 48.4237,
+                                     span: spanB, pad: pad, size: size)
+                    XCTAssertLessThan(hypot(p.x - q.x, p.y - q.y), 1, f.string(from: event))
+                }
+            }
+        }
+    }
+
     func testSolarEclipseDrawsTheMoonOverTheSunAndDarkensTheSky() throws {
         // 2017-08-21 from Victoria BC: about nine tenths of the sun covered at 17:21 UTC.
         let peak = try XCTUnwrap(ISO8601DateFormatter().date(from: "2017-08-21T17:21:00Z"))
@@ -188,6 +230,48 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertTrue(lit(0.9, -5)); XCTAssertFalse(lit(0.9, -9))    // ellipse half-width 8
         XCTAssertFalse(lit(0.1, 5)); XCTAssertTrue(lit(0.1, 9))
         XCTAssertTrue(lit(1, -9)); XCTAssertFalse(lit(0, 9))
+    }
+
+    /// The tilt is Almanac's bright limb, turned into SwiftUI's frame. A waxing
+    /// crescent low in the west after sunset is lit on its lower right from
+    /// Victoria and on its lower left from Sydney. At every instant the limb
+    /// points along the great circle to the sun, within a couple of degrees:
+    /// the sun's direction at the moon, worked from both bodies' alt/az.
+    func testMoonTiltAimsTheLitLimbAtTheSun() throws {
+        let f = ISO8601DateFormatter()
+        let victoria = (lat: 48.4284, lon: -123.3656), sydney = (lat: -33.8688, lon: 151.2093)
+        func tilt(_ time: String, _ site: (lat: Double, lon: Double)) throws -> Double {
+            let observer = try Observer(latitudeDeg: site.lat, longitudeDeg: site.lon)
+            return try XCTUnwrap(moonTilt(at: XCTUnwrap(f.date(from: time)), observer: observer))
+        }
+        let north = try tilt("2026-10-15T02:00:00Z", victoria)
+        XCTAssertGreaterThan(cos(north), 0, "lit on the right")
+        XCTAssertGreaterThan(sin(north), 0, "lit from below (y runs down)")
+        let south = try tilt("2026-10-14T09:00:00Z", sydney)
+        XCTAssertLessThan(cos(south), 0, "lit on the left")
+        XCTAssertGreaterThan(sin(south), 0, "lit from below (y runs down)")
+
+        func gap(_ a: Double, _ b: Double) -> Double { abs(atan2(sin(a - b), cos(a - b))) }
+        for (time, site) in [("2026-10-15T02:00:00Z", victoria), ("2026-10-21T06:00:00Z", victoria),
+                             ("2026-10-28T12:00:00Z", victoria), ("2026-11-02T15:00:00Z", victoria),
+                             ("2026-10-14T09:00:00Z", sydney), ("2026-10-21T12:00:00Z", sydney),
+                             ("2026-11-02T19:00:00Z", sydney)] {
+            let at = try XCTUnwrap(f.date(from: time))
+            let observer = try Observer(latitudeDeg: site.lat, longitudeDeg: site.lon)
+            let sun = try sunAltAz(at, observer: observer), moon = try moonAltAz(at, observer: observer)
+            let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
+            let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
+            // Facing the moon, a larger azimuth is to the right.
+            let right = cos(sunAlt) * sin(deltaAz)
+            let up = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
+            let toSun = atan2(-up, right)
+            XCTAssertLessThan(gap(try tilt(time, site), toSun), 2 * .pi / 180, time)
+            // The sky backdrop puts east on the right, so in the north it is the
+            // sky's mirror image, and the tilt is mirrored with it.
+            let sky = SkyState(time: at, latitude: site.lat, longitude: site.lon)
+            XCTAssertLessThan(gap(sky.moonLightAngle, site.lat >= 0 ? .pi - toSun : toSun),
+                              2 * .pi / 180, time)
+        }
     }
 
     /// Phase names are presentation, kept app-side when the astronomy moved to

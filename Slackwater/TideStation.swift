@@ -28,6 +28,23 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// stations.json only where it is true, and a non-optional `Bool` would make
     /// the synthesized decoder demand the key on all 4,409 records that omit it.
     var seasonalDominant: Bool? = nil
+    /// The floor and ceiling of this station's predictions, in metres above its
+    /// chart datum — the same frame as `TideExtreme.height`, so they compare
+    /// against a predicted extreme directly.
+    ///
+    /// Optional for the reason the fields above are, and because absence is a
+    /// real state rather than a gap: the database withholds LAT and HAT where
+    /// Sa and Ssa are both zero amplitude, since a seasonless constituent set
+    /// narrows the envelope instead of bounding it. That is every CHS on-device
+    /// fit and about a fifth of NOAA's harmonic references. `nil` means the
+    /// station cannot support an absolute claim; `0.0` means its floor IS chart
+    /// datum, which is true of 887 shipped stations — so nothing may read a
+    /// missing value as zero.
+    var latDatum: Double? = nil
+    var hatDatum: Double? = nil
+    /// The publisher of the constants, named as the database names it. Read
+    /// from the tcdb only; stations.json does not carry it.
+    var source: String? = nil
 
     var isSubordinate: Bool { reference != nil }
 
@@ -130,13 +147,14 @@ struct TideOffsets: Codable, Hashable {
 
 /// What every tide consumer needs: a harmonic `Station` or a subordinate
 /// reduced from one, behind the same three calls.
-protocol TidePredicting {
+protocol TidePredicting: Sendable {
     func heights(from: Date, to: Date, step: TimeInterval) -> [TidePoint]
     func rates(from: Date, to: Date, step: TimeInterval) -> [TideRatePoint]
     func extremes(from: Date, to: Date) -> [TideExtreme]
 }
 extension Station: TidePredicting {}
 extension SubordinateTideStation: TidePredicting {}
+extension ChsTidePreview: TidePredicting {}
 
 /// What a list card shows: height now, direction, next turn. Heights in metres.
 struct CardState {
@@ -163,7 +181,7 @@ extension TideStationRecord {
         let height = station.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
         // Direction from the next turn, not neighbouring samples (web tides.ts:
         // near a turn the curve is flat and sampling picks up numerical noise).
-        let rising = next.map { $0.kind == .high } ?? true
+        let rising = next.map { $0.kind == .high } ?? (station as? ChsTidePreview).map { $0.rateOfChange(at: now) >= 0 } ?? true
         return CardState(height: height, rising: rising, next: next)
     }
 }

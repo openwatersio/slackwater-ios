@@ -9,16 +9,27 @@ struct StationRow: View {
     let mark: PlaceMark?
     /// When the wearer last raised the app: the card reads at this instant.
     let now: Date
-    // Read by `WidgetCard.build`; iCloud can deliver the phone's units after
+    // Read by `WidgetCard.build`; iCloud can deliver the phone's settings after
     // a card has loaded, and a card must not keep the fallback ones.
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = ""
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = ""
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults) private var slackWindowSpeed = defaultSlackThresholdKn
     @State private var card: WidgetCard?
+    @ObservedObject private var net = Connectivity.shared
+    @ObservedObject private var downloads = ChsFitService.shared
 
     var body: some View {
         Group {
             if let card {
                 NextEventContentView(card: card, mark: mark)
+                    .overlay(alignment: .bottomLeading) {
+                        if case .chsCurrent(let gate) = item, downloads.isProvisional(gate.id) {
+                            CardStatusStrip(status: cardStatus(id: gate.id))
+                                .accessibilityLabel(cardStatus(id: gate.id).label)
+                                .padding(12)
+                                .background(SN.canvas.opacity(0.9))
+                        }
+                    }
             } else {
                 // While the record loads, and for good when this device
                 // cannot predict the place.
@@ -34,7 +45,7 @@ struct StationRow: View {
         .frame(height: 150)
         .background(SN.canvas)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .task(id: "\(item.id)|\(now.timeIntervalSince1970)|\(units)|\(speedUnit)") {
+        .task(id: "\(item.id)|\(now.timeIntervalSince1970)|\(units)|\(speedUnit)|\(slackWindowSpeed)|\(downloads.modelRevision)") {
             let id = item.id, now = now
             let next = await Task.detached(priority: .utility) {
                 WidgetStationLoader.loadRecord(id: id, at: now).map { WidgetCard.build($0, now: now) }

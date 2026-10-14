@@ -226,12 +226,20 @@ struct MonoLabel: View {
     let text: String
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
+    /// Whether this label NAMES A SECTION, which is what the headings rotor
+    /// moves between. Opt-in, not the default: the role draws tile eyebrows,
+    /// row labels and the "Predictions — not for navigation" disclaimer too,
+    /// and a rotor full of those is no better than none (#602). `.textCase`
+    /// is a visual transform, so a heading is still heard in its written
+    /// case (list §12).
+    var isHeader = false
     var body: some View {
         Text(text)
             .textCase(.uppercase)
             .font(.caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
+            .accessibilityAddTraits(isHeader ? [.isHeader] : [])
     }
 }
 
@@ -279,7 +287,7 @@ func noonLocal(_ day: Date, _ tz: TimeZone) -> Date {
 
 /// NSCache, not a Dictionary: thread-safe (Canvas draws can run off-main) and
 /// bounded. DateFormatter itself is thread-safe for formatting since iOS 7.
-private let formatterCache = NSCache<NSString, DateFormatter>()
+nonisolated(unsafe) private let formatterCache = NSCache<NSString, DateFormatter>()
 
 func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
     let key = ("pattern|" + pattern + "|" + tz.identifier) as NSString

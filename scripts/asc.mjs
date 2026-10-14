@@ -22,6 +22,7 @@ const YES = flags.includes('--yes');
 // one: every lookup misses and every write is a create.
 const OFFLINE = DRY_RUN && !process.env.ASC_KEY_ID;
 let dryRunCreates = 0;
+let plannedVersionCreated = false;
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 
@@ -154,6 +155,7 @@ async function ensureVersion(versionString) {
       rels: { app: ['apps', await appId()] },
     }));
     console.log(`version ${versionString}: created, manual release`);
+    plannedVersionCreated = DRY_RUN;
     return { ...r.data, first: all.length === 0 };
   }
   if (!EDITABLE.includes(versionState(v))) fail(`version ${versionString} is ${versionState(v)}; its listing can no longer change`);
@@ -190,7 +192,8 @@ async function pushAppInfo(l) {
   const app = await appId();
   await api('PATCH', `/v1/apps/${app}`, body('apps', { id: app, attributes: l.app }));
   const infos = (await api('GET', `/v1/apps/${app}/appInfos`)).data;
-  const info = need(infos.find((i) => EDITABLE.includes(i.attributes.state ?? i.attributes.appStoreState)), 'appInfos',
+  const info = need(infos.find((i) => EDITABLE.includes(i.attributes.state ?? i.attributes.appStoreState))
+    ?? (plannedVersionCreated ? { id: '<appInfos>' } : undefined), 'appInfos',
     'no editable app info; one appears with a version in Prepare for Submission');
   await api('PATCH', `/v1/appInfos/${info.id}`, body('appInfos', { id: info.id, rels: categoryRels(l) }));
   for (const loc of l.locales) {
@@ -432,7 +435,7 @@ if (cmd === 'create-cert') {
 } else if (cmd === 'notes') {
   // "What to Test", per build. The localizations are created with the build and
   // start empty — so this PATCHes them, it never POSTs a second one. Every
-  // locale gets the same text; the app is English-only.
+  // locale gets the same release notes.
   const build = await waitForBuild(undefined, args[0]);
   const whatsNew = fs.readFileSync(args[1], 'utf8');
   const locs = await api('GET', `/v1/builds/${build.id}/betaBuildLocalizations`);
@@ -532,11 +535,15 @@ if (cmd === 'create-cert') {
   // this is the button that puts it on sale.
   const version = args[0] ?? fail('usage: asc.mjs release <version> --yes');
   confirm(`release puts ${version} on the App Store`);
-  const v = await findVersion(version, ['PENDING_DEVELOPER_RELEASE']);
-  await api('POST', '/v1/appStoreVersionReleaseRequests', body('appStoreVersionReleaseRequests', {
-    rels: { appStoreVersion: ['appStoreVersions', v.id] },
-  }));
-  console.log(`version ${version}: released`);
+  const v = await findVersion(version, ['PENDING_DEVELOPER_RELEASE', 'PROCESSING_FOR_DISTRIBUTION', 'READY_FOR_DISTRIBUTION', 'PENDING_APPLE_RELEASE', 'PROCESSING_FOR_APP_STORE', 'READY_FOR_SALE']);
+  if (OFFLINE || versionState(v) === 'PENDING_DEVELOPER_RELEASE') {
+    await api('POST', '/v1/appStoreVersionReleaseRequests', body('appStoreVersionReleaseRequests', {
+      rels: { appStoreVersion: ['appStoreVersions', v.id] },
+    }));
+    console.log(`version ${version}: release requested; confirm availability on the App Store`);
+  } else {
+    console.log(`version ${version}: already ${versionState(v)}, no release request sent`);
+  }
 } else if (cmd === 'accessibility') {
   confirm('accessibility publishes the labels to the product page');
   await pushAccessibility(loadListing());

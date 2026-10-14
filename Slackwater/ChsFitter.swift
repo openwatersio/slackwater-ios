@@ -19,11 +19,13 @@ struct ChsFitter {
     ]
 
     func fit(samples: [ChsSample]) async throws -> ChsFitResult {
+        try Task.checkCancellation()
         let start = ContinuousClock.now
         do {
             let result = try SlackwaterKit.fit(samples: samples.map {
                 HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
             }, constituents: Self.basis)
+            try Task.checkCancellation()
             let elapsed = start.duration(to: .now).components
             return ChsFitResult(
                 fitMs: Double(elapsed.seconds) * 1000 + Double(elapsed.attoseconds) / 1e15,
@@ -32,6 +34,7 @@ struct ChsFitter {
                     Con(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
                 })
         } catch {
+            if error is CancellationError { throw error }
             throw ChsError.permanent("Harmonic fit failed: \(error)")
         }
     }

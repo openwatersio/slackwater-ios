@@ -7,8 +7,102 @@ import XCTest
 @testable import Slackwater
 import SlackwaterKit
 
-final class TimelineTests: XCTestCase {
+@MainActor final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
+
+    @MainActor func testInitialCenterDoesNotPublishFromLayout() async {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        for animated in [true, false] {
+            let start = Timeline.introStart(for: now)
+            var scrub = start
+            var writes: [Date] = []
+            let published = animated ? nil : expectation(description: "opening published after layout")
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: {
+                                            scrub = $0
+                                            writes.append($0)
+                                            if writes.count == 1 { published?.fulfill() }
+                                        }))
+            let co = TimelineScrubber.Coordinator(strip)
+            defer { co.stopIntro() }
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            co.centerIfNeeded(sv, animated: animated)
+            co.centerIfNeeded(sv, animated: animated)
+            XCTAssertTrue(writes.isEmpty, "initial layout must not write the SwiftUI binding, animated: \(animated)")
+            XCTAssertTrue(co.didInitialCenter)
+            XCTAssertEqual(co.nudging, animated)
+            let target = animated ? start : now
+            XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
+                           0, accuracy: 300)
+            if let published {
+                await fulfillment(of: [published], timeout: 2)
+                XCTAssertEqual(writes, [now], "instant opening publishes exactly once after layout")
+            }
+            co.stopIntro()
+            let count = writes.count
+            sv.contentOffset.x += 40
+            XCTAssertGreaterThan(writes.count, count, "ordinary scroll feedback must still publish")
+            XCTAssertEqual(scrub, data.time(atX: sv.contentOffset.x + sv.bounds.width / 2))
+        }
+    }
+
+    @MainActor func testViewUpdatesDoNotPublishScrollFeedback() {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let anchor = dayLocal(now, friday.tz)
+        let initial = TimelineData.build(tide: friday, current: nil, now: now, anchor: anchor)
+        let shifted = TimelineData.build(tide: friday, current: nil, now: now,
+                                          anchor: addingDays(-1, to: anchor, in: friday.tz))
+        var scrub = now
+        var writes: [Date] = []
+        let binding = Binding(get: { scrub }, set: { scrub = $0; writes.append($0) })
+        let strip = TimelineScrubber(data: initial, geo: TimelineGeo(data: initial), imperial: true,
+                                    speedUnit: "kn", now: now, scrubTime: binding)
+        let co = TimelineScrubber.Coordinator(strip)
+        let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: strip.geo.height))
+        sv.contentSize = CGSize(width: initial.totalWidth, height: strip.geo.height)
+        sv.delegate = co
+        co.centerIfNeeded(sv)
+        for (hours, jump) in [(0.0, 0), (1.0, 0), (-30.0, 1)] {
+            let requested = now.addingTimeInterval(hours * 3600)
+            scrub = requested
+            let updated = TimelineScrubber(data: shifted, geo: TimelineGeo(data: shifted), imperial: true,
+                                          speedUnit: "kn", now: now, scrubTime: binding, jumpToken: jump)
+            updated.updateUIView(sv, coordinator: co)
+            XCTAssertTrue(writes.isEmpty, "applying a window, external time, or jump must not publish inside updateUIView")
+            XCTAssertEqual(scrub, requested)
+            XCTAssertEqual(shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(requested),
+                           0, accuracy: 300)
+        }
+        sv.contentOffset.x += 40
+        XCTAssertEqual(writes.count, 1, "ordinary scrolling must publish after the view update returns")
+        XCTAssertEqual(scrub, shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2))
+    }
+
+    func testPixelRoundedCenterStaysWithinHalfAPointOfTheReadout() {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let target = formatter("yyyy-MM-dd HH:mm", friday.tz).date(from: "2026-09-09 09:54")!
+        for width in [CGFloat(400), 500, 514, 800, 834, 1194] {
+            var scrub = target
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: { scrub = $0 }))
+            let co = TimelineScrubber.Coordinator(strip)
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: width, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            co.layoutDidRun(sv)
+            let centre = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(centre.timeIntervalSince(target), 0, accuracy: 0.5 * 3600 / Double(Timeline.pph),
+                           "width \(width): the curve drifted more than half a point")
+            XCTAssertEqual(sv.accessibilityValue, spokenWhen(centre, data.tz))
+            XCTAssertEqual(scrub, target, "pixel rounding must not rewrite the selected time")
+        }
+    }
 
     func testSlackWindowSettingHasIncrementalTouchControls() throws {
         let source = try repoSource("Slackwater/SettingsView.swift")
@@ -94,6 +188,68 @@ final class TimelineTests: XCTestCase {
                        now.addingTimeInterval(-3600))
         XCTAssertEqual(Timeline.introTime(from: start, to: now,
                                           elapsed: Timeline.introDuration), now)
+    }
+
+    func testHingeProgressRunsFromTheFirstAngleToFlat() {
+        XCTAssertEqual(Timeline.hingeProgress(angle: 0.5, from: 0.5), 0)
+        XCTAssertEqual(Timeline.hingeProgress(angle: (0.5 + .pi) / 2, from: 0.5), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.hingeProgress(angle: .pi, from: 0.5), 1)
+        XCTAssertEqual(Timeline.hingeProgress(angle: 0.2, from: 0.5), 0, "closing past the start stays at the start")
+        XCTAssertEqual(Timeline.hingeProgress(angle: .pi, from: .pi), 1, "already flat is done")
+    }
+
+    func testAHingeThatHasNotMovedYetGetsLongerToStart() {
+        XCTAssertFalse(Timeline.hingeSettled(moved: false, idle: 0.67), "the simulator's pause at the posture switch")
+        XCTAssertTrue(Timeline.hingeSettled(moved: false, idle: Timeline.hingeFirstMove + 0.1))
+        XCTAssertFalse(Timeline.hingeSettled(moved: true, idle: Timeline.hingeSettle / 2))
+        XCTAssertTrue(Timeline.hingeSettled(moved: true, idle: Timeline.hingeSettle + 0.05), "propped half-open")
+    }
+
+    func testFoldHandoffGoesOnlyToTheSameStationWhileFresh() {
+        defer { FoldHandoff.slot = nil }
+        let moment = FoldHandoff.Moment(stationID: "a", time: Date(), live: false, closing: false, at: 100)
+        FoldHandoff.slot = moment
+        XCTAssertNil(FoldHandoff.take("b", at: 100.5), "another station's strip")
+        XCTAssertNil(FoldHandoff.slot, "a take clears the slot either way")
+        FoldHandoff.slot = moment
+        XCTAssertNil(FoldHandoff.take("a", at: 100 + FoldHandoff.freshFor + 1), "a different visit")
+        FoldHandoff.slot = moment
+        XCTAssertEqual(FoldHandoff.take("a", at: 100.5)?.time, moment.time)
+    }
+
+    /// A fold rebuilds the detail. Closing lands the cover screen's strip on the
+    /// folded moment; opening starts ahead of it and the hinge brings it back.
+    @MainActor func testAFoldHandsTheMomentToTheRebuiltStrip() async {
+        defer { FoldHandoff.slot = nil }
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let moment = now.addingTimeInterval(3 * 3600)
+        for closing in [true, false] {
+            var scrub = Timeline.introStart(for: now)
+            let landed = expectation(description: "lands on the folded moment, closing: \(closing)")
+            landed.assertForOverFulfill = false  // the scroll callback and the final park both write it
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: {
+                                            scrub = $0
+                                            if $0 == moment { landed.fulfill() }
+                                        }), stationID: "fh")
+            let co = TimelineScrubber.Coordinator(strip)
+            defer { co.stopIntro() }
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            FoldHandoff.slot = .init(stationID: "fh", time: moment, live: false, closing: closing,
+                                     at: CACurrentMediaTime())
+            co.centerIfNeeded(sv, animated: true)
+            let centered = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(centered.timeIntervalSince(moment), closing ? 0 : Timeline.hingeLead, accuracy: 300)
+            if !closing {
+                co.hingeDidChange(closed: false, fullyOpen: false, angle: 0.5)
+                co.hingeDidChange(closed: false, fullyOpen: true, angle: .pi)
+            }
+            await fulfillment(of: [landed], timeout: 3)
+        }
     }
 
     /// The current lead speaks plain language, and both current surfaces get
@@ -474,6 +630,10 @@ final class TimelineTests: XCTestCase {
     /// `UIScrollView` and a live `UIAccessibility`, and this target can inject
     /// neither. The UI suite covers what a scrub actually does; this only
     /// guards the accessibility branch from being simplified away.
+    ///
+    /// The branch asks `landsInstantly`, which is the Reduce Motion question
+    /// with `-uiTestQuiet` folded in, so `assertLandsInstantly` below keeps
+    /// the name honest rather than letting the indirection hide its removal.
     func testExternalScrubHonoursReduceMotion() throws {
         let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
@@ -481,7 +641,8 @@ final class TimelineTests: XCTestCase {
               let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
         else { return XCTFail("the jump branch was not found — this tripwire needs retargeting") }
         let jump = lines[start...offset].joined(separator: "\n")
-        XCTAssertTrue(jump.contains("UIAccessibility.isReduceMotionEnabled"),
+        assertLandsInstantlyAsksAboutReduceMotion(source)
+        XCTAssertTrue(jump.contains("landsInstantly"),
                       "the jump must ask about Reduce Motion before animating")
         XCTAssertTrue(jump.contains("co.magneting = false"),
                       "the direct landing clears the magnet rather than riding it")
@@ -500,10 +661,24 @@ final class TimelineTests: XCTestCase {
               let end = lines[(start + 1)...].firstIndex(where: { $0.contains("animated: true") })
         else { return XCTFail("the magnet was not found — this tripwire needs retargeting") }
         let magnet = lines[start...end].joined(separator: "\n")
-        XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
+        assertLandsInstantlyAsksAboutReduceMotion(source)
+        XCTAssertTrue(magnet.contains("landsInstantly"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
         XCTAssertTrue(magnet.contains("park(sv, at: target)"),
                       "the direct landing parks on the target itself")
+    }
+
+    /// Both tripwires above read `landsInstantly` rather than the flag itself,
+    /// so they are only as good as what that name means. A scrubber that asks
+    /// it but has quietly stopped asking about Reduce Motion is the exact
+    /// regression they exist to catch.
+    private func assertLandsInstantlyAsksAboutReduceMotion(_ source: String) {
+        let lines = source.components(separatedBy: .newlines)
+        guard let decl = lines.firstIndex(where: { $0.contains("private var landsInstantly: Bool") })
+        else { return XCTFail("landsInstantly was not found — these tripwires need retargeting") }
+        XCTAssertTrue(lines[decl...min(decl + 3, lines.count - 1)]
+            .joined(separator: "\n").contains("UIAccessibility.isReduceMotionEnabled"),
+                      "landsInstantly must still be the Reduce Motion question")
     }
 
     /// The chrome pills fade in once the scrub rests; under Reduce Motion the
@@ -519,6 +694,54 @@ final class TimelineTests: XCTestCase {
             XCTAssertTrue(line.contains("reduceMotion ? nil :"),
                           "a settle fade must not animate under Reduce Motion:\n\(line)")
         }
+    }
+
+    @MainActor func testCommentaryJumpSurvivesScrollFeedback() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = friday.tz
+        let data = TimelineData.build(tide: friday, current: nil, now: now,
+                                      anchor: calendar.startOfDay(for: now))
+        let geo = TimelineGeo(data: data)
+        var scrub = now.addingTimeInterval(-6 * 3600)
+        func strip(_ token: Int) -> TimelineScrubber {
+            let renderedTime = scrub
+            return TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                    scrubTime: Binding(get: { renderedTime }, set: { scrub = $0 }),
+                                    jumpToken: token)
+        }
+        let host = UIHostingController(rootView: strip(0))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(100))
+        func scrollView(in view: UIView) -> UIScrollView? {
+            if let scroll = view as? TimelineScrubber.ScrubScrollView { return scroll }
+            return view.subviews.compactMap { scrollView(in: $0) }.first
+        }
+        let sv = try XCTUnwrap(scrollView(in: host.view))
+        let co = try XCTUnwrap(sv.delegate as? TimelineScrubber.Coordinator)
+        let target = scrub.addingTimeInterval(2 * 3600)
+        scrub = target
+        host.rootView = strip(1)
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let landing = co.magnetTarget
+        XCTAssertTrue(co.magneting, "the commentary must still be travelling when feedback arrives")
+        // A rendered scroll update can trail the offset while the jump animates.
+        scrub = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).addingTimeInterval(-600)
+        host.rootView = strip(1)
+        host.view.layoutIfNeeded()
+        for _ in 0..<100 where co.magneting {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(landing, target, "scroll feedback must not replace the tapped destination")
+        XCTAssertEqual(scrub.timeIntervalSince(target), 0, accuracy: 1,
+                       "the commentary jump must finish on its destination despite scroll feedback")
+        XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
+                       0, accuracy: 300, "the curve must finish under the same selected time")
     }
 
     /// #280: rotation keeps `contentOffset.x` while the viewport width

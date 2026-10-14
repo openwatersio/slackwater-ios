@@ -34,7 +34,7 @@ console.log("countries and territories", ticonCountries.size);
 
 Round down in copy. "More than 4,700" survives a catalog change; "4,793" needs an App Store review to correct.
 
-Every feature the copy names must be in the build attached to the version. Release builds have sold Premium since `nightly-1.14.0-57`, and the watch app, alerts, station calendars, and 14 languages ship alongside it.
+Every feature the copy names must be in the build attached to the version. Release builds have sold Premium since `nightly-1.14.0-57`, and the watch app, alerts, station calendars, ship alongside it. The current app supports 16 languages; verify the count against the selected build before publishing it.
 
 ## Name & subtitle
 
@@ -88,7 +88,7 @@ Rules that are easy to break by accident:
 - **Currents are named as the US and Canada every time coverage is claimed.** The opening and the provenance block both say so, and neither can be trimmed for length.
 - **Provenance names every source.** Tides come from NOAA, CHS, Kartverket and TICON-4, a research catalogue rather than a national authority. Only stations that publish datums are checked against them, so the copy says "wherever it has them".
 - **Premium is disclosed while it is on sale.** The paragraph under FREE, NO ACCOUNT, NO ADS names what Premium adds and that it is a yearly subscription or a lifetime purchase (App Review 2.3.2). Every prediction stays free, so the free claims hold either way.
-- **The Terms of Use line stays last while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
+- **The description ends with Terms of Use and Privacy Policy links while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
 
 ## What's New
 
@@ -98,7 +98,7 @@ This field is the version's release notes without the beta testing instructions,
 sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 ```
 
-[`release-notes/README.md`](release-notes/README.md) documents the format. An app's first version has no What's New field, so 1.14.0's introduction reaches TestFlight and the GitHub release only. Every version after it leads with what changed.
+[`release-notes/README.md`](release-notes/README.md) documents the format. An app's first version has no What's New field. Every subsequent App Store version requires release notes that lead with what changed.
 
 ## Spanish (Mexico) and French (Canada)
 
@@ -151,7 +151,7 @@ Each "not yet" names the issue that closes it; [`scrubber.md`](scrubber.md) § 1
 
 ## Review notes
 
-`reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, where the app is marked not for navigation, that location is optional, that no account is needed, and that Canadian stations download their data once for offline use. While Premium is on sale they also say what it unlocks and how to reach the purchase sheet, so the reviewer can test the purchase. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
+`reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, where the app is marked not for navigation, that location is optional, that no account is needed, and which Canadian stations fit an offline model and which download predictions. While Premium is on sale they also say what it unlocks and how to reach the purchase sheet, so the reviewer can test the purchase. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
 
 ## In-app purchases
 
@@ -202,31 +202,64 @@ Review notes for Premium Yearly:
 
 > Premium Yearly is a one-year auto-renewable subscription in the Slackwater Premium group. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars. Every tide and current prediction, the Watch app and the home screen widgets stay free.
 >
-> To buy: scroll to the bottom of the station list and tap Support Slackwater. Alerts and Calendar in Settings open the same sheet. It shows both Premium products with their prices and the yearly term, Restore purchase, and links to the Privacy Policy and Terms of Use.
+> To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices and the yearly term, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, or press and hold a station's curve to set an alert. No account is needed.
+> To see it unlocked: in Settings → Calendar, turn on a saved station, or tap Set an alert under a station's timeline. No account is needed.
 
 Review notes for Premium Lifetime:
 
 > Premium Lifetime is a one-time, non-consumable purchase. It unlocks the same features as Premium Yearly permanently, with no renewal: lock screen widgets, Apple Watch complications, alerts and station calendars. It is not shared through Family Sharing. Every tide and current prediction, the Watch app and the home screen widgets stay free.
 >
-> To buy: scroll to the bottom of the station list and tap Support Slackwater. Alerts and Calendar in Settings open the same sheet. It shows both Premium products with their prices, Restore purchase, and links to the Privacy Policy and Terms of Use.
+> To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, or press and hold a station's curve to set an alert. No account is needed.
+> To see it unlocked: in Settings → Calendar, turn on a saved station, or tap Set an alert under a station's timeline. No account is needed.
 
 ## Before submission
 
-- [ ] Screenshots shot on the current UI. Apple takes 1–10 per device size and scales the 6.9" set down for smaller iPhones, so two sets cover a universal app: 6.9" iPhone (1320×2868) and 13" iPad (2064×2752). `SlackwaterUITests/AppStoreScreenshots.swift` shoots both from a pinned clock, location fix and favorites, so a re-run reproduces them, and `asc.mjs screenshots` uploads them:
+- [ ] Screenshots uploaded. Apple takes 1–10 per device size. The required iPhone slot is "iPhone with Dynamic Island (medium display)", which accepts only 1206×2622 or 1179×2556; the 6.9" set (1320×2868) fills the optional large-display slot and is not scaled into the required one. A universal app needs the 6.3" iPhone and 13" iPad (2064×2752) sets, and the 6.9" set is worth adding. `SlackwaterUITests/AppStoreScreenshots.swift` shoots each from a pinned clock, location fix and favorites, so a re-run reproduces them:
 
   ```
+  WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.3 \
+    SLACKWATER_SIM='iPhone 18 Pro' ./scripts/screenshots.sh
   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 ./scripts/screenshots.sh
   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
     SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh
   ```
 
-  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
-- [ ] Station counts re-derived and rounded down, in every locale.
+  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. Do not imply navigation use; disclose Premium whenever a screenshot shows a paid feature. The iPhone 18 Pro shoots 1206×2622; the script's default, the iPhone 18 Pro Max, shoots 1320×2868.
+
+  The watch app makes an Apple Watch set required too. App Store Connect takes one watch size for every localization and scales it down, so shoot the largest, Ultra (422×514), from the same pinned clock, fix and favorites as the phone:
+
+  ```
+  WALK=WatchAppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/watch ./scripts/screenshots.sh
+  ```
+
+  Four frames: the list where the wearer is, that place's tide, the crown scrubbed off now, and Deception Pass's current.
+
+  The iPhone Duo set is optional and takes either screen's size: the cover (1398×2034) or the inner screen (2853×2007). The inner screen is the one worth showing, unfolded in landscape with the sidebar beside the detail. Unfold the simulator in Xcode's device view first and leave it open; the `scripts/screenshots.sh` header has both commands.
+- [ ] Mac screenshots uploaded if distributing on Mac. Apple accepts 1280×800, 1440×900, 2560×1600, or 2880×1800 ([specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)). Run the installed Mac app, then use the guided capture session:
+
+  ```sh
+  ./scripts/mac-screenshots.sh --set
+  ./scripts/mac-screenshots.sh --verify
+  ```
+
+  The script prompts you to choose each screen, resizes the normal Mac window before every capture, and saves five numbered PNGs in `/tmp/slackwater-appstore/mac`. It captures the actual running app, including its Mac sidebar and title bar. It uses live app state: the clock, location, favorites, selected dates, and map camera are not seeded. On Mac, choose a local place and scroll its detail to Nearby for frame four, keeping Favorites visible in the sidebar. Choose a nighttime schedule row or scrub the graph for frame three. Double-click the map to zoom, then click empty water to clear its preview card for frame five. Wait for reading updates and map tiles before confirming each prompt. Inspect the resulting images before uploading in filename order; `app-version.txt` records the captured version and build.
+
+  `--size` only sizes the window; `--capture 02-tide` captures the current screen without prompting. `SHOT_DIR` overrides the output directory. The default sizes the window to 1280×800 points and exports 2560×1600 pixels on Retina. `MAC_PIXELS=1280x800` supports a non-Retina display; `MAC_PIXELS=1440x900` or `2880x1800` uses a 1440×900 point window. The main display must have room for the entire window. The script refuses full screen, ambiguous windows, wrong aspect ratios, and upscaling. Exports are opaque sRGB PNGs, with rounded window corners flattened onto a dark background and no window shadow.
+
+  macOS requires Accessibility and Screen Recording access for the terminal or app hosting the script. Enable these under System Settings → Privacy & Security if denied. Run exactly one Slackwater app; `MAC_BUNDLE_ID` can select a particular running build when both the old `org.openwaters.slackwater` and current `io.openwaters.slackwater` identities are installed. Xcode command-line tools supply the Swift compiler; no additional packages or simulator are needed. Generated screenshots and helper binaries stay outside tracked source.
+
+  Focused export checks cover alpha removal, native-size and downsampled output, invalid dimensions, and rejection of distorted or upscaled images:
+
+  ```sh
+  xcrun swiftc -D SCREENSHOT_TEST scripts/mac-screenshot.swift scripts/mac-screenshot-tests.swift \
+    -o /tmp/slackwater-mac-screenshot-checks
+  /tmp/slackwater-mac-screenshot-checks
+  ```
+- [ ] Station counts re-derived and rounded down, in every localization.
 - [ ] A native speaker has read the Spanish (Mexico) and French (Canada) copy.
-- [ ] Both Premium products attached to the version while the build sells them. A first in-app purchase goes to App Review with a version, and a purchase sheet whose products App Review cannot load is rejected under 2.1. `asc.mjs submit` stops on a submission holding an in-app purchase, so that submission goes through the App Store Connect UI.
-- [ ] Each product's localizations, review notes and review screenshot entered from [In-app purchases](#in-app-purchases), and the subscription group's `en-US` display name.
-- [ ] After approval: the hand check in #610 done, then the Accessibility Nutrition Labels published, iPhone and iPad with `asc.mjs accessibility --yes` and Apple Watch in the UI, claiming only the cells that say Yes.
+- [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
+- [ ] Both Premium products have complete metadata. Attach any first in-app purchase to the version in App Store Connect and submit there; `asc.mjs submit` refuses a submission holding purchases.
+- [ ] Description ends with the Terms of Use and Privacy Policy links, and the Privacy Policy URL field is `https://slackwater.xyz/privacy/`.
+- [ ] Accessibility Nutrition Labels answered against Apple's current criteria, claiming only the rows that are yes. Complete the device checks in #610 before publishing with `asc.mjs accessibility --yes`; Apple Watch labels remain a UI step.

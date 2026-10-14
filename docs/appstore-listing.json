@@ -28,13 +28,13 @@
       "Predictions are made on your phone, not fetched. Down a dead-end road, out at the point, in an anchorage, or with the boat's electronics down — you get the same answer you would have got at the dock. The map for your area and your favourite stations stays on your phone too.",
       "",
       "CURRENTS, NOT JUST TIDES",
-      "Slack, max flood and max ebb on one curve, with speed and direction. Drag your thumb across the week to read any moment. Every current station links to the tide at its reference port.",
+      "Slack, max flood and max ebb on one curve, with speed and direction. Drag your thumb across the week to read any moment. Paired current stations link to the tide at their reference port.",
       "",
       "SUN, MOON AND THE TIDES THEY DRIVE",
       "Sunrise, sunset and twilight, the moon's phase, spring and neap tides explained, and solar and lunar eclipses, for every station.",
       "",
       "ON YOUR WRIST, HOME SCREEN AND SIRI",
-      "An Apple Watch app that works without your phone: turn the Digital Crown to scrub the day. Home screen widgets for the next event and today's curve. Ask Siri for the next low tide, high tide or slack window. On iPhone and iPad, in 14 languages.",
+      "An Apple Watch app that works without your phone: turn the Digital Crown to move through the day. Home screen widgets for the next event and today's curve. Ask Siri for the next low tide, high tide or slack window. On iPhone and iPad, in 16 languages.",
       "",
       "FREE, NO ACCOUNT, NO ADS",
       "Every station and every date is free and stays free. No account, no ads, no tracking, and the app is open source.",
@@ -46,7 +46,9 @@
       "",
       "Predictions are not observations — conditions vary with weather and river flow. Not for navigation.",
       "",
-      "Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+      "Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+      "",
+      "Privacy Policy: https://slackwater.xyz/privacy/"
     ],
     "keywords": "chart,table,tidal,ebb,flood,marine,kayak,paddle,fishing,sailing,beach,widget,noaa,harbour,salish sea",
     "supportUrl": "https://slackwater.xyz/support/",
@@ -71,13 +73,13 @@
           "Las predicciones se calculan en tu celular, no se descargan. Al final de un camino de terracería, en la punta, en un fondeadero o sin la electrónica del barco, obtienes la misma respuesta que en el muelle. El mapa de tu zona y tus estaciones favoritas también se quedan en tu celular.",
           "",
           "CORRIENTES, NO SOLO MAREAS",
-          "Estoa, máximo flujo y máximo reflujo en una sola curva, con velocidad y dirección. Desliza el dedo por la semana para leer cualquier momento. Cada estación de corriente enlaza con la marea de su puerto de referencia.",
+          "Estoa, máximo flujo y máximo reflujo en una sola curva, con velocidad y dirección. Desliza el dedo por la semana para leer cualquier momento. Las estaciones de corriente emparejadas enlazan con la marea de su puerto de referencia.",
           "",
           "EL SOL, LA LUNA Y SUS MAREAS",
           "Amanecer, atardecer y crepúsculo, la fase de la luna, las mareas vivas y muertas explicadas, y los eclipses de sol y de luna, para cada estación.",
           "",
           "EN TU MUÑECA, EN TU PANTALLA DE INICIO Y CON SIRI",
-          "Una app para Apple Watch que funciona sin el iPhone: gira la Digital Crown para recorrer el día. Widgets en la pantalla de inicio con el próximo evento y la curva de hoy. Pídele a Siri la próxima bajamar, pleamar o ventana de estoa. En iPhone y iPad, en 14 idiomas.",
+          "Una app para Apple Watch que funciona sin el iPhone: gira la Digital Crown para recorrer el día. Widgets en la pantalla de inicio con el próximo evento y la curva de hoy. Pídele a Siri la próxima bajamar, pleamar o ventana de estoa. En iPhone y iPad, en 16 idiomas.",
           "",
           "GRATIS, SIN REGISTRO, SIN ANUNCIOS",
           "Todas las estaciones y todas las fechas son gratis y lo seguirán siendo. Sin registro, sin anuncios, sin rastreo, y la app es de código abierto.",
@@ -89,7 +91,9 @@
           "",
           "Las predicciones no son observaciones: las condiciones cambian con el clima y el caudal de los ríos. No usar para la navegación.",
           "",
-          "Términos de uso: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+          "Términos de uso: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+          "",
+          "Aviso de privacidad: https://slackwater.xyz/privacy/"
         ],
         "keywords": "pesca,vela,velero,lancha,barco,buceo,remo,marea,alta,baja,puerto,playa,internet,estoa,náutica"
       }
@@ -112,13 +116,13 @@
           "Les prévisions sont calculées sur votre téléphone, pas téléchargées. Au bout d’un chemin de terre, sur la pointe, au mouillage ou sans l’électronique du bord, vous obtenez la même réponse qu’au quai. La carte de votre secteur et vos stations favorites restent aussi sur votre téléphone.",
           "",
           "DES COURANTS, PAS SEULEMENT DES MARÉES",
-          "L’étale, le flot max. et le jusant max. sur une même courbe, avec la vitesse et la direction. Glissez le doigt sur la semaine pour lire n’importe quel moment. Chaque station de courant renvoie à la marée de son port de référence.",
+          "L’étale, le flot max. et le jusant max. sur une même courbe, avec la vitesse et la direction. Glissez le doigt sur la semaine pour lire n’importe quel moment. Les stations de courant jumelées renvoient à la marée de leur port de référence.",
           "",
           "LE SOLEIL, LA LUNE ET LEURS MARÉES",
           "Lever et coucher du soleil, crépuscules, phase de la lune, marées de vive-eau et de morte-eau expliquées, et éclipses solaires et lunaires, pour chaque station.",
           "",
           "AU POIGNET, SUR L’ÉCRAN D’ACCUEIL ET AVEC SIRI",
-          "Une appli Apple Watch qui fonctionne sans votre iPhone : tournez la Digital Crown pour parcourir la journée. Des widgets d’écran d’accueil pour le prochain événement et la courbe du jour. Demandez à Siri la prochaine marée basse, marée haute ou fenêtre d’étale. Sur iPhone et iPad, en 14 langues.",
+          "Une appli Apple Watch qui fonctionne sans votre iPhone : tournez la Digital Crown pour parcourir la journée. Des widgets d’écran d’accueil pour le prochain événement et la courbe du jour. Demandez à Siri la prochaine marée basse, marée haute ou fenêtre d’étale. Sur iPhone et iPad, en 16 langues.",
           "",
           "GRATUIT, SANS COMPTE, SANS PUB",
           "Toutes les stations et toutes les dates sont gratuites, et le resteront. Pas de compte, pas de pub, aucun pistage, et l’appli est à code source ouvert.",
@@ -130,7 +134,9 @@
           "",
           "Les prévisions ne sont pas des observations : les conditions varient selon la météo et le débit des rivières. Non destiné à la navigation.",
           "",
-          "Conditions d’utilisation : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+          "Conditions d’utilisation : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+          "",
+          "Politique de confidentialité : https://slackwater.xyz/privacy/"
         ],
         "keywords": "table,marée,haute,basse,pêche,voile,voilier,bateau,pagaie,plongée,plaisance,fleuve,shc,mer"
       }
@@ -142,9 +148,9 @@
     "contactEmail": "slackwater@openwaters.io",
     "demoAccountRequired": false,
     "notes": [
-      "All predictions are computed on-device from public harmonic data. The app is marked \"not for navigation\" on every station detail, the map, and Settings → About. Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
+      "Bundled tide and current predictions are computed on-device from public harmonic data. Nine Canadian current passes use online predictions from CHS instead. The app is marked \"not for navigation\" on every station detail, the map, and Settings → About. Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
       "",
-      "No account is needed. Canadian stations download their data from the Canadian Hydrographic Service once, the first time each one is opened, and then work offline.",
+      "No account is needed. Canadian tide stations and 13 Canadian current passes download their data from the Canadian Hydrographic Service once and then work offline. The other nine current passes download a month of predictions at a time and show their offline availability.",
       "",
       "Premium is optional: a yearly auto-renewable subscription or a one-time lifetime purchase. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars; every prediction stays free. To reach the purchase sheet, scroll to the bottom of the station list and tap Support Slackwater. Restore purchase and the Privacy Policy and Terms of Use links are on the same sheet."
     ]

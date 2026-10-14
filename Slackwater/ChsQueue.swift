@@ -73,11 +73,23 @@ struct ChsQueue {
     var total: Int { jobs.count }
     var ready: Int { jobs.filter { $0.status == .ready }.count }
     var failed: Int { jobs.filter { $0.status == .failed }.count }
+    var requestProgress: (completed: Double, total: Double) {
+        let total = jobs.reduce(0.0) { $0 + $1.requestCount }
+        let completed = jobs.reduce(0.0) { sum, job in
+            sum + (job.status == .ready ? job.requestCount : Double(job.done))
+        }
+        return (completed, total)
+    }
     /// A run is still in flight: something is queued or downloading.
     var active: Bool { jobs.contains { $0.status == .pending || $0.status == .downloading } }
     var complete: Bool { total > 0 && ready == total }
-    func nextPending(at now: Date = appNow()) -> ChsJob? {
-        jobs.first { $0.status == .pending && ($0.retryAfter ?? .distantPast) <= now }
+    func nextPending(at now: Date = appNow(), previewedIDs: Set<String>? = nil) -> ChsJob? {
+        let pending = jobs.filter { $0.status == .pending && ($0.retryAfter ?? .distantPast) <= now }
+        if let previewedIDs {
+            if let opened = pending.first, isPromoted(opened.id) { return opened }
+            if let empty = pending.first(where: { !$0.isCurrent && !previewedIDs.contains($0.id) }) { return empty }
+        }
+        return pending.first
     }
 
     func status(_ id: String) -> ChsJobStatus? { jobs.first { $0.id == id }?.status }

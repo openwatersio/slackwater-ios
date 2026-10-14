@@ -41,7 +41,7 @@ struct ComplicationReading: Equatable {
     private static let windowSearch: TimeInterval = 26 * 3600
 
     static func build(_ station: WidgetStation, now: Date) -> ComplicationReading? {
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let imperial = heightUnits() != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let from = now.addingTimeInterval(span.lowerBound * 3600)
         let to = now.addingTimeInterval(span.upperBound * 3600)

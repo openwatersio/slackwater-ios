@@ -9,6 +9,12 @@ import Foundation
 
 let unitsKey = "slackwater.units"  // "imperial" | "metric", same values as the web
 
+/// Regional defaults stay unsaved so an arriving cloud preference can replace them.
+func heightUnits(defaults: UserDefaults = AppGroup.defaults,
+                 locale: Locale = .autoupdatingCurrent) -> String {
+    defaults.string(forKey: unitsKey) ?? (locale.region?.identifier == "US" ? "imperial" : "metric")
+}
+
 func toFeet(_ metres: Double) -> Double { metres * 3.28084 }
 
 /// Strip a negative zero, which appears whenever a tide sits just below datum.

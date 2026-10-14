@@ -5,7 +5,7 @@ import Foundation
 #if DEBUG
 /// The launch-argument hooks a UI test drives the app with, applied once from
 /// `SlackwaterApp.init` before anything reads the state they write.
-func applySeedHooksIfRequested() {
+@MainActor func applySeedHooksIfRequested() {
     // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
     // gate; -seedGate skips it (arguments-domain values would mask the
     // in-app write, so tests set persisted state explicitly instead).
@@ -27,8 +27,20 @@ func applySeedHooksIfRequested() {
     if CommandLine.arguments.contains("-resetSeriesFilter") {
         UserDefaults.standard.removeObject(forKey: seriesFilterKey)
     }
+    if CommandLine.arguments.contains("-resetUnits") {
+        AppGroup.defaults.removeObject(forKey: unitsKey)
+        AppGroup.defaults.removeObject(forKey: speedUnitKey)
+    }
+    if CommandLine.arguments.contains("-resetComfortCurrent") {
+        AppGroup.defaults.removeObject(forKey: AppGroup.slackWindowSpeedKey)
+    }
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
+    }
+    // Through the store, not the key: `SlackwaterApp.init` wires `AlertRuleStore.shared` before
+    // this runs, so the store already holds whatever the key held (docs/alerts.md §7.1).
+    if CommandLine.arguments.contains("-resetAlerts") {
+        AlertRuleStore.shared.rules.map(\.id).forEach { AlertRuleStore.shared.remove($0) }
     }
     // -seedTideModel <id> (UserDefaults argument domain): writes a
     // synthetic fitted model for one bundled CHS tide port, so a derived

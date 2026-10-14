@@ -1,4 +1,6 @@
-# CHS tide fit window — how short can it be? (2026-09-20)
+# CHS tide fit window validation
+
+This record supports the 60-day tide fit in [the CHS data model](../chs-data-model.md). Measurements below come from the September 20, 2026 sweep; they are evidence for that decision, not a claim about every future fit. `tools/FitValidation` reads its tide numbers against the bar set here.
 
 `ChsFitService.tideFitDays` is 60. The fit window is the highest-leverage lever on first-run download time: wall clock is linear in request count, 1,058 of the 1,073 fittable CHS stations are tide ports, and `chunkPlan`'s 7-day grid turns 60 days into 10 IWLS requests per port against 6 for 35 days. At Victoria's 25 km tier that is 11 minutes against 7.
 
@@ -41,7 +43,7 @@ Ports are spread deliberately, because whatever does vary with window length wil
 
 ## The bar (set before scoring)
 
-There is no written tide bar in this repo; the currents bar in `spikes/chs-currents-fit/README.md` is the precedent, and this one follows its shape — one clause per number a person actually reads, tightest on the quantity they act on.
+There is no written tide bar in this repo; the currents bar in [CHS current validation](chs-currents.md) is the precedent, and this one follows its shape — one clause per number a person actually reads, tightest on the quantity they act on.
 
 Height is not slack. Nobody transits a tide port *at* high water the way a gate is transited at slack, so the timing clauses are the engine's established maxima bar rather than the tighter safety numbers currents earned. What a skipper does act on is the height itself, for underkeel clearance.
 
