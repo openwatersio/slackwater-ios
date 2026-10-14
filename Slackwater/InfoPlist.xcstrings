@@ -65,6 +65,18 @@
             "value" : "Slackwater crée un calendrier pour chaque station que vous activez, nommé d’après cette station, et y maintient à jour ses marées ou ses courants. Désactivez la station et Slackwater supprime ce calendrier et ses événements. Il ne lit que les calendriers portant le nom d’une station, pour retrouver les siens, et ne modifie jamais vos autres calendriers."
           }
         },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tugann Slackwater a fhéilire féin do gach stáisiún a chuireann tú ar siúl, ainmnithe as an stáisiún sin, agus coinníonn sé a imeachtaí taoide nó srutha cothrom le dáta. Múch an stáisiún agus scriosfaidh Slackwater an féilire sin agus a imeachtaí. Ní léann sé ach féilirí atá ainmnithe as stáisiún, chun a chuid féin a aimsiú, agus ní athraíonn sé do chuid féilirí eile riamh."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bheir Slackwater mìosachan fa leth do gach stèisean a chuireas tu air, air ainmeachadh air an stèisean sin, agus cumaidh e na tachartasan seòl-mara no srutha aige ùraichte. Cuir an stèisean dheth agus sguabaidh Slackwater às am mìosachan sin is na tachartasan aige. Cha leugh e ach mìosachain air an ainmeachadh air stèisean, gus an fheadhainn aige fhèin a lorg, agus cha atharraich e na mìosachain eile agad idir."
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
@@ -152,6 +164,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre position permet de trouver des prévisions de marée et de courant à proximité. Elle reste sur cet appareil."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabhraíonn do shuíomh le tuartha taoide agus srutha in aice láimhe a aimsiú. Fanann sé ar an ngléas seo."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuidichidh d' ionad le bhith a' lorg ro-innsean seòl-mara is srutha faisg ort. Fanaidh e air an uidheam seo."
           }
         },
         "it" : {

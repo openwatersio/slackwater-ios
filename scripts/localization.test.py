@@ -36,6 +36,14 @@ class Completeness(unittest.TestCase):
         self.assertEqual(module.check(catalog, catalog, locales + ["ko"]),
                          [f"{locale}: missing plural categories: %lld alerts (one, other)" for locale in locales])
 
+    def test_gaelic_requires_its_own_plural_branches(self):
+        unit = {"stringUnit": {"state": "translated", "value": "%lld alerts"}}
+        two = {"variations": {"plural": {"one": unit, "other": unit}}}
+        catalog = {"%lld alerts": {"localizations": {"en": two, "ga": two, "gd": two}}}
+        self.assertEqual(module.check(catalog, catalog, ["ga", "gd"]), [
+            "ga: missing plural categories: %lld alerts (few, many, two)",
+            "gd: missing plural categories: %lld alerts (few, two)"])
+
     def test_translations_preserve_format_arguments(self):
         key = "At %@: %lld boats"
         catalog = {key: {"localizations": {"de": {"stringUnit": {
