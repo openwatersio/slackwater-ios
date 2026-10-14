@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. The line under the strip: Rest, Pressed, or Set (docs/alerts.md §7.1).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 /// What the line reads. Set wins whenever a rule already exists for the centerline's offer, so a

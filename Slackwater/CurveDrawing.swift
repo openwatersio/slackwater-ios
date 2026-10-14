@@ -4,6 +4,7 @@
 // widget extension compiles this file too, so nothing here reads a Date, an
 // engine type or the strip's geometry — callers map to points first. The
 // knobs live in `CurveStyle` (Palette.swift); this is what they drive.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 /// The pointer under a hanging reading: the to-bar arrow for a tide turn

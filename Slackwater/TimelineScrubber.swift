@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The phone's scrub host: the scroll view, its momentum
 // and magnet, the strip that composes it, and the rescale glide's display
 // link. The watch drives the same canvas with the Crown instead (#522).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import SwiftUI
 import UIKit

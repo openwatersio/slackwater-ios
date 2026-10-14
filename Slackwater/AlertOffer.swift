@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. What the strip offers for the moment on the centerline, and the draft a new rule starts from (docs/alerts.md §7.1).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 
 /// A height as the strip shows it — 0.1 ft, or 0.01 m — so a crossing rule is the reading the user

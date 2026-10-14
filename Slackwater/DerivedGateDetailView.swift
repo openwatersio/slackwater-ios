@@ -2,6 +2,7 @@
 // schematic current strip with phase readout and slack times, one-tap link to
 // the reference port's tide. A derived gate has honest slack times and phase,
 // but no speed prediction.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 

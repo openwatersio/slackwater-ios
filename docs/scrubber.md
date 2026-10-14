@@ -17,7 +17,7 @@ The scrubber is the complete, time-linked composition containing:
 3. the fixed reading line and riding dot;
 4. one horizontally moving tide or current graph;
 5. graph-owned event times, day labels, dates, sunrise and sunset marks, and eclipse mark; and
-6. the sky backdrop behind the lead and graph.
+6. the sky backdrop, which starts at the top of the page behind the station header and lead, and runs down to the plot floor; it is shown only while a timeline exists.
 
 The following are deliberately outside this specification because they are separate surfaces or are under active development:
 
@@ -28,7 +28,7 @@ The following are deliberately outside this specification because they are separ
 - station header, favourite control, navigation, provenance, and related-station links; and
 - loading, download, and error cards shown instead of the scrubber.
 
-This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
+This specification covers their selection handoff to the scrubber. Date taps open the picker. A picked day moves the selection to its station-local noon, unless the selection already lies inside `Timeline.window(anchor:)` for that day (48 hours before its midnight through 180 hours after), in which case it stays. Shared links and schedule-row and sheet jumps land on their exact instant. The schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
 
 ## 2. Product idea
 
@@ -50,7 +50,7 @@ The model gives one invariant that every implementation must preserve:
 > the sky, and the exposed accessibility value always represent one selected
 > instant.
 
-The control shows exactly one water track. A tide detail scrubs tide. A measured or online-current detail scrubs current. A derived gate scrubs a schematic current phase. Tide and current must never share one scrubber.
+The control shows exactly one water track. A tide detail scrubs tide. A predicted-current detail (harmonic, subordinate, or fitted on the device) or an online-current detail scrubs current speed. A derived gate scrubs a schematic current phase. Tide and current must never share one scrubber.
 
 ## 3. Conceptual anatomy
 
@@ -77,6 +77,10 @@ MOVES HORIZONTALLY AS ONE CONTINUOUS STRIP
 
 Only one Now pill is ever present. It occupies the side toward which “now” lies; the two positions above illustrate the alternatives.
 
+A derived gate has no speed, so it omits the large reading; its state and glyph sit directly above the local date and time.
+
+The riding dot is always shown. The reading line appears only while the strip is at rest and a commentary is showing (§11); after a press or the "Set an alert" action on a host with alerts, its extension below the plot shows until the selection moves to another minute (§6.5.1).
+
 The layers, back to front, are:
 
 1. the time-dependent sky;
@@ -85,8 +89,10 @@ The layers, back to front, are:
 4. reference line, curve, event runs, labels, and the absolute-now dot;
 5. day and celestial chrome;
 6. the fixed reading line and riding dot;
-7. lead reading; and
-8. glass pills.
+7. glass pills; and
+8. lead reading.
+
+The lead and the pill row occupy separate vertical bands and must not overlap.
 
 The sky, graph, and overlay form one visual scene even when a platform renders them with separate views.
 
@@ -102,9 +108,15 @@ An implementation must keep these concepts separate:
 | `now` | The live reference instant captured for this scrubber session | Opening destination, past/future treatment, absolute-now dot, and Now pill |
 | `selectedTime` | The instant under the fixed centreline | Lead, sky, riding dot, commentary, and accessible value |
 
-The reference implementation samples `now` when the detail opens, when Now is activated, and when the app returns to the foreground. On foreground return, compare the selection with the old `now` using the 200-second home threshold. If it was home, refresh `now` and return the selection and schedule to the current instant using the ordinary Now movement. If it was scrubbed away, refresh only `now`; preserve the selected instant and planning position. Foreground return must not replay the opening motion.
+The selection is home when it lies within 200 seconds (one logical unit at 18 units per hour) of `now`, and scrubbed away beyond that.
 
-`now` never advances on a timer while the view stays open. A minute tick, or a `TimelineView`-driven `live`, was considered and declined: Slackwater is not a charting app, and nobody holds a detail open long enough for the marker to go visibly stale. Resampling on foreground return covers the real case. Implement one only if a reader asks for it.
+The reference implementation samples `now` when the detail opens, when Now is activated, and whenever the scene becomes active again, including after a brief inactive state such as Control Center or the app switcher. On foreground return, compare the selection with the old `now` using the 200-second home threshold. If it was home, refresh `now` and return the selection and schedule to the current instant using the ordinary Now movement. If it was scrubbed away, refresh only `now`; preserve the selected instant and planning position. Foreground return must not replay the opening motion.
+
+`now` never advances on a timer while the view stays open. A long-open detail can show a slightly stale now marker; resampling on foreground return covers the real case.
+
+Continuous details take the Today, Tomorrow, and Yesterday day labels from the device clock at each chunk publish, not from the session `now`, so after midnight a later publish can relabel days while the now dot stays put. Fixed-window details use the `now` of their most recent build, so after a foreground return while scrubbed away their labels can lag the refreshed now dot until the next rebuild.
+
+The watch place page follows the same `now` sampling and settle re-anchor rules, counting a raised wrist as a foreground return. It opens directly on now, without the opening motion.
 
 All visible civil-time language uses the station's time zone, never the device's time zone. Horizontal geometry uses elapsed time. A daylight-saving transition therefore produces a 23- or 25-hour civil day while the curve remains continuous.
 
@@ -112,11 +124,15 @@ Anything meaning “calendar day,” “midnight,” or “noon” must use a ca
 
 ### 4.2 Loaded window and schedule
 
-Fitted tide, harmonic-current, and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
+Constituent-backed tide and current details (harmonic, subordinate, or fitted on the device) and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
 
-The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, opening, and settling are quiet. Repeated backward flings can temporarily reach the loaded edge; the strip clamps until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use.
+The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, opening, and settling are quiet (except during a tap's ride, §18). Repeated backward flings can temporarily reach the loaded edge; the strip clamps until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use: iOS keeps the published chunks plus one each side, and mounts only the 900-unit drawing tiles in view plus one each side.
 
-A Canadian tide preview is bounded by its contiguous downloaded samples. It must never extend, extrapolate, or offer a date outside those samples. The additional-download notice retains the station’s progress meter and available-through date while the remaining model downloads, centered below the scrubber and above the summary cards. Its generic accuracy explanation is shared with current gates that already have usable early models. Download and status notices must never write over the scrubber. When the full tide model lands, the continuous store starts around the selected instant without navigating away or replaying the opening motion.
+Chunks are counted in seven-day steps from the schedule anchor in force when the store starts, not from a calendar-week boundary: ordinarily the station-local midnight of the day the detail opened, the linked day when a shared link opens the detail outside today's window, and the current schedule anchor when a refined model or a new slack threshold rebuilds the store. The first build synchronously covers 48 hours either side of the opening instant. An explicit jump (picker, Now, or shared link) synchronously builds half a viewport either side of its target and publishes at once, without waiting for a quiet moment.
+
+A Canadian tide preview exists only when every gap between its downloaded samples is 30 minutes or less and every sample is finite; a single longer gap rejects the whole preview, which is never trimmed to a contiguous run. It must never extend, extrapolate, or offer a date outside those samples. A preview is shown only while its samples cover the current instant; its strip spans exactly those samples, its schedule stays anchored on today, and it never re-anchors on settle. The week bar and date taps offer no picker. Now and every selection are clamped into the samples.
+
+The additional-download notice retains the station’s progress meter and available-through date while the remaining model downloads, centred below the scrubber and above the summary cards, and adds a reconnect, failure, or retry line as the download state requires. Its generic accuracy explanation is shared with current gates that already have usable early models; on a current gate the notice shows the provisional headline in amber instead of an available-through date. Download and status notices must never write over the scrubber. When the full tide model lands, the handoff waits until the strip is quiet, then starts the continuous store around the selected instant without navigating away or replaying the opening motion.
 
 Official online-current details remain bounded by downloaded coverage. Their displayed window is defined by `Timeline.window(anchor:)`:
 
@@ -126,9 +142,9 @@ windowEnd   = anchor + 180 hours
 duration    = 228 elapsed hours
 ```
 
-The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values.
+The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values. The online detail never re-anchors on settle. Drags, taps, presses, and accessibility steps stay within its fixed window; commentary activation can land past its end (§18).
 
-Every advertised target needs half a viewport of valid content on both sides, or equivalent insets. Explicit picker and shared-link destinations must have their data ready before centering; a first build for a shared link uses the linked instant rather than the ordinary opening destination.
+Every advertised target should have half a viewport of valid content on both sides. Continuous details meet this by building data around each target. The online window pads 12 hours past its schedule week, which is enough for a phone-width viewport. Where a viewport is wider than its window allows, including at either end of a Canadian tide preview, taps, presses, and accessibility steps clamp to the content edge and show the time actually under the centreline, never an unreachable target. Explicit picker and shared-link destinations must have their data ready before centring; a first build for a shared link uses the linked instant rather than the ordinary opening destination.
 
 The schedule remains seven local calendar days anchored independently of the continuous strip. After a selection stays unchanged for 600 ms outside `Timeline.window(anchor:)`, the three continuous details re-anchor the schedule to the selected local day without moving the graph. The 48-hour look-back belongs to the existing anchor and does not trigger this re-anchor. Now restores the schedule to today's station-local midnight.
 
@@ -145,7 +161,7 @@ selectedTime  = time(scrollOffset + viewportWidth / 2)
 
 One logical unit means one iOS point, one Android density-independent pixel, or one CSS pixel before device-pixel scaling. At 18 units/hour, a 390-unit phone shows about 21.7 hours. The online detail's 228-hour window is 4,104 units wide; continuous details use the current merged window's start and duration.
 
-The mapping and its inverse must round-trip. Rendering may quantize an offset to a device pixel, but the displayed reading must be derived from the resulting centre position rather than from the requested offset.
+The mapping and its inverse must round-trip. During direct manipulation, the reading is derived from the actual centre position. When the strip settles on a stop or lands on an explicit target, the reading shows that stop's exact instant, even if rendering quantizes the offset by less than a device pixel; the accessibility value always reads the actual offset. The difference must stay under one logical unit.
 
 ## 5. Reference geometry and type
 
@@ -164,7 +180,7 @@ These are the current iOS logical-unit values. Preserve them on phone-sized surf
 | `sunDotY` | 378 | Sunrise/sunset dots and eclipse glyph |
 | `stripHeight` | 396 | Bottom of graph-owned chrome plus margin |
 
-The fixed reading line begins at `topPad` and ends at `plotBottom`. The lead is centred on the viewport centreline and overlaid in the top pad; it does not consume horizontal strip width.
+The fixed reading line begins at `topPad` and ends at `plotBottom` (§11). The lead is centred on the viewport centreline and overlaid in the top pad; it does not consume horizontal strip width.
 
 Reference typography:
 
@@ -172,7 +188,7 @@ Reference typography:
 |---|---|
 | Lead value | 44, medium, rounded, tabular digits, scaled with the large title |
 | Lead unit | title level 2, light |
-| Lead state | footnote, semibold |
+| Lead state | footnote; the word medium, its glyph and set point semibold |
 | Lead time | caption, tabular digits |
 | Pill text | caption, semibold, tabular digits, capped at the first accessibility size |
 | Turn/peak value | 18, semibold, tabular digits |
@@ -182,7 +198,9 @@ Reference typography:
 | Sunrise/sunset time | 11, medium, monospaced |
 | Eclipse glyph | 6.5 |
 
-Graph labels stay fixed to graph geometry rather than scaling independently. The lead and interactive controls must participate in the platform's accessible text sizing; see §18 for the current iOS gaps.
+Graph labels stay fixed to graph geometry rather than scaling independently. The lead and interactive controls participate in the platform's accessible text sizing: the lead value and `topPad` grow with the large title, and the pills stop growing at the first accessibility size.
+
+The watch strip uses a top pad of 8 and a plot depth of 52, and ends 10 units below the event-time row; it draws no day, date, or sun row.
 
 ## 6. State and motion
 
@@ -212,9 +230,9 @@ On an ordinary opening at now:
 
 The motion is an affordance: it teaches that the graph moves beneath a fixed reader without adding instructional copy.
 
-The opening is one-shot. If the initial selection is an explicit historical or future instant, centre that instant directly and do not replay the opening. If a person touches the scrubber during the opening, cancel it immediately and leave the graph exactly where they grabbed it.
+The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row when it is recognized after its half second; a touch-down alone does not. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
 
-With Reduce Motion enabled, skip the opening motion and land directly on now.
+With Reduce Motion enabled, skip the opening motion and land directly on now. The watch place page opens directly on now with no opening motion.
 
 ### 6.3 Direct manipulation and momentum
 
@@ -226,7 +244,9 @@ The graph must track a horizontal drag one-to-one:
 - the lead, sky, and riding dot update in the same rendered frame; and
 - releasing with velocity continues with the platform's native-feeling horizontal momentum.
 
-The full strip height is the direct-manipulation surface. There is no separate grab handle and no visible native scrollbar. Taps select a time or open the date picker (§6.5). Pinch zoom and variable time scale are not part of this control; horizontal scale remains 18 logical units/hour.
+At a loaded edge a drag rubber-bands with the platform's ordinary overscroll. During overscroll the selected time follows the centre past the data, except on a Canadian tide preview, which keeps the selection clamped to its samples. The riding dot and an online-current lead hold the edge sample. Predicted tide and current leads (harmonic, subordinate, or fitted) keep computing the engine value at the selected instant, and a derived-gate lead keeps reading its phase from its slack list. When the strip springs back to rest the magnet evaluates as usual. The iOS reference uses `UIScrollView`'s default bounce and deceleration rate.
+
+The full strip height is the direct-manipulation surface, except where the lead's text sits (§18) and, while the strip is at rest, where the commentary and Now pills sit; a drag or tap that starts on a resting pill goes to the pill. There is no separate grab handle and no visible native scrollbar. Taps select a time or open the date picker (§6.5). Pinch zoom and variable time scale are not part of this control; horizontal scale remains 18 logical units/hour.
 
 The scrubber commonly sits inside a vertically scrolling page. Use native gesture arbitration or directional locking so a clearly vertical gesture scrolls the page and a clearly horizontal gesture scrubs time. Do not add a full-screen drag recognizer that steals vertical navigation or an edge-back gesture.
 
@@ -234,23 +254,23 @@ There is no haptic tick for ordinary samples or magnetic targets in the referenc
 
 ### 6.4 Rest and pill visibility
 
-A rest begins after `selectedTime` has not changed for 450 ms. In the reference appearance, the pills and the conditional reading line then fade in over 200 ms. Any new selected-time change hides them and disables their hit testing immediately.
+A rest begins after `selectedTime` has not changed for 450 ms. In the reference appearance, the pills and the conditional reading line then fade in over 200 ms. Any new selected-time change disables their hit testing immediately and fades them out over the same 200 ms.
 
 The riding dot and lead never disappear during movement. Those are the feedback that makes direct manipulation legible.
 
-When Reduce Motion is enabled, do not animate pill opacity. Controls should remain visible where space permits; if an implementation suppresses them during active movement, restore them immediately at rest.
+When Reduce Motion is enabled, the pills and line appear and disappear without animation. They are still hidden during movement and restored at rest after 450 ms, as without Reduce Motion.
 
 ### 6.5 Taps
 
-A tap on the plot or event-time row brings the tapped instant to the centerline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
+A tap anywhere above the day row (the top pad outside the lead's text and the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. Clamp to a reachable scroll offset and derive the final selected instant from that offset so the lead and curve agree at loaded edges.
 
-In the day/date/sun row, a sunrise or sunset tap centers that event; a date tap opens the host's date picker. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centered on daylight (§14); this mismatch is recorded in §18.
+In the day/date/sun row, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centred on daylight (§14); this mismatch is recorded in §18.
 
 Every tap stops opening motion, momentum, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. Time taps use the ordinary settling animation; Reduce Motion or travel below 0.5 unit lands directly.
 
 #### 6.5.1 Press and hold
 
-A press held on the plot or event-time row resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host's alert line under the strip names the parked moment, and the strip runs its reading line on down to it while the press holds (docs/alerts.md §7.1). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host and opens its alert sheet in one step, since there is no line to go and find. A strip whose host has no alerts (a list card) carries neither the recognizer nor the action.
+A press held anywhere above the day row (the top pad, the plot, or the event-time row) resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centreline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed. Like a tap, it clamps to a reachable offset and reads the parked instant back from it. The host's alert line under the strip names the parked moment, and the strip extends its reading line from the plot floor to the strip's bottom edge, toward that line (docs/alerts.md §7.1). The alert line keeps naming the parked moment, and the reading-line extension below the plot stays, after the finger lifts, until the selection moves to a different minute. The reading line above the plot still follows §11. A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centreline moment to the host and opens its alert sheet in one step, since there is no line to go and find. Like a press, it also switches the alert line to the parked moment and extends the reading line below the plot until the selection moves to a different minute. Every detail strip carries the press recognizer and the "Set an alert" action. On a host with nothing to alert on (an online gate, or a CHS tide station still in preview), a press still stops motion, parks its moment, and gives the medium haptic, but neither the alert line nor the reading-line extension appears; the VoiceOver action is present and does nothing.
 
 ## 7. Magnetic settling
 
@@ -261,7 +281,7 @@ The magnet runs only after a person-driven scroll comes fully to rest:
 
 It does not pull during a drag, and it does not repeatedly quantize free scrubbing.
 
-Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. The event-time row's labels and the next- and previous-event actions land exactly on a known point, so the magnet does not have to. A target already within half a logical unit is treated as already parked. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
+Find the snap target whose x-coordinate is closest to the viewport centre. Snap when its distance is strictly less than 4.5 logical units and greater than 0.5 logical units. At 18 units/hour, the capture radius is 15 minutes: wide enough that a landing a hair off an event takes the event, narrow enough that a moment between two close events stays choosable, which a press needs because it names an alert's moment. Schedule-list rows and the next- and previous-event actions land exactly on their event, so the magnet does not have to. A tap on an event-time label is an ordinary plot tap: it takes the event only within 4.5 units of the event's own x. A target within half a logical unit starts no animation, and `selectedTime` keeps the released centre value, up to 100 seconds off the target's own instant. If two targets are exactly equidistant, choose the earlier one for deterministic behavior.
 
 The reference target set is the sorted, de-duplicated union of all applicable in-window moments:
 
@@ -270,10 +290,11 @@ The reference target set is the sorted, de-duplicated union of all applicable in
 - current maxima and slack instants;
 - measured slack-window openings and closings;
 - sunrise and sunset;
-- every contact of a visible lunar eclipse; and
+- the first penumbral and umbral contacts, greatest eclipse, and the last umbral and penumbral contacts of each lunar eclipse that has a contact or its greatest eclipse above the station's horizon (a penumbral eclipse has no umbral contacts);
+- the first and last contacts and greatest eclipse of each locally visible solar eclipse, plus its second and third contacts when it is total or annular; and
 - derived-gate slack instants.
 
-Animate a magnetic settle with the platform's standard short scroll animation, then assign `selectedTime` to the exact target when the animation completes. This final assignment prevents interpolation or pixel rounding from leaving an event readout a few seconds off its own time.
+Animate a magnetic settle with the platform's standard short scroll animation, then assign `selectedTime` to the exact target when the animation completes. This final assignment prevents interpolation or pixel rounding from leaving an event readout a few seconds off its own time. With Reduce Motion enabled, a magnetic settle lands directly on its target.
 
 ## 8. Programmatic movement and interruption
 
@@ -289,11 +310,13 @@ An animated request must:
 
 Scroll feedback during that animation must not cancel the request. A rendered selection can trail the current offset; the destination remains the requested instant until the animation finishes or an explicit interaction interrupts it.
 
-A finger that is still down retains control. Do not fight an active drag with an external state update.
+A finger that is still down retains control. Do not fight an active drag with an external state update. The iOS reference has one exception: a drag on the first-run tour's stars step advances the tour on its first frame, and the moon step's animated ride starts while the finger is still down.
 
-Reduce Motion, a target less than 0.5 logical units away, travel greater than seven elapsed days, or a non-visual restore must land directly without animation. Nearby Now and commentary requests ride the strip to their destination; distant picker, shared-link, and Now requests load the destination and land without compressing weeks into a short animation.
+Reduce Motion, a target less than 0.5 logical units away, or travel greater than seven elapsed days lands directly without animation. Now, commentary, foreground return at home, and the first-run tour ride the strip to their destination when the travel is seven days or less. Picker, shared-link, schedule-row, and sheet selections land directly at any distance, without compressing weeks into a short animation. A host-set selection less than one unit from the current centre changes the reading without moving the strip. A host-set selection that arrives during the opening, or during an animated ride (Now, commentary, foreground return, the tour, or a tap), is ignored; the motion finishes on its own destination. One that arrives during momentum or a magnetic settle after a drag stops that motion and lands directly. The first-run tour moves the selection with the same animated ride as commentary and obeys the same interruption rules. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour.
 
-When the viewport width changes—rotation, split screen, browser resize, or a foldable posture change—recompute the offset so the existing `selectedTime` remains under the new centreline. Cancel momentum or a magnetic settle if needed. The resize must not change `selectedTime`, replay the opening, or briefly publish the wrong centre value.
+When the viewport width changes—rotation, split screen, or browser resize—recompute the offset so the existing `selectedTime` remains under the new centreline. Cancel momentum or a magnetic settle if needed. The resize must not change `selectedTime`, replay the opening, or briefly publish the wrong centre value.
+
+On a foldable whose posture change rebuilds the page (iPhone Duo), the rebuilt strip returns to the selected moment when it lies inside the rebuilt strip's first data, or to refreshed now if it was home. While the hinge opens, the strip starts up to six hours past that moment and scrubs back to it in step with the hinge, landing exactly on it at flat or when the hinge rests for 0.25 s. Closing to the cover screen, or Reduce Motion, lands directly. Until the hinge moves past the angle the rebuilt strip first saw, the follow waits 1 s for it before landing; the follow eases toward the hinge and snaps once it is within a minute of the moment. A moment the rebuilt strip has not loaded opens as an ordinary detail.
 
 ## 9. Fixed lead reading
 
@@ -305,42 +328,52 @@ Its anatomy is:
 2. one large value and a lighter unit, when magnitude is known; and
 3. station-local selected date and clock time.
 
-The state and value form one accessible reading. The lead prints the station-local date and clock without a weekday or relative day word. Date order, month names, clock cycle, separator spacing, and meridiem follow the platform locale. A figure space pads a one-digit hour when the locale uses one, keeping the centered tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same localized time style without the date or padding.
+The lead prints the station-local date and clock without a weekday or relative day word: the locale's abbreviated month and day, a fixed ` · `, then the locale's hour and minute. Date order, month names, clock cycle, and meridiem follow the platform locale; the ` · ` separator is not localized. A figure space pads a one-digit hour when the locale uses one, keeping the centred tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same localized time style without the date or padding.
+
+The lead is a centred column overlaid at the top of the strip: 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and compass point 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink. The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
+
+VoiceOver reads the lead as one combined element: the state word, the eyebrow glyph's own symbol label (iOS leaves it exposed, so a set arrow is announced by its unrotated symbol name), the compass point of the set on a measured current outside slack, the value, and the unit. The date and clock are its value, with the padding figure space removed.
 
 ### 9.1 Tide lead
 
-The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. Format feet to one fractional digit or metres to two using the locale's decimal separator, and strip negative zero. The compact unit symbols remain `ft` and `m` in every locale.
+The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. A CHS tide preview, which has no engine model, interpolates linearly between its fetched samples. Format feet to one fractional digit or metres to two using the locale's decimal separator. Any height whose magnitude is below 0.05 in the display unit prints without a sign, so metric heights from −0.049 m to 0 print as positive. The compact unit symbols remain `ft` and `m` in every locale.
 
-Within one second of an extreme, the state is `High` or `Low` and uses the corresponding to-bar glyph. Otherwise the state is `Rising` or `Falling`, inferred from the next extreme, with a diagonal arrow.
+Within one second of an extreme, the state is `High` or `Low` with `arrow.up.to.line` or `arrow.down.to.line`. Otherwise the state is `Rising` or `Falling` with `arrow.up.right` or `arrow.down.right`. Direction comes from the next extreme (rising toward a high), or from the sign of the sampled rate on a CHS tide preview, and defaults to rising when no later extreme is loaded.
 
-State colour:
+Glyph colour:
 
-- high/rising uses the high teal for the glyph;
-- low/falling uses the low amber for the glyph; and
-- a fast-rate warning overrides the glyph with the magnitude-ramp colour.
+- high/rising uses the high teal;
+- low/falling uses the low amber; and
+- while the absolute rate is at least 0.6 m/hr, the glyph takes the fast-tide commentary's ink instead: the rate-ramp colour lifted toward white for the sky behind the pill row (§10.1).
 
 ### 9.2 Measured-current lead
 
-The value is the absolute speed at `selectedTime`; the phase carries its sign. Harmonic stations use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator, and strip negative zero. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
+The value is the absolute speed at `selectedTime`; the phase carries its sign. Predicted stations (harmonic, subordinate, or fitted) use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator, and strip negative zero. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
 
 The state is:
 
 - `Slack` while `selectedTime` lies in a measured slack window, including its opening but excluding its closing;
-- `Slack` for an instantaneous magnitude below 0.15 kn when no measured window supplies the state;
+- `Slack` whenever the instantaneous magnitude is below 0.15 kn, inside or outside a measured window;
 - `Max flood` or `Max ebb` within one second of that maximum; or
 - `Flooding` / `Ebbing` otherwise.
 
-Outside slack, show a true-bearing arrow and one of 16 compass points for the set. Positive velocity selects the station's flood bearing; negative velocity selects its ebb bearing. In slack, use the opposed-arrows slack glyph instead of claiming a set.
+Outside slack, show a true-bearing arrow (`arrow.up` rotated to the bearing) and one of 16 compass points for the set. Positive velocity selects the station's flood bearing; negative velocity selects its ebb bearing. In slack, use the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) instead of claiming a set. The set arrow and its compass point use the flood colour or ebb colour by direction, and the slack glyph uses the go colour.
 
-A provisional model prefixes numeric values and water commentary events with `~` and uses the attention colour for the value. Sunrise and sunset commentary never receives a provisional prefix. Provenance is outside this spec.
+A provisional model prefixes numeric values and water commentary events with `~`, including the commentary's accessible label, and uses the attention colour for the value, its unit, and the whole set group (arrow and compass point, or the slack glyph). Sunrise and sunset commentary never receives a provisional prefix. Provenance is outside this spec.
 
 ### 9.3 Derived-gate lead
 
-A derived gate knows phase and slack times but no speed or set bearing. Its lead contains the state (`Flooding`, `Ebbing`, or `Slack`), a simple forward/back/slack glyph, and selected time. It must not display a numeric value, unit, compass point, or true-bearing arrow.
+A derived gate knows phase and slack times but no speed or set bearing. Its lead contains the state (`Flooding`, `Ebbing`, or `Slack`), a glyph (`arrow.forward` for flooding, `arrow.backward` for ebbing, or the slack glyph) in the flood, ebb, or go colour, and selected time. It must not display a numeric value, unit, compass point, or true-bearing arrow. VoiceOver reads the phase word and the glyph's symbol label, with the date and clock as the value; there is no number or unit to read.
+
+The lead reads `Slack` within 12 minutes of a derived slack. Otherwise it reads `Flooding` when the next slack is a high-water slack and `Ebbing` when it is a low-water slack. Past the last slack it reads the phase that follows it: ebb after a high-water slack, flood after a low-water slack. With no derived slacks loaded it reads `Slack`.
+
+### 9.4 Watch reading
+
+The watch place page has no lead card. Its top line is the place name, prefixed with `location.fill` when the place was chosen from the wearer's location, or the dated clock while the selection is away from now. Its reading row is the value, unit, and compass set, then a tide arrow or the current phase word. The watch treats a stop within 200 seconds as reached, reads heights and current speeds from the ten-minute interpolation, has no `Max` or window-based slack states and no provisional `~`, and shows a next-event line instead of a commentary pill. The next-event line names the first tide high or low, or the first current slack or maximum, at least 200 seconds ahead; it never names sunrise, sunset, slack-window edges, fast-rate points, or eclipse contacts. It gives the event word, its value and unit when known, ` · `, and its clock. On a derived gate the watch shows no value, unit, or set, and reads the phase from the schematic shape with the 0.15 threshold, so `Slack` spans roughly 17 minutes either side of a slack on a six-hour half-cycle rather than §9.3's 12 minutes.
 
 ## 10. Commentary and Now pills
 
-Both controls use compact, capsule-shaped translucent material with semibold, tabular text. “Glass” describes the visual role—legible interactive chrome floating above a changing sky—not a requirement to use an Apple-only material.
+Both controls use compact, capsule-shaped translucent material with caption semibold, tabular text. Pill text stops growing at the first accessibility text size so commentary and Now share one row. “Glass” describes the visual role—legible interactive chrome floating above a changing sky—not a requirement to use an Apple-only material.
 
 ### 10.1 Commentary
 
@@ -353,41 +386,53 @@ under 60 minutes: 28m
 60 minutes or more: 3h 28m
 ```
 
-The compact `h` and `m` countdowns are fixed chart notation. VoiceOver uses localized full-duration words.
+The compact `h` and `m` countdowns are fixed chart notation. VoiceOver uses localized full-duration words, floored to whole minutes like the visual label, omitting zero units (`1h 0m` is read as one hour), and reading under a minute as zero minutes.
 
 The visual label uses the same selected-time-relative order at now and while planning away from now. It contains no sentence glue:
 
 ```text
 High ↑ 28m
 Low ↓ 3h 28m
-Slack 1h 12m
+Slack →|← 1h 12m
+Max flood → 28m
+Sunset ☀︎↓ 2h 5m
 ```
 
-The up/down marks above represent SF Symbols, not translated glyphs. Only tide extrema receive them: `High` uses `arrow.up`, `Low` uses `arrow.down`, and the symbol inherits the text colour. Current, slack, sunrise, sunset, and fast-tide commentary have no tide arrow.
+The marks above represent SF Symbols, not translated glyphs, drawn between the label and the countdown in the text colour, 4 units from each:
 
-The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Max ebb in 42 minutes`. The decorative tide arrow is hidden from accessibility.
+| Stop | Symbol |
+| --- | --- |
+| High, Low | `arrow.up`, `arrow.down` |
+| Slack | `arrow.right.and.line.vertical.and.arrow.left` |
+| Flood, Max flood | `arrow.forward` |
+| Ebb, Max ebb | `arrow.backward` |
+| Sunrise, Sunset | `sunrise`, `sunset` |
 
-All four consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Candidates must be more than one second after the selection, so landing on a stop advances the pill. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
+Fast-tide commentary has no symbol.
+
+The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`. The decorative symbol is hidden from accessibility.
+
+All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Sun candidates and measured-current water candidates must be more than one second after the selection, so landing on a stop advances the pill. Tide and derived gates take their first water stop strictly after the selection and drop it if it is within one second, so a selection less than a second before a high, low, or derived slack names the next sun event, or nothing, instead of the following water stop. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop. When a sun event and a water stop share an instant, the sun event is named. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
 
 #### Tide commentary
 
 Ordinarily name the next extreme (`High …` or `Low …`) or an earlier `Sunrise …` or `Sunset …`.
 
-When the absolute tide rate reaches 0.6 m/hour, commentary instead explains the warm-coloured curve at the selected instant:
+When the absolute tide rate, linearly interpolated from the ten-minute rate series, reaches 0.6 m/hour, commentary instead explains the warm-coloured curve at the selected instant:
 
 ```text
 Rising 0.60 m/hr
 Falling 5.2 ft/hr
 ```
 
-Tint this text — and the lead glyph above it — with a lightened form of the rate-ramp colour, lightened as far as the sky behind the pill demands: the ramp's red end is unreadable against a sunrise, and where no tint clears that ground the ink is the chrome's own white. Activating it moves to the closest fastest-rate point in the same rising/falling run, unless already within one second of that point; from there it advances to the next water or sun stop.
+Tint this text, and the lead glyph above it, with the rate-ramp colour lifted toward white: at least a quarter of the way, then in 5% steps until it reaches 4.5:1 contrast against the sky's horizon colour composited over the canvas at the sky's opacity (§14), the brightest ground the pill row can sit on. The ramp's red end is unreadable against a sunrise. Where no step reaches 4.5:1, the ink is white. It has no countdown, and its accessible label is the visible text. Activating it moves, earlier or later, to the nearest per-run fastest-rate point with the same sign (rising or falling), unless already within one second of it; from there, or when no such point is loaded, it moves to the next water or sun stop.
 
 #### Current commentary
 
 Walk strictly forward—more than one second after `selectedTime`—through these significant stops:
 
 1. a measured slack window opening, named `Slack`;
-2. its closing, named `Flood` or `Ebb` from the velocity immediately after it;
+2. its closing, named `Flood` or `Ebb` from the velocity one second after it (zero counts as `Flood`);
 3. `Max flood` and `Max ebb`; and
 4. a bare slack instant when no measured window exists.
 
@@ -410,9 +455,11 @@ The pill sits at the outer edge on the side where now lies:
 - selected in the future: `← Now` on the left;
 - selected in the past: `Now →` on the right.
 
+The pill row is inset 16 units from each viewport edge. Now uses the `arrow.left` or `arrow.right` symbol 4 units from the word, and is announced `Return to now`. It appears only when the host supplies a return action. On the watch, Now is an `xmark` toolbar button labelled `Now`, shown behind the same 200-second test.
+
 The arrow is both instruction and spatial truth. Activating Now refreshes the reference `now`, ensures its data window is active, and moves that instant beneath the centreline. After landing, the pill disappears.
 
-The Now request must win over momentum or a magnetic animation. A fling must never swallow the tap.
+The Now request must win over momentum or a magnetic animation. Because both pills are hidden and inert while the strip moves (§6.4), this rule governs external requests that move the selection while the strip coasts: a scene reactivation that returns to now, and a schedule-row tap, which lands on its own event.
 
 ## 11. Fixed centre overlay
 
@@ -425,14 +472,14 @@ x = viewportWidth / 2
 y = graphY(valueAt(selectedTime))
 ```
 
-Use a white 13-unit dot with a four-unit glow for tide, and a white 10-unit dot with a three-unit glow for current and derived current. The larger tide dot keeps its presence against the more varied datum fill.
+Use a white 13-unit dot with a four-unit, 90%-white glow for tide, and a white 10-unit dot with a three-unit glow of the same colour for current and derived current. The larger tide dot keeps its presence against the more varied datum fill. The watch marks the selection with a 14-unit ring instead: a 3-unit white stroke over a canvas-colour fill, with no glow, for tide and current alike, and it draws no reading line.
 
-At rest, a one-unit white line at 18% opacity connects the pill row to the plot floor. Show it only when commentary exists; the riding dot alone carries the selection when there is no commentary. The line must not intercept input.
+At rest, a one-unit white line at 18% opacity runs from `topPad`, 6 units below the pill capsules, to the plot floor. Show it only when commentary exists; the riding dot alone carries the selection when there is no commentary. It fades with the pills. After a press, or VoiceOver's "Set an alert" action, parks a moment on a host that offers alerts (§6.5.1), the line also runs from the plot floor to the bottom of the strip, with or without commentary, until the selection moves to a different minute. A host with nothing to alert on draws no extension. The line must not intercept input.
 
 Do not confuse the riding dot with the graph's absolute-now dot:
 
 - the riding dot is fixed to the viewport and marks `selectedTime`;
-- the absolute-now dot is drawn into the moving graph and marks `now`; and
+- the absolute-now dot is drawn into the moving graph and marks `now`: a 7-unit paper dot with a halo gap, drawn only when now lies inside the loaded window; and
 - the two coincide when the scrubber is home.
 
 ## 12. Shared graph rules
@@ -441,7 +488,7 @@ Do not confuse the riding dot with the graph's absolute-now dot:
 
 The reference harmonic series is sampled every ten minutes. Official online series may arrive every fifteen minutes. Draw a continuous polyline through the samples and linearly interpolate the riding-dot position between them.
 
-Prediction generation, event finding, slack-window calculation, sun/moon event searches, and eclipse searches happen when the timeline is built—not on each scrub frame. A scrub frame may interpolate values and calculate the current sky, but must not rebuild the week.
+Prediction generation across the window, event finding, slack-window calculation, sun/moon event searches, and eclipse searches happen when the timeline is built, not on each scrub frame. A scrub frame may interpolate values, calculate the current sky, and evaluate the engine at the single selected instant for the tide and predicted-current leads (§9.1, §9.2), but must not rebuild the week.
 
 ### 12.2 Past and future
 
@@ -449,23 +496,23 @@ Split every curve stroke and overlaid run at the absolute-now x-coordinate:
 
 - past stroke opacity: 35%;
 - future stroke opacity: 100%; and
-- past event-label opacity: 45%.
+- past event-mark and event-label opacity: 45% of the future value.
 
-“Event label” here means a water turn/peak value or its axis time. Day names, dates, sunrise/sunset chrome, and eclipse context do not fade merely because their instant is in the past.
+“Event mark” and “event label” here mean a water turn's dot, a peak or turn's hanging value and glyph, a bare-slack hairline, a derived-gate slack dot, and an axis time. Day names, dates, sunrise/sunset chrome, and eclipse context do not fade merely because their instant is in the past.
 
 If now is before the window, all content is future. If now is after it, all content is past.
 
-Draw a seven-unit white absolute-now dot on the curve only when now lies inside the loaded window. Punch a 2.5-unit clear halo beyond its edge so it remains legible over fills and day/night shading.
+Draw a seven-unit paper (`#FCFCFC`) absolute-now dot on the curve only when now lies inside the loaded window. Punch a 2.5-unit clear halo beyond its edge so it remains legible over fills and day/night shading. Turn-dot, derived-gate slack-dot, and now-dot halos erase everything already drawn on the strip beneath them (fills, shading, and curve), so the sky behind the strip shows through the ring and the curve is broken around each dot.
 
 ### 12.3 Reference marks and labels
 
-The base curve is 2.5 units wide with round caps and joins. Dashed reference lines are one unit wide at 35% foam opacity with a `[1, 3]` dash pattern.
+The base curve is 2.5 units wide with round caps and joins. Dashed reference lines are one unit wide at 35% foam opacity with a `[1, 3]` dash pattern. They span the whole strip width and draw above fills and shading, beneath the curve.
 
-Turn and peak values hang 23 units toward the plot's vertical middle. The glyph sits nearest the curve and the value beyond it. The reference gaps are eight units for the glyph and seven for the value.
+A tide high's reading hangs below its dot and a low's above it, whatever the turn's height; a max flood's reading hangs below its peak and a max ebb's above it, toward the zero line. Each is centred on the event's x. The glyph sits nearest the curve and the value beyond it: the glyph's centre is 15 units from the turn or peak (23 − 8) and the value's centre 30 units (23 + 7). The glyph is 12 units, semibold for a to-bar glyph and bold for a set arrow; the value is 18 units semibold with tabular digits.
 
-Absolute event times have one home: the event-time row beneath the plot. Sort candidate times first. If the next label would be within 64 horizontal units of the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
+Absolute event times have one home: the event-time row beneath the plot, in foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
 
-Do not draw turn or peak labels within 0.3 hours (18 minutes) of either strip edge. Edge clipping makes a valid event look broken.
+Do not draw any event mark, hanging reading, or event time within 0.3 hours (18 minutes) of either edge of the loaded window: turn dots, turn and peak readings, bare-slack hairlines, derived-gate slack dots, and their axis times. Edge clipping makes a valid event look broken. Slack runs, the curve, and the now dot draw to the edge.
 
 ### 12.4 Colour tokens
 
@@ -473,22 +520,26 @@ These sRGB values are the portable reference palette:
 
 | Role | Hex | Meaning |
 |---|---|---|
-| Deep ink | `#00183C` | Text over a light sky |
+| Deep ink | `#00183C` | Text on schedule pills; the sky's chrome ink is always white (§14) |
 | Canvas | `#05122A` | Water/page ground |
 | Foam | `#E4F0E4` | Primary light ink |
 | Graph line | `#38BDF8` | Base water curve |
 | High | `#2DD4BF` | Tide high |
 | Low | `#FBBF24` | Tide low |
+| Flood | `#4A9FD8` | Flood set glyph and derived flood glyph in the lead, and the schedule's flood pill |
+| Ebb | `#E8A33D` | Ebb set glyph and derived ebb glyph in the lead, and the schedule's ebb pill |
 | Go | `#88B868` | A measured slack-window run, or a known bare slack instant when no duration can be measured |
-| Neutral unknown | `#5888A8` | Schematic magnitude |
+| Neutral unknown | `#5888A8` | Unknown or unavailable state: map pin, unavailable-station card and page, Unfavorite swipe action |
 | Sun | `#F0C860` | Sunrise/sunset dot |
-| Sunrise label | `#F0D890` | Sunrise time |
-| Sunset label | `#C8A86A` | Sunset time |
-| Night | `#00101F` | Night shading |
+| Sunrise label | `#F0D890` | Sunrise and sunset times on the strip; sunrise time in schedule day headers and the sun sheet |
+| Sunset label | `#C8A86A` | Sunset time in schedule day headers and the sun sheet |
+| Night | `#00101F` | Night shading beneath the curve (70%) |
+| Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (14%) |
+| Paper | `#FCFCFC` | Absolute-now dot |
 | Attention | `#EF6F4A` | Provisional or exceptional state, not alarm |
-| Eclipse umbra | `#6B2A18` | Eclipse-only copper |
+| Eclipse umbra | `#6B2A18` | Eclipse-only copper, drawn at 94% |
 
-Green is reserved for slack evidence: a measured, sign-reversing slack window and its direct state, or a known slack instant when no duration can honestly be measured. It must not identify a station type, rising tide, weak water without a reversal, or generic success.
+Inside the graph, green is reserved for slack evidence: a measured slack window and its direct state, or a known slack instant when no duration can honestly be measured. It must not identify a station type, rising tide, weak water without a reversal, or generic success there. The same hex is also the app's leaf accent outside the graph: section labels, controls, card strokes, and the schedule's selected-row bar.
 
 The magnitude ramp contains no green:
 
@@ -518,23 +569,22 @@ Draw in this order:
 7. absolute event times; and
 8. the absolute-now dot.
 
-The datum fill is graph blue at 50% at the top, fading to clear at chart datum. Below datum, low amber fades from clear at datum to 50% at the bottom. If the loaded series never reaches datum, finish the blue fade at its lowest trough and do not invent an amber region.
+The fill occupies the area between the curve and chart datum. Where the curve lies below datum, the fill lies above the curve, over the sky, not over the opaque water ground. The datum fill is graph blue at 50% at the top, fading to clear at chart datum. Below datum, low amber fades from clear at datum to 50% at the bottom. If the loaded series never reaches datum, finish the blue fade at its lowest trough and do not invent an amber region.
 
-The tide curve is base graph blue while `abs(rate) < 0.6 m/hr`. At and above that floor it follows the absolute rate ramp in §12.4. The past/future opacity split applies on top of the gradient.
+The tide curve is base graph blue while `abs(rate) < 0.6 m/hr`. At and above that floor it follows the absolute rate ramp in §12.4: from 0.6 to 1.0 m/hr the line is solid ramp yellow, and the step from blue is softened only by the gradient between adjacent samples. The past/future opacity split applies on top of the gradient.
 
 Each high or low gets:
 
-- a five-unit diameter dot with a 2.5-unit clear outer halo;
-- high teal or low amber;
-- its height without a unit, since the lead owns the unit;
-- a to-bar glyph—`⤒` for high, `⤓` for low—nearest the dot; and
+- a five-unit diameter dot with a 2.5-unit clear outer halo, high teal or low amber;
+- its height without a unit, since the lead owns the unit, in foam;
+- a to-bar glyph nearest the dot, the `arrow.up.to.line` SF Symbol for a high and `arrow.down.to.line` for a low, in the dot's colour; and
 - its local time in the event-time row.
 
 The arrow-to-bar means “arrives and stops.” A plain up arrow must not label a high, because rising is precisely what has ended.
 
 ### 13.2 Measured current
 
-Fit symmetrically around zero using the largest absolute speed in the fitted range multiplied by 1.05. Continuous harmonic-current browsing follows the visible-span governor in §16; online currents fit their loaded series. The zero line stays at the vertical middle so equal flood and ebb magnitudes occupy equal heights.
+Fit symmetrically around zero using the largest absolute speed in the fitted range (floored at 0.01 kn) multiplied by 1.05. Speeds map to ±(half the plot height − 3 units); a speed beyond the fitted maximum clamps to that edge. Continuous predicted-current browsing (harmonic, subordinate, or fitted) follows the visible-span governor in §16; online currents fit the samples inside their fixed window. The zero line stays at the vertical middle so equal flood and ebb magnitudes occupy equal heights.
 
 Draw in this order:
 
@@ -544,11 +594,11 @@ Draw in this order:
 4. the dashed zero reference line;
 5. the base curve and its magnitude thread;
 6. measured slack runs;
-7. bare-slack hairlines and peak readings;
-8. run-opening/bare-slack times; and
+7. run-opening/bare-slack times;
+8. bare-slack hairlines, derived-gate slack dots, and peak readings; and
 9. the absolute-now dot.
 
-The current fill is clear at zero and reaches 50% graph blue toward both vertical extremes. It does not encode flood versus ebb; y-position and bearing labels do.
+The fill occupies the area between the curve and the zero line, so in an ebb lobe it lies above the curve, over the sky. The current fill is clear at zero and reaches 50% graph blue toward both vertical extremes. It does not encode flood versus ebb; y-position and bearing labels do.
 
 Draw the curve in graph blue at 2.5 units. Down its middle, draw a two-unit absolute-speed thread:
 
@@ -557,11 +607,13 @@ Draw the curve in graph blue at 2.5 units. Down its middle, draw a two-unit abso
 - yellow through orange between 3 and 8 kn; and
 - orange through red between 8 and 12 kn, clamped red above 12 kn.
 
-A measured slack window is the interval where absolute speed is at or below the configured threshold and a sign reversal occurs inside the interval. Interpolate its threshold crossings from adjacent samples. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band.
+An online sampled series derives its events from the samples. A slack falls at an exact-zero sample or at the linear crossing between opposite-sign samples. A maximum is the largest-magnitude sample of each signed run, without interpolation; the partial runs at the series ends also yield a maximum at their largest sample. Events are kept up to six hours beyond the fixed window.
 
-Where a slack instant has no measurable window, draw a one-unit go-colour hairline from plot top to plot bottom at 35% opacity. A zero-width run must never look like a usable duration.
+A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. It exists only if one of the two samples bracketing the slack is at or below the configured threshold; it extends to the interpolated threshold crossings on each side and clamps to the loaded series. Window openings and closings are magnetic. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band.
 
-Current maxima are context, not destinations:
+Where a slack instant has no measurable window, draw a one-unit go-colour hairline from plot top to plot bottom at 35% opacity, or 35% × 45% when the slack is past. A zero-width run must never look like a usable duration. Hairlines are rare at the default 0.5 kn threshold: both bracketing samples exceed it only where the speed changes by more than 1 kn between samples. Station cards print the bare slack's time and draw no hairline.
+
+Current maxima are drawn as context rather than as marks:
 
 - no peak dot;
 - hang the absolute speed, without unit, toward the zero line;
@@ -572,11 +624,12 @@ The event-time row contains each merged slack run's opening and every bare slack
 
 ### 13.3 Schematic derived current
 
-A derived gate uses the current plot box with a normalized ±1 phase shape:
+A derived gate uses the current plot box with a normalized ±1 phase shape: a half-sine between consecutive derived slacks, positive (flood) after a low-water slack and negative (ebb) after a high-water slack, and zero outside the slack range.
 
 - use the same blue fill fading to clear at the shape's zero crossing;
 - keep the blue curve and past/future split;
-- mark known slack instants with green dots and their thinned axis times;
+- mark each known slack with a five-unit go-colour dot with a 2.5-unit clear halo on the zero line, and its thinned axis time;
+- fit the loaded shape (±1 × 1.05) without the visible-span governor;
 - omit the dashed zero reference line, magnitude thread, speed values, set arrows, measured slack windows, and green duration runs; and
 - expose no numeric value in the lead.
 
@@ -589,27 +642,33 @@ The day/celestial layer moves with the graph. It provides calendar and light con
 For every civil day touched by the window:
 
 - centre `Today`, `Tomorrow`, `Yesterday`, or the short weekday halfway between sunrise and sunset; use station-local noon when either sun event is missing;
-- place `MMM d` beneath it;
-- draw sunrise as `↑` plus its localized station time in sunrise ink at its true x-coordinate;
-- draw sunset as `↓` plus its localized station time in sunset ink at its true x-coordinate; and
-- place a seven-unit sun dot beneath each time.
+- place the locale's abbreviated month and day (iOS template `MMMd`) beneath it;
+- draw sunrise as the `sunrise` SF Symbol, a space, and its localized station time, in sunrise ink at its true x-coordinate;
+- draw sunset as the `sunset` SF Symbol, a space, and its localized station time, also in sunrise ink (the symbol, not the colour, tells them apart) at its true x-coordinate; and
+- place a seven-unit sun-colour dot centred 14 units below the day row beneath each time.
 
-Sunrise/sunset events are computed for the station coordinate and civil-day bounds. A polar day may lack either event; omit missing marks without inventing a time.
+The day name is foam at 85% and the date foam at 48%, 17 units below the day name. Day names, dates, sun times, sun dots, and the eclipse glyph do not fade in the past. Day names and sun times share the day row with no collision handling, so on short days they may overprint. The day row, dates, sun dots, and eclipse glyph draw after the track, over its shading.
 
-Night shading spans each sunset to the following sunrise; daylight tint spans sunrise to sunset. Each edge fades across 0.75 hour on both sides. Shade is clipped beneath the curve, stays full through the upper 35% of the water region, and fades vertically to transparent at the bottom of the scrubber so it does not end as a hard rectangle behind the time rows.
+Sunrise/sunset events are computed for the station coordinate and civil-day bounds; when a civil day has more than one rise or set, the first of each is used. A polar day may lack either event; omit missing marks without inventing a time.
 
-For a lunar eclipse visible from the station, draw only a small `🌘` at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. All eclipse contact times remain magnetic targets.
+Night shading (`#00101F` at 70%) spans each civil day's first sunset to the next civil day's first sunrise; daylight tint (`#A8CAE0` at 14%) spans a civil day's first sunrise to its first sunset, and is skipped when that sunset comes first (§18). Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. A day with no sunrise or sunset draws no tint, and a night with no sunset or no following sunrise draws no band. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
+
+For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. The eclipse's contacts are magnetic targets (§7).
 
 The backdrop behind the lead responds continuously to `selectedTime` and station coordinates:
 
-- interpolate sky colours from solar altitude;
+- paint a top colour and a horizon colour interpolated linearly in sun altitude between anchors: 10° `#2F7FD4`/`#BDE3FB`, 0° `#2B4A7A`/`#F8A15F`, −6° `#17264A`/`#8D4A63`, −12° `#0B1430`/`#2A2A52`, −18° `#04060F`/`#0B1023`, held beyond both ends. The gradient runs from the top colour at the frame top to the horizon colour at the horizon, and holds the horizon colour below it;
+- composite the sky over the canvas at 55% opacity with the sun at or above the horizon, rising linearly to 100% at −6°;
+- map altitude at a fixed 3 units per degree, with the horizon 16 units below the plot top so curve peaks pass in front of the lowest stars; stretch a body's own rise-to-set azimuth span across the width, padded by the sun's 8-unit disc radius or half the moon's 22-unit glyph frame (11 units), so the body just clears the edge at the horizon, and use the full 360° when there is no span (polar day or night, or no day data yet);
 - position sun and moon against the nearest complete rise-to-set horizon span, keeping that span through both crossings so the disc and halo enter and leave continuously; switch spans midway between set and the following rise, while the body is below the horizon;
-- show the moon's illuminated limb and current lunar eclipse shadow, with the bright limb at its angle from the zenith (Almanac's bright-limb angle less the parallactic angle). Sun and moon sit east on the right, a mirror image of the sky in the northern hemisphere, so there the limb is mirrored too and keeps facing the drawn sun;
-- during a solar eclipse, keep the moon visible over the sun and darken the sky according to the locally obscured fraction;
-- reveal stars as the sky darkens; and
-- switch foreground ink between light foam and deep navy for contrast.
+- draw the sun as a 16-unit `#F0C860` disc over a 54-unit glow of the same colour at 24% opacity, blurred 12;
+- draw the moon as a 20-unit phase disc in a 22-unit glyph frame, on a dark limb (`#00122C` at 92% × 18%) with a 0.75-unit white outline at 25%, over a radial glow of radius 12 + 20 × illuminated fraction, offset 4 units toward its bright limb, with a `#E6EEFF` core at 0.95 × (0.1 + 0.66 × illuminated fraction) and a `#CFE0FF` halo at 0.28 × the same factor at 45% of the radius, both multiplied by the eclipse dim and fading to clear at the edge. Outside a solar eclipse the moon fades to transparent as its centre comes within 19 units of the sun's and is fully opaque from 38 units out. While a lunar eclipse is underway the glow turns copper (`#E8B08C` core, `#D79A78` halo) and dims by 1 − 0.75 × umbral fraction − 0.25 × penumbral wash;
+- show the moon's illuminated limb and current lunar eclipse shadow, with the bright limb at its angle from the zenith (Almanac's bright-limb angle less the parallactic angle). Sun and moon sit east on the right, a mirror image of the sky in the northern hemisphere, so there the limb is mirrored too and keeps facing the drawn sun. The lunar umbra is an equal-radius copper disc that slides in from the moon's right edge and is concentric when the umbral fraction reaches 1; that fraction rises linearly from 0 at U1 to the umbral magnitude at greatest eclipse and falls back to 0 at U4, and the disc does not rotate with the bright limb. From P1 to P4 of every lunar eclipse the whole disc is also washed copper at 42% × a penumbral fraction that rises linearly from 0 at P1 to the penumbral magnitude (capped at 1) at greatest eclipse and falls back to 0 at P4; for a penumbral eclipse this wash is the only mark, and for a partial or total eclipse the umbra draws over it;
+- during a solar eclipse, draw the moon over a 20-unit `#04060F` silhouette, placed along its true bearing from the sun at (8 + 11) × (1 − obscuration) units, the sun's disc radius plus half the moon glyph: just clear of the sun at first contact and concentric only at full obscuration, so a partial eclipse keeps an offset bite at its greatest. Every sky quantity (paint, opacity, stars, ink ground) is evaluated at the sun altitude pulled toward −9° by obscuration⁴, so a half-covered sun still reads as day and totality reads as deep twilight;
+- reveal stars as the sky darkens: the catalogue stars of magnitude 3.5 or brighter, placed in the sun's horizon frame so they slide with the bodies. Field opacity is 0 with the sun above −6° and rises linearly to 0.7 at −18°; each star is further scaled by its own altitude, from 0 at −10° to full at 40°. Radius is max(0.5, 1.6 − 0.3 × magnitude) units. Twinkle multiplies opacity by 0.86 + 0.14 × a per-star sine, so between 0.72 and 1.0, and redraws at most 8 times a second; it pauses while the field opacity is zero. No stars are drawn when the sun position is unavailable; and
+- draw the lead and chrome ink in white at every sky state, because the sky paint never gets light enough to need deep navy. Coloured chrome text, such as a rate-warning tint, is lifted toward white, at least a quarter of the way and then in 5% steps, until it reaches 4.5:1 against the sky's horizon band composited over the canvas, or falls back to white.
 
-Solar eclipse appearance is evaluated for the selected instant and station coordinate. A partial eclipse must leave a visible bite in the sun instead of looking total; the moon must not disappear into the ordinary near-sun glare fade. Solar obscuration changes the backdrop, while the strip's eclipse glyph and contact snap targets describe lunar eclipses.
+Solar eclipse appearance is evaluated for the selected instant and station coordinate. A partial eclipse must leave a visible bite in the sun instead of looking total; the moon must not disappear into the ordinary near-sun glare fade. Solar obscuration changes the backdrop; the strip marks solar eclipses with the same glyph and contact snap targets as lunar ones.
 
 The sky is non-interactive and accessibility-hidden. Under Reduce Motion, stars must not twinkle; selected-time movement may still reposition the astronomical scene because that change conveys time rather than decoration.
 
@@ -619,16 +678,16 @@ The intended scrubber must be usable without seeing or directly dragging the can
 
 Expose one adjustable timeline control with:
 
-- label: the track type and station context supplied by the host;
-- value: full station-local date and time, lead state, magnitude/unit when known, and set when known;
+- label: the track type, `Tide timeline` for a tide strip and `Current timeline` for a measured or derived current strip (the watch labels its strip with the station name);
+- value: the lead state, then the magnitude and spoken unit when known, then the station-local month, day, time, and time-zone abbreviation of the instant under the centreline. The phone strip's value omits the set. The watch's value leads with the station-local month, day, time, and time-zone abbreviation, then the state, the value and spoken unit, and the set when known, joined with spaces;
 - increment/decrement actions that move later/earlier by five minutes; and
-- named actions for next and previous magnetic target when the platform supports custom actions.
+- named actions for next and previous magnetic target when the platform supports custom actions (`Next event`, `Previous event`), plus `Set an alert` on detail strips (§6.5.1).
 
-The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input.
+The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input. Adjustments and next/previous actions land directly with no travel and stop any opening motion; a target past the window's edge parks at the nearest reachable centre. Next and previous ignore a target within one second of the current time; with no target, the action reports failure and nothing moves. The watch strip is one adjustable element with the same five-minute steps and next/previous event actions; its steps are not clamped to the loaded span, and a next or previous action with no target does nothing without reporting failure.
 
-Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now includes its visible text. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller.
+Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now is announced `Return to now`. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller. iOS sets a 44-point semantic row height; the capsules are always wider than 44 points.
 
-The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops. Include the civil date and station time zone in spoken output when crossing midnight; a clock time without its date is ambiguous in a multi-day timeline.
+The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops, and it speaks its date with the clock. The timeline control's value always includes the civil date and the station time zone, because a clock time without its date is ambiguous in a multi-day timeline.
 
 Do not rely on colour alone:
 
@@ -641,11 +700,12 @@ Do not rely on colour alone:
 With Reduce Motion:
 
 - opening and programmatic travel land directly;
+- the magnetic settle lands directly;
 - decorative twinkle stops;
 - pill opacity does not animate; and
 - selected-time updates and the riding dot remain immediate.
 
-Keyboard-capable web and Android implementations should map Left/Right to the same five-minute decrement/increment, with logical direction unaffected by text direction because the timeline itself is chronological left-to-right. Provide a focus-visible treatment around the scrubber without moving its centreline.
+iOS does not map hardware-keyboard Left/Right to the timeline step. Keyboard-capable web and Android implementations should map Left/Right to the same five-minute decrement/increment, with logical direction unaffected by text direction because the timeline itself is chronological left-to-right. Provide a focus-visible treatment around the scrubber without moving its centreline.
 
 ## 16. Rendering and platform guidance
 
@@ -653,11 +713,11 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 ### iOS reference
 
-The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centering suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the animated opening so the selected time and sky follow every frame.
+The reference uses a horizontal `UIScrollView` (`TimelineScrubber.swift`) hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centring suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the animated opening so the selected time and sky follow every frame. On a device with a trailing status rail, the strip and sky draw on under the rail while the scroll viewport, and so the centreline, stays inside the safe area.
 
 ### watchOS
 
-The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
+The watch place page (`SlackwaterWatch/PlaceDetail.swift`) hosts `CrownScrubStrip` (`SlackwaterWatch/CrownScrubStrip.swift`), which draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on. A Crown settle rides a snappy animation to the magnet target (direct under Reduce Motion) and plays a light impact haptic, including under Reduce Motion. The Crown's range is the loaded span's start to end, so the centre can reach the data's very edge. Now is a bottom-bar `xmark` button in place of the list button, shown only when scrubbed away; it moves with the same snappy animation unless Reduce Motion is on or the travel exceeds seven days. The watch mounts two tiles around the centre, marks the selection with a 14-unit white ring, fits its vertical scale as if its viewport were 200 units wide (about 11 hours), and hosts tide, predicted-current (harmonic, subordinate, and fitted), and derived-gate places but not online currents. On its 52-unit plot, current peak readings hang across the zero line. The sky backdrop runs behind the reading card from the top of the screen to the plot floor, with its horizon 16 units below the plot's top.
 
 ### Android
 
@@ -669,24 +729,24 @@ Prefer a native horizontal scroll container or equally native-feeling pointer + 
 
 ### Long-surface limits
 
-Even the bounded 4,104-unit strip exceeds a single 8,192-pixel texture on a 3× display. iOS draws 900-unit tiles and mounts only those near the viewport, with surrounding tiles as a buffer. Each tile reads its own sample range with edge context; event-time thinning and shared fill boundaries remain window-wide so labels and gradients agree across seams. A pan alone must not rebuild an unchanged canvas. Changes to data, units, bearings, reference now, or vertical scale must invalidate it, including a replacement CHS fit or slack threshold with the same sample count.
+Even the bounded 4,104-unit strip exceeds a single 8,192-pixel texture on a 3× display. iOS draws 900-unit tiles and mounts only the visible tiles plus one tile on each side. Each tile reads its own sample range with edge context; event-time thinning and shared fill boundaries remain window-wide so labels and gradients agree across seams. A pan alone must not rebuild an unchanged canvas; only a pan that changes the mounted tile set re-hosts it. Changes to data, units, bearings, reference now, strip height, or vertical scale must invalidate it, including a replacement CHS fit or slack threshold with the same sample count.
 
 Other platforms may tile, window, or draw vector content directly. They must not allocate one oversized bitmap and silently lose the graph on high-density screens. Tile boundaries must land on device pixels and must not change the time mapping or create visible seams.
 
 ### Vertical scale
 
-Continuous tide and harmonic-current details fit the visible time span plus one hour on each side. Preserve the current scale while the curve fits comfortably: expand when the visible reach exceeds 97% of the held half-span, and contract when the newly fitted span is below 65% of the held span. Tide fitting adds 6% padding; measured-current fitting adds 5%. Chunk arrivals alone must not stretch the graph.
+Continuous tide and predicted-current details (harmonic, subordinate, or fitted) fit the visible time span plus one hour on each side. Preserve the current scale while the curve fits comfortably: expand when the visible reach exceeds 97% of the held half-span, and contract when the newly fitted span is below 65% of the held span. Tide fitting adds 6% padding; measured-current fitting adds 5%. The fitted span uses a viewport of at least six hours. An adopted tide fit replaces both centre and half-span. Chunk arrivals alone must not stretch the graph.
 
-An adopted scale glides over 300 ms with smoothstep easing, carrying the drawn curve and riding dot together. A new target during the glide starts from the currently drawn scale. Reduce Motion lands directly. Online details fit their fixed loaded window; derived shapes retain their normalized scale.
+An adopted scale glides over 300 ms with smoothstep easing, carrying the drawn curve and riding dot together. A new target during the glide starts from the currently drawn scale. The glide runs at up to 60 frames per second. Reduce Motion lands directly. Online details fit their fixed loaded window; derived shapes retain their normalized scale.
 
 ## 17. Conformance scenarios
 
-These scenarios define the minimum behavior shared by all platforms.
+These scenarios define the minimum behavior shared by all platforms. Scenario 38 applies only where a posture change rebuilds the page.
 
 ### Opening and manipulation
 
 1. **Ordinary opening:** Given a complete current window and Reduce Motion off, opening starts two hours behind now, reaches now in 650 ms, and ends with the lead time equal to the centre time.
-2. **Interrupted opening:** Touching during the opening cancels it; the next drag begins from the touched position without jumping to now.
+2. **Interrupted opening:** A drag, tap, or plot press during the opening cancels it; the drag continues from the strip's position when it began, without jumping to now.
 3. **First drag:** The first drag after opening changes the lead and riding dot during the gesture, before release or snap.
 4. **Direction:** Dragging content left advances selected time; dragging it right moves selected time backward.
 5. **Momentum:** A flick continues natively, updates the lead during motion, then evaluates the magnet once.
@@ -696,8 +756,8 @@ These scenarios define the minimum behavior shared by all platforms.
 6. **Near target:** Resting 3 units (10 minutes) from a tide extreme animates to its exact instant.
 7. **Outside capture:** Resting 4.5 or more units from every target remains where released, including 40 minutes before a low.
 8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation.
-9. **Commentary during fling:** Activating commentary stops the fling and lands on the named target; no later momentum frame overwrites the request.
-10. **Now during settle:** Activating Now cancels a magnetic animation, refreshes now, lands home, and removes the Now pill.
+9. **Commentary during fling:** A commentary request issued during a fling (the visible pill is inert while the strip moves, §6.4) stops the fling and lands on the named target; no later momentum frame overwrites the request.
+10. **Now during settle:** A return to now that arrives during a magnetic animation, such as a scene reactivation (the visible pill is inert while the strip moves, §6.4), cancels the animation, refreshes now, lands home, and removes the Now pill.
 11. **Reduce Motion:** Opening, commentary, Now, and a drag-end magnetic settle land directly with no travel, and the pill row appears without an opacity animation.
 
 ### Geometry and time
@@ -709,17 +769,17 @@ These scenarios define the minimum behavior shared by all platforms.
 
 ### Track meaning
 
-16. **Tide turn:** At an exact high, the lead says High, the high dot sits beneath its hanging reading, and the commentary advances to the following event.
+16. **Tide turn:** At an exact high, the lead says High, the high's reading hangs below its dot, and the commentary advances to the following event.
 17. **Fast tide:** At 0.6 m/hr or faster, the line and commentary share the same ramp position and activating commentary goes to that run's fastest point.
-18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and changes phase at the half-open closing.
+18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and, with a threshold of 0.15 kn or more, changes phase at the half-open closing. Below that threshold the lead stays Slack until the speed reaches 0.15 kn (§9.2).
 19. **Bare slack:** A sampled current with no measurable sub-threshold window draws a hairline, not a green duration.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
 21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill and no speed thread, and only known slack instants get green dots; there is no dashed zero line.
-22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the moving absolute-now dot.
+22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the absolute-now dot.
 
 ### Accessibility
 
-23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value; the next- and previous-event actions park exactly on a magnetic target.
+23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value; the next- and previous-event actions park exactly on a magnetic target, or at the nearest reachable centre when the target lies within half a viewport of the content edge.
 24. **Direct controls:** Commentary and Now meet semantic target sizes and expose their visible meaning without requiring the canvas labels.
 25. **No-colour reading:** High/low, current direction, slack, magnitude, and schematic unknown remain distinguishable in greyscale.
 26. **Larger text:** At the largest accessibility size the lead value and its pad grow together, the plot and chrome rows move down without overprinting, and commentary and Now share one row.
@@ -728,22 +788,32 @@ These scenarios define the minimum behavior shared by all platforms.
 
 27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
-29. **Plot tap:** A tap selects its moment or a magnetic target within 4.5 units and lands on a reachable center time.
-30. **Date or sun tap:** A date tap stops motion and opens the picker; a sun tap centers that event.
+29. **Plot tap:** A tap selects its moment or a magnetic target strictly within 4.5 units and lands on a reachable centre time.
+30. **Date or sun tap:** A date tap stops motion and opens the picker where the host can change dates; a sun tap centres that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
 33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it.
-34. **Far destination:** A shared link or picked week opens at its requested instant with data on both sides. A Now jump over seven days lands without travel and restores the current schedule.
+34. **Far destination:** A shared link opens at its requested instant, and a picked week at station-local noon of the picked day unless the selection already lies inside that week's window, with data on both sides. A Now jump over seven days lands without travel and restores the current schedule.
 35. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
 36. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
-37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible. Greater obscuration darkens the backdrop without adding solar contact stops to the strip.
+37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and every solar contact is a magnetic target.
+38. **Fold:** Unfolding after scrubbing lands on the folded instant when it lies inside the rebuilt strip's first data; folding while home lands on refreshed now.
 
 ## 18. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
-- The online-current detail has no alerts, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
+- The online-current detail and a Canadian tide preview have no alerts, but their strips still install the press recognizer and the VoiceOver "Set an alert" action (§6.5.1). A press parks its moment with a medium haptic and shows no alert line; the action reports success and does nothing. Every iOS strip is hosted by the detail scaffold, whose press and alert-action closures are never absent, so no iOS strip omits them.
+- On fixed windows (online current, Canadian tide preview), commentary can name a stop in the last half viewport or beyond the drawn data: an online current keeps water events six hours past its window, and both take sunrise and sunset from day chrome that runs to the end of the eighth day after the anchor. Activation lands on that instant (a preview first clamps it into its samples) without clamping to a reachable offset, so the strip parks partly over empty space. Plot taps, presses, and the VoiceOver actions clamp; commentary and other external scrubs, such as schedule rows, do not, with or without Reduce Motion. This fails scenario 15.
+- A fold rebuilds the detail around now, so a folded instant outside the rebuilt strip's first data (the week either side of today's local midnight on a continuous detail, today's fixed window on an online current) is dropped, and the rebuilt strip plays the ordinary opening to now. The rebuild should build data around the folded instant first.
+
+- The 0.3-hour edge margin (§12.3) is 5.4 units, less than half the width of an event time or hanging reading. A mark between about 0.3 and 1.5 hours from either end of the loaded window therefore draws its time and reading cut by the strip edge. This is visible at both ends of an online-current window and a Canadian tide preview, and at a continuous strip's loaded edge until it extends. This also fails scenario 15. The margin should cover half the widest label.
+- Night and daylight bands pair sun events by civil day rather than by succession. Where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset precedes its sunrise, so that day gets no daylight tint, a night band that covers the whole day and overlaps the previous night, and a day name centred in the night. Night shading should span each sunset to the sunrise that follows it, and daylight tint each sunrise to the sunset that follows it.
+
+- A tap's animated ride does not mark the strip busy for the chunk store, so a left-edge publish that lands mid-ride shifts the coordinate origin under the animation; the curve and reading jump until the ride parks and the next update re-centres. The other animated paths (opening, hinge follow, Now and commentary rides, drag magnet) mark it busy.
+
+- The lead card overlays the strip without opting out of hit testing, so a drag or tap that starts on the lead's text (state, value, unit, or clock) does not reach the strip. The rest of the top pad scrubs normally.
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
@@ -753,24 +823,32 @@ The living implementation is split by responsibility:
 
 | Concern | iOS source |
 |---|---|
-| Fixed online window, data, geometry, canvas, scroll host, taps, magnet, overlay, celestial chrome | `Slackwater/TimelineStrip.swift` |
-| Continuous chunks, merging, scroll gate, vertical scale | `Slackwater/TimelineChunks.swift` |
+| Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, schedule list | `Slackwater/TimelineStrip.swift` |
+| Scroll host, opening, taps, press and hold, accessibility actions, resize and fold follow, magnet settle, fixed overlay, commentary and Now pill row, rescale glide | `Slackwater/TimelineScrubber.swift` |
+| Continuous chunks, merging, scroll gate, scale governor | `Slackwater/TimelineChunks.swift` |
+| Detail scaffold: date picker, alert line wiring, shared-link jump, week bar | `Slackwater/Theme.swift` |
+| Lead card, commentary pill and stop walk, lead clock, sky state and backdrop | `Slackwater/DetailPieces.swift` |
+| Colour tokens, curve style, station-local clock formatting | `Slackwater/Palette.swift` |
 | Shared current lead and direct commentary walk | `Slackwater/CurrentLead.swift` |
-| Tide lead and fast-rate commentary | `Slackwater/TideDetailView.swift` |
+| Tide lead and fast-rate commentary; Canadian tide preview binding and its sample model (coverage, interpolation, rates, extremes) | `Slackwater/TideDetailView.swift`, `Slackwater/ChsTidePreview.swift` |
+| Predicted-current binding (harmonic, subordinate, and fitted) | `Slackwater/CurrentDetailView.swift` |
 | Derived phase-only lead | `Slackwater/DerivedGateDetailView.swift` |
 | Online sampled-current binding | `Slackwater/OnlineGateDetailView.swift` |
-| Lead, commentary pill, sky state/backdrop, clock formatting | `Slackwater/Theme.swift`, `Slackwater/Palette.swift` |
 | Shared strokes, fills, dots, runs, and hanging labels | `Slackwater/CurveDrawing.swift` |
-| Measured slack-window predicate and merging | `Slackwater/SlackWindow.swift` |
+| Measured slack-window predicate and merging, current axis moments, online sample-event derivation, speed-ramp anchors | `Slackwater/SlackWindow.swift` |
+| Derived slack instants, schematic ±1 shape, derived phase rule | `swift/Sources/SlackwaterKit/DerivedSlack.swift` in the slackwater repository |
 | Tide-rate targets | `Slackwater/TideMovement.swift` |
-| Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/TimelineChunkTests.swift`, `SlackwaterTests/DetailLeadTests.swift`, `SlackwaterTests/SkyBackdropTests.swift` |
-| End-to-end interaction checks | `SlackwaterUITests/DetailAndScrubTests.swift` |
+| Eclipse windows and contacts | `Slackwater/Eclipse.swift` |
+| Press offer and alert line | `Slackwater/AlertOffer.swift`, `Slackwater/AlertLine.swift` |
+| Watch place page and Crown strip | `SlackwaterWatch/PlaceDetail.swift`, `SlackwaterWatch/CrownScrubStrip.swift`, `Slackwater/ScrubReading.swift` |
+| Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/TimelineSnapTests.swift`, `SlackwaterTests/TimelineChunkTests.swift`, `SlackwaterTests/DetailLeadTests.swift`, `SlackwaterTests/SkyBackdropTests.swift`, `SlackwaterTests/EclipseTests.swift`, `SlackwaterTests/SlackWindowTests.swift`, `SlackwaterTests/RenderedStripTests.swift`, `SlackwaterTests/ReduceMotionTests.swift`, `SlackwaterTests/ScrubReadingTests.swift`, `SlackwaterTests/ChsTidePreviewTests.swift`, `SlackwaterTests/AlertOfferTests.swift`, `SlackwaterTests/AlertLineTests.swift`, `SlackwaterTests/DerivedGateTests.swift` |
+| End-to-end interaction checks | `SlackwaterUITests/DetailAndScrubTests.swift`, `SlackwaterUITests/AlertLineUITests.swift`, `SlackwaterUITests/AccessibilityAuditTests.swift`, `SlackwaterWatchUITests/WatchUITests.swift` |
 
 Design history and completed implementation plans belong in Git history and pull requests. This file is the maintained scrubber contract.
 
 ## 20. Maintaining this specification
 
-Any user-visible scrubber change should update this file in the same change as the reference implementation. At minimum, review all five consumers: tide, harmonic current, online current, derived gate, and the watch place page.
+Any user-visible scrubber change should update this file in the same change as the reference implementation. At minimum, review all five consumers: tide (harmonic, subordinate, and fitted on the device, including the bounded Canadian tide preview), predicted current (NOAA harmonic and subordinate stations, and fitted Canadian gates), online current, derived gate, and the watch place page (tide, predicted current, and derived gate; no online current). Every app and watch source file in §19 carries a header comment pointing here.
 
 When an implementation differs intentionally:
 

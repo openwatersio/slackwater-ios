@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The phone's timeline canvas, scrubbed by the Digital
 // Crown (#522). No momentum code: the Crown brings its own, and a settle
 // snaps by the phone's rule.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 struct CrownScrubStrip: View {

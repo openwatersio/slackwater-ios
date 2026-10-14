@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. Continuous timeline beneath a fixed centerline.
 // Native scrolling, tap selection, and magnetic settling at 18 points/hour.
-// Product contract: docs/scrubber.md. Chunked data and scale: TimelineChunks.swift.
+// Chunked data and scale: TimelineChunks.swift.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import Synchronization
 import SwiftUI

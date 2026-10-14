@@ -2,6 +2,7 @@
 // for every station with real velocities, harmonic or CHS-published: the
 // speed as the hero, the set arrow and phase word above it, the time below,
 // and the next significant stop the commentary pill walks to.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 

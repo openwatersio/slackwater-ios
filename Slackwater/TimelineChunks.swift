@@ -19,6 +19,7 @@
 // - Day chrome: a night band needs the NEXT day's sunrise and the previous
 //   day's sunset, so a chunk carries one day of chrome beyond each end and the
 //   merge dedupes by day start.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import Foundation
 import SwiftUI
@@ -294,10 +295,6 @@ struct TimelineScale: Equatable {
 /// box has gone mostly empty. Between the two thresholds a pan never
 /// rescales. After adopting a fit the data reaches 1/1.06 ≈ 0.94 of the span,
 /// inside both thresholds, so an adoption is always a fixed point.
-///
-/// ponytail: a rescale lands as a snap. The upgrade path is animating
-/// `TimelineScale` toward the governor's target over a few frames before it
-/// reaches TimelineGeo; nothing else changes.
 enum ScaleGovernor {
     static let expandAt = 0.97
     static let contractAt = 0.65

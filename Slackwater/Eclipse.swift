@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. Eclipses for the strip, the schedule and the Moon
 // sheet. The astronomy is Almanac's; everything here is presentation.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import Foundation
 

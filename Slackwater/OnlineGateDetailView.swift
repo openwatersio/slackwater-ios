@@ -3,6 +3,7 @@
 // window is the only source of truth. Modeled on CurrentDetailView's
 // post-split single-track anatomy, minus everything fit/provisional (there is
 // no fast answer here, only the real published numbers or an honest why-not).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import Combine
 import SlackwaterKit
