@@ -98,6 +98,11 @@ nonisolated struct StationCardGraph: View {
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
+    /// One time per run, under its mark at the card's own scale.
+    static func axisMoments(_ runs: [WindowRun], pointsPerHour: CGFloat) -> [Date] {
+        runs.map { $0.axisMoment(pointsPerHour: pointsPerHour) }.sorted()
+    }
+
     var body: some View {
         Canvas { context, size in
             guard points.count > 1 else { return }
@@ -232,9 +237,8 @@ nonisolated struct StationCardGraph: View {
 
             CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
 
-            // The axis names each run's opening.
             if includesZero && showsTimes {
-                for when in currentAxisMoments(runs: windows) {
+                for when in Self.axisMoments(windows, pointsPerHour: xScale * 3600) {
                     let cx = x(when)
                     let fade = when < now ? CurveStyle.pastLabelFade : 1.0
                     guard cx >= Self.axisEdgeMargin,

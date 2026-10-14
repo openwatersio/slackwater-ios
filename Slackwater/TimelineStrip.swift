@@ -655,15 +655,10 @@ struct TimelineData {
 }
 
 extension WindowRun {
-    /// From the duration at the strip's scale, so data code agrees with the drawing without a Path.
-    var isDot: Bool {
-        CurveStyle.runDrawsAsDot(width: CGFloat(end.timeIntervalSince(start) / 3600) * Timeline.pph)
-    }
-    var centre: Date { start.addingTimeInterval(end.timeIntervalSince(start) / 2) }
+    var isDot: Bool { drawsAsDot(pointsPerHour: Timeline.pph) }
     /// A dot is one moment, so the magnet stops only at its centre.
     var snapMoments: [Date] { isDot ? [centre] : [start, end] }
-    /// The event-time row prints where the run's mark is: a dot's centre, a stroke's opening.
-    var axisMoment: Date { isDot ? centre : start }
+    var axisMoment: Date { axisMoment(pointsPerHour: Timeline.pph) }
 }
 
 // MARK: - Vertical geometry (prototype geo())

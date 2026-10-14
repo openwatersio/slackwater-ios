@@ -83,13 +83,13 @@ struct ComplicationReading: Equatable {
             let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
             let windows = cardWindows(points: points, slacks: slacks)
                 .map { hours($0.start)...hours($0.end) }
-            let phase = currentPhase(signed: signed)
-            let slack = windows.contains { $0.contains(0) } || phase == .slack
-            let symbol = slack ? "arrow.left.arrow.right"
+            // Slack only inside a measured window, as the phone's lead says it.
+            let phase: CurrentPhase = windows.contains { $0.contains(0) } ? .slack : signed >= 0 ? .flood : .ebb
+            let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
             return ComplicationReading(
                 kind: .current, valueText: formatSpeed(abs(signed), unit: speedUnit),
-                word: (slack ? CurrentPhase.slack : phase).word,
+                word: phase.word,
                 symbol: symbol,
                 samples: samples,
                 slackRuns: windows.filter { $0.overlaps(span) },

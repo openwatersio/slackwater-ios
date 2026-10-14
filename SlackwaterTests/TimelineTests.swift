@@ -825,7 +825,8 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
     /// In a window, so its animated scrolls run.
     private func mountedStrip(_ data: TimelineData, _ sel: Selection, now: Date,
                               gate: ScrollGate? = nil, opening: Bool = false, pills: [CGRect] = [],
-                              alerts: AlertHost? = nil, onPickDate: @escaping () -> Void = {})
+                              alerts: AlertHost? = nil, onPickDate: @escaping () -> Void = {},
+                              scrollView: (CGRect) -> UIScrollView = { TimelineScrubber.ScrubScrollView(frame: $0) })
         -> (window: UIWindow, sv: UIScrollView, co: TimelineScrubber.Coordinator, strip: (Int) -> TimelineScrubber) {
         let geo = TimelineGeo(data: data)
         let strip = { (token: Int) in
@@ -838,7 +839,7 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         }
         let co = TimelineScrubber.Coordinator(strip(0))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
-        let sv = TimelineScrubber.ScrubScrollView(frame: window.bounds)
+        let sv = scrollView(window.bounds)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         sv.bounces = false
         sv.delegate = co
@@ -910,6 +911,51 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         XCTAssertEqual(opening.time, linked)
     }
 
+    /// A finger still down keeps control: a request under it moving the strip, or the drag's momentum outliving it, would fight the finger or overwrite the request.
+    func testARequestDuringADragWaitsForTheLiftAndReplacesMomentum() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(now)
+        let held = HeldScrollView(frame: .zero)
+        let m = mountedStrip(data, sel, now: now, scrollView: { held.frame = $0; return held })
+        defer { m.window.isHidden = true }
+
+        m.co.scrollViewWillBeginDragging(m.sv)
+        held.fingerDown = true
+        m.sv.contentOffset.x -= 60
+        let grabbed = m.sv.contentOffset
+        let first = now.addingTimeInterval(4 * 3600)
+        sel.time = first
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.pendingTarget, first, "the request waits for the finger")
+        XCTAssertFalse(m.co.magneting, "nothing rides under a finger")
+        XCTAssertEqual(m.sv.contentOffset, grabbed, "the strip stays where the finger holds it")
+        let second = now.addingTimeInterval(7 * 3600)
+        sel.time = second
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.pendingTarget, second, "a newer request replaces a waiting one")
+        XCTAssertEqual(m.sv.contentOffset, grabbed)
+
+        var momentum = CGPoint(x: grabbed.x - 900, y: 0)
+        m.co.scrollViewWillEndDragging(m.sv, withVelocity: CGPoint(x: -3, y: 0), targetContentOffset: &momentum)
+        XCTAssertEqual(momentum, grabbed, "the lift's fling is cancelled in favour of the request")
+        held.fingerDown = false
+        m.co.scrollViewDidEndDragging(m.sv, willDecelerate: false)
+        XCTAssertNil(m.co.pendingTarget)
+        XCTAssertTrue(m.co.magneting, "the waiting request rides once the finger lifts")
+        XCTAssertEqual(m.co.magnetTarget, second)
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, second)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(second),
+                       0, accuracy: 300)
+    }
+
+    /// `isDragging` follows a real pan only; this one says a finger is down when told to.
+    private final class HeldScrollView: UIScrollView {
+        var fingerDown = false
+        override var isDragging: Bool { fingerDown }
+    }
+
     /// An unreachable target would leave the reading disagreeing with the curve under the line.
     func testAnExternalSelectionPastTheEdgeIsClampedAndReadBack() async throws {
         let now = Date(timeIntervalSince1970: 1788868800)
@@ -953,6 +999,32 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
         try await settle(m.co)
         XCTAssertLessThan(sel.time, target, "a tap left of the pill brings an earlier moment to the line")
+    }
+
+    /// A press held on a resting pill would park a moment, buzz, and name it in the alert line before the pill's button fires.
+    func testAPressOnARestingPillNeverReachesTheStrip() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let pill = CGRect(x: 140, y: 124, width: 120, height: Timeline.pillTarget)
+        let m = mountedStrip(data, Selection(now), now: now, pills: [pill], alerts: AlertHost(offered: true))
+        defer { m.window.isHidden = true }
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let press = try XCTUnwrap(m.co.pressRecognizer)
+        let tap = try XCTUnwrap(m.co.tapRecognizer)
+        let onPill = PlacedTouch(CGPoint(x: m.sv.contentOffset.x + pill.midX, y: pill.midY))
+        let offPill = PlacedTouch(CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
+        // UIKit asks the delegate, and a recognizer without one receives every touch.
+        func receives(_ g: UIGestureRecognizer, _ t: UITouch) -> Bool { g.delegate?.gestureRecognizer?(g, shouldReceive: t) ?? true }
+        for (name, g) in [("press", press as UIGestureRecognizer), ("tap", tap)] {
+            XCTAssertFalse(receives(g, onPill), "the \(name) must leave a resting pill's touch to the pill")
+            XCTAssertTrue(receives(g, offPill), "off the pill, the \(name) acts on the strip as ever")
+        }
+    }
+
+    private final class PlacedTouch: UITouch {
+        let point: CGPoint
+        init(_ point: CGPoint) { self.point = point; super.init() }
+        override func location(in view: UIView?) -> CGPoint { point }
     }
 
     /// A host with nothing to alert on gets no press and no "Set an alert"; a preview's model landing adds both under the same strip.

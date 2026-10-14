@@ -204,8 +204,8 @@ enum CurveDrawing {
     // MARK: Marks
 
     /// The slack runs: the line itself turns the go colour along each
-    /// segment. No end dots: a run is one mark, and its opening time goes on
-    /// the axis. A run shorter than a turn's dot draws as that dot: a stroke that short reads as a blot.
+    /// segment. No end dots: a run is one mark, with one time on the axis.
+    /// A run shorter than a turn's dot draws as that dot: a stroke that short reads as a blot.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
         for seg in segments {
