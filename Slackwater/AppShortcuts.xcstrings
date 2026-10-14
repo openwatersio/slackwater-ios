@@ -64,6 +64,16 @@
             ]
           }
         },
+        "ga" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cathain a bheidh an chéad lán mara eile in ${applicationName}",
+              "Cén t-am a bheidh an chéad lán mara eile in ${applicationName}",
+              "Cathain a bheidh lán mara in ${applicationName}"
+            ]
+          }
+        },
         "it" : {
           "stringSet" : {
             "state" : "translated",
@@ -210,6 +220,16 @@
             ]
           }
         },
+        "ga" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cathain a bheidh an chéad lag trá eile in ${applicationName}",
+              "Cén t-am a bheidh an chéad lag trá eile in ${applicationName}",
+              "Cathain a bheidh lag trá in ${applicationName}"
+            ]
+          }
+        },
         "it" : {
           "stringSet" : {
             "state" : "translated",
@@ -341,6 +361,14 @@
             "state" : "translated",
             "values" : [
               "Quand est la prochaine fenêtre d’étale dans ${applicationName}"
+            ]
+          }
+        },
+        "ga" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cathain a bheidh an chéad tréimhse fáfaill eile in ${applicationName}"
             ]
           }
         },

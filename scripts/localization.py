@@ -8,6 +8,14 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 
+# CLDR's integer plural categories; ja and ko have only "other" and need no variants.
+PLURAL_CATEGORIES = {
+    **{language: {"one", "other"} for language in ("da", "de", "es", "fi", "fr", "it", "nb", "nl", "pt", "sv")},
+    "ga": {"one", "two", "few", "many", "other"},
+    "gd": {"one", "two", "few", "other"},
+}
+
+
 def string_units(value):
     if isinstance(value, dict):
         if not value:
@@ -51,9 +59,9 @@ def check(source, catalog, locales, source_language="en"):
             else:
                 original = catalog[key].get("localizations", {}).get(source_language, {})
                 originals = list(string_units(original))
-                if "plural" in original.get("variations", {}) and locale.split("-")[0] in {"da", "de", "es", "fi", "fr", "it", "nb", "nl", "pt", "sv"}:
+                if "plural" in original.get("variations", {}) and locale.split("-")[0] in PLURAL_CATEGORIES:
                     plural = catalog[key]["localizations"][locale].get("variations", {}).get("plural", {})
-                    missing = {"one", "other"} - plural.keys()
+                    missing = PLURAL_CATEGORIES[locale.split("-")[0]] - plural.keys()
                     if missing:
                         errors.append(f"{locale}: missing plural categories: {key} ({', '.join(sorted(missing))})")
                 expected = [placeholders(unit["value"]) for unit in originals if unit.get("value")] or [placeholders(key)]
