@@ -2,10 +2,31 @@
 // (TimelineStrip.swift): fixed window and x↔time mapping, the now-readout
 // equivalence with the old model's committed readout, night continuity across
 // midnight, and the multi-day schedule window.
+import Almanac
 import SwiftUI
 import XCTest
 @testable import Slackwater
 import SlackwaterKit
+
+/// Wales, Alaska, in late July: sunset falls after local midnight, so a civil
+/// day's first sunset comes before its sunrise. Day chrome as the builders make it.
+func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
+    let tz = try XCTUnwrap(TimeZone(identifier: "America/Nome"))
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    let observer = try Observer(latitudeDeg: 65.61, longitudeDeg: -168.09)
+    let first = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 7, day: 20)))
+    let days = try (0..<5).map { i -> TimelineDay in
+        let start = try XCTUnwrap(cal.date(byAdding: .day, value: i, to: first))
+        let end = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: start))
+        let sun = try sunEvents(from: start, to: end, observer: observer)
+        return TimelineDay(offset: i, start: start,
+                           sunrise: sun.first { $0.kind == .rise }?.time,
+                           sunset: sun.first { $0.kind == .set }?.time,
+                           moonrise: nil, moonset: nil)
+    }
+    return (tz, days)
+}
 
 @MainActor final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
@@ -526,6 +547,35 @@ import SlackwaterKit
             checked += 1
         }
         XCTAssertGreaterThanOrEqual(checked, 7)
+    }
+
+    /// Where sunset follows local midnight, each sun event pairs with the next one rather than with its civil day's,
+    /// and each day's name centres on the daylight its sunrise begins.
+    func testSunBandsPairBySuccessionWhereSunsetFollowsMidnight() throws {
+        let (tz, days) = try lateSunsetDays()
+        XCTAssertTrue(days.contains { d in
+            guard let rise = d.sunrise, let set = d.sunset else { return false }
+            return set < rise
+        }, "no day here sets before it rises: the fixture proves nothing")
+        let start = days[0].start, end = try XCTUnwrap(days.last?.start)
+        let data = TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: days,
+                                tidePoints: [], tideRates: [], tideExtremes: [],
+                                currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+        let spans = data.sunSpans
+        XCTAssertGreaterThanOrEqual(spans.count, 8)
+        for (a, b) in zip(spans, spans.dropFirst()) {
+            XCTAssertEqual(a.end, b.start, "bands must meet without overlapping")
+            XCTAssertNotEqual(a.daylight, b.daylight, "night and daylight must alternate")
+        }
+        for d in days.dropLast() {
+            let rise = try XCTUnwrap(d.sunrise)
+            let daylight = try XCTUnwrap(spans.first { $0.daylight && $0.start == rise }, "\(d.start) has no daylight")
+            let label = data.dayLabelTime(d)
+            XCTAssertTrue(daylight.start < label && label < daylight.end, "\(d.start)'s name sits in the night")
+        }
+        let last = try XCTUnwrap(days.last)
+        XCTAssertEqual(data.dayLabelTime(last), noonLocal(last.start, tz),
+                       "a daylight with no following sunset centres the name on noon")
     }
 
     /// Day chrome draws every day the strip touches, and nothing else draws a
@@ -1506,6 +1556,15 @@ import SlackwaterKit
 
     /// One label, the shapes it has to take. Was three tests with one assert
     /// each and the same two setup lines.
+    /// Sunrise and sunset times share one ink wherever they print; the symbol tells them apart.
+    func testSunTimesShareTheSunriseInk() throws {
+        for (name, source) in try appSources() {
+            for line in source.components(separatedBy: .newlines) {
+                XCTAssertFalse(codeOnly(line).contains("SN.sunset"), "\(name) gives sunset its own ink: \(line)")
+            }
+        }
+    }
+
     func testWeekRangeLabel() {
         let tz = TimeZone(identifier: "America/Vancouver")!
         let today = vancouverMidnight(2026, 9, 12)

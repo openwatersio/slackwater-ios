@@ -422,4 +422,25 @@ import SlackwaterKit
         store.jump(to: now, anchor: today)
         XCTAssertEqual(store.timeline?.anchor, today, "return-to-now left the schedule keyed to the past")
     }
+
+    /// A publish labels its days from the session's `now`, not the device clock, and a refreshed `now` relabels them.
+    @MainActor func testAPublishLabelsItsDaysFromTheStoresNow() {
+        let today = vancouverMidnight(2026, 8, 11)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = friday.tz
+        let now = cal.date(bySettingHour: 23, minute: 50, second: 0, of: today)!
+        let store = TimelineWindowStore(source: .tide(friday))
+        store.start(anchor: today, now: now)
+        XCTAssertEqual(store.timeline?.today, today, "the publish took its Today from another clock")
+
+        let afterMidnight = now.addingTimeInterval(20 * 60)
+        store.setNow(afterMidnight)
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: today)!
+        XCTAssertEqual(store.timeline?.today, tomorrow, "a refreshed now left yesterday labelled Today")
+        XCTAssertEqual(relativeDayLabel(today, friday.tz, today: store.timeline!.today), "Yesterday")
+
+        // Every later publish keeps the refreshed day, including a jump's.
+        store.jump(to: afterMidnight, anchor: tomorrow)
+        XCTAssertEqual(store.timeline?.today, tomorrow)
+    }
 }

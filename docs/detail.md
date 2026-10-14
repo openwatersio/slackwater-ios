@@ -238,7 +238,7 @@ Every kind also lists lunar and solar eclipses visible from the station, timed a
 Each day with at least one event gets a header. A day with no events gets none.
 
 - **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday, with a localized short date beneath.
-- **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, in sunrise ink (`#F0D890`) and sunset ink (`#C8A86A`). They share the day/date header height.
+- **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, both in sunrise ink (`#F0D890`); their symbols tell them apart. They share the day/date header height.
 - **When expanded:** a full-width tappable row above the water events places sunrise left, solar noon centered, and sunset right. Each shows only its native symbol and local time, with a descriptive VoiceOver label. At accessibility text sizes these stack. The entire row opens Sun activity. Missing events display “—”.
 
 Only one day is open at a time. The anchor day starts open. Tapping an open day closes it; tapping another day opens it and closes the first.

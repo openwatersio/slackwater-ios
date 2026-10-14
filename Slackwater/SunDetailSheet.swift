@@ -119,12 +119,12 @@ struct SunDetailSheet: View {
         case .morningGoldenEnd: (label, symbol, color) = ("Golden hour ends", "sun.haze", SN.sun)
         case .transit: (label, symbol, color) = ("Solar noon", "sun.max", SN.sun)
         case .eveningGoldenStart: (label, symbol, color) = ("Golden hour begins", "sun.haze", SN.sun)
-        case .set: (label, symbol, color) = ("Sunset", "sunset", SN.sunset)
+        case .set: (label, symbol, color) = ("Sunset", "sunset", SN.sunrise)
         case .eveningBlueStart: (label, symbol, color) = ("Blue hour begins", "moon.haze", SN.graphLine)
-        case .civilDusk: (label, symbol, color) = ("Civil dusk", "sun.horizon", SN.sunset)
+        case .civilDusk: (label, symbol, color) = ("Civil dusk", "sun.horizon", SN.sunrise)
         case .eveningBlueEnd: (label, symbol, color) = ("Blue hour ends", "moon.haze", SN.graphLine)
-        case .nauticalDusk: (label, symbol, color) = ("Nautical dusk", "moon.stars", SN.sunset)
-        case .astroDusk: (label, symbol, color) = ("Astronomical dusk", "sparkles", SN.sunset)
+        case .nauticalDusk: (label, symbol, color) = ("Nautical dusk", "moon.stars", SN.sunrise)
+        case .astroDusk: (label, symbol, color) = ("Astronomical dusk", "sparkles", SN.sunrise)
         }
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))

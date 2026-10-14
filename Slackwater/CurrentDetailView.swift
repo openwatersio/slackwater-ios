@@ -163,6 +163,7 @@ struct CurrentDetailView: View {
                 }
             }
             .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .onChange(of: live) { _, now in store?.setNow(now) }
             // The schedule follows a scrub that has settled outside its window —
             // the strip is endless now. A cancelled sleep is a scrub still in
             // motion, same rest rule as the chrome row's.

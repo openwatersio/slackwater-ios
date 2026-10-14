@@ -71,8 +71,7 @@ enum SN {
     /// misread as `ebb`. Same value the web app uses. (The retired literal is
     /// not spelled here — `testNoSourceFileSpellsARetiredColour` bans it.)
     static let amber = Color(hex: 0xEF6F4A)
-    static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
-    static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
+    static let sunrise = Color(hex: 0xF0D890)      // every sun time: its symbol, not its ink, says rise or set
     static let shadow = Color(hex: 0x001432)       // every drop shadow; sites pick the opacity
     static let moonLimb = Color(hex: 0x00122C, opacity: 0.92)  // the moon's dark limb, glyph and strip
     static let umbra = Color(hex: 0x6B2A18, opacity: 0.94)     // the eclipse shadow — copper, not black

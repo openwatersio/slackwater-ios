@@ -19,7 +19,7 @@ struct WindowEclipse: Identifiable {
     /// mark point at, and what "scrub to the start" means.
     var start: Date { eclipse.u1 ?? eclipse.p1 }
 
-    /// The snap targets, chronological, nils dropped: P1, U1, greatest, U4, P4.
+    /// Chronological, nils dropped: P1, U1, greatest, U4, P4.
     var contacts: [Date] {
         [eclipse.p1, eclipse.u1, eclipse.peak, eclipse.u4, eclipse.p4].compactMap { $0 }
     }

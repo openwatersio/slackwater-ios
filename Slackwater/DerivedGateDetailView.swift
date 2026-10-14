@@ -108,6 +108,7 @@ struct DerivedGateDetailView: View {
                 RecentsStore.shared.record(gate.id)
             }
             .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .onChange(of: live) { _, now in store?.setNow(now) }
             // Chunks landing widen the strip; the phase readout's slacks must
             // cover whatever it now spans.
             .onChange(of: timeline.map { $0.start...$0.end }) { _, _ in refreshSlacks() }
