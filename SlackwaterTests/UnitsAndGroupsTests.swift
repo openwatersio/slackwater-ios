@@ -49,6 +49,17 @@ import XCTest
         XCTAssertEqual(formatNm(10.5 * 1.852, locale: english), "11 nm")
     }
 
+    /// Only a height that prints as zero loses its sign: metres print a finer digit than feet.
+    func testAHeightKeepsItsMinusUnlessItPrintsAsZero() {
+        let english = Locale(identifier: "en_US")
+        XCTAssertEqual(formatHeight(-0.04, imperial: false, locale: english), "-0.04")
+        XCTAssertEqual(formatHeight(-0.004, imperial: false, locale: english), "0.00")
+        XCTAssertEqual(formatHeight(-0.04 / 3.28084, imperial: true, locale: english), "0.0")
+        XCTAssertEqual(formatHeight(-0.06 / 3.28084, imperial: true, locale: english), "-0.1")
+        XCTAssertEqual(formatSpeed(-0.04, unit: "kn", locale: english), "0.0")
+        XCTAssertEqual(formatSpeed(-0.06, unit: "kn", locale: english), "-0.1")
+    }
+
     func testSpeedUnitLabels() {
         XCTAssertEqual(speedUnitLabel("kn"), "kn")
         XCTAssertEqual(speedUnitLabel("kmh"), "km/h")

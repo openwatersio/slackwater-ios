@@ -340,7 +340,7 @@ struct TideDetailView: View {
     }
     /// The lead in words, for the strip's spoken value.
     private var spokenLead: String {
-        String(localized: "\(leadState) \(formatHeight(scrubHeight, imperial: imperial)) \(spokenUnit(unit))", comment: "VoiceOver tide reading. Values are tide state, formatted height, and spoken unit.")
+        spokenReading(leadState, formatHeight(scrubHeight, imperial: imperial), unit: unit)
     }
 
     private func lead(sky: SkyState) -> some View {
@@ -358,8 +358,8 @@ struct TideDetailView: View {
             // The graph's own two inks, so the eyebrow names the curve the
             // reader is looking at — unless the rate is out of the ordinary
             // (#95), which outranks direction.
-            Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
-                              ?? (rising ? "arrow.up.right" : "arrow.down.right"))
+            LeadGlyph(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
+                                  ?? (rising ? "arrow.up.right" : "arrow.down.right"))
                 .foregroundStyle(rateWarning(over: sky.chromeGround) ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }

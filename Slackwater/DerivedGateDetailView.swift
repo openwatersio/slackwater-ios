@@ -144,7 +144,7 @@ struct DerivedGateDetailView: View {
         let word = phase.word
         return LeadCard(time: leadWhen(scrubTime, tz), timeColor: ink) {
             leadState(word, ink: ink)
-            Image(systemName: glyph)
+            LeadGlyph(systemName: glyph)
                 .foregroundStyle(Self.phaseColor(phase))
         }
     }

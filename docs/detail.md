@@ -397,7 +397,7 @@ A station the catalog lists without predictions opens this page: the header with
 
 ## 14. Alerts
 
-On tide, current, and derived-gate pages, a quiet "Set an alert" line sits under the scrubber; a press held on the scrubber parks that moment and the line names it, and the line's tap opens the alert sheet (scrubber §6.5.1; alerts.md §7). The online gate offers no alerts and no line.
+On tide, current, and derived-gate pages, a quiet "Set an alert" line sits under the scrubber; a press held on the scrubber parks that moment and the line names it, and the line's tap opens the alert sheet (scrubber §6.5.1; alerts.md §7). The online gate, and a Canadian tide station still in preview, offer no alerts: no line, no press, and no VoiceOver "Set an alert" action.
 
 ## 15. Sharing a moment
 

@@ -104,9 +104,10 @@ struct CurrentLead: View {
         return phase.word
     }
 
-    /// The lead in words, for the strip's spoken value.
+    /// The lead in words, for the strip's spoken value: the set's compass point follows outside slack, as on the watch.
     var spoken: String {
-        String(localized: "\(state) \(tilde)\(formatSpeed(abs(signed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))", comment: "VoiceOver current reading. Values are current state, optional approximation mark, formatted speed, and spoken unit.")
+        let reading = spokenReading(state, formatSpeed(abs(signed), unit: speedUnit), unit: speedUnitLabel(speedUnit))
+        return isSlack ? reading : "\(reading) \(compass16(setDegrees))"
     }
 
     var body: some View {
@@ -121,9 +122,9 @@ struct CurrentLead: View {
             // word. In slack the water goes both ways, so the glyph does too.
             HStack(spacing: 4) {
                 if isSlack {
-                    Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                    LeadGlyph(systemName: "arrow.right.and.line.vertical.and.arrow.left")
                 } else {
-                    CompassArrow(deg: setDegrees)
+                    LeadGlyph(systemName: "arrow.up", degrees: setDegrees)
                     Text(compass16(setDegrees))
                 }
             }

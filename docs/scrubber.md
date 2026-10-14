@@ -230,7 +230,7 @@ On an ordinary opening at now:
 
 The motion is an affordance: it teaches that the graph moves beneath a fixed reader without adding instructional copy.
 
-The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row when it is recognized after its half second; a touch-down alone does not. A host request (§8) cancels it too and moves to its own target. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
+The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row on a host with alerts (§6.5.1) when it is recognized after its half second; a touch-down alone does not. A host request (§8) cancels it too and moves to its own target. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
 
 With Reduce Motion enabled, skip the opening motion and land directly on now. The watch place page opens directly on now with no opening motion.
 
@@ -246,7 +246,7 @@ The graph must track a horizontal drag one-to-one:
 
 A loaded edge is a hard stop. A drag or fling stops there with no rubber-band overscroll, so the centre never passes the first or last loaded instant and the selected time never runs past the data. The magnet evaluates as usual when the strip comes to rest against an edge. The iOS reference turns off `UIScrollView`'s bounce and keeps its default deceleration rate.
 
-The full strip height is the direct-manipulation surface, except where the lead's text sits (§18) and, while the strip is at rest, where the commentary and Now pills sit; a drag or tap that starts on a resting pill goes to the pill. There is no separate grab handle and no visible native scrollbar. Taps select a time or open the date picker (§6.5). Pinch zoom and variable time scale are not part of this control; horizontal scale remains 18 logical units/hour.
+The full strip height is the direct-manipulation surface, except, while the strip is at rest, where the commentary and Now pills sit; a drag or tap that starts on a resting pill goes to the pill. The lead takes no touches, so a drag or tap that starts on its text reaches the strip beneath it. There is no separate grab handle and no visible native scrollbar. Taps select a time or open the date picker (§6.5). Pinch zoom and variable time scale are not part of this control; horizontal scale remains 18 logical units/hour.
 
 The scrubber commonly sits inside a vertically scrolling page. Use native gesture arbitration or directional locking so a clearly vertical gesture scrolls the page and a clearly horizontal gesture scrubs time. Do not add a full-screen drag recognizer that steals vertical navigation or an edge-back gesture.
 
@@ -262,15 +262,15 @@ When Reduce Motion is enabled, the pills and line appear and disappear without a
 
 ### 6.5 Taps
 
-A tap anywhere above the day row (the top pad outside the lead's text and the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. The tap then moves the strip by §8: it clamps to a reachable scroll offset and derives the final selected instant from that offset, so the lead and curve agree at loaded edges.
+A tap anywhere above the day row (the top pad, including the lead, outside the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. The tap then moves the strip by §8: it clamps to a reachable scroll offset and derives the final selected instant from that offset, so the lead and curve agree at loaded edges.
 
-In the day/date/sun row, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. The current date hit target uses local noon, while the drawn date is centred on daylight (§14); this mismatch is recorded in §18.
+In the day/date/sun row, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. A date's anchor is where its label is drawn: the daylight midpoint, or station-local noon where the day has no daylight to centre on (§14).
 
 Every tap stops opening motion, momentum, a ride, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. A time tap rides to its target like any other programmatic move and marks the strip busy for the chunk store until it lands; Reduce Motion or travel below 0.5 unit lands directly.
 
 #### 6.5.1 Press and hold
 
-A press held anywhere above the day row (the top pad, the plot, or the event-time row) resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centreline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed. Like a tap, it clamps to a reachable offset and reads the parked instant back from it. The host's alert line under the strip names the parked moment, and the strip extends its reading line from the plot floor to the strip's bottom edge, toward that line (docs/alerts.md §7.1). The alert line keeps naming the parked moment, and the reading-line extension below the plot stays, after the finger lifts, until the selection moves to a different minute. The reading line above the plot still follows §11. A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centreline moment to the host and opens its alert sheet in one step, since there is no line to go and find. Like a press, it also switches the alert line to the parked moment and extends the reading line below the plot until the selection moves to a different minute. Every detail strip carries the press recognizer and the "Set an alert" action. On a host with nothing to alert on (an online gate, or a CHS tide station still in preview), a press still stops motion, parks its moment, and gives the medium haptic, but neither the alert line nor the reading-line extension appears; the VoiceOver action is present and does nothing.
+On a strip whose host can alert, a press held anywhere above the day row (the top pad, the plot, or the event-time row) resolves like a tap (the magnet within 4.5 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centreline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed. Like a tap, it clamps to a reachable offset and reads the parked instant back from it. The host's alert line under the strip names the parked moment, and the strip extends its reading line from the plot floor to the strip's bottom edge, toward that line (docs/alerts.md §7.1). The alert line keeps naming the parked moment, and the reading-line extension below the plot stays, after the finger lifts, until the selection moves to a different minute. The reading line above the plot still follows §11. A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centreline moment to the host and opens its alert sheet in one step, since there is no line to go and find. Like a press, it also switches the alert line to the parked moment and extends the reading line below the plot until the selection moves to a different minute. Only a strip whose host can alert carries the press and the "Set an alert" action. On a host with nothing to alert on (an online gate, or a CHS tide station still in preview), the strip has neither: a held touch parks nothing and gives no haptic, and VoiceOver offers only "Next event" and "Previous event". A CHS tide preview gains both when its model lands, on the same strip.
 
 ## 7. Magnetic settling
 
@@ -328,13 +328,13 @@ Its anatomy is:
 
 The lead prints the station-local date and clock without a weekday or relative day word: the locale's abbreviated month and day, a fixed ` · `, then the locale's hour and minute. Date order, month names, clock cycle, and meridiem follow the platform locale; the ` · ` separator is not localized. A figure space pads a one-digit hour when the locale uses one, keeping the centred tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same localized time style without the date or padding.
 
-The lead is a centred column overlaid at the top of the strip: 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and compass point 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink. The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
+The lead is a centred column overlaid at the top of the strip, and it takes no touches (§6.3): 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and compass point 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink. The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
 
-VoiceOver reads the lead as one combined element: the state word, the eyebrow glyph's own symbol label (iOS leaves it exposed, so a set arrow is announced by its unrotated symbol name), the compass point of the set on a measured current outside slack, the value, and the unit. The date and clock are its value, with the padding figure space removed.
+VoiceOver reads the lead as one combined element: the state word, the compass point of the set on a measured current outside slack, the value without a provisional `~` (§9.2), and the unit. The eyebrow glyph is hidden from VoiceOver, because the word and compass point already say what it shows and a set arrow's symbol name is its unrotated one. The date and clock are its value, with the padding figure space removed.
 
 ### 9.1 Tide lead
 
-The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. A CHS tide preview, which has no engine model, interpolates linearly between its fetched samples. Format feet to one fractional digit or metres to two using the locale's decimal separator. Any height whose magnitude is below 0.05 in the display unit prints without a sign, so metric heights from −0.049 m to 0 print as positive. The compact unit symbols remain `ft` and `m` in every locale.
+The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. A CHS tide preview, which has no engine model, interpolates linearly between its fetched samples. Format feet to one fractional digit or metres to two using the locale's decimal separator. A height prints without a sign only when it rounds to zero at that precision, below 0.05 ft or 0.005 m in magnitude, so −0.04 m prints as `-0.04` and −0.004 m as `0.00`. The compact unit symbols remain `ft` and `m` in every locale.
 
 Within one second of an extreme, the state is `High` or `Low` with `arrow.up.to.line` or `arrow.down.to.line`. Otherwise the state is `Rising` or `Falling` with `arrow.up.right` or `arrow.down.right`. Direction comes from the next extreme (rising toward a high), or from the sign of the sampled rate on a CHS tide preview, and defaults to rising when no later extreme is loaded.
 
@@ -346,7 +346,7 @@ Glyph colour:
 
 ### 9.2 Measured-current lead
 
-The value is the absolute speed at `selectedTime`; the phase carries its sign. Predicted stations (harmonic, subordinate, or fitted) use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator, and strip negative zero. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
+The value is the absolute speed at `selectedTime`; the phase carries its sign. Predicted stations (harmonic, subordinate, or fitted) use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator; a speed prints without a sign only when it rounds to zero, below 0.05 in the display unit. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
 
 The state is:
 
@@ -356,11 +356,11 @@ The state is:
 
 Outside slack, show a true-bearing arrow (`arrow.up` rotated to the bearing) and one of 16 compass points for the set. Positive velocity selects the station's flood bearing; negative velocity selects its ebb bearing. In slack, use the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) instead of claiming a set. The set arrow and its compass point use the flood colour or ebb colour by direction, and the slack glyph uses the go colour.
 
-A provisional model prefixes numeric values and water commentary events with `~`, including the commentary's accessible label, and uses the attention colour for the value, its unit, and the whole set group (arrow and compass point, or the slack glyph). Sunrise and sunset commentary never receives a provisional prefix. Provenance is outside this spec.
+A provisional model prefixes numeric values and water commentary events with `~` in visible text, and uses the attention colour for the value, its unit, and the whole set group (arrow and compass point, or the slack glyph). Sunrise and sunset commentary never receives a provisional prefix. VoiceOver never reads the `~`, which it would speak as the word “tilde”: the lead, the strip's value, and the commentary's accessible label omit it, and the provisional notice under the strip (§4.2) says the reading is approximate. Provenance is outside this spec.
 
 ### 9.3 Derived-gate lead
 
-A derived gate knows phase and slack times but no speed or set bearing. Its lead contains the state (`Flooding`, `Ebbing`, or `Slack`), a glyph (`arrow.forward` for flooding, `arrow.backward` for ebbing, or the slack glyph) in the flood, ebb, or go colour, and selected time. It must not display a numeric value, unit, compass point, or true-bearing arrow. VoiceOver reads the phase word and the glyph's symbol label, with the date and clock as the value; there is no number or unit to read.
+A derived gate knows phase and slack times but no speed or set bearing. Its lead contains the state (`Flooding`, `Ebbing`, or `Slack`), a glyph (`arrow.forward` for flooding, `arrow.backward` for ebbing, or the slack glyph) in the flood, ebb, or go colour, and selected time. It must not display a numeric value, unit, compass point, or true-bearing arrow. VoiceOver reads the phase word, with the date and clock as the value; the glyph is hidden from VoiceOver as in §9, and there is no number or unit to read.
 
 The lead reads `Slack` within 12 minutes of a derived slack. Otherwise it reads `Flooding` when the next slack is a high-water slack and `Ebbing` when it is a low-water slack. Past the last slack it reads the phase that follows it: ebb after a high-water slack, flood after a low-water slack. With no derived slacks loaded it reads `Slack`.
 
@@ -407,7 +407,7 @@ The marks above represent SF Symbols, not translated glyphs, drawn between the l
 
 Fast-tide commentary has no symbol.
 
-The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`. The decorative symbol is hidden from accessibility.
+The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
 
 All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Every candidate, water or sun, is the first stop more than one second after the selection, so landing on a stop advances the pill, and it must lie between the first and last drawn sample: water events kept beyond the strip for event search and sun events from day chrome beyond the data never count. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop, and activation moves there by §8. When a sun event and a water stop share an instant, the sun event is named. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
 
@@ -472,7 +472,7 @@ y = graphY(valueAt(selectedTime))
 
 Use a white 13-unit dot with a four-unit, 90%-white glow for tide, and a white 10-unit dot with a three-unit glow of the same colour for current and derived current. The larger tide dot keeps its presence against the more varied datum fill. The watch marks the selection with a 14-unit ring instead: a 3-unit white stroke over a canvas-colour fill, with no glow, for tide and current alike, and it draws no reading line.
 
-At rest, a one-unit white line at 18% opacity runs from `topPad`, 6 units below the pill capsules, to the plot floor. Show it only when commentary exists; the riding dot alone carries the selection when there is no commentary. It fades with the pills. After a press, or VoiceOver's "Set an alert" action, parks a moment on a host that offers alerts (§6.5.1), the line also runs from the plot floor to the bottom of the strip, with or without commentary, until the selection moves to a different minute. A host with nothing to alert on draws no extension. The line must not intercept input.
+At rest, a one-unit white line at 18% opacity runs from `topPad`, 6 units below the pill capsules, to the plot floor. Show it only when commentary exists; the riding dot alone carries the selection when there is no commentary. It fades with the pills. After a press, or VoiceOver's "Set an alert" action, parks a moment (§6.5.1), the line also runs from the plot floor to the bottom of the strip, with or without commentary, until the selection moves to a different minute. A host with nothing to alert on has neither the press nor the action, so it never draws the extension. The line must not intercept input.
 
 Do not confuse the riding dot with the graph's absolute-now dot:
 
@@ -676,15 +676,15 @@ The intended scrubber must be usable without seeing or directly dragging the can
 Expose one adjustable timeline control with:
 
 - label: the track type, `Tide timeline` for a tide strip and `Current timeline` for a measured or derived current strip (the watch labels its strip with the station name);
-- value: the lead state, then the magnitude and spoken unit when known, then the station-local month, day, time, and time-zone abbreviation of the instant under the centreline. The phone strip's value omits the set. The watch's value leads with the station-local month, day, time, and time-zone abbreviation, then the state, the value and spoken unit, and the set when known, joined with spaces;
+- value: the lead state, then the magnitude and spoken unit when known, then the set's compass point on a measured current outside slack, then the station-local month, day, time, and time-zone abbreviation of the instant under the centreline. The phone joins the reading and the dated time with a comma. Neither speaks a provisional `~` (§9.2). The watch's value leads with the station-local month, day, time, and time-zone abbreviation, then the state, the value and spoken unit, and the set when known, joined with spaces;
 - increment/decrement actions that move later/earlier by five minutes; and
-- named actions for next and previous magnetic target when the platform supports custom actions (`Next event`, `Previous event`), plus `Set an alert` on detail strips (§6.5.1).
+- named actions for next and previous magnetic target when the platform supports custom actions (`Next event`, `Previous event`), plus `Set an alert` on a detail strip whose host can alert (§6.5.1).
 
 The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input. Adjustments and next/previous actions are programmatic moves (§8) that always land directly with no travel and stop any opening motion; a target past the window's edge parks at the nearest reachable centre. Next and previous ignore a target within one second of the current time; with no target, the action reports failure and nothing moves. The watch strip is one adjustable element with the same five-minute steps and next/previous event actions; its steps are not clamped to the loaded span, and a next or previous action with no target does nothing without reporting failure.
 
 Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now is announced `Return to now`. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller. iOS sets a 44-point semantic row height; the capsules are always wider than 44 points.
 
-The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops, and it speaks its date with the clock. The timeline control's value always includes the civil date and the station time zone, because a clock time without its date is ambiguous in a multi-day timeline.
+The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops, and it speaks its date with the clock. Its eyebrow glyph is not announced (§9). The timeline control's value always includes the civil date and the station time zone, because a clock time without its date is ambiguous in a multi-day timeline.
 
 Do not rely on colour alone:
 
@@ -710,7 +710,7 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 ### iOS reference
 
-The reference uses a horizontal `UIScrollView` (`TimelineScrubber.swift`) hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centring suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. The pills draw over the scroll view but cannot keep a touch from its recognizers, so the strip's tap recognizer declines a touch that starts on a resting pill. A display-link drives the animated opening so the selected time and sky follow every frame. On a device with a trailing status rail, the strip and sky draw on under the rail while the scroll viewport, and so the centreline, stays inside the safe area.
+The reference uses a horizontal `UIScrollView` (`TimelineScrubber.swift`) hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centring suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. The pills draw over the scroll view but cannot keep a touch from its recognizers, so the strip's tap recognizer declines a touch that starts on a resting pill. The lead card draws over the scroll view with hit testing off, so a touch on the lead goes straight to the strip. A display-link drives the animated opening so the selected time and sky follow every frame. On a device with a trailing status rail, the strip and sky draw on under the rail while the scroll viewport, and so the centreline, stays inside the safe area.
 
 ### watchOS
 
@@ -744,7 +744,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 1. **Ordinary opening:** Given a complete current window and Reduce Motion off, opening starts two hours behind now, reaches now in 650 ms, and ends with the lead time equal to the centre time.
 2. **Interrupted opening:** A drag, tap, plot press, or host request during the opening cancels it; the drag continues from the strip's position when it began, without jumping to now.
-3. **First drag:** The first drag after opening changes the lead and riding dot during the gesture, before release or snap.
+3. **First drag:** The first drag after opening, including one that starts on the lead's text, changes the lead and riding dot during the gesture, before release or snap.
 4. **Direction:** Dragging content left advances selected time; dragging it right moves selected time backward.
 5. **Momentum:** A flick continues natively, updates the lead during motion, then evaluates the magnet once.
 
@@ -776,7 +776,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 ### Accessibility
 
-23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value; the next- and previous-event actions park exactly on a magnetic target, or at the nearest reachable centre when the target lies within half a viewport of the content edge.
+23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value, with the set on a measured current outside slack and no provisional `~`; the next- and previous-event actions park exactly on a magnetic target, or at the nearest reachable centre when the target lies within half a viewport of the content edge.
 24. **Direct controls:** Commentary and Now meet semantic target sizes and expose their visible meaning without requiring the canvas labels.
 25. **No-colour reading:** High/low, current direction, slack, magnitude, and schematic unknown remain distinguishable in greyscale.
 26. **Larger text:** At the largest accessibility size the lead value and its pad grow together, the plot and chrome rows move down without overprinting, and commentary and Now share one row.
@@ -786,7 +786,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
 29. **Plot tap:** A tap selects its moment or a magnetic target strictly within 4.5 units and rides to a reachable centre time, holding left-edge chunk publishes until it lands.
-30. **Date or sun tap:** A date tap stops motion and opens the picker where the host can change dates; a sun tap centres that event.
+30. **Date or sun tap:** A tap nearer the drawn date than any sun time stops motion and opens the picker where the host can change dates; a sun tap centres that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
 33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it. Either way, when the refreshed now falls on a new station-local day, the Today, Tomorrow, and Yesterday labels move with it.
@@ -798,13 +798,9 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 ## 18. Known iOS deviations from the intended contract
 
-These are implementation gaps, not behavior to copy to another platform:
+This section lists implementation gaps, not behavior to copy to another platform. No gap is known in the iOS reference.
 
-- The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
-- The online-current detail and a Canadian tide preview have no alerts, but their strips still install the press recognizer and the VoiceOver "Set an alert" action (§6.5.1). A press parks its moment with a medium haptic and shows no alert line; the action reports success and does nothing. Every iOS strip is hosted by the detail scaffold, whose press and alert-action closures are never absent, so no iOS strip omits them.
-- The lead card overlays the strip without opting out of hit testing, so a drag or tap that starts on the lead's text (state, value, unit, or clock) does not reach the strip. The rest of the top pad scrubs normally.
-
-Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
+A gap found later is listed here. Fixing one should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
 ## 19. Reference implementation map
 
