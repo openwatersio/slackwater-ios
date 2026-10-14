@@ -285,28 +285,6 @@ import notify
         XCTAssert(reachable(), "could not scroll element within reach: target \(el.exists ? "\(el.identifier) \(el.frame)" : "missing"), container \(container.identifier) \(container.frame)")
     }
 
-    /// Bring `el` within reach inside a SHEET using a bounded wait after each
-    /// swipe, when the row may not yet be realized in its scroll container.
-    ///
-    /// Waits between swipes rather than swiping blind. A single speculative
-    /// swipe is right only when the row happens to start exactly one screen
-    /// away; when the sheet settles with it further down — or is still
-    /// settling, which is what a loaded machine buys — the hard assert on the
-    /// next line then fails on a row that is merely below the fold.
-    ///
-    /// Hittability is asked only of a row wholly on screen. A row straddling
-    /// the bottom edge has no valid activation point, and XCUITest answers
-    /// that query by failing the test, not with false (#570).
-    @discardableResult
-    func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
-        let onScreen = { el.exists && !el.frame.isEmpty && app.frame.contains(el.frame) }
-        for _ in 0..<tries {
-            if onScreen(), waitFor(el, "isHittable == true", timeout: 2) { return true }
-            app.swipeUp()
-        }
-        return onScreen() && el.isHittable
-    }
-
     /// Pan the timeline strip under its fixed centerline (drag left = later).
     /// Targets the strip element itself so the drag lands on it at any size —
     /// a window-normalized offset (dy 0.8) misses the strip on iPad.

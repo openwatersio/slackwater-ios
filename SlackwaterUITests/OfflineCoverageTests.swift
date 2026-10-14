@@ -235,7 +235,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-selkirk-water"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded deferred row is missing")
-        XCTAssert(reachInSheet(row, in: app), "the deferred row never became hittable")
+        scrollTo(row, in: app)
         XCTAssert(row.label.contains("Retrying in"), "deferred row says: \(row.label)")
         XCTAssertFalse(row.buttons["Retry"].exists)
         save(app, "resilient-downloads-after.png")
@@ -243,6 +243,32 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         row.tap()
         XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].appears(within: 5),
                   "tapping the row did not open the station")
+    }
+
+    func testIPadDeferredRowOpensAfterScrollingPastIt() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad Downloads sheet clipping")
+        }
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-selkirk-water",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        openDownloads(app)
+        let row = app.buttons["download-row-chs-selkirk-water"].firstMatch
+        XCTAssert(row.appears(within: 5))
+        let manager = app.scrollViews["downloads-manager"].firstMatch
+        manager.buttons["download-all-currents"].tap()
+        for _ in 0..<4 {
+            manager.swipeUp(velocity: .slow)
+            if row.frame.maxY < manager.frame.minY { break }
+        }
+        XCTAssertLessThan(row.frame.maxY, manager.frame.minY,
+                          "the regression setup must scroll past Selkirk Water")
+        save(app, "deferred-row-scrolled-past.png")
+
+        scrollTo(row, in: app)
+        row.tap()
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].appears(within: 5),
+                  "the recovered row did not open the station")
     }
 
     func testRetryNowAppearsWhileSomethingIsDeferred() throws {
@@ -253,7 +279,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openDownloads(app)
         let retry = app.buttons["downloads-retry-now"].firstMatch
         XCTAssert(retry.appears(within: 5), "a deferred job should offer Retry now")
-        XCTAssert(reachInSheet(retry, in: app), "Retry now never became hittable")
+        scrollTo(retry, in: app)
     }
 
     /// #205: far from Canadian water, nothing downloads and the manager is
