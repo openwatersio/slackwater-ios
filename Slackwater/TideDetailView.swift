@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Tide detail: a continuous strip beneath a fixed
 // centerline and a rolling schedule anchored to the selected local week.
-// Product contract: docs/scrubber.md.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 

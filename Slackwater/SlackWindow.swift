@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. The workable sub-threshold window around a slack — shared by the timeline strip and the widget extension.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 import SlackwaterKit
 

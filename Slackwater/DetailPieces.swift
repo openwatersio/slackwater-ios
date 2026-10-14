@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The detail views' shared pieces: sky, moon, formatters,
 // the lead card and its commentary. SwiftUI and Almanac only, so the watch
 // compiles them too (#522).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import SwiftUI
 

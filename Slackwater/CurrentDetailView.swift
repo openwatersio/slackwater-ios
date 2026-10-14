@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Current detail: a continuous current-only strip
 // beneath a fixed centerline, with a rolling schedule and paired tide link.
-// Product contract: docs/scrubber.md.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 

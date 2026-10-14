@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. The watch card's words at a scrub time: state,
 // reading and the next event, read off the loaded timeline (#522).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 import SlackwaterKit
 

@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. Shared palette, typography, chart geometry, and unit formatting.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 extension Color {

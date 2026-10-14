@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. A place on the watch: a glass reading card over the
 // sky, above the phone's timeline, scrubbed with the Crown (#522, #563).
 // One screen: the Crown only scrubs.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 extension TimelineSource {
