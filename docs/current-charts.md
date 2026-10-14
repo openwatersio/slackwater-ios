@@ -661,10 +661,9 @@ every mark that only earns its place at scale. The card and the widget are
   the schedule behind the detail.
 - **Colour is state** (§6): the go colour for the run and its dots, and
   nothing coloured by direction on the line or the marks. The card's fill is
-  the one carry-over from the card's own idiom: anchored at zero, sky above
-  and amber below, intensifying with distance from zero — a card-scale
-  magnitude cue that the detail's absolute ramp replaces at size (a
-  §6.2/§6.4 deviation, recorded in the card-face spec §6).
+  the detail's: blue beneath the curve in each flood lobe, fading to clear at
+  zero, and none in an ebb lobe, where the curve-to-zero area would sit above
+  the curve.
 
 ### 15.2 The reading
 

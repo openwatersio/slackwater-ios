@@ -595,7 +595,7 @@ Draw in this order:
 8. derived-gate slack dots and peak readings; and
 9. the absolute-now dot.
 
-The fill occupies the area between the curve and the zero line, so in an ebb lobe it lies above the curve, over the sky. The current fill is clear at zero and reaches 50% graph blue toward both vertical extremes. It does not encode flood versus ebb; y-position and bearing labels do.
+The fill lies beneath the curve only, as on a tide chart: in each flood lobe, the area between the curve and the zero line, graph blue at 50% at the top of the plot fading to clear at zero. An ebb lobe has no fill, because its curve-to-zero area lies above the curve, over the sky. The gradient spans the larger half of the plot, so its rate per unit does not depend on how strong the flood is against the ebb.
 
 Draw the curve in graph blue at 2.5 units. Down its middle, draw a two-unit absolute-speed thread:
 
@@ -623,7 +623,7 @@ The event-time row contains each merged slack run's opening, or for a run drawn 
 
 A derived gate uses the current plot box with a normalized ±1 phase shape: a half-sine between consecutive derived slacks, positive (flood) after a low-water slack and negative (ebb) after a high-water slack, and zero outside the slack range.
 
-- use the same blue fill fading to clear at the shape's zero crossing;
+- use the same blue fill, beneath the curve in the positive half only, fading to clear at the shape's zero crossing;
 - keep the blue curve and past/future split;
 - mark each known slack with a five-unit go-colour dot with a 2.5-unit clear halo on the zero line, and its thinned axis time;
 - fit the loaded shape (±1 × 1.05) without the visible-span governor;
@@ -771,7 +771,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and changes phase at the half-open closing, and never says Slack outside a window (§9.2).
 19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged run narrower than a turn dot draws as the go-colour dot with its halo, not a stroke, and its centre is its event time, its only magnetic target, and its one commentary stop.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
-21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill and no speed thread, and only known slack instants get green dots; there is no dashed zero line.
+21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill beneath its positive half only and no speed thread, and only known slack instants get green dots; there is no dashed zero line.
 22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the absolute-now dot.
 
 ### Accessibility
