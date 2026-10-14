@@ -603,7 +603,7 @@ For a lunar eclipse visible from the station, draw only a small `🌘` at greate
 The backdrop behind the lead responds continuously to `selectedTime` and station coordinates:
 
 - interpolate sky colours from solar altitude;
-- position sun and moon against their visible horizon spans;
+- position sun and moon against the nearest complete rise-to-set horizon span, keeping that span through both crossings so the disc and halo enter and leave continuously; switch spans midway between set and the following rise, while the body is below the horizon;
 - show the moon's illuminated limb and current lunar eclipse shadow, with the bright limb at its angle from the zenith (Almanac's bright-limb angle less the parallactic angle). Sun and moon sit east on the right, a mirror image of the sky in the northern hemisphere, so there the limb is mirrored too and keeps facing the drawn sun;
 - during a solar eclipse, keep the moon visible over the sun and darken the sky according to the locally obscured fraction;
 - reveal stars as the sky darkens; and
