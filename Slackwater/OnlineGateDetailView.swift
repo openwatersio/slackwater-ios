@@ -185,6 +185,9 @@ struct OnlineGateDetailView: View {
             .onReceive(ChsFitService.shared.$onlineProgress
                 .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
+            .onChange(of: live) { _, now in
+                if let tl = timeline, tl.today != dayLocal(now, tz) { rebuild() }
+            }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
             }

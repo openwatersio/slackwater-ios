@@ -114,7 +114,7 @@ The reference implementation samples `now` when the detail opens, when Now is ac
 
 `now` never advances on a timer while the view stays open. A long-open detail can show a slightly stale now marker; resampling on foreground return covers the real case.
 
-Continuous details take the Today, Tomorrow, and Yesterday day labels from the device clock at each chunk publish, not from the session `now`, so after midnight a later publish can relabel days while the now dot stays put. Fixed-window details use the `now` of their most recent build, so after a foreground return while scrubbed away their labels can lag the refreshed now dot until the next rebuild.
+Every detail takes the Today, Tomorrow, and Yesterday day labels from the session `now`, the same instant that places the absolute-now dot: each chunk publish and each fixed-window build labels its days from it. Refreshing `now` (Now, or a foreground return whether home or scrubbed away) relabels the days when the refreshed `now` falls on a different station-local day, so the labels and the now dot always agree.
 
 The watch place page follows the same `now` sampling and settle re-anchor rules, counting a raised wrist as a foreground return. It opens directly on now, without the opening motion.
 
@@ -290,8 +290,7 @@ The reference target set is the sorted, de-duplicated union of all applicable in
 - current maxima and slack instants;
 - the opening and closing of each merged measured slack run, or for a run drawn as a dot (§13.2) its centre alone, which replaces the slack instant and any other event inside the run;
 - sunrise and sunset;
-- the first penumbral and umbral contacts, greatest eclipse, and the last umbral and penumbral contacts of each lunar eclipse that has a contact or its greatest eclipse above the station's horizon (a penumbral eclipse has no umbral contacts);
-- the first and last contacts and greatest eclipse of each locally visible solar eclipse, plus its second and third contacts when it is total or annular; and
+- greatest eclipse of each lunar eclipse that has a contact or its greatest eclipse above the station's horizon, and of each locally visible solar eclipse, but none of their other contacts; and
 - derived-gate slack instants.
 
 Animate a magnetic settle with the platform's standard short scroll animation, then assign `selectedTime` to the exact target when the animation completes. This final assignment prevents interpolation or pixel rounding from leaving an event readout a few seconds off its own time. With Reduce Motion enabled, a magnetic settle lands directly on its target.
@@ -511,7 +510,7 @@ A tide high's reading hangs below its dot and a low's above it, whatever the tur
 
 Absolute event times have one home: the event-time row beneath the plot, in foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
 
-Do not draw any event mark, hanging reading, or event time within 0.3 hours (18 minutes) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and their axis times. Edge clipping makes a valid event look broken. Slack runs, including a run drawn as a dot, the curve, and the now dot draw to the edge.
+Do not draw any event mark, hanging reading, or event time within 1.5 hours (27 units) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and every event time. The margin is half the widest of those labels, so an event near an edge is left out whole rather than cut by the edge; edge clipping makes a valid event look broken. The event still exists and remains magnetic. Slack runs, including a run drawn as a dot, the curve, and the now dot draw to the edge.
 
 ### 12.4 Colour tokens
 
@@ -530,8 +529,7 @@ These sRGB values are the portable reference palette:
 | Go | `#88B868` | A measured slack-window run, as a stroke or a dot, and a derived gate's known slack instant |
 | Neutral unknown | `#5888A8` | Unknown or unavailable state: map pin, unavailable-station card and page, Unfavorite swipe action |
 | Sun | `#F0C860` | Sunrise/sunset dot |
-| Sunrise label | `#F0D890` | Sunrise and sunset times on the strip; sunrise time in schedule day headers and the sun sheet |
-| Sunset label | `#C8A86A` | Sunset time in schedule day headers and the sun sheet |
+| Sunrise label | `#F0D890` | Every sunrise and sunset time, on the strip, in schedule day headers, and in the sun sheet, which also uses it for dawn and dusk; the symbol, not the colour, tells sunrise from sunset |
 | Night | `#00101F` | Night shading beneath the curve (70%) |
 | Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (14%) |
 | Paper | `#FCFCFC` | Absolute-now dot |
@@ -640,7 +638,7 @@ The day/celestial layer moves with the graph. It provides calendar and light con
 
 For every civil day touched by the window:
 
-- centre `Today`, `Tomorrow`, `Yesterday`, or the short weekday halfway between sunrise and sunset; use station-local noon when either sun event is missing;
+- centre `Today`, `Tomorrow`, `Yesterday`, or the short weekday on the daylight that the day's sunrise begins, halfway between that sunrise and the sunset that follows it; use station-local noon when the day has no sunrise or that daylight has no following sunset, so the day name never lands in the night;
 - place the locale's abbreviated month and day (iOS template `MMMd`) beneath it;
 - draw sunrise as the `sunrise` SF Symbol, a space, and its localized station time, in sunrise ink at its true x-coordinate;
 - draw sunset as the `sunset` SF Symbol, a space, and its localized station time, also in sunrise ink (the symbol, not the colour, tells them apart) at its true x-coordinate; and
@@ -650,9 +648,9 @@ The day name is foam at 85% and the date foam at 48%, 17 units below the day nam
 
 Sunrise/sunset events are computed for the station coordinate and civil-day bounds; when a civil day has more than one rise or set, the first of each is used. A polar day may lack either event; omit missing marks without inventing a time.
 
-Night shading (`#00101F` at 70%) spans each civil day's first sunset to the next civil day's first sunrise; daylight tint (`#A8CAE0` at 14%) spans a civil day's first sunrise to its first sunset, and is skipped when that sunset comes first (§18). Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. A day with no sunrise or sunset draws no tint, and a night with no sunset or no following sunrise draws no band. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
+Night shading (`#00101F` at 70%) spans each sunset to the sunrise that follows it; daylight tint (`#A8CAE0` at 14%) spans each sunrise to the sunset that follows it. Pair the sun events by succession, from the time-sorted sunrises and sunsets of every day the strip holds, never by civil day: where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset comes before its sunrise and closes the previous day's daylight. A sun event followed by another of the same kind, or by none, opens no band. Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
 
-For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. The eclipse's contacts are magnetic targets (§7).
+For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. Greatest eclipse is a magnetic target; the eclipse's other contacts are not (§7).
 
 The backdrop behind the lead responds continuously to `selectedTime` and station coordinates:
 
@@ -667,7 +665,7 @@ The backdrop behind the lead responds continuously to `selectedTime` and station
 - reveal stars as the sky darkens: the catalogue stars of magnitude 3.5 or brighter, placed in the sun's horizon frame so they slide with the bodies. Field opacity is 0 with the sun above −6° and rises linearly to 0.7 at −18°; each star is further scaled by its own altitude, from 0 at −10° to full at 40°. Radius is max(0.5, 1.6 − 0.3 × magnitude) units. Twinkle multiplies opacity by 0.86 + 0.14 × a per-star sine, so between 0.72 and 1.0, and redraws at most 8 times a second; it pauses while the field opacity is zero. No stars are drawn when the sun position is unavailable; and
 - draw the lead and chrome ink in white at every sky state, because the sky paint never gets light enough to need deep navy. Coloured chrome text, such as a rate-warning tint, is lifted toward white, at least a quarter of the way and then in 5% steps, until it reaches 4.5:1 against the sky's horizon band composited over the canvas, or falls back to white.
 
-Solar eclipse appearance is evaluated for the selected instant and station coordinate. A partial eclipse must leave a visible bite in the sun instead of looking total; the moon must not disappear into the ordinary near-sun glare fade. Solar obscuration changes the backdrop; the strip marks solar eclipses with the same glyph and contact snap targets as lunar ones.
+Solar eclipse appearance is evaluated for the selected instant and station coordinate. A partial eclipse must leave a visible bite in the sun instead of looking total; the moon must not disappear into the ordinary near-sun glare fade. Solar obscuration changes the backdrop; the strip marks solar eclipses with the same glyph and greatest-eclipse snap target as lunar ones.
 
 The sky is non-interactive and accessibility-hidden. Under Reduce Motion, stars must not twinkle; selected-time movement may still reposition the astronomical scene because that change conveys time rather than decoration.
 
@@ -762,9 +760,9 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 ### Geometry and time
 
 12. **Resize:** Rotate or resize after scrubbing. The lead time and centre time remain equal and unchanged.
-13. **Cross midnight:** Scrubbing continuously across midnight changes the day chrome without discontinuity or a page transition.
+13. **Cross midnight:** Scrubbing continuously across midnight changes the day chrome without discontinuity or a page transition. Where sunset falls after local midnight (western Alaska in summer), the night band runs from that sunset to the sunrise that follows it, the afternoon carries the daylight tint, and each day name sits in daylight.
 14. **DST:** On a transition week, the civil day occupies 23 or 25 hours at the same 18-unit/hour scale; sunrise, sunset, and noon remain correct locally.
-15. **Window edge:** No event label is clipped at an edge. No direct control or commentary advertises a target that cannot be centred over valid data, and every programmatic move lands on a reachable centre. A drag stops at the loaded edge without overscroll.
+15. **Window edge:** No event label is clipped at an edge: an event within 1.5 hours of a loaded edge draws no mark, reading, or time. No direct control or commentary advertises a target that cannot be centred over valid data, and every programmatic move lands on a reachable centre. A drag stops at the loaded edge without overscroll.
 
 ### Track meaning
 
@@ -791,11 +789,11 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 30. **Date or sun tap:** A date tap stops motion and opens the picker where the host can change dates; a sun tap centres that event.
 31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
-33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it.
+33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it. Either way, when the refreshed now falls on a new station-local day, the Today, Tomorrow, and Yesterday labels move with it.
 34. **Far destination:** A shared link opens at its requested instant, and a picked week at station-local noon of the picked day unless the selection already lies inside that week's window, with data on both sides. A picked day, link, or Now within seven days of travel rides there; over seven days it lands without travel. Now restores the current schedule.
 35. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
 36. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
-37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and every solar contact is a magnetic target.
+37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and greatest eclipse is the eclipse's only magnetic target; its other contacts are not.
 38. **Fold:** Unfolding after scrubbing lands on the folded instant, including one weeks from now; folding while home lands on refreshed now.
 
 ## 18. Known iOS deviations from the intended contract
@@ -804,9 +802,6 @@ These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
 - The online-current detail and a Canadian tide preview have no alerts, but their strips still install the press recognizer and the VoiceOver "Set an alert" action (§6.5.1). A press parks its moment with a medium haptic and shows no alert line; the action reports success and does nothing. Every iOS strip is hosted by the detail scaffold, whose press and alert-action closures are never absent, so no iOS strip omits them.
-- The 0.3-hour edge margin (§12.3) is 5.4 units, less than half the width of an event time or hanging reading. A mark between about 0.3 and 1.5 hours from either end of the loaded window therefore draws its time and reading cut by the strip edge. This is visible at both ends of an online-current window and a Canadian tide preview, and at a continuous strip's loaded edge until it extends. This fails scenario 15. The margin should cover half the widest label.
-- Night and daylight bands pair sun events by civil day rather than by succession. Where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset precedes its sunrise, so that day gets no daylight tint, a night band that covers the whole day and overlaps the previous night, and a day name centred in the night. Night shading should span each sunset to the sunrise that follows it, and daylight tint each sunrise to the sunset that follows it.
-
 - The lead card overlays the strip without opting out of hit testing, so a drag or tap that starts on the lead's text (state, value, unit, or clock) does not reach the strip. The rest of the top pad scrubs normally.
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.

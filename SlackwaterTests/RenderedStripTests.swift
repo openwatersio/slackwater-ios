@@ -92,6 +92,88 @@ final class RenderedStripTests: XCTestCase {
         XCTAssertGreaterThan(pixels[line + 2], pixels[line], "the curve continues beyond the halo")
     }
 
+    /// A tide held at 1 after one opening sample at 0, so the curve rides near the plot top and
+    /// the shade beneath it is at full strength.
+    private func flatTide(start: Date, end: Date, tz: TimeZone, days: [TimelineDay] = [],
+                          extremes: [TideExtreme] = []) -> TimelineData {
+        let count = Int(end.timeIntervalSince(start) / 600)
+        let times = (0...count).map { start.addingTimeInterval(Double($0) * 600) }
+        return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: days,
+                            tidePoints: times.enumerated().map { TidePoint(time: $1, height: $0 == 0 ? 0 : 1) },
+                            tideRates: times.map { TideRatePoint(time: $0, rate: 0) },
+                            tideExtremes: extremes, currentPoints: [], currentEvents: [],
+                            snapTimes: [], slackWindows: [])
+    }
+
+    /// RGBA bytes of a 1× render, row-major from the top.
+    private func pixels(_ image: UIImage) throws -> (bytes: [UInt8], width: Int) {
+        let cg = try XCTUnwrap(image.cgImage)
+        var px = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+        let ctx = try XCTUnwrap(CGContext(data: &px, width: cg.width, height: cg.height,
+                                          bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        return (px, cg.width)
+    }
+
+    private func brightness(_ p: (bytes: [UInt8], width: Int), x: CGFloat, y: CGFloat) -> Int {
+        let i = (Int(y) * p.width + Int(x)) * 4
+        return Int(p.bytes[i]) + Int(p.bytes[i + 1]) + Int(p.bytes[i + 2])
+    }
+
+    /// Where sunset follows local midnight, the afternoon takes the daylight tint and the small
+    /// hours the night band, rather than the civil day's sunset shading the whole day as night.
+    @MainActor
+    func testDaylightAndNightFollowTheSunWhereSunsetFollowsMidnight() throws {
+        let (tz, days) = try lateSunsetDays()
+        let start = days[0].start, end = try XCTUnwrap(days.last?.start)
+        let lit = flatTide(start: start, end: end, tz: tz, days: days)
+        let bare = flatTide(start: start, end: end, tz: tz)
+        let before = start.addingTimeInterval(-86_400)
+        let shaded = try pixels(XCTUnwrap(stripImage(lit, now: before)))
+        let plain = try pixels(XCTUnwrap(stripImage(bare, now: before)))
+        let y = TimelineGeo(data: lit).tideTop + 30
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        for d in days.dropFirst().dropLast() {
+            let rise = try XCTUnwrap(d.sunrise), set = try XCTUnwrap(d.sunset)
+            XCTAssertLessThan(set, rise, "\(d.start) sets before it rises: the fixture proves nothing")
+            let afternoon = try XCTUnwrap(cal.date(bySettingHour: 15, minute: 0, second: 0, of: d.start))
+            XCTAssertGreaterThan(brightness(shaded, x: lit.x(afternoon), y: y),
+                                 brightness(plain, x: lit.x(afternoon), y: y),
+                                 "\(d.start)'s afternoon is not tinted as daylight")
+            let smallHours = set.addingTimeInterval(rise.timeIntervalSince(set) / 2)
+            XCTAssertLessThan(brightness(shaded, x: lit.x(smallHours), y: y),
+                              brightness(plain, x: lit.x(smallHours), y: y),
+                              "\(d.start)'s small hours are not shaded as night")
+        }
+    }
+
+    /// A turn an hour inside a loaded edge would have its label cut by it, so it draws nothing;
+    /// two hours in, it draws whole.
+    @MainActor
+    func testATurnTooNearTheLoadedEdgeDrawsNoLabel() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let before = start.addingTimeInterval(-86_400)
+        let none = try XCTUnwrap(stripImage(flatTide(start: start, end: end, tz: tz), now: before))
+        for (hours, draws) in [(1.0, false), (2.0, true)] {
+            for t in [start.addingTimeInterval(hours * 3600), end.addingTimeInterval(-hours * 3600)] {
+                let turn = TideExtreme(time: t, height: 1, kind: .high)
+                let one = try XCTUnwrap(stripImage(flatTide(start: start, end: end, tz: tz, extremes: [turn]),
+                                                   now: before))
+                let changed = differingFraction(one, none)
+                if draws {
+                    XCTAssertGreaterThan(changed, 0, "a turn \(hours) h inside the edge drew nothing")
+                } else {
+                    XCTAssertEqual(changed, 0, "a turn \(hours) h inside the edge drew a clipped label")
+                }
+            }
+        }
+    }
+
     private var friday: TideStationRecord {
         TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
     }

@@ -43,6 +43,8 @@ enum Timeline {
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = pph / 4    // a quarter hour: just off an event takes it, between stays free
+    /// Half the widest event label, so a mark near a loaded edge is left out rather than cut by it.
+    static let labelEdgeHours = 1.5
     static let accessibilityStep: TimeInterval = 300    // one VoiceOver increment
     static let pillTarget: CGFloat = 44    // a pill's semantic hit target; the capsule is ~30
     /// No scrub change for this long is a strip at rest, and the chrome — commentary, the Now
@@ -226,7 +228,7 @@ struct TimelineData {
     let tz: TimeZone
     /// The local midnight this window is built around. Geometry only.
     let anchor: Date
-    /// The REAL local midnight. Language and liveness only — the
+    /// The local midnight of the session's `now`. Language and liveness only — the
     /// Today/Tomorrow labels, the now-marker, return-to-now. Never geometry.
     let today: Date
     let start: Date          // anchor - 48h, and only when the anchor is today
@@ -237,7 +239,7 @@ struct TimelineData {
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
     let currentEvents: [CurrentEvent]
-    let snapTimes: [Date]    // prototype stops(): turns + slacks/maxes + sun events + eclipse contacts
+    let snapTimes: [Date]    // prototype stops(): turns + slacks/maxes + sun events + greatest eclipses
 
     /// Lunar eclipses with a peak inside the window and at least one contact
     /// above this station's horizon. Built ONCE, in the builders below —
@@ -308,6 +310,30 @@ struct TimelineData {
     var visibleDays: [TimelineDay] {
         let firstStart = day(of: start)?.start ?? .distantPast
         return days.filter { $0.start >= firstStart && $0.start <= end }
+    }
+
+    /// Far enough inside both loaded edges for an event's label to draw whole.
+    func clearsLabelEdges(_ t: Date) -> Bool {
+        let margin = Timeline.labelEdgeHours * 3600
+        return t >= start.addingTimeInterval(margin) && t <= end.addingTimeInterval(-margin)
+    }
+
+    /// Each sun event paired with the next when that is the other kind, since a sunset can fall after local midnight, before its civil day's sunrise.
+    var sunSpans: [(start: Date, end: Date, daylight: Bool)] {
+        let events = days.flatMap { d in
+            [d.sunrise.map { (time: $0, rise: true) }, d.sunset.map { (time: $0, rise: false) }].compactMap { $0 }
+        }.sorted { $0.time < $1.time }
+        return zip(events, events.dropFirst()).compactMap { a, b in
+            a.rise != b.rise ? (start: a.time, end: b.time, daylight: a.rise) : nil
+        }
+    }
+
+    /// Where a day's name centres: on the daylight its sunrise begins, so it never lands in the night.
+    func dayLabelTime(_ day: TimelineDay) -> Date {
+        if let rise = day.sunrise, let span = sunSpans.first(where: { $0.daylight && $0.start == rise }) {
+            return span.start.addingTimeInterval(span.end.timeIntervalSince(span.start) / 2)
+        }
+        return noonLocal(day.start, tz)
     }
 
     func x(_ t: Date) -> CGFloat {
@@ -522,8 +548,8 @@ struct TimelineData {
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
-                              + eclipses.flatMap(\.contacts)
-                              + solarEclipses.flatMap(\.contacts)))
+                              + eclipses.map(\.peak)
+                              + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
@@ -545,7 +571,7 @@ struct TimelineData {
         let solar = windowSolarEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
         let sun = chrome.days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = Array(Set(extremes.map(\.time) + tideFlowArrows(rates).map(\.time) + sun
-                              + eclipses.flatMap(\.contacts) + solar.flatMap(\.contacts)))
+                              + eclipses.map(\.peak) + solar.map(\.peak)))
             .filter { coverage.contains($0) }.sorted()
         return TimelineData(tz: tide.tz, anchor: anchor, today: chrome.today, start: start, end: end,
                             days: chrome.days, tidePoints: points, tideRates: rates, tideExtremes: extremes,
@@ -614,8 +640,8 @@ struct TimelineData {
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
                               + currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
-                              + eclipses.flatMap(\.contacts)
-                              + solarEclipses.flatMap(\.contacts)))
+                              + eclipses.map(\.peak)
+                              + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
@@ -903,14 +929,9 @@ struct TimelineCanvas: View {
         for day in data.visibleDays where day.start >= from && day.start <= to {
             // Day label at the daylight midpoint, not clock noon: the tint
             // band is what the label names, and clock noon sits toward
-            // sunrise all DST season. Clock noon only when a polar day has
-            // no band to center on. Fixed size, not `.caption2` — chart
+            // sunrise all DST season. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
-            let labelX: CGFloat = if let sr = day.sunrise, let ss = day.sunset {
-                data.x(sr.addingTimeInterval(ss.timeIntervalSince(sr) / 2))
-            } else {
-                data.x(noonLocal(day.start, data.tz))
-            }
+            let labelX = data.x(data.dayLabelTime(day))
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
@@ -1008,10 +1029,8 @@ struct TimelineCanvas: View {
         // reading carries it once.
         // A turn's label hangs off its dot, so a turn just off the tile can
         // still print into it: the slice, not a strict tile test.
-        let margin = 0.3 * 3600
         let turns = window(data.tideExtremes, { $0.time }, t0, t1)
-        for e in turns where e.time >= data.start.addingTimeInterval(margin)
-                          && e.time <= data.end.addingTimeInterval(-margin) {
+        for e in turns where data.clearsLabelEdges(e.time) {
             let p = CGPoint(x: data.x(e.time), y: geo.tideY(e.height))
             let high = e.kind == .high
             let f = fade(e.time)
@@ -1022,9 +1041,7 @@ struct TimelineCanvas: View {
                                    glyph: .toBar(high: high), tint: tint, ink: SN.foam.opacity(f),
                                    valueFontSize: CurveStyle.stripValueFontSize)
         }
-        axisTimes(ctx, data.tideExtremes.map(\.time).filter { t in
-            t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
-        }, t0, t1)
+        axisTimes(ctx, data.tideExtremes.map(\.time).filter(data.clearsLabelEdges), t0, t1)
 
         if now >= t0, now <= t1 {
             drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.tideY(data.heightAt(now))))
@@ -1048,8 +1065,8 @@ struct TimelineCanvas: View {
     }
 
     /// Daylight under the curve, painted after the fill so the dark reaches
-    /// the line: one band per NIGHT, sunset to the next day's sunrise
-    /// straddling midnight, and a faint tint per day, each fading across
+    /// the line: one band per NIGHT, sunset to the sunrise that follows it,
+    /// and a faint tint per daylight, each fading across
     /// twilight — a hard edge at sunset read as a rectangle pasted onto the
     /// chart. The fades land on the sun events and nothing abuts at midnight.
     /// Clipped under the curve, so the line is the shade's top edge at every
@@ -1089,20 +1106,16 @@ struct TimelineCanvas: View {
                 ]),
                 startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
         }
-        // A band can start a day before this tile and end a day after it, so
-        // the day list is widened rather than clipped to the tile; `fadedBand`
-        // skips anything that lands entirely outside.
-        let from = t0.addingTimeInterval(-36 * 3600), to = t1.addingTimeInterval(36 * 3600)
-        let nights = data.days.filter { $0.start >= from && $0.start <= to }
-        for day in nights {
-            guard let set = day.sunset,
-                  let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
-            else { continue }
-            fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.7)
+        // A band's fade reaches past its sun events, so one ending just off this tile still tints it.
+        let fade = Self.twilightHours * 3600
+        let spans = data.sunSpans.filter {
+            $0.end.addingTimeInterval(fade) >= t0 && $0.start.addingTimeInterval(-fade) <= t1
         }
-        for day in nights {
-            guard let rise = day.sunrise, let set = day.sunset else { continue }
-            fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.14)
+        for night in spans where !night.daylight {
+            fadedBand(from: data.x(night.start), to: data.x(night.end), color: SN.night, opacity: 0.7)
+        }
+        for day in spans where day.daylight {
+            fadedBand(from: data.x(day.start), to: data.x(day.end), color: Color(hex: 0xA8CAE0), opacity: 0.14)
         }
     }
 
@@ -1161,15 +1174,11 @@ struct TimelineCanvas: View {
         // colour between each run's interpolated edges (CurveDrawing.runs).
         CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
-        let margin = 0.3 * 3600
-        let onStrip = { (t: Date) in
-            t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
-        }
-        axisTimes(ctx, allRuns.map(\.axisMoment).sorted().filter(onStrip), t0, t1)
+        axisTimes(ctx, allRuns.map(\.axisMoment).sorted().filter(data.clearsLabelEdges), t0, t1)
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.
-        for e in window(data.currentEvents, { $0.time }, t0, t1) where onStrip(e.time) {
+        for e in window(data.currentEvents, { $0.time }, t0, t1) where data.clearsLabelEdges(e.time) {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
@@ -1412,7 +1421,7 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.sunrise)
                 .accessibilityLabel("Sunrise \(day.sunrise.map { chartTime($0, tz) } ?? "—")")
             Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
-                .foregroundStyle(SN.sunset)
+                .foregroundStyle(SN.sunrise)
                 .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
         }
         .font(.caption2.monospacedDigit())
@@ -1434,7 +1443,7 @@ struct MultiDaySchedule: View {
                 .accessibilityValue(day.solarNoon.map { chartTime($0, tz) } ?? "—")
                 .frame(maxWidth: .infinity, alignment: large ? .leading : .center)
             Label(day.sunset.map { chartTime($0, tz) } ?? "—", systemImage: "sunset")
-                .foregroundStyle(SN.sunset)
+                .foregroundStyle(SN.sunrise)
                 .accessibilityLabel("Sunset \(day.sunset.map { chartTime($0, tz) } ?? "—")")
                 .frame(maxWidth: .infinity, alignment: large ? .leading : .trailing)
         }

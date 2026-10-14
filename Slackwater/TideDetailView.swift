@@ -229,6 +229,19 @@ struct TideDetailView: View {
                     clamp(into: coverage)
                 } else { store?.focus(t, viewportPts: viewportPts) }
             }
+            .onChange(of: live) { _, now in
+                store?.setNow(now)
+                // A preview is built once per fetch, so only a rebuild relabels its days.
+                guard store == nil, let preview = displayedPreview, let built = previewTimeline,
+                      built.today != dayLocal(now, tz) else { return }
+                let record = record, day = built.anchor
+                Task {
+                    let relabelled = await Task.detached(priority: .userInitiated) {
+                        TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
+                    }.value
+                    if let relabelled, previewTimeline?.revision == built.revision { previewTimeline = relabelled }
+                }
+            }
             // The schedule follows a scrub that has settled somewhere outside
             // its window — the strip is endless now, and a list still describing
             // three weeks ago would be a lie. A cancelled sleep is a scrub
