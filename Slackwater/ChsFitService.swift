@@ -579,7 +579,7 @@ final class ChsFitService: ObservableObject {
     func startIfNeeded() {
         guard !started else { return }
         started = true
-        pump()
+        resumeForForeground()
     }
 
     /// A fix landed (or moved): take the nearest stations there into the
@@ -589,9 +589,9 @@ final class ChsFitService: ObservableObject {
         adopt(lat: lat, lon: lon)
         onlineOrigin = (lat, lon)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
-        pump()
         prefetchOnlineGates(favoriteGates + (allCurrentsSelected
             ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? []))
+        resumeForForeground()
     }
 
     /// Queue the visible station, then favorites, before the nearby tail.
@@ -750,6 +750,13 @@ final class ChsFitService: ObservableObject {
     func resumeForBackground() {
         pump()
         prefetchOnlineGates(Array(onlineDesired.values))
+    }
+
+    func resumeForForeground() {
+        resumeForBackground()
+        #if os(iOS)
+        BackgroundDownloads.submitIfPossible()
+        #endif
     }
 
     func setDownloadsActive(_ active: Bool) {

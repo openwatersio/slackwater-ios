@@ -98,6 +98,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 LocationService.shared.refreshIfAuthorized()
+                ChsFitService.shared.resumeForForeground()
                 // Tops up the notification horizon and picks up permission changes made in Settings.
                 AlertScheduler.requestReschedule()
             }
