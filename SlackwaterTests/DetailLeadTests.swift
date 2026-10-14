@@ -105,8 +105,8 @@ import SlackwaterKit
     // MARK: - The stops a current lead walks
 
     /// A synthetic current day: a flood max, a slack with a window either side
-    /// of it, an ebb max, a second window, and a bare slack with no window at
-    /// all. Velocities interpolate between the listed points, which is what
+    /// of it, an ebb max, a second window, and a slack at the series' end that
+    /// no window covers. Velocities interpolate between the listed points, which is what
     /// tells a window's CLOSING whether the run after it floods or ebbs.
     private func timeline(days: [TimelineDay] = []) -> TimelineData {
         TimelineData(
@@ -135,9 +135,9 @@ import SlackwaterKit
             ])
     }
 
-    private func lead(scrub: Date, provisional: Bool = false,
+    private func lead(scrub: Date, signed: Double = 1, provisional: Bool = false,
                       days: [TimelineDay] = []) -> CurrentLead {
-        CurrentLead(timeline: timeline(days: days), scrubTime: scrub, now: t0, signed: 1,
+        CurrentLead(timeline: timeline(days: days), scrubTime: scrub, now: t0, signed: signed,
                     floodDeg: 0, ebbDeg: 180, speedUnit: "kn", tz: utc, provisional: provisional)
     }
 
@@ -165,10 +165,18 @@ import SlackwaterKit
         XCTAssertEqual(spokenUnit("ft"), "feet")
     }
 
+    /// Slack is the measured window and nothing else: weak water outside a
+    /// window still names its direction, and the window holds Slack at any speed.
+    func testTheLeadSaysSlackOnlyInsideAWindow() {
+        XCTAssertEqual(lead(scrub: at(5000), signed: 0.1).spoken, "Flooding 0.1 knots")
+        XCTAssertEqual(lead(scrub: at(5000), signed: -0.1).spoken, "Ebbing 0.1 knots")
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0.4).spoken, "Slack 0.4 knots")
+    }
+
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes TWO stops — its opening is the
-    /// slack, its closing is the run that begins — and the window's own slack
-    /// event is dropped so the pill never says "Slack" twice for one turn.
+    /// slack, its closing is the run that begins. Slack events are never stops
+    /// themselves, so the pill never says "Slack" twice for one turn.
     func testNextSignificantNamesEveryKindOfStop() {
         assertNext(at(-100), t0, "Max flood", "the flood max is the first stop of the day")
         assertNext(at(10), at(3000), "Slack", "a window's opening is a slack")
@@ -177,7 +185,7 @@ import SlackwaterKit
         assertNext(at(6100), at(8400), "Slack", "the second window opens")
         assertNext(at(9000), at(9600), "Flood",
                    "a closing is named by the velocity after it, not by the one before")
-        assertNext(at(9700), at(12_600), "Slack", "a slack with no window is still a stop")
+        XCTAssertNil(lead(scrub: at(9700)).nextSignificant, "a slack no window covers is not a stop")
     }
 
     /// Land exactly on a stop and the pill points at the NEXT one. Otherwise

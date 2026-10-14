@@ -40,8 +40,8 @@ var slackThresholdKn: Double {
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
 /// the same series the strip renders, so the window can never disagree with
-/// the curve. Clamped to the series; nil when no sub-threshold sample
-/// brackets the slack.
+/// the curve. Clamped to the series; nil for a slack outside it or between two
+/// above-threshold samples of one sign.
 func slackWindow(_ points: [CurrentPoint], around slack: Date,
                  threshold: Double) -> (start: Date, end: Date)? {
     // A slack outside the sampled series has no measurable window. Events are
@@ -54,6 +54,13 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     let k: Int
     if abs(points[i].speed) <= threshold { k = i }
     else if i + 1 < points.count, abs(points[i + 1].speed) <= threshold { k = i + 1 }
+    else if i + 1 < points.count, (points[i].speed > 0) != (points[i + 1].speed > 0) {
+        // Both samples sit outside the band but the reversal between them crosses it.
+        let a = points[i], b = points[i + 1]
+        let span = abs(a.speed) + abs(b.speed), dt = b.time.timeIntervalSince(a.time)
+        return (a.time.addingTimeInterval(dt * (abs(a.speed) - threshold) / span),
+                a.time.addingTimeInterval(dt * (abs(a.speed) + threshold) / span))
+    }
     else { return nil }
     func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
         let va = abs(a.speed), vb = abs(b.speed)
@@ -98,12 +105,10 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
     return runs
 }
 
-/// The moments a current axis prints: each run's opening (the time a planner
-/// is aiming at — spec §4 rule 7), plus the bare instant of any slack no run
-/// covers, which is the hairline case (§5.3). Sorted.
-func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
-    let bare = slacks.filter { t in !runs.contains { $0.contains(t) } }
-    return (runs.map(\.start) + bare).sorted()
+/// The moments a current axis prints: each run's opening, the time a planner
+/// is aiming at (spec §4 rule 7). Sorted.
+func currentAxisMoments(runs: [WindowRun]) -> [Date] {
+    runs.map(\.start).sorted()
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

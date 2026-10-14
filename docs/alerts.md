@@ -116,7 +116,7 @@ Every trigger reads a producer that exists today:
 
 | Trigger | Source |
 |---|---|
-| `.slackWindowOpens` | `CurrentPredicting.events()` slacks → `speeds(step: 600)` over the span ±6 h → `slackWindow()` → `mergeWindows()`. One occurrence per run, at its opening — the moment `currentAxisMoments()` prints as "the time a planner is aiming at". A slack no run covers is an occurrence at the slack with `noWindow`. |
+| `.slackWindowOpens` | `CurrentPredicting.events()` slacks → `speeds(step: 600)` over the span ±6 h → `slackWindow()` → `mergeWindows()`. One occurrence per run, at its opening — the moment `currentAxisMoments()` prints as "the time a planner is aiming at". A slack no run covers (one outside the sampled span, or between two samples of the same sign) is an occurrence at the slack with `noWindow`; a reversal the sampling steps over still has a short window. |
 | `.slack` | `DerivedSlackStation.slacks(from:to:)` |
 | `.currentPeak` | `events()` filtered to `.maxFlood` or `.maxEbb` |
 | `.tideExtreme` | `TidePredicting.extremes()` filtered by kind. `ofDay`: the query reaches a day past either end and keeps the lowest low (highest high) of each station-local calendar day, so a mixed tide's lower low is judged against its whole day, not the range |
@@ -600,7 +600,7 @@ No engine or Almanac version change.
 **Unit** (`SlackwaterTests`, failing test first):
 
 - Occurrences — one case per trigger on the fixtures `SlackWindowTests` and `TideShortcutTests`
-  already use. Merged runs yield one occurrence; a hairline slack yields a `noWindow` occurrence;
+  already use. Merged runs yield one occurrence; a reversal the sampling steps over yields its own short window;
   the first opening agrees with `SlackWindowShortcutQuery.next`; crossings interpolate and respect
   direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.

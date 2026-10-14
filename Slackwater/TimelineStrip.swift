@@ -1086,9 +1086,8 @@ struct TimelineCanvas: View {
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
         // Merged over the whole window — runs join across a seam, and the
-        // axis labels and the no-run test below must see every one of them or
-        // they would disagree from tile to tile. Only the drawn segments are
-        // cut to the tile.
+        // axis labels must see every one of them or they would disagree from
+        // tile to tile. Only the drawn segments are cut to the tile.
         let allRuns = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
         let runs = allRuns.filter { $0.end >= t0 && $0.start <= t1 }
         // The run segments, built before the line because the line clips
@@ -1137,8 +1136,7 @@ struct TimelineCanvas: View {
         let onStrip = { (t: Date) in
             t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
         }
-        let slacks = data.currentEvents.filter { $0.kind == .slack }.map(\.time)
-        axisTimes(ctx, currentAxisMoments(runs: allRuns, slacks: slacks).filter(onStrip), t0, t1)
+        axisTimes(ctx, currentAxisMoments(runs: allRuns).filter(onStrip), t0, t1)
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.
@@ -1149,11 +1147,6 @@ struct TimelineCanvas: View {
                 if data.speedsAreSchematic {
                     CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.zeroY),
                                      color: SN.go.opacity(fade(e.time)))
-                } else if !allRuns.contains(where: { $0.contains(e.time) }) {
-                    var tick = Path()
-                    tick.move(to: CGPoint(x: x, y: geo.curTop))
-                    tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
-                    ctx.stroke(tick, with: .color(SN.go.opacity(0.35 * fade(e.time))), lineWidth: 1)
                 }
             case .maxFlood, .maxEbb:
                 // Context, not the event (§5.1): no dot. The speed hangs off

@@ -1074,15 +1074,18 @@ import SlackwaterKit
         XCTAssertEqual(window.end, points[1].time)
     }
 
-    /// No sub-threshold sample brackets the slack (a violent gate where the
-    /// 10-min sampling steps over the window) — no window, not a wrong one.
-    func testSlackWindowNilWhenSamplingStepsOver() {
+    /// A violent gate where the 10-min sampling steps over the band: the
+    /// reversal between +4 and −4 kn still crosses ±0.5 kn, so the window is
+    /// interpolated on that one segment — 262.5 s and 337.5 s into it.
+    func testSlackWindowInterpolatesAReversalThatStepsOverTheBand() throws {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let pts = (0...4).map { i in
             CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600),
                          speed: i < 2 ? 4.0 : -4.0)
         }
-        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+        let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+        XCTAssertEqual(w.start.timeIntervalSince(t0), 862.5, accuracy: 0.01)
+        XCTAssertEqual(w.end.timeIntervalSince(t0), 937.5, accuracy: 0.01)
     }
 
     /// A slack outside the sampled series has no window. Events are scanned with a

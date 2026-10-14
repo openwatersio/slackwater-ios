@@ -225,7 +225,7 @@ become comparable by length alone — which a mark whose height followed the
 curve's steepness was not. A mark drawn behind the curve will eventually
 disagree with the curve; one drawn on it cannot.
 
-### 5.3 The slack instant gets no dot
+### 5.3 The window is the mark
 
 Slack is the zero crossing. It is a mathematical point, and a point is not
 something you can transit *at*. If the window and its threshold are the true
@@ -233,14 +233,13 @@ value, marking the instant adds a competing focal point that carries no
 decision — an "interesting moment," like a peak, but without the peak's
 justification.
 
-**Draw the instant only when there is no window to draw**, as a hairline:
-
-- a pass so fast the window is shorter than the sample step (§8.3)
-- a measured-current series with no measurable sub-threshold interval (derived-gate presentation is specified in §9)
-
-A zero-width window must never look like a window; a hairline is the honest
-form. And where a run exists, the run is the mark — the crossing is already
-inside it.
+**Every reversal has a window.** When the sampling steps over the band, the
+line between the two samples either side of the crossing still crosses it,
+and the window is measured on that line (§8.3). A window too narrow to draw
+as a run draws as the go-colour dot a turn gets, at the window's centre, so
+a short window never pretends to be a usable duration. Where a run exists,
+the run is the mark — the crossing is already inside it. (Derived-gate
+presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
@@ -469,7 +468,8 @@ degenerate or inverted.
 Handled by 8.1, not separately.
 
 **8.3 A window shorter than the sample step.** A violent gate stepped over by
-the sampling interval. Hairline, not a run (§5.3). The *events* still resolve,
+the sampling interval. Measured on the line between the samples either side
+of the crossing, and drawn as a dot when narrower than one (§5.3). The *events* still resolve,
 because crossings are interpolated rather than looked up among the samples —
 this is why §4.1's interpolation rule is not an optimisation.
 

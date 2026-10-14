@@ -35,7 +35,7 @@ final class AlertPrimitivesTests: XCTestCase {
         XCTAssertEqual(spans.count, 3)
     }
 
-    /// Two slacks whose windows touch, then a hairline slack no sample under the
+    /// Two slacks whose windows touch, then a fast reversal no sample under the
     /// threshold brackets.
     private struct FakeCurrent: CurrentPredicting {
         let points: [CurrentPoint]
@@ -46,20 +46,20 @@ final class AlertPrimitivesTests: XCTestCase {
         }
     }
 
-    func testMergedWindowsOpenOnceAndAHairlineSlackStandsAlone() {
+    func testMergedWindowsOpenOnceAndAFastReversalOpensItsOwn() {
         let speeds: [Double] = [2, 1.5, 1, 0.6, 0.3, 0.1, 0,   // 0…3600: slack A at 3600
                                 0.1, 0.3, 0,                   // 4200…5400: slack B at 5400
                                 0.3, 0.6, 1, 1.5, 1.2, 1.1, 1, // 6000…9600
-                                1, 0.8, -1, -1.5, -2]          // 10200…12600: hairline at 10800
+                                1, 1, -1, -1.5, -2]            // 10200…12600: slack C at 11100
         let points = speeds.enumerated().map { CurrentPoint(time: at(Double($0.offset) * 600), speed: $0.element) }
-        let station = FakeCurrent(points: points, slacks: [at(3600), at(5400), at(10_800)])
+        let station = FakeCurrent(points: points, slacks: [at(3600), at(5400), at(11_100)])
 
         let openings = slackWindowOpenings(station, from: t0, to: at(12_600), threshold: 0.5)
 
         XCTAssertEqual(openings.count, 2)
         XCTAssertEqual(openings[0].event.timeIntervalSince(t0), 2000, accuracy: 1)
         XCTAssertEqual(try XCTUnwrap(openings[0].end).timeIntervalSince(t0), 6400, accuracy: 1)
-        XCTAssertEqual(openings[1].event, at(10_800))
-        XCTAssertNil(openings[1].end)
+        XCTAssertEqual(openings[1].event.timeIntervalSince(t0), 10_950, accuracy: 1)
+        XCTAssertEqual(try XCTUnwrap(openings[1].end).timeIntervalSince(t0), 11_250, accuracy: 1)
     }
 }
