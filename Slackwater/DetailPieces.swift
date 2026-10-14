@@ -724,6 +724,7 @@ struct LeadCard<Eyebrow: View>: View {
                 (Text(value).font(ReadoutType.lead(leadSize).monospacedDigit())
                     + Text(unit.map { " \($0)" } ?? "").font(ReadoutType.leadUnit))
                     .foregroundStyle(valueColor)
+                    .accessibilityLabel(leadSpokenValue(value, unit: unit))
             }
             Text(time)
                 .font(.caption.monospacedDigit())
@@ -731,6 +732,8 @@ struct LeadCard<Eyebrow: View>: View {
                 .accessibilityHidden(true)
         }
         .padding(.vertical, 12)
+        // A drag or tap that starts on the reading belongs to the strip under it.
+        .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
         .tourAnchor(.read)
@@ -742,6 +745,28 @@ struct LeadCard<Eyebrow: View>: View {
 /// The eyebrow's word, in the weight and ink every lead shares.
 func leadState(_ text: String, ink: Color = SN.foam) -> Text {
     Text(text).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
+}
+
+/// The eyebrow's glyph, silent because the word and compass point beside it already say it and VoiceOver reads a rotated symbol by its unrotated name.
+struct LeadGlyph: View {
+    let systemName: String
+    var degrees: Double = 0
+
+    var body: some View {
+        Image(systemName: systemName)
+            .rotationEffect(.degrees(degrees))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The lead's value as VoiceOver reads it: a provisional tilde is printed, not spoken.
+func leadSpokenValue(_ value: String, unit: String?) -> String {
+    [String(value.drop { $0 == "~" }), unit].compactMap { $0 }.joined(separator: " ")
+}
+
+/// A tide or current reading in words, for the strip's spoken value: the state, then the value with its unit written out.
+func spokenReading(_ state: String, _ value: String, unit: String) -> String {
+    String(localized: "\(state) \(value) \(spokenUnit(unit))", comment: "VoiceOver tide or current reading. Values are the tide or current state, a formatted height or speed, and its spoken unit.")
 }
 
 struct CommentaryStop: Equatable {
@@ -771,10 +796,11 @@ func commentaryEventStop(_ label: String, at time: Date,
     case "Ebb": (visible, spoken, systemImage) = (String(localized: "Ebb", comment: "Ebb-current event label."), String(localized: "Ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
     case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), "arrow.forward")
     case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
-    default: return CommentaryStop(time: time, label: prefix + label)
+    default: return CommentaryStop(time: time, label: prefix + label, spokenLabel: label)
     }
+    // The prefix is the printed provisional tilde, which VoiceOver would read as a word.
     return CommentaryStop(time: time, label: prefix + visible,
-                          spokenLabel: prefix + spoken,
+                          spokenLabel: spoken,
                           systemImage: systemImage)
 }
 

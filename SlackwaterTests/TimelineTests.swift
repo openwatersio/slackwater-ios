@@ -814,15 +814,27 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         init(_ time: Date) { self.time = time }
     }
 
+    /// What the scaffold hands the strip for alerts: closures while it has an offer, nil without one.
+    private final class AlertHost {
+        var offered: Bool
+        var presses = 0
+        var actions = 0
+        init(offered: Bool) { self.offered = offered }
+    }
+
     /// In a window, so its animated scrolls run.
     private func mountedStrip(_ data: TimelineData, _ sel: Selection, now: Date,
-                              gate: ScrollGate? = nil, opening: Bool = false, pills: [CGRect] = [])
+                              gate: ScrollGate? = nil, opening: Bool = false, pills: [CGRect] = [],
+                              alerts: AlertHost? = nil, onPickDate: @escaping () -> Void = {})
         -> (window: UIWindow, sv: UIScrollView, co: TimelineScrubber.Coordinator, strip: (Int) -> TimelineScrubber) {
         let geo = TimelineGeo(data: data)
         let strip = { (token: Int) in
             TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
                              scrubTime: Binding(get: { sel.time }, set: { sel.time = $0 }),
-                             jumpToken: token, scrollGate: gate, restingPills: pills)
+                             jumpToken: token, scrollGate: gate, onPickDate: onPickDate,
+                             onLongPress: alerts.flatMap { host in host.offered ? { host.presses += 1 } : nil },
+                             onAlertAction: alerts.flatMap { host in host.offered ? { host.actions += 1 } : nil },
+                             restingPills: pills)
         }
         let co = TimelineScrubber.Coordinator(strip(0))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
@@ -941,6 +953,75 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
         try await settle(m.co)
         XCTAssertLessThan(sel.time, target, "a tap left of the pill brings an earlier moment to the line")
+    }
+
+    /// A host with nothing to alert on gets no press and no "Set an alert"; a preview's model landing adds both under the same strip.
+    func testThePressAndItsActionFollowTheHostsAlertOffer() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let host = AlertHost(offered: false)
+        let m = mountedStrip(data, Selection(now), now: now, alerts: host)
+        defer { m.window.isHidden = true }
+        // UIScrollView brings long presses of its own; count the strip's against them.
+        func presses() -> Int { (m.sv.gestureRecognizers ?? []).filter { $0 is UILongPressGestureRecognizer }.count }
+        func actionNames() -> [String] { (m.sv.accessibilityCustomActions ?? []).map(\.name) }
+
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let builtIn = presses()
+        XCTAssertNil(m.co.pressRecognizer, "no alert offer, no press recognizer")
+        let plainTap = try XCTUnwrap(m.co.tapRecognizer, "every strip taps")
+        XCTAssertTrue(m.sv.gestureRecognizers?.contains(plainTap) ?? false)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event"], "no alert offer, no Set an alert")
+
+        host.offered = true
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let press = try XCTUnwrap(m.co.pressRecognizer, "the offer arriving installs the press")
+        XCTAssertTrue(m.sv.gestureRecognizers?.contains(press) ?? false)
+        XCTAssertEqual(presses(), builtIn + 1)
+        let waitingTap = try XCTUnwrap(m.co.tapRecognizer)
+        XCTAssertFalse(waitingTap === plainTap, "the tap that waits for the press replaces the one that did not")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(plainTap) ?? true)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event", "Set an alert"])
+        let action = try XCTUnwrap(m.sv.accessibilityCustomActions?.last)
+        XCTAssertTrue(action.actionHandler?(action) ?? false)
+        XCTAssertEqual(host.actions, 1, "the action reaches the host")
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(presses(), builtIn + 1, "an update does not stack a second press")
+        XCTAssertTrue(m.co.tapRecognizer === waitingTap, "nor rebuild an unchanged tap")
+
+        host.offered = false
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertNil(m.co.pressRecognizer, "the offer leaving removes the press")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(press) ?? false)
+        XCTAssertEqual(presses(), builtIn)
+        XCTAssertFalse(m.co.tapRecognizer === waitingTap, "a fresh tap no longer waits on it")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(waitingTap) ?? true)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event"])
+    }
+
+    /// A date tap lands where the date is drawn, on the daylight midpoint, not at clock noon.
+    func testADateTapLandsWhereTheDateIsDrawn() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let day = try XCTUnwrap(data.visibleDays.first { d in
+            d.sunset != nil && data.x(data.dayLabelTime(d)) - data.x(noonLocal(d.start, data.tz)) > 8
+        }, "no day here draws its date clear of noon: the fixture proves nothing")
+        let label = data.x(data.dayLabelTime(day))
+        let sunset = data.x(try XCTUnwrap(day.sunset))
+        let noon = data.x(noonLocal(day.start, data.tz))
+        // Nearer the drawn date than the sunset, but nearer the sunset than noon.
+        let x = (label + sunset) / 2 - 2
+        XCTAssertGreaterThan(x - noon, sunset - x, "the tap must sit where a noon anchor would lose to the sunset")
+        var picked = 0
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, onPickDate: { picked += 1 })
+        defer { m.window.isHidden = true }
+        let before = sel.time
+        m.co.tap(m.sv, at: CGPoint(x: x, y: geo.dayY + 17))
+        XCTAssertEqual(picked, 1, "a tap nearer the drawn date opens the picker")
+        XCTAssertEqual(sel.time, before, "and moves nothing")
+        XCTAssertFalse(m.co.magneting)
     }
 
     /// A left-edge publish mid-ride would move the origin under the animation.

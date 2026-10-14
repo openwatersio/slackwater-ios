@@ -17,8 +17,10 @@ func heightUnits(defaults: UserDefaults = AppGroup.defaults,
 
 func toFeet(_ metres: Double) -> Double { metres * 3.28084 }
 
-/// Strip a negative zero, which appears whenever a tide sits just below datum.
-private func unsign(_ n: Double) -> Double { abs(n) < 0.05 ? abs(n) : n }
+/// Strip the sign only from a value that prints as zero at `places` decimals, so "-0.00" never shows and "-0.04" keeps its minus.
+private func unsign(_ n: Double, places: Int) -> Double {
+    abs(n) < 0.5 / pow(10, Double(places)) ? abs(n) : n
+}
 
 private func decimal(_ value: Double, places: Int, locale: Locale) -> String {
     value.formatted(.number.locale(locale).grouping(.never)
@@ -27,8 +29,8 @@ private func decimal(_ value: Double, places: Int, locale: Locale) -> String {
 
 func formatHeight(_ metres: Double, imperial: Bool,
                   locale: Locale = .autoupdatingCurrent) -> String {
-    imperial ? decimal(unsign(toFeet(metres)), places: 1, locale: locale)
-             : decimal(unsign(metres), places: 2, locale: locale)
+    imperial ? decimal(unsign(toFeet(metres), places: 1), places: 1, locale: locale)
+             : decimal(unsign(metres, places: 2), places: 2, locale: locale)
 }
 
 func heightUnit(imperial: Bool) -> String { imperial ? "ft" : "m" }
@@ -43,7 +45,7 @@ func toMs(_ knots: Double) -> Double { knots * 0.514444 }
 func formatSpeed(_ knots: Double, unit: String,
                  locale: Locale = .autoupdatingCurrent) -> String {
     let v = unit == "kmh" ? toKmh(knots) : unit == "ms" ? toMs(knots) : knots
-    return decimal(abs(v) < 0.05 ? abs(v) : v, places: 1, locale: locale)
+    return decimal(unsign(v, places: 1), places: 1, locale: locale)
 }
 
 func speedUnitLabel(_ unit: String) -> String {

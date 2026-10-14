@@ -166,15 +166,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
             .environment(\.stripMoveRequests, moveRequests)
-            .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
+            .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
-            // VoiceOver's "Set an alert" has no line to go and find: it parks the moment and
-            // opens the sheet in one step.
-            .environment(\.stripAlertAction, {
-                guard let alertOffer else { return }
-                pressedMoment = scrubTime
-                openAlertSheet(alertOffer, pressedAt: scrubTime)
-            })
+            .environment(\.stripAlertAction, stripAlertAction)
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -343,6 +337,22 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         .padding(.bottom, 12)
     }
 
+    /// Nil without an offer, so the strip carries neither the press nor its VoiceOver action.
+    private var stripPressed: (@MainActor () -> Void)? {
+        guard alertOffer != nil else { return nil }
+        return { pressedMoment = scrubTime }
+    }
+
+    /// VoiceOver's "Set an alert" has no line to go and find: it parks the moment and opens the
+    /// sheet in one step.
+    private var stripAlertAction: (@MainActor () -> Void)? {
+        guard let alertOffer else { return nil }
+        return {
+            pressedMoment = scrubTime
+            openAlertSheet(alertOffer, pressedAt: scrubTime)
+        }
+    }
+
     /// What the line opens: the rule it reads, else a new rule for the pressed moment, else one
     /// for the offer's next occurrence — on an unscrubbed tide strip, the next low (§7.1).
     private func openAlertSheet(_ offer: AlertTrigger, pressedAt: Date?) {
@@ -494,9 +504,9 @@ struct AlertSheetSubject: Identifiable {
 
 /// How the strip tells the scaffold it was pressed and held. Same reasoning as
 /// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
-/// have nothing to say about alerts.
+/// have nothing to say about alerts. Nil where the host has nothing to alert on.
 private struct StripPressedKey: EnvironmentKey {
-    static let defaultValue: @MainActor () -> Void = {}
+    static let defaultValue: (@MainActor () -> Void)? = nil
 }
 
 /// Whether the scaffold holds a pressed moment, so the strip can run its reading line down to
@@ -505,17 +515,18 @@ private struct StripIsPressedKey: EnvironmentKey {
     static let defaultValue = false
 }
 
-/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet.
+/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet. Nil
+/// wherever `stripPressed` is.
 private struct StripAlertActionKey: EnvironmentKey {
-    static let defaultValue: @MainActor () -> Void = {}
+    static let defaultValue: (@MainActor () -> Void)? = nil
 }
 
 extension EnvironmentValues {
-    var stripPressed: @MainActor () -> Void {
+    var stripPressed: (@MainActor () -> Void)? {
         get { self[StripPressedKey.self] }
         set { self[StripPressedKey.self] = newValue }
     }
-    var stripAlertAction: @MainActor () -> Void {
+    var stripAlertAction: (@MainActor () -> Void)? {
         get { self[StripAlertActionKey.self] }
         set { self[StripAlertActionKey.self] = newValue }
     }

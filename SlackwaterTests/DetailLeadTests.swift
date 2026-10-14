@@ -161,10 +161,11 @@ import SlackwaterKit
     }
 
     /// The strip's spoken value is the lead in words: the state, then the
-    /// magnitude with its unit written out (§ 15), never "kn".
+    /// magnitude with its unit written out (§ 15), never "kn", then the set outside slack.
     func testSpokenLeadNamesStateAndUnitInFull() {
-        XCTAssertEqual(lead(scrub: at(0)).spoken, "Max flood 1.0 knots")
-        XCTAssertEqual(lead(scrub: at(3600)).spoken, "Slack 1.0 knots")
+        XCTAssertEqual(lead(scrub: at(0)).spoken, "Max flood 1.0 knots N")
+        XCTAssertEqual(lead(scrub: at(3600)).spoken, "Slack 1.0 knots", "slack claims no set")
+        XCTAssertEqual(lead(scrub: at(5000), signed: -1).spoken, "Ebbing 1.0 knots S", "an ebb speaks the ebb set")
         XCTAssertEqual(spokenUnit("km/h"), "kilometres per hour")
         XCTAssertEqual(spokenUnit("ft"), "feet")
     }
@@ -172,8 +173,8 @@ import SlackwaterKit
     /// Slack is the measured window and nothing else: weak water outside a
     /// window still names its direction, and the window holds Slack at any speed.
     func testTheLeadSaysSlackOnlyInsideAWindow() {
-        XCTAssertEqual(lead(scrub: at(5000), signed: 0.1).spoken, "Flooding 0.1 knots")
-        XCTAssertEqual(lead(scrub: at(5000), signed: -0.1).spoken, "Ebbing 0.1 knots")
+        XCTAssertEqual(lead(scrub: at(5000), signed: 0.1).spoken, "Flooding 0.1 knots N")
+        XCTAssertEqual(lead(scrub: at(5000), signed: -0.1).spoken, "Ebbing 0.1 knots S")
         XCTAssertEqual(lead(scrub: at(3600), signed: 0.4).spoken, "Slack 0.4 knots")
     }
 
@@ -218,7 +219,7 @@ import SlackwaterKit
     }
 
     /// A fast answer marks every number it prints, in the tile and in the
-    /// pill alike — one tilde rule, not two.
+    /// pill alike — one tilde rule, not two. The tilde is printed, never spoken.
     func testProvisionalMarksTheTileAndTheCommentary() throws {
         let provisional = lead(scrub: at(-100), provisional: true)
         XCTAssertEqual(try XCTUnwrap(provisional.nextMax).value, "~2.4\u{00a0}kn")
@@ -228,9 +229,55 @@ import SlackwaterKit
                 label: "~Max flood",
                 duration: "1m",
                 systemImage: "arrow.forward",
-                accessibilityLabel: "~Maximum flood current in 1 minute"
+                accessibilityLabel: "Maximum flood current in 1 minute"
             )
         )
+        XCTAssertEqual(provisional.spoken, "Flooding 1.0 knots N")
+        XCTAssertEqual(leadSpokenValue("~1.0", unit: "kn"), "1.0 kn", "the lead's value is spoken without its tilde")
+        XCTAssertEqual(leadSpokenValue("-0.4", unit: "m"), "-0.4 m")
+        XCTAssertEqual(leadSpokenValue("2.1", unit: nil), "2.1")
+    }
+
+    /// VoiceOver reads a lead glyph by its unrotated symbol name ("up arrow" for a set to the south), so every eyebrow glyph goes through the hidden `LeadGlyph`.
+    func testEveryLeadGlyphIsHiddenFromVoiceOver() throws {
+        var leads = 0
+        for (name, source) in try appSources() {
+            var rest = source[...]
+            while let call = rest.range(of: "LeadCard(") {
+                let eyebrow = try XCTUnwrap(trailingClosure(after: call.upperBound, in: source), "\(name): no eyebrow")
+                XCTAssertTrue(eyebrow.contains("LeadGlyph("), "\(name): a lead eyebrow without its glyph")
+                XCTAssertFalse(eyebrow.contains("Image(systemName:"), "\(name): a spoken eyebrow glyph")
+                XCTAssertFalse(eyebrow.contains("CompassArrow("), "\(name): a spoken set arrow")
+                leads += 1
+                rest = source[eyebrow.endIndex...]
+            }
+        }
+        XCTAssertEqual(leads, 3, "the tide, current, and derived-gate leads")
+        let glyph = try repoSource("Slackwater/DetailPieces.swift")
+        let body = try XCTUnwrap(glyph.range(of: "struct LeadGlyph: View {")).upperBound
+        XCTAssertTrue(try XCTUnwrap(trailingClosure(after: body, in: glyph, opened: true)).contains(".accessibilityHidden(true)"))
+    }
+
+    /// The text of the brace block that follows `index`: a call's trailing closure, or with `opened` the block `index` is already inside.
+    private func trailingClosure(after index: String.Index, in source: String, opened: Bool = false) -> Substring? {
+        var depth = opened ? 1 : 0, parens = opened ? 0 : 1
+        var start = opened ? index : nil
+        var i = index
+        while i < source.endIndex {
+            switch source[i] {
+            case "(": parens += 1
+            case ")": parens -= 1
+            case "{" where parens == 0:
+                if start == nil { start = source.index(after: i) }
+                depth += 1
+            case "}" where parens == 0:
+                depth -= 1
+                if depth == 0, let start { return source[start..<i] }
+            default: break
+            }
+            i = source.index(after: i)
+        }
+        return nil
     }
 
     /// Dark is a stop like any other: whichever comes first — the water's turn
@@ -313,7 +360,7 @@ import SlackwaterKit
                 label: "~Slack",
                 duration: "16m",
                 systemImage: "arrow.right.and.line.vertical.and.arrow.left",
-                accessibilityLabel: "~Slack current in 16 minutes"
+                accessibilityLabel: "Slack current in 16 minutes"
             )
         )
     }

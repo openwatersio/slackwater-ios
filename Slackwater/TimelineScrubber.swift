@@ -151,18 +151,7 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
-        let tap = UITapGestureRecognizer(target: context.coordinator,
-                                         action: #selector(Coordinator.handleTap(_:)))
-        if onLongPress != nil {
-            let press = UILongPressGestureRecognizer(target: context.coordinator,
-                                                     action: #selector(Coordinator.handlePress(_:)))
-            // A press held and then lifted must not also scrub. The press fails the instant the
-            // finger leaves before its half second, so an ordinary tap is not delayed.
-            tap.require(toFail: press)
-            sv.addGestureRecognizer(press)
-        }
-        tap.delegate = context.coordinator
-        sv.addGestureRecognizer(tap)
+        context.coordinator.syncPress(sv)
         // The iOS 27.1 SDK's UIKit, the first with `UIHingeInteraction`. CI builds
         // with an older Xcode, where the type does not exist to name.
         #if canImport(UIKit, _version: 9127.0.85)
@@ -192,6 +181,7 @@ struct TimelineScrubber: UIViewRepresentable {
         ScrubTrace.record("update requested=\(scrubTime.timeIntervalSince1970) jump=\(jumpToken)", sv)
         let previousStart = co.parent.data.start
         co.parent = self
+        co.syncPress(sv)
         // Rendered from the CURRENT offset; when a branch below moves the
         // offset, the scroll callback it fires refreshes again from the
         // final position.
@@ -261,6 +251,9 @@ struct TimelineScrubber: UIViewRepresentable {
         var dragSettling = false
         /// Counts every interruption, so a deferred write can tell it was overtaken.
         var moves = 0
+        private(set) weak var tapRecognizer: UITapGestureRecognizer?
+        /// Present only while the host has something to alert on (`onLongPress`).
+        private(set) var pressRecognizer: UILongPressGestureRecognizer?
         var magneting = false
         /// An opening, hinge follow, or ride is driving the reading toward a destination already chosen.
         var nudging = false
@@ -716,6 +709,25 @@ struct TimelineScrubber: UIViewRepresentable {
             return !pillOwns(touch.location(in: sv), in: sv)
         }
 
+        /// The host's offer can arrive after the strip does, when a Canadian tide preview's model lands.
+        func syncPress(_ sv: UIScrollView) {
+            guard tapRecognizer == nil || (parent.onLongPress != nil) != (pressRecognizer != nil) else { return }
+            // A failure requirement cannot be withdrawn, so the tap is rebuilt whenever the press comes or goes.
+            for old in [tapRecognizer, pressRecognizer as UIGestureRecognizer?].compactMap({ $0 }) { sv.removeGestureRecognizer(old) }
+            pressRecognizer = nil
+            let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+            tap.delegate = self
+            if parent.onLongPress != nil {
+                let press = UILongPressGestureRecognizer(target: self, action: #selector(handlePress(_:)))
+                // A press held and then lifted must not also scrub; an early lift fails the press, so a tap is not delayed.
+                tap.require(toFail: press)
+                sv.addGestureRecognizer(press)
+                pressRecognizer = press
+            }
+            sv.addGestureRecognizer(tap)
+            tapRecognizer = tap
+        }
+
         func tap(_ sv: UIScrollView, at p: CGPoint) {
             guard !pillOwns(p, in: sv) else { return }
             guard let target = tapTarget(x: p.x, y: p.y) else {
@@ -761,14 +773,14 @@ struct TimelineScrubber: UIViewRepresentable {
                 }
                 return data.time(atX: x)
             }
-            // The day row is a row of labels — each day's date at its noon, its
-            // sun times where they fall — so a tap goes to the nearest one. A
+            // The day row is a row of labels — each day's date where it is drawn,
+            // its sun times where they fall — so a tap goes to the nearest one. A
             // sunrise is a moment on the strip and scrubs there like anything
             // else; only the date is a different question.
             let sun = nearest(data.visibleDays.flatMap { day in
                 [day.sunrise, day.sunset].compactMap { $0 }
             }, toX: x)
-            let date = nearest(data.visibleDays.map { noonLocal($0.start, data.tz) }, toX: x)
+            let date = nearest(data.visibleDays.map(data.dayLabelTime), toX: x)
             guard let sun, sun.dx < (date?.dx ?? .greatestFiniteMagnitude) else { return nil }
             return sun.time
         }
