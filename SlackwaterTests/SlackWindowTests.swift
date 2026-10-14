@@ -80,13 +80,35 @@ final class SlackWindowTests: XCTestCase {
                               WindowRun(start: s(500), end: s(700))])
     }
 
-    /// The axis prints one time per run, at the run's opening, and the bare
-    /// slack instant only where no run covers a slack (the hairline case).
-    func testCurrentAxisMomentsNameRunStartsAndBareSlacks() {
+    /// The axis prints one time per run, at the run's opening.
+    func testCurrentAxisMomentsNameRunStarts() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
-        let runs = [WindowRun(start: s(50), end: s(340)), WindowRun(start: s(500), end: s(700))]
-        let moments = currentAxisMoments(runs: runs, slacks: [s(76), s(188), s(600), s(999)])
-        XCTAssertEqual(moments, [s(50), s(500), s(999)])
+        let runs = [WindowRun(start: s(500), end: s(700)), WindowRun(start: s(50), end: s(340))]
+        XCTAssertEqual(currentAxisMoments(runs: runs), [s(50), s(500)])
+    }
+
+    /// A fast reversal whose bracketing samples are both outside the band, at
+    /// unequal speeds: the window is where the straight line between them is
+    /// within ±threshold.
+    func testFastReversalOutsideTheBandHasAnInterpolatedWindow() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = [CurrentPoint(time: t0, speed: 3),
+                   CurrentPoint(time: t0.addingTimeInterval(600), speed: 1.5),
+                   CurrentPoint(time: t0.addingTimeInterval(1200), speed: -1),
+                   CurrentPoint(time: t0.addingTimeInterval(1800), speed: -3)]
+        let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(960), threshold: 0.5))
+        // v = 1.5 − 2.5·f over the segment: +0.5 at f = 0.4, −0.5 at f = 0.8.
+        XCTAssertEqual(w.start.timeIntervalSince(t0), 840, accuracy: 0.01)
+        XCTAssertEqual(w.end.timeIntervalSince(t0), 1080, accuracy: 0.01)
+    }
+
+    /// Two samples on the same side of zero bracket no reversal, so a slack
+    /// placed between them still has no window.
+    func testSameSignSamplesOutsideTheBandHaveNoWindow() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = [CurrentPoint(time: t0, speed: -2),
+                   CurrentPoint(time: t0.addingTimeInterval(600), speed: -1)]
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(300), threshold: 0.5))
     }
 }

@@ -57,6 +57,41 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
+    /// A run narrower than a turn's dot draws as that dot at its centre, and
+    /// its halo erases the ground under it the way a turn dot's does.
+    @MainActor
+    func testAShortSlackRunDrawsTheDot() throws {
+        let renderer = ImageRenderer(content:
+            Canvas { context, size in
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: 12))
+                line.addLine(to: CGPoint(x: 80, y: 12))
+                var run = Path()
+                run.move(to: CGPoint(x: 39, y: 12))
+                run.addLine(to: CGPoint(x: 41, y: 12))
+                CurveDrawing.currentLine(context, line, slackRuns: [run], samples: [],
+                                         nowX: 0, width: size.width, height: size.height)
+                CurveDrawing.runs(context, [run], nowX: 0, width: size.width, height: size.height)
+            }
+            .frame(width: 80, height: 24)
+            .background(Color.red))
+        let image = try XCTUnwrap(renderer.uiImage?.cgImage)
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: image.width, height: image.height,
+                                              bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let centre = (12 * image.width + 40) * 4
+        XCTAssertGreaterThan(pixels[centre + 1], pixels[centre + 2], "the dot is not the go colour")
+        let halo = (12 * image.width + 44) * 4
+        XCTAssertGreaterThan(pixels[halo], 200, "the halo must erase down to what is behind the strip")
+        XCTAssertLessThan(pixels[halo + 1], 80, "the halo must erase down to what is behind the strip")
+        let line = (12 * image.width + 50) * 4
+        XCTAssertGreaterThan(pixels[line + 2], pixels[line], "the curve continues beyond the halo")
+    }
+
     private var friday: TideStationRecord {
         TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
     }

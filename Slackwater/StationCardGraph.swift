@@ -108,8 +108,7 @@ nonisolated struct StationCardGraph: View {
     /// effective threshold — never re-derived in the canvas (§6.1). Only
     /// signed current curves carry them.
     var windows: [WindowRun] = []
-    /// Every slack instant on the curve, so the axis can print the bare
-    /// instant where no run covers a slack. Only signed current curves.
+    /// A derived gate's slack instants, each drawn as a dot on the zero line.
     var slacks: [Date] = []
     /// A normalized phase shape, never a speed measurement.
     var speedsAreSchematic = false
@@ -168,7 +167,7 @@ nonisolated struct StationCardGraph: View {
             // Slack: each run is a REAL sub-path of the curve (interpolated
             // endpoints), computed by the builders from the SHARED
             // slackWindow predicate — never re-derived here.
-            let segs = windows.filter { $0.end > $0.start }.map { w -> Path in
+            let segs = windows.map { w -> Path in
                 var seg = Path()
                 seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
                 for p in points where p.time > w.start && p.time < w.end {
@@ -391,8 +390,7 @@ extension CurrentStationRecord {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
-            slacks: slackTimes)
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold))
     }
 }
 
@@ -419,7 +417,6 @@ extension ChsOnlineWindow {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
-            slacks: slackTimes)
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold))
     }
 }

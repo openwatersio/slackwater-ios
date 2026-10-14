@@ -24,21 +24,17 @@ struct CurrentLead: View {
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
 
-    private var phase: CurrentPhase { currentPhase(signed: signed) }
-    private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil || phase == .slack }
+    private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil }
+    private var phase: CurrentPhase { isSlack ? .slack : signed >= 0 ? .flood : .ebb }
     private var tilde: String { provisional ? "~" : "" }
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
     /// The stops the commentary walks: a window opening, its closing (the
-    /// run that begins), each max, a bare slack where no window exists, and
-    /// the sun's next rise or set when it beats all of them.
+    /// run that begins), each max, and the sun's next rise or set when it
+    /// beats all of them.
     var nextSignificant: CommentaryStop? {
         var stops: [(time: Date, text: String)] = []
-        // The windows' own slacks, gathered once: the event loop below asks
-        // this of every slack event, and the linear scan it replaces made
-        // that quadratic across a week of events.
-        var windowSlacks = Set<Date>()
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
         for w in timeline.slackWindows {
             stops.append((w.start, "Slack"))
@@ -48,15 +44,9 @@ struct CurrentLead: View {
                 let v = timeline.velocityAt(w.end.addingTimeInterval(1))
                 stops.append((w.end, v >= 0 ? "Flood" : "Ebb"))
             }
-            windowSlacks.insert(w.slack)
         }
-        for e in timeline.currentEvents {
-            switch e.kind {
-            case .slack:
-                if !windowSlacks.contains(e.time) { stops.append((e.time, "Slack")) }
-            case .maxFlood, .maxEbb:
-                stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
-            }
+        for e in timeline.currentEvents where e.kind != .slack {
+            stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
         }
         // The tilde belongs to the water's numbers, not to the sun's clock,
         // so it goes on here rather than in `commentary`.
@@ -115,7 +105,7 @@ struct CurrentLead: View {
     }
 
     var body: some View {
-        let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(isSlack ? .slack : phase)
+        let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(phase)
         LeadCard(value: "\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))",
                  unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),

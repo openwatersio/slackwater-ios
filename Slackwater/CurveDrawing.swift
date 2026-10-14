@@ -185,7 +185,7 @@ enum CurveDrawing {
         var track = ctx
         let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
         let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
-        for run in slackRuns {
+        for run in slackRuns where !isDot(run) {
             let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
             let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
             let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
@@ -205,13 +205,46 @@ enum CurveDrawing {
 
     /// The slack runs: the line itself turns the go colour along each
     /// segment. No end dots: a run is one mark, and its opening time goes on
-    /// the axis.
+    /// the axis. A run shorter than a turn's dot draws as that dot: a stroke that short reads as a blot.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
         for seg in segments {
-            strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
-                             lineWidth: CurveStyle.runWidth)
+            if isDot(seg) {
+                let centre = runCentre(seg)
+                dot(ctx, at: centre,
+                    color: SN.go.opacity(centre.x < nowX ? CurveStyle.pastLabelFade : 1))
+            } else {
+                strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
+                                 lineWidth: CurveStyle.runWidth)
+            }
         }
+    }
+
+    static func isDot(_ run: Path) -> Bool {
+        let xs = vertices(run).map(\.x)
+        return (xs.max() ?? 0) - (xs.min() ?? 0) < CurveStyle.dotRadius * 2
+    }
+
+    static func runCentre(_ run: Path) -> CGPoint {
+        let points = vertices(run)
+        let xs = points.map(\.x)
+        let midX = ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2
+        for (a, b) in zip(points, points.dropFirst()) where min(a.x, b.x) <= midX && midX <= max(a.x, b.x) {
+            let f = b.x == a.x ? 0.5 : (midX - a.x) / (b.x - a.x)
+            return CGPoint(x: midX, y: a.y + (b.y - a.y) * f)
+        }
+        return points.first ?? .zero
+    }
+
+    private static func vertices(_ run: Path) -> [CGPoint] {
+        var points: [CGPoint] = []
+        run.forEach { element in
+            switch element {
+            case .move(let p), .line(let p): points.append(p)
+            default: break
+            }
+        }
+        return points
     }
 
     /// A reading hanging off a turn or peak in the direction `toward`
