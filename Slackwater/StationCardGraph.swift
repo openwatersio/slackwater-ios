@@ -122,6 +122,11 @@ nonisolated struct StationCardGraph: View {
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
+    /// One time per run, under its mark at the card's own scale.
+    static func axisMoments(_ runs: [WindowRun], pointsPerHour: CGFloat) -> [Date] {
+        runs.map { $0.axisMoment(pointsPerHour: pointsPerHour) }.sorted()
+    }
+
     var body: some View {
         Canvas { context, size in
             guard points.count > 1 else { return }
@@ -219,7 +224,7 @@ nonisolated struct StationCardGraph: View {
             if showsTimes {
                 axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText) }
                 if includesZero {
-                    axisMoments += currentAxisMoments(runs: windows, slacks: slacks).map { ($0, nil) }
+                    axisMoments += Self.axisMoments(windows, pointsPerHour: xScale * 3600).map { ($0, nil) }
                 }
             }
             let axisTimes = axisMoments

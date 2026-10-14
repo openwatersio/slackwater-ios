@@ -107,6 +107,18 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(r.symbol, "arrow.left.arrow.right")
     }
 
+    func testWordIsNotSlackOutsideAWindowBelowTheFixedThreshold() throws {
+        // A weak flood that never turns: under 0.15 kn at its weakest, with no slack and so no window.
+        let weak = SteadyCurrent(station: Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 0.5, phase: 0)],
+                                                  offset: 0.6))
+        let p = try XCTUnwrap(weak.speeds(from: now, to: now.addingTimeInterval(13 * 3600), step: 600)
+            .first { abs($0.speed) < slackKn })
+        let r = try XCTUnwrap(ComplicationReading.build(.current(weak, tz: utc, name: "Weak"), now: p.time))
+        XCTAssertTrue(r.slackRuns.isEmpty)
+        XCTAssertEqual(r.word, "Flooding", "the phone's lead says Slack only inside a window")
+        XCTAssertEqual(r.symbol, "arrow.up.right")
+    }
+
     func testCurrentGaugeEndsAtTheWindow() throws {
         let g = try XCTUnwrap(ComplicationReading.build(current, now: now)?.gauge)
         let start = try XCTUnwrap(g.windowStart)

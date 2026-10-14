@@ -81,12 +81,24 @@ final class SlackWindowTests: XCTestCase {
                               WindowRun(start: s(500), end: s(700))])
     }
 
-    /// The axis prints one time per run, at the run's opening.
-    func testCurrentAxisMomentsNameRunStarts() {
+    /// The card prints one time per run under its mark: a stroke at its opening, a dot at its centre,
+    /// judged at the card's own scale rather than the strip's.
+    func testTheCardPrintsEachRunWhereItDrawsTheRun() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
-        let runs = [WindowRun(start: s(500), end: s(700)), WindowRun(start: s(50), end: s(340))]
-        XCTAssertEqual(currentAxisMoments(runs: runs), [s(50), s(500)])
+        let cardPPH: CGFloat = 350 / CGFloat(StationCardGraph.window / 3600)
+        let stroke = WindowRun(start: s(50), end: s(340))
+        let dot = WindowRun(start: s(500), end: s(520))
+        XCTAssertFalse(dot.isDot, "a run the strip strokes")
+        XCTAssertEqual(StationCardGraph.axisMoments([dot, stroke], pointsPerHour: cardPPH), [s(50), s(510)])
+
+        for run in [stroke, dot] {
+            var path = Path()
+            path.move(to: CGPoint(x: 10, y: 40))
+            path.addLine(to: CGPoint(x: 10 + CGFloat(run.end.timeIntervalSince(run.start) / 3600) * cardPPH, y: 40))
+            XCTAssertEqual(CurveDrawing.isDot(path), run.drawsAsDot(pointsPerHour: cardPPH),
+                           "the card draws \(run) one way and times it the other")
+        }
     }
 
     /// A dot is one mark, so it is one magnet stop and one event time, at its centre.

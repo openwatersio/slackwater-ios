@@ -208,6 +208,7 @@ The curve spans 1.5 tidal swings back and 2.5 ahead of the card's moment, where 
 - Tide highs and lows get a dot; current peaks do not.
 - Axis times hide within 20 units of either edge and value labels within 34, so nothing is clipped.
 - The past fades to 45% opacity, and a now dot rides the curve.
+- A measured current's slack windows draw as green runs on the line, each with one axis time at its opening. A window narrower than a turn's dot at the card's scale draws as that dot, and its time sits at the dot, the window's centre.
 - A derived gate draws a schematic shape with green dots at its slack times.
 - Times use the station's time zone and the locale's hour format.
 

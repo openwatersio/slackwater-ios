@@ -105,10 +105,16 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
     return runs
 }
 
-/// The moments a station card's current axis prints: each run's opening, the
-/// time a planner is aiming at (spec §4 rule 7). Sorted.
-func currentAxisMoments(runs: [WindowRun]) -> [Date] {
-    runs.map(\.start).sorted()
+extension WindowRun {
+    var centre: Date { start.addingTimeInterval(end.timeIntervalSince(start) / 2) }
+    /// From the duration at a surface's scale, so data code agrees with that surface's drawing without a Path.
+    func drawsAsDot(pointsPerHour: CGFloat) -> Bool {
+        CurveStyle.runDrawsAsDot(width: CGFloat(end.timeIntervalSince(start) / 3600) * pointsPerHour)
+    }
+    /// The axis prints where the run's mark is: a dot's centre, a stroke's opening (spec §4 rule 7).
+    func axisMoment(pointsPerHour: CGFloat) -> Date {
+        drawsAsDot(pointsPerHour: pointsPerHour) ? centre : start
+    }
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

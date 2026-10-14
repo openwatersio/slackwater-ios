@@ -657,7 +657,8 @@ every mark that only earns its place at scale. The card and the widget are
   off the peak inside its lobe. Values near the curve never carry a unit —
   the reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
-  one time per run at its opening. Peak times are not shown; they are in
+  one time per run at its opening, or at its centre for a run drawn as a
+  dot (§5.3). Peak times are not shown; they are in
   the schedule behind the detail.
 - **Colour is state** (§6): the go colour for the run and its dots, and
   nothing coloured by direction on the line or the marks. The card's fill is

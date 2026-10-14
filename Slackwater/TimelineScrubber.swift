@@ -698,7 +698,7 @@ struct TimelineScrubber: UIViewRepresentable {
             tap(sv, at: g.location(in: sv))
         }
 
-        /// The pills draw over the strip but cannot keep a touch from its recognizers, so a tap on one would also scrub.
+        /// The pills draw over the strip but cannot keep a touch from its recognizers, so a tap or press on one would also act on the strip.
         func pillOwns(_ p: CGPoint, in sv: UIScrollView) -> Bool {
             let viewport = CGPoint(x: p.x - sv.contentOffset.x, y: p.y - sv.contentOffset.y)
             return parent.restingPills.contains { $0.contains(viewport) }
@@ -719,6 +719,7 @@ struct TimelineScrubber: UIViewRepresentable {
             tap.delegate = self
             if parent.onLongPress != nil {
                 let press = UILongPressGestureRecognizer(target: self, action: #selector(handlePress(_:)))
+                press.delegate = self
                 // A press held and then lifted must not also scrub; an early lift fails the press, so a tap is not delayed.
                 tap.require(toFail: press)
                 sv.addGestureRecognizer(press)
