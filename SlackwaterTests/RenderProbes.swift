@@ -158,14 +158,14 @@ func blankStripInk(tz: TimeZone, now: Date = appNow()) -> Double {
 /// this bitmap, not into it. A geometry change moves all six numbers, so
 /// re-measure rather than nudging the threshold.
 ///
-///     no track (day chrome only)   0.028
-///     online gate (fetched speeds) 0.075   ← the lowest drawn shape
-///     derived gate (schematic ±1)  0.090
-///     Boston tide                  0.097
-///     Avonmouth tide               0.102
-///     Friday Harbor tide           0.115
+///     no track (day chrome only)   0.005
+///     derived gate (schematic ±1)  0.040   ← the lowest drawn shape
+///     online gate (fetched speeds) 0.055
+///     Avonmouth tide               0.084
+///     Boston tide                  0.098
+///     Friday Harbor tide           0.129
 ///
-/// 0.046 sits in the gap, with ~1.6× of margin either side. The online gate
-/// sets the low end: its fetched curve spends the window near zero, hugging
-/// the middle of a plot the tide curves fill top to bottom.
-let drawnStripInk = 0.046
+/// 0.014 sits in the gap, with ~2.8× of margin either side. The currents set
+/// the low end: only their flood lobes carry a fill, and the derived gate's
+/// schematic shape has no speed thread.
+let drawnStripInk = 0.014

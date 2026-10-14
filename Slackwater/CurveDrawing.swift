@@ -108,23 +108,23 @@ enum CurveDrawing {
                                               endPoint: CGPoint(x: 0, y: bottom)))
     }
 
-    /// The current fill, anchored at zero: clear at slack and intensifying
-    /// outward, blue in both directions — the set arrows and the schedule
-    /// pills carry flood against ebb; the fill only says how far from slack
-    /// the water is. Symmetric about zero even when the plot is not: the
-    /// gradient spans the larger half either side, so a 3 kn flood against a
-    /// 1 kn ebb intensifies at the same rate per point on both sides.
+    /// The current fill, beneath the curve only: blue at the flood peaks,
+    /// clear at slack. In an ebb lobe the curve-to-zero area lies above the
+    /// curve, over the sky, and a tide chart never fills there. The gradient
+    /// spans the larger half of the plot, so its rate per point does not
+    /// depend on how strong the flood is against the ebb.
     static func zeroFill(_ ctx: GraphicsContext, _ area: Path,
                          plotTop: CGFloat, plotBottom: CGFloat, zeroY: CGFloat) {
         let half = max(zeroY - plotTop, plotBottom - zeroY)
-        ctx.fill(area, with: .linearGradient(
+        var flood = ctx
+        flood.clip(to: Path(CGRect(x: -1e6, y: -1e6, width: 2e6, height: zeroY + 1e6)))
+        flood.fill(area, with: .linearGradient(
             Gradient(stops: [
                 .init(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
-                .init(color: SN.graphLine.opacity(0), location: 0.5),
-                .init(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 1),
+                .init(color: SN.graphLine.opacity(0), location: 1),
             ]),
             startPoint: CGPoint(x: 0, y: zeroY - half),
-            endPoint: CGPoint(x: 0, y: zeroY + half)))
+            endPoint: CGPoint(x: 0, y: zeroY)))
     }
 
     // MARK: Lines

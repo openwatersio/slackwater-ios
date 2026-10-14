@@ -92,6 +92,33 @@ final class RenderedStripTests: XCTestCase {
         XCTAssertGreaterThan(pixels[line + 2], pixels[line], "the curve continues beyond the halo")
     }
 
+    /// A flood lobe fills beneath its curve; an ebb lobe's curve-to-zero area sits above the
+    /// curve, and a tide chart never fills there, so it stays clear.
+    @MainActor
+    func testOnlyTheFloodLobeIsFilled() throws {
+        let renderer = ImageRenderer(content:
+            Canvas { context, size in
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                var area = Path()
+                area.move(to: CGPoint(x: 0, y: 50))
+                area.addLine(to: CGPoint(x: 0, y: 10))
+                area.addLine(to: CGPoint(x: 40, y: 10))
+                area.addLine(to: CGPoint(x: 40, y: 90))
+                area.addLine(to: CGPoint(x: 80, y: 90))
+                area.addLine(to: CGPoint(x: 80, y: 50))
+                area.closeSubpath()
+                CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: 100, zeroY: 50)
+            }
+            .frame(width: 80, height: 100))
+        let image = renderer.uiImage
+        let p = try pixels(XCTUnwrap(image))
+        let flood = (12 * p.width + 20) * 4
+        XCTAssertLessThan(p.bytes[flood], 200, "the flood lobe is filled beneath its curve")
+        let ebb = (80 * p.width + 60) * 4
+        XCTAssertEqual(p.bytes[ebb], 255, "the ebb lobe above its curve stays unfilled")
+        XCTAssertEqual(p.bytes[ebb + 1], 255)
+    }
+
     /// A tide held at 1 after one opening sample at 0, so the curve rides near the plot top and
     /// the shade beneath it is at full strength.
     private func flatTide(start: Date, end: Date, tz: TimeZone, days: [TimelineDay] = [],
@@ -199,8 +226,7 @@ final class RenderedStripTests: XCTestCase {
     /// (Severn, 13.7 ft/hr peak) near the top, so between them they exercise
     /// both ends of the ramp rather than one colour twice.
     ///
-    /// Measured at 1× on the 396pt canvas: Friday Harbor 0.115, Avonmouth
-    /// 0.102, against a no-track floor of 0.028 (`drawnStripInk`).
+    /// Measured ink for both stations is tabled at `drawnStripInk`.
     @MainActor
     func testTideRateRampDrawsOnQuietAndExtremeStations() throws {
         let now = appNow()
@@ -225,8 +251,7 @@ final class RenderedStripTests: XCTestCase {
     /// its metres of range) is pinned in NationalScaleTests; what this adds is
     /// that the far end of the bundle reaches the chart.
     ///
-    /// Measured at 1× on the 396pt canvas: Boston 0.097, against a no-track
-    /// floor of 0.028.
+    /// Measured ink is tabled at `drawnStripInk`.
     @MainActor
     func testUsEastCoastStationDrawsItsCurve() throws {
         let now = appNow()
@@ -255,9 +280,9 @@ final class RenderedStripTests: XCTestCase {
     /// plausible harmonic shape gives SlackwaterKit real highs and lows to lag
     /// into slacks, which is all a gate reads from its reference.
     ///
-    /// Measured at 1× on the 396pt canvas: 0.090 against a no-track floor of
-    /// 0.028 — a thin ±1 shape carries no fill under it, so it clears the
-    /// floor by less than any tide curve does.
+    /// The lowest drawn shape (tabled at `drawnStripInk`): a thin ±1 shape
+    /// with fill only in its positive half clears the floor by less than any
+    /// tide curve does.
     @MainActor
     func testDerivedGateDrawsItsSchematicStrip() throws {
         let port = TideStationRecord(
@@ -297,10 +322,9 @@ final class RenderedStripTests: XCTestCase {
     /// sine at the 15-minute official-sample cadence, spanning exactly
     /// `Timeline.window(anchor:)`.
     ///
-    /// Measured at 1× on the 396pt canvas: 0.075 against a no-track floor of
-    /// 0.028 — the lowest drawn shape the app has, and the one that sets
-    /// `drawnStripInk`. A fetched curve spends the window near zero, so it
-    /// occupies less of the plot than a tide sweeping it top to bottom.
+    /// Measured ink is tabled at `drawnStripInk`. A fetched curve spends the
+    /// window near zero, so it occupies less of the plot than a tide
+    /// sweeping it top to bottom.
     @MainActor
     func testOnlineGateDrawsItsFetchedStrip() throws {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
