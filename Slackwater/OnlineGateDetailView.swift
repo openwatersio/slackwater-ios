@@ -178,12 +178,18 @@ struct OnlineGateDetailView: View {
             // rather than @ObservedObject-ing the service keeps the fit
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
-                if let pendingAnchor { applyIfStored(pendingAnchor) }
+                if let pendingAnchor { landIfCovered(pendingAnchor) }
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
                 rebuild()
             }
             .onReceive(ChsFitService.shared.$onlineStates
-                .map { $0[gate.id] ?? .idle }.removeDuplicates()) { fetchState = $0 }
+                .map { $0[gate.id] ?? .idle }.removeDuplicates()) { state in
+                    // The service's own retry re-checks only today's block, so a
+                    // pending week asks again when the backoff ends.
+                    let backedOff = if case .deferred = fetchState { state == .idle } else { false }
+                    fetchState = state
+                    if backedOff { fetchPending() }
+                }
             .onReceive(ChsFitService.shared.$onlineProgress
                 .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
@@ -236,22 +242,27 @@ struct OnlineGateDetailView: View {
     /// and the card under the strip says so — the scrubber never gives way to
     /// the honesty card for a week the user only scrolled toward.
     private func extend(to next: Date) {
-        if applyIfStored(next) { return }
         pendingAnchor = next
+        if landIfCovered(next) { return }
         fetchPending()
     }
 
-    /// Moves the window to `next` when a stored block covers it and the scrub
-    /// still rests inside that window — a reader who scrolled back while it
-    /// downloaded keeps the week they returned to.
+    /// Ends the pending move once a block covers `next` — the store's, or
+    /// `fetched` when the save behind it failed. The window moves only if the
+    /// scrub still rests at the edge that asked for `next`: a reader who
+    /// scrolled back to today while it downloaded keeps today.
     @discardableResult
-    private func applyIfStored(_ next: Date) -> Bool {
-        guard ChsModelStore.loadOnline(gate.id)?.block(covering: next) != nil else { return false }
+    private func landIfCovered(_ next: Date, fetched: ChsOnlineWindow? = nil) -> Bool {
+        guard pendingAnchor == next,
+              let block = ChsModelStore.loadOnline(gate.id)?.block(covering: next)
+                ?? fetched.flatMap({ $0.covers(anchor: next) ? $0 : nil })
+        else { return false }
         pendingAnchor = nil
-        let w = Timeline.window(anchor: next)
-        guard scrubTime >= w.start, scrubTime <= w.end else { return true }
+        guard Timeline.edgeReanchor(settledAt: scrubTime, anchor: anchor,
+                                    viewportPts: viewportPts, tz: tz) == next else { return true }
         anchor = next
-        applyAnchor()
+        window = block
+        rebuild()
         return true
     }
 
@@ -261,9 +272,9 @@ struct OnlineGateDetailView: View {
         guard let next = pendingAnchor, net.online else { return }
         Task { @MainActor in
             for _ in 0..<2 {
-                guard (try? await ChsFitService.fetchOnlineWindow(for: gate, from: next)) != nil,
+                guard let fetched = try? await ChsFitService.fetchOnlineWindow(for: gate, from: next),
                       pendingAnchor == next else { return }
-                if applyIfStored(next) { return }
+                if landIfCovered(next, fetched: fetched) { return }
             }
         }
     }
