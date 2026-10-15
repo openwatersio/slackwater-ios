@@ -169,6 +169,21 @@ enum Timeline {
         let w = window(anchor: anchor)
         return t < w.start || t > w.end ? dayLocal(t, tz) : nil
     }
+
+    /// `reanchor(settledAt:)` for a strip that ends with its window — the
+    /// online gate's. Its scroll view clamps the centerline half a viewport
+    /// inside either end, so a scrub there never settles outside the window
+    /// and the plain rule never fires. Instead: the day it rests on, once it
+    /// rests within reach of an end. The extra hour absorbs the magnet and
+    /// pixel rounding at the clamp.
+    static func edgeReanchor(settledAt t: Date, anchor: Date, viewportPts: CGFloat, tz: TimeZone) -> Date? {
+        guard viewportPts > 0 else { return nil }
+        let w = window(anchor: anchor)
+        let reach = Double(viewportPts / 2 / pph) * 3600 + 3600
+        guard t >= w.end.addingTimeInterval(-reach) || t <= w.start.addingTimeInterval(reach) else { return nil }
+        let next = dayLocal(t, tz)
+        return next == anchor ? nil : next
+    }
 }
 
 /// Is the strip parked somewhere other than now? The one definition, shared by

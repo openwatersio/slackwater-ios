@@ -50,4 +50,27 @@ final class TimelineSnapTests: XCTestCase {
         let before = w.start.addingTimeInterval(-3_600)
         XCTAssertEqual(Timeline.reanchor(settledAt: before, anchor: anchor, tz: tz), dayLocal(before, tz))
     }
+
+    /// The online gate's strip stops half a viewport inside its window, so the
+    /// furthest a scrub can rest is that far in from either end.
+    func testEdgeReanchorFiresAtTheClampedEnds() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let anchor = dayLocal(Date(timeIntervalSince1970: 1_791_000_000), tz)
+        let w = Timeline.window(anchor: anchor)
+        let viewport: CGFloat = 393
+        let half = Double(viewport / 2 / Timeline.pph) * 3600
+        let lastReachable = w.end.addingTimeInterval(-half)
+        XCTAssertEqual(Timeline.edgeReanchor(settledAt: lastReachable, anchor: anchor, viewportPts: viewport, tz: tz),
+                       dayLocal(lastReachable, tz))
+        let firstReachable = w.start.addingTimeInterval(half)
+        XCTAssertEqual(Timeline.edgeReanchor(settledAt: firstReachable, anchor: anchor, viewportPts: viewport, tz: tz),
+                       dayLocal(firstReachable, tz))
+        let midweek = anchor.addingTimeInterval(3 * 86_400)
+        XCTAssertNil(Timeline.edgeReanchor(settledAt: midweek, anchor: anchor, viewportPts: viewport, tz: tz))
+        XCTAssertNil(Timeline.edgeReanchor(settledAt: lastReachable, anchor: anchor, viewportPts: 0, tz: tz))
+        // The new window centres the resting scrub, well clear of its own ends.
+        let next = try XCTUnwrap(Timeline.edgeReanchor(settledAt: lastReachable, anchor: anchor,
+                                                       viewportPts: viewport, tz: tz))
+        XCTAssertNil(Timeline.edgeReanchor(settledAt: lastReachable, anchor: next, viewportPts: viewport, tz: tz))
+    }
 }

@@ -32,6 +32,10 @@ struct OnlineGateDetailView: View {
     /// discovery fallback when this gate carries no `tideReference`. Computed
     /// once on appear; the body re-evaluates on every scrub tick.
     @State private var nearbyTide: (item: StationItem, km: Double)?
+    @State private var viewportPts: CGFloat = 0
+    /// The day a scrub settled against the strip's end on, while its block
+    /// downloads. The week on screen stays put until it lands (`extend`).
+    @State private var pendingAnchor: Date?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -97,7 +101,7 @@ struct OnlineGateDetailView: View {
                             // is a week the picker can get back to; none is not.
                             canPickDate: window != nil,
                             onPickerOpen: prefetchNextBlock,
-                            onPicked: { _ in applyAnchor() },
+                            onPicked: { _ in pendingAnchor = nil; applyAnchor() },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
@@ -108,11 +112,13 @@ struct OnlineGateDetailView: View {
                                                      ebbDeg: window.ebbDirection,
                                                      sky: sky,
                                                      scrubTime: $scrubTime, onReturn: returnToNow,
-                                                     onResumeScrubbedAway: { live = appNow() })
+                                                     onResumeScrubbedAway: { live = appNow() },
+                                                     onViewportWidth: { viewportPts = $0 })
                                 }
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
+                                    if pendingAnchor != nil { extendingCard }
                                     // `tl`, never this view's `timeline`: that
                                     // property rebuilds the whole TimelineData
                                     // on every read, and the scaffold has
@@ -172,16 +178,34 @@ struct OnlineGateDetailView: View {
             // rather than @ObservedObject-ing the service keeps the fit
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
+                if let pendingAnchor { landIfCovered(pendingAnchor) }
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
                 rebuild()
             }
             .onReceive(ChsFitService.shared.$onlineStates
-                .map { $0[gate.id] ?? .idle }.removeDuplicates()) { fetchState = $0 }
+                .map { $0[gate.id] ?? .idle }.removeDuplicates()) { state in
+                    // The service's own retry re-checks only today's block, so a
+                    // pending week asks again when the backoff ends.
+                    let backedOff = if case .deferred = fetchState { state == .idle } else { false }
+                    fetchState = state
+                    if backedOff { fetchPending() }
+                }
             .onReceive(ChsFitService.shared.$onlineProgress
                 .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
+                if online { fetchPending() }
+            }
+            // The strip ends with its window, so a scrub carried to either end
+            // has nowhere left to go. Once it rests there, move the window —
+            // the same rest rule the endless details settle by.
+            .task(id: scrubTime) {
+                guard (try? await Task.sleep(for: .milliseconds(600))) != nil, timeline != nil,
+                      let next = Timeline.edgeReanchor(settledAt: scrubTime, anchor: anchor,
+                                                       viewportPts: viewportPts, tz: tz)
+                else { return }
+                extend(to: next)
             }
     }
 
@@ -211,6 +235,48 @@ struct OnlineGateDetailView: View {
         if let block = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) { window = block }
         rebuild()
         if timeline == nil, net.online { fetchNow(from: anchor) }
+    }
+
+    /// A scrub settled at the strip's end. A stored block moves the window at
+    /// once; otherwise the week on screen stays while the next one downloads,
+    /// and the card under the strip says so — the scrubber never gives way to
+    /// the honesty card for a week the user only scrolled toward.
+    private func extend(to next: Date) {
+        pendingAnchor = next
+        if landIfCovered(next) { return }
+        fetchPending()
+    }
+
+    /// Ends the pending move once a block covers `next` — the store's, or
+    /// `fetched` when the save behind it failed. The window moves only if the
+    /// scrub still rests at the edge that asked for `next`: a reader who
+    /// scrolled back to today while it downloaded keeps today.
+    @discardableResult
+    private func landIfCovered(_ next: Date, fetched: ChsOnlineWindow? = nil) -> Bool {
+        guard pendingAnchor == next,
+              let block = ChsModelStore.loadOnline(gate.id)?.block(covering: next)
+                ?? fetched.flatMap({ $0.covers(anchor: next) ? $0 : nil })
+        else { return false }
+        pendingAnchor = nil
+        guard Timeline.edgeReanchor(settledAt: scrubTime, anchor: anchor,
+                                    viewportPts: viewportPts, tz: tz) == next else { return true }
+        anchor = next
+        window = block
+        rebuild()
+        return true
+    }
+
+    /// Twice at most: the first call joins any fetch already in flight (the
+    /// picker's prefetch), which may be for a different block.
+    private func fetchPending() {
+        guard let next = pendingAnchor, net.online else { return }
+        Task { @MainActor in
+            for _ in 0..<2 {
+                guard let fetched = try? await ChsFitService.fetchOnlineWindow(for: gate, from: next),
+                      pendingAnchor == next else { return }
+                if landIfCovered(next, fetched: fetched) { return }
+            }
+        }
     }
 
     /// Always fetches the block the WINDOW is parked on — no default, so no
@@ -283,6 +349,17 @@ struct OnlineGateDetailView: View {
         }
     }
 
+    /// The download card's look, under the strip instead of in place of it.
+    private var extendingCard: some View {
+        ChsAmberCard(title: downloadTitle,
+                     headline: String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation."),
+                     action: downloadAction, identifier: "online-extending-card", status: downloadStatus,
+                     downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
+            fetchPending()
+        }
+        .padding(.horizontal, -16)
+    }
+
     private var downloadStatus: CardStatus {
         onlineGateStatus(window, online: net.online, state: fetchState)
     }
@@ -341,6 +418,7 @@ struct OnlineGateDetailView: View {
     // MARK: - Data
 
     private func returnToNow() {
+        pendingAnchor = nil
         live = appNow()
         scrubTime = live
         // The anchor too: return-to-now from a September window has to bring
