@@ -166,23 +166,25 @@ struct RectangularView: View {
     var body: some View {
         if !entry.premium { LockedComplication() }
         else if let card = entry.card, let graph = card.graph {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 4) {
-                    Text(verbatim: card.name).font(.headline).lineLimit(1)
-                    Spacer(minLength: 2)
-                    if card.locationMark { Image(systemName: "location.fill").font(.caption2) }
-                    else if favorite { Image(systemName: "star.fill").font(.caption2) }
-                }
-                cropped(graph).frame(maxHeight: .infinity).widgetAccentable()
+            // No name row: the face is too narrow for one, and the curve needs
+            // the height. The mark sits over the curve's top corner instead.
+            ZStack(alignment: .topTrailing) {
+                cropped(graph).widgetAccentable()
+                if card.locationMark { Image(systemName: "location.fill").font(.caption2) }
+                else if favorite { Image(systemName: "star.fill").font(.caption2) }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text(verbatim: card.name))
         } else { Text("Open Slackwater", comment: "Watch complication with nothing to show.") }
     }
 
-    /// The small widget's crop: half a swing back, one and a half ahead.
+    /// The small widget's crop: half a swing back, one and a half ahead,
+    /// with a lane under the curve so a hanging reading clears the times.
     private func cropped(_ g: StationCardGraph) -> StationCardGraph {
         var g = g
         g.back = 0.5 * StationCardGraph.swing
         g.forward = 1.5 * StationCardGraph.swing
+        g.timeLabelSpace = 14
         return g
     }
 }
