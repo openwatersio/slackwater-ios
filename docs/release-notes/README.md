@@ -1,6 +1,6 @@
 # Release notes
 
-One file per version, named for its `MARKETING_VERSION`. The promotion workflow drafts it from merged pull request titles, posts it as the build's TestFlight "What to Test", and uses it as the body of the `v$VERSION` GitHub release. Reviewers replace the generic `Worth testing:` paragraph when a release needs specific checks.
+One file per version, named for its `MARKETING_VERSION`. The promotion workflow posts it as the build's TestFlight "What to Test" (a `<version>-<build>.md` file wins when present; otherwise it collects merged pull request titles). Once the version is live on the App Store, everything above `Worth testing:` becomes the body of the `v$VERSION` GitHub release. Reviewers replace the generic `Worth testing:` paragraph when a release needs specific checks.
 
 ## Format
 
