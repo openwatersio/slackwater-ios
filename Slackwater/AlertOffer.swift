@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. What the strip offers for the moment on the centerline, and the draft a new rule starts from (docs/alerts.md §7.1).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 
 /// A height as the strip shows it — 0.1 ft, or 0.01 m — so a crossing rule is the reading the user
@@ -32,7 +33,7 @@ func derivedAlertOffer(onEclipseContact: Bool) -> AlertTrigger {
     onEclipseContact ? .eclipse : .slack
 }
 
-/// The magnet parks `scrubTime` on a snap target's own second; ±1 s is `atTurn`'s tolerance too.
+/// The magnet parks only on greatest eclipse and an exact move lands on any contact's own second; ±1 s is `atTurn`'s tolerance too.
 func isOnEclipseContact(_ time: Date, _ eclipses: [WindowEclipse]) -> Bool {
     eclipses.contains { $0.contacts.contains { abs($0.timeIntervalSince(time)) < 1 } }
 }

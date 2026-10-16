@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. Detail-view chrome and list state; the palette and formatters live in Palette.swift so the widget can share them.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import SwiftUI
 import WidgetKit
@@ -55,6 +56,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
+    /// Bumped with every selection the page sets, so the strip moves for it.
+    @State private var moveRequests = 0
     /// The moment a long press parked (§7.1). Cleared the moment the strip moves off it.
     @State private var pressedMoment: Date? = nil
     @State private var alertSubject: AlertSheetSubject? = nil
@@ -162,15 +165,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
-            .environment(\.stripPressed, { if alertOffer != nil { pressedMoment = scrubTime } })
+            .environment(\.stripMoveRequests, moveRequests)
+            .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
-            // VoiceOver's "Set an alert" has no line to go and find: it parks the moment and
-            // opens the sheet in one step.
-            .environment(\.stripAlertAction, {
-                guard let alertOffer else { return }
-                pressedMoment = scrubTime
-                openAlertSheet(alertOffer, pressedAt: scrubTime)
-            })
+            .environment(\.stripAlertAction, stripAlertAction)
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -228,6 +226,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     // a spring-forward day would otherwise open at 13:00.
                     let week = Timeline.window(anchor: picked)
                     if scrubTime < week.start || scrubTime > week.end {
+                        moveRequests += 1
                         scrubTime = noonLocal(picked, tz)
                     }
                     onPicked(picked)
@@ -278,6 +277,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// `linkedAnchor`'s — the picker's rule inverted, so a jump to later today
     /// doesn't re-key the schedule off today.
     private func jump(to t: Date) {
+        moveRequests += 1
         scrubTime = t
         if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
             anchor = day
@@ -288,16 +288,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // here, and opens its first build on `scrubTime` rather than now.
             anchor = todayLocal(tz)
         }
-    }
-
-    /// `jump(to:)` with the animated ride the tour's demo depends on. The
-    /// token bump comes FIRST so the strip's `jumpToken` is already different
-    /// by the time `scrubTime`'s change reaches `updateUIView` — reversed,
-    /// the offset write can land in the pass before the token and the strip
-    /// teleports.
-    private func glide(to t: Date) {
-        TourCoach.shared.requestGlide()
-        jump(to: t)
     }
 
     /// Advance the tour, gliding first where the next mark needs the strip
@@ -313,7 +303,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         default: nil
         }
         guard let target else { return }
-        glide(to: target)
+        jump(to: target)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(600))
             tourArrived = true
@@ -345,6 +335,22 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 .padding(.horizontal, 16)
         }
         .padding(.bottom, 12)
+    }
+
+    /// Nil without an offer, so the strip carries neither the press nor its VoiceOver action.
+    private var stripPressed: (@MainActor () -> Void)? {
+        guard alertOffer != nil else { return nil }
+        return { pressedMoment = scrubTime }
+    }
+
+    /// VoiceOver's "Set an alert" has no line to go and find: it parks the moment and opens the
+    /// sheet in one step.
+    private var stripAlertAction: (@MainActor () -> Void)? {
+        guard let alertOffer else { return nil }
+        return {
+            pressedMoment = scrubTime
+            openAlertSheet(alertOffer, pressedAt: scrubTime)
+        }
     }
 
     /// What the line opens: the rule it reads, else a new rule for the pressed moment, else one
@@ -381,7 +387,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
                              tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
-                             scrubTime: scrubTime, onTap: { scrubTime = $0 },
+                             scrubTime: scrubTime, onTap: { moveRequests += 1; scrubTime = $0 },
                              sunLocation: StationItem.byId[favoriteId])
         }
         .background(SN.cardFill)
@@ -475,6 +481,15 @@ extension EnvironmentValues {
         get { self[StripStationIDKey.self] }
         set { self[StripStationIDKey.self] = newValue }
     }
+    /// The scaffold's count of selections it set: the strip moves only when asked.
+    var stripMoveRequests: Int {
+        get { self[StripMoveRequestsKey.self] }
+        set { self[StripMoveRequestsKey.self] = newValue }
+    }
+}
+
+private struct StripMoveRequestsKey: EnvironmentKey {
+    static let defaultValue = 0
 }
 
 /// What the line's sheet opens on.
@@ -489,9 +504,9 @@ struct AlertSheetSubject: Identifiable {
 
 /// How the strip tells the scaffold it was pressed and held. Same reasoning as
 /// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
-/// have nothing to say about alerts.
+/// have nothing to say about alerts. Nil where the host has nothing to alert on.
 private struct StripPressedKey: EnvironmentKey {
-    static let defaultValue: @MainActor () -> Void = {}
+    static let defaultValue: (@MainActor () -> Void)? = nil
 }
 
 /// Whether the scaffold holds a pressed moment, so the strip can run its reading line down to
@@ -500,17 +515,18 @@ private struct StripIsPressedKey: EnvironmentKey {
     static let defaultValue = false
 }
 
-/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet.
+/// The strip's VoiceOver "Set an alert" action: park the moment and open the sheet. Nil
+/// wherever `stripPressed` is.
 private struct StripAlertActionKey: EnvironmentKey {
-    static let defaultValue: @MainActor () -> Void = {}
+    static let defaultValue: (@MainActor () -> Void)? = nil
 }
 
 extension EnvironmentValues {
-    var stripPressed: @MainActor () -> Void {
+    var stripPressed: (@MainActor () -> Void)? {
         get { self[StripPressedKey.self] }
         set { self[StripPressedKey.self] = newValue }
     }
-    var stripAlertAction: @MainActor () -> Void {
+    var stripAlertAction: (@MainActor () -> Void)? {
         get { self[StripAlertActionKey.self] }
         set { self[StripAlertActionKey.self] = newValue }
     }

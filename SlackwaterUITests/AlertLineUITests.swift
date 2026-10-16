@@ -201,7 +201,7 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssertNotEqual(reading.label, before, "the first swipe after the sheet closed did not scrub")
     }
 
-    /// The invariant `tap.require(toFail: press)` (TimelineStrip.swift) exists to protect: a
+    /// The invariant `tap.require(toFail: press)` (TimelineScrubber.swift) exists to protect: a
     /// press that ends in a lift leaves the reading exactly where the press put it, with no
     /// second scrub landing on top of it. Off-centre, not `pressStrip`'s centerline — a press
     /// there is self-stabilizing (the jump parks the pressed moment ON the centerline, so a

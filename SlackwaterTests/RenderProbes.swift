@@ -27,14 +27,14 @@ import UIKit
 /// "is anything drawn here". The same measure the UI suite takes off a device
 /// screenshot, over an `ImageRenderer` bitmap instead.
 ///
-/// The UI target's 0.05 threshold does NOT carry over, and reusing it would be
-/// worse than no test at all: it was calibrated against a device screenshot
-/// whose "blank" was 0.008 — a strip element holding only the centerline, the
-/// riding dot and the ft axis, SwiftUI overlays drawn ON TOP of the canvas. An
-/// `ImageRenderer` shot of `TimelineCanvas` alone has no overlays and the whole
-/// 228-hour span of day chrome. A completely blank chart would sail past 0.05
-/// here, and a drawn one sits under it. `drawnStripInk` is the threshold
-/// measured against the real floor; see it for the numbers.
+/// The UI target's threshold (`ScreenshotTestCase.drawnStripInk`) does NOT
+/// carry over: it is calibrated against a device screenshot whose "blank" was
+/// 0.008 — a strip element holding only the centerline, the riding dot and the
+/// ft axis, SwiftUI overlays drawn ON TOP of the canvas. An `ImageRenderer`
+/// shot of `TimelineCanvas` alone has no overlays and the whole 228-hour span
+/// of day chrome, so its floor and its drawn strips are different numbers.
+/// `drawnStripInk` here is measured against this bitmap's own floor; see it
+/// for the numbers.
 func inkFraction(_ image: UIImage) -> Double {
     guard let cg = image.cgImage else { return 0 }
     let w = cg.width, h = cg.height
@@ -158,14 +158,16 @@ func blankStripInk(tz: TimeZone, now: Date = appNow()) -> Double {
 /// this bitmap, not into it. A geometry change moves all six numbers, so
 /// re-measure rather than nudging the threshold.
 ///
-///     no track (day chrome only)   0.028
-///     online gate (fetched speeds) 0.075   ← the lowest drawn shape
-///     derived gate (schematic ±1)  0.090
-///     Boston tide                  0.097
-///     Avonmouth tide               0.102
-///     Friday Harbor tide           0.115
+///     no track (day chrome only)   0.005
+///     Friday Harbor tide           0.023   ← the lowest drawn shape
+///     Avonmouth tide               0.026
+///     Boston tide                  0.027
+///     derived gate (schematic ±1)  0.036
+///     online gate (fetched speeds) 0.047
 ///
-/// 0.046 sits in the gap, with ~1.6× of margin either side. The online gate
-/// sets the low end: its fetched curve spends the window near zero, hugging
-/// the middle of a plot the tide curves fill top to bottom.
-let drawnStripInk = 0.046
+/// The tides set the low end: the strip fills a tide only between chart datum
+/// and water below it, so a tide day is mostly its line, while a current fills
+/// beneath its curve. That leaves a 4.3× gap between the floor and Friday
+/// Harbor, too narrow for 2.5× of margin on both sides, so 0.011 sits at its
+/// geometric middle with ~2× either side.
+let drawnStripInk = 0.011

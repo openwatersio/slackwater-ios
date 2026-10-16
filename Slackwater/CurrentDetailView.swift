@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Current detail: a continuous current-only strip
 // beneath a fixed centerline, with a rolling schedule and paired tide link.
-// Product contract: docs/scrubber.md.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 
@@ -152,7 +152,7 @@ struct CurrentDetailView: View {
                     // or the first build covers now and the strip clamps it away.
                     let linked = anchor != .distantPast
                     if !linked { anchor = todayLocal(tz) }
-                    resetStore(focus: linked ? scrubTime : nil)
+                    resetStore(focus: linked ? scrubTime : FoldHandoff.pending(record.itemId))
                 }
                 RecentsStore.shared.record(record.itemId)
                 if record.isChs { chsModel = ChsModelStore.loadCurrent(record.id) }
@@ -163,6 +163,7 @@ struct CurrentDetailView: View {
                 }
             }
             .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .onChange(of: live) { _, now in store?.setNow(now) }
             // The schedule follows a scrub that has settled outside its window —
             // the strip is endless now. A cancelled sleep is a scrub still in
             // motion, same rest rule as the chrome row's.

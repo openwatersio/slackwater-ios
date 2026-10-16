@@ -19,6 +19,7 @@
 // - Day chrome: a night band needs the NEXT day's sunrise and the previous
 //   day's sunset, so a chunk carries one day of chrome beyond each end and the
 //   merge dedupes by day start.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import Foundation
 import SwiftUI
@@ -232,10 +233,9 @@ extension TimelineData {
         // The magnet's stops, assembled the way both monolithic builders do it.
         let sunTimes = days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentEvents.map(\.time) + sunTimes
-                              + eclipses.flatMap(\.contacts)
-                              + solarEclipses.flatMap(\.contacts)
-                              + windows.flatMap { [$0.start, $0.end] }))
+                              + currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
+                              + eclipses.map(\.peak)
+                              + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: anchor, today: today, start: start, end: end, days: days,
@@ -294,10 +294,6 @@ struct TimelineScale: Equatable {
 /// box has gone mostly empty. Between the two thresholds a pan never
 /// rescales. After adopting a fit the data reaches 1/1.06 ≈ 0.94 of the span,
 /// inside both thresholds, so an adoption is always a fixed point.
-///
-/// ponytail: a rescale lands as a snap. The upgrade path is animating
-/// `TimelineScale` toward the governor's target over a few frames before it
-/// reaches TimelineGeo; nothing else changes.
 enum ScaleGovernor {
     static let expandAt = 0.97
     static let contractAt = 0.65
@@ -367,6 +363,8 @@ final class ScrollGate {
     /// indices are stable for the life of the store.
     private var origin = Date.distantPast
     private var anchor = Date.distantPast
+    /// The local midnight of the session's `now`, so the day labels agree with the now dot.
+    private var today = Date.distantPast
     private var chunks: [Int: TimelineChunk] = [:]
     private var building: Set<Int> = []
     private var published: ClosedRange<Int>?
@@ -426,6 +424,7 @@ final class ScrollGate {
         guard origin == .distantPast else { return }
         origin = anchor
         self.anchor = anchor
+        today = dayLocal(now, tz)
         // `Timeline.backHours` either side, and it is the BACK one that has to
         // be this wide. Chunk 0 begins at the anchor's own midnight, so a
         // reach that does not clear midnight builds nothing behind today and
@@ -468,6 +467,14 @@ final class ScrollGate {
     func setAnchor(_ a: Date) {
         guard a != anchor else { return }
         anchor = a
+        if let published { apply(published) }
+    }
+
+    /// The session's `now` was sampled again. Same chunks, same start: safe at any moment.
+    func setNow(_ now: Date) {
+        let day = dayLocal(now, tz)
+        guard day != today else { return }
+        today = day
         if let published { apply(published) }
     }
 
@@ -564,7 +571,7 @@ final class ScrollGate {
         let solid = range.lowerBound...hi
         published = solid
         timeline = TimelineData.merged(solid.compactMap { chunks[$0] }, source: source,
-                                       anchor: anchor, today: todayLocal(tz))
+                                       anchor: anchor, today: today)
         // Drop chunks the window has left behind; a step back rebuilds them.
         // Keys collected before removing: mutating inside `for i in chunks.keys`
         // is well-defined in Swift (the iterator holds the original storage and

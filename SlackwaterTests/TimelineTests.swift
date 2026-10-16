@@ -2,10 +2,31 @@
 // (TimelineStrip.swift): fixed window and x↔time mapping, the now-readout
 // equivalence with the old model's committed readout, night continuity across
 // midnight, and the multi-day schedule window.
+import Almanac
 import SwiftUI
 import XCTest
 @testable import Slackwater
 import SlackwaterKit
+
+/// Wales, Alaska, in late July: sunset falls after local midnight, so a civil
+/// day's first sunset comes before its sunrise. Day chrome as the builders make it.
+func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
+    let tz = try XCTUnwrap(TimeZone(identifier: "America/Nome"))
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    let observer = try Observer(latitudeDeg: 65.61, longitudeDeg: -168.09)
+    let first = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 7, day: 20)))
+    let days = try (0..<5).map { i -> TimelineDay in
+        let start = try XCTUnwrap(cal.date(byAdding: .day, value: i, to: first))
+        let end = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: start))
+        let sun = try sunEvents(from: start, to: end, observer: observer)
+        return TimelineDay(offset: i, start: start,
+                           sunrise: sun.first { $0.kind == .rise }?.time,
+                           sunset: sun.first { $0.kind == .set }?.time,
+                           moonrise: nil, moonset: nil)
+    }
+    return (tz, days)
+}
 
 @MainActor final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
@@ -74,8 +95,9 @@ import SlackwaterKit
             updated.updateUIView(sv, coordinator: co)
             XCTAssertTrue(writes.isEmpty, "applying a window, external time, or jump must not publish inside updateUIView")
             XCTAssertEqual(scrub, requested)
-            XCTAssertEqual(shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(requested),
-                           0, accuracy: 300)
+            // A request within a week rides; a window shift alone keeps the centre.
+            let destination = co.magnetTarget ?? shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(destination.timeIntervalSince(requested), 0, accuracy: 300)
         }
         sv.contentOffset.x += 40
         XCTAssertEqual(writes.count, 1, "ordinary scrolling must publish after the view update returns")
@@ -215,6 +237,20 @@ import SlackwaterKit
         XCTAssertNil(FoldHandoff.take("a", at: 100 + FoldHandoff.freshFor + 1), "a different visit")
         FoldHandoff.slot = moment
         XCTAssertEqual(FoldHandoff.take("a", at: 100.5)?.time, moment.time)
+    }
+
+    /// The rebuilt detail reads the folded moment before its strip takes it, so
+    /// its first data is built around a moment far from now.
+    func testAPendingFoldIsReadWithoutTakingIt() {
+        defer { FoldHandoff.slot = nil }
+        let moment = FoldHandoff.Moment(stationID: "a", time: Date(timeIntervalSince1970: 0), live: false, closing: false, at: 100)
+        FoldHandoff.slot = moment
+        XCTAssertEqual(FoldHandoff.pending("a", at: 100.5), moment.time)
+        XCTAssertNotNil(FoldHandoff.slot, "pending leaves the moment for the strip's take")
+        XCTAssertNil(FoldHandoff.pending("b", at: 100.5), "another station's strip")
+        XCTAssertNil(FoldHandoff.pending("a", at: 100 + FoldHandoff.freshFor + 1), "a different visit")
+        FoldHandoff.slot = .init(stationID: "a", time: moment.time, live: true, closing: false, at: 100)
+        XCTAssertNil(FoldHandoff.pending("a", at: 100.5), "on now, the ordinary build already covers it")
     }
 
     /// A fold rebuilds the detail. Closing lands the cover screen's strip on the
@@ -513,6 +549,35 @@ import SlackwaterKit
         XCTAssertGreaterThanOrEqual(checked, 7)
     }
 
+    /// Where sunset follows local midnight, each sun event pairs with the next one rather than with its civil day's,
+    /// and each day's name centres on the daylight its sunrise begins.
+    func testSunBandsPairBySuccessionWhereSunsetFollowsMidnight() throws {
+        let (tz, days) = try lateSunsetDays()
+        XCTAssertTrue(days.contains { d in
+            guard let rise = d.sunrise, let set = d.sunset else { return false }
+            return set < rise
+        }, "no day here sets before it rises: the fixture proves nothing")
+        let start = days[0].start, end = try XCTUnwrap(days.last?.start)
+        let data = TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: days,
+                                tidePoints: [], tideRates: [], tideExtremes: [],
+                                currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+        let spans = data.sunSpans
+        XCTAssertGreaterThanOrEqual(spans.count, 8)
+        for (a, b) in zip(spans, spans.dropFirst()) {
+            XCTAssertEqual(a.end, b.start, "bands must meet without overlapping")
+            XCTAssertNotEqual(a.daylight, b.daylight, "night and daylight must alternate")
+        }
+        for d in days.dropLast() {
+            let rise = try XCTUnwrap(d.sunrise)
+            let daylight = try XCTUnwrap(spans.first { $0.daylight && $0.start == rise }, "\(d.start) has no daylight")
+            let label = data.dayLabelTime(d)
+            XCTAssertTrue(daylight.start < label && label < daylight.end, "\(d.start)'s name sits in the night")
+        }
+        let last = try XCTUnwrap(days.last)
+        XCTAssertEqual(data.dayLabelTime(last), noonLocal(last.start, tz),
+                       "a daylight with no following sunset centres the name on noon")
+    }
+
     /// Day chrome draws every day the strip touches, and nothing else draws a
     /// snap stop. The filter behind `drawDayChrome` was a literal `offset <= 5`
     /// left over from the 132h strip: days 6 and 7 of the week drew no night
@@ -623,13 +688,12 @@ import SlackwaterKit
             .contains("오전 \u{2007}7:05"))
     }
 
-    /// An external scrub — a tapped commentary pill, return-to-now — rides the
-    /// magnet's animated path so the curve eases under the centerline, except
+    /// A programmatic move — a pill, return-to-now, a schedule row, a tap —
+    /// rides the animated path so the curve eases under the centerline, except
     /// under Reduce Motion, where it lands directly. A source scan, not a
-    /// behaviour test: the branch lives in `updateUIView`, which needs a real
-    /// `UIScrollView` and a live `UIAccessibility`, and this target can inject
-    /// neither. The UI suite covers what a scrub actually does; this only
-    /// guards the accessibility branch from being simplified away.
+    /// behaviour test: the branch needs a live `UIAccessibility`, which this
+    /// target cannot inject. The UI suite covers what a scrub actually does;
+    /// this only guards the accessibility branch from being simplified away.
     ///
     /// The branch asks `landsInstantly`, which is the Reduce Motion question
     /// with `-uiTestQuiet` folded in, so `assertLandsInstantly` below keeps
@@ -637,16 +701,16 @@ import SlackwaterKit
     func testExternalScrubHonoursReduceMotion() throws {
         let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
-        guard let start = lines.firstIndex(where: { $0.contains("if co.seenJump != jumpToken {") }),
-              let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
-        else { return XCTFail("the jump branch was not found — this tripwire needs retargeting") }
-        let jump = lines[start...offset].joined(separator: "\n")
+        guard let start = lines.firstIndex(where: { $0.contains("func move(_ sv: UIScrollView, to target: Date") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("syncGate(sv)") })
+        else { return XCTFail("the move was not found — this tripwire needs retargeting") }
+        let move = lines[start...end].joined(separator: "\n")
         assertLandsInstantlyAsksAboutReduceMotion(source)
-        XCTAssertTrue(jump.contains("landsInstantly"),
-                      "the jump must ask about Reduce Motion before animating")
-        XCTAssertTrue(jump.contains("co.magneting = false"),
-                      "the direct landing clears the magnet rather than riding it")
-        XCTAssertTrue(jump.contains("animated: true"),
+        XCTAssertTrue(move.contains("landsInstantly"),
+                      "the move must ask about Reduce Motion before animating")
+        XCTAssertTrue(move.contains("sv.contentOffset = CGPoint(x: offset, y: 0)"),
+                      "the direct landing sets the offset rather than riding to it")
+        XCTAssertTrue(move.contains("animated: true"),
                       "and the ordinary path animates the travel")
     }
 
@@ -664,7 +728,7 @@ import SlackwaterKit
         assertLandsInstantlyAsksAboutReduceMotion(source)
         XCTAssertTrue(magnet.contains("landsInstantly"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
-        XCTAssertTrue(magnet.contains("park(sv, at: target)"),
+        XCTAssertTrue(magnet.contains("move(sv, to: target, ride: false)"),
                       "the direct landing parks on the target itself")
     }
 
@@ -742,6 +806,310 @@ import SlackwaterKit
                        "the commentary jump must finish on its destination despite scroll feedback")
         XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
                        0, accuracy: 300, "the curve must finish under the same selected time")
+    }
+
+    /// The host's state, which the strip's own writes land in, as SwiftUI's would.
+    private final class Selection {
+        var time: Date
+        init(_ time: Date) { self.time = time }
+    }
+
+    /// What the scaffold hands the strip for alerts: closures while it has an offer, nil without one.
+    private final class AlertHost {
+        var offered: Bool
+        var presses = 0
+        var actions = 0
+        init(offered: Bool) { self.offered = offered }
+    }
+
+    /// In a window, so its animated scrolls run.
+    private func mountedStrip(_ data: TimelineData, _ sel: Selection, now: Date,
+                              gate: ScrollGate? = nil, opening: Bool = false, pills: [CGRect] = [],
+                              alerts: AlertHost? = nil, onPickDate: @escaping () -> Void = {},
+                              scrollView: (CGRect) -> UIScrollView = { TimelineScrubber.ScrubScrollView(frame: $0) })
+        -> (window: UIWindow, sv: UIScrollView, co: TimelineScrubber.Coordinator, strip: (Int) -> TimelineScrubber) {
+        let geo = TimelineGeo(data: data)
+        let strip = { (token: Int) in
+            TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                             scrubTime: Binding(get: { sel.time }, set: { sel.time = $0 }),
+                             jumpToken: token, scrollGate: gate, onPickDate: onPickDate,
+                             onLongPress: alerts.flatMap { host in host.offered ? { host.presses += 1 } : nil },
+                             onAlertAction: alerts.flatMap { host in host.offered ? { host.actions += 1 } : nil },
+                             restingPills: pills)
+        }
+        let co = TimelineScrubber.Coordinator(strip(0))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        let sv = scrollView(window.bounds)
+        sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        sv.bounces = false
+        sv.delegate = co
+        window.addSubview(sv)
+        window.isHidden = false
+        co.centerIfNeeded(sv, animated: opening)
+        return (window, sv, co, strip)
+    }
+
+    private func settle(_ co: TimelineScrubber.Coordinator) async throws {
+        for _ in 0..<150 where co.magneting || co.nudging { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(20))
+    }
+
+    /// A rest a hair off a stop reads the stop's own time without a redundant animation.
+    func testADragEndingWithinHalfAUnitOfAStopLandsOnItExactly() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let stop = try XCTUnwrap(data.snapTimes.first { $0 > now.addingTimeInterval(12 * 3600) })
+        let sel = Selection(stop.addingTimeInterval(0.2 * 3600 / Double(Timeline.pph)))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let offset = m.sv.contentOffset.x
+        m.co.scrollViewWillBeginDragging(m.sv)
+        m.co.scrollViewDidEndDragging(m.sv, willDecelerate: false)
+        XCTAssertEqual(sel.time, stop, "the magnet lands on the stop's own instant")
+        XCTAssertEqual(m.sv.contentOffset.x, offset, "and moves nothing to get there")
+        XCTAssertFalse(m.co.magneting)
+    }
+
+    /// The newest request wins, or a schedule row tapped mid-ride would be dropped.
+    func testAHostSelectionDuringARideOrTheOpeningWins() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+
+        let sel = Selection(now.addingTimeInterval(-6 * 3600))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let first = now.addingTimeInterval(-3 * 3600)
+        sel.time = first
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertTrue(m.co.magneting, "a commentary request rides")
+        XCTAssertEqual(m.co.magnetTarget, first)
+        let second = now.addingTimeInterval(4 * 3600)
+        sel.time = second
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.magnetTarget, second, "a schedule row mid-ride replaces the ride's destination")
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, second)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(second),
+                       0, accuracy: 300)
+        // A time set without a request only resyncs a quiet strip, directly.
+        let unasked = second.addingTimeInterval(3600)
+        sel.time = unasked
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertFalse(m.co.magneting, "only a request rides")
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(unasked),
+                       0, accuracy: 300)
+
+        let opening = Selection(Timeline.introStart(for: now))
+        let o = mountedStrip(data, opening, now: now, opening: true)
+        defer { o.window.isHidden = true; o.co.stopIntro() }
+        XCTAssertNotNil(o.co.introDisplayLink, "the opening is running")
+        let linked = now.addingTimeInterval(9 * 3600)
+        opening.time = linked
+        o.strip(1).updateUIView(o.sv, coordinator: o.co)
+        XCTAssertNil(o.co.introDisplayLink, "a shared link stops the opening")
+        try await settle(o.co)
+        XCTAssertEqual(opening.time, linked)
+    }
+
+    /// A finger still down keeps control: a request under it moving the strip, or the drag's momentum outliving it, would fight the finger or overwrite the request.
+    func testARequestDuringADragWaitsForTheLiftAndReplacesMomentum() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(now)
+        let held = HeldScrollView(frame: .zero)
+        let m = mountedStrip(data, sel, now: now, scrollView: { held.frame = $0; return held })
+        defer { m.window.isHidden = true }
+
+        m.co.scrollViewWillBeginDragging(m.sv)
+        held.fingerDown = true
+        m.sv.contentOffset.x -= 60
+        let grabbed = m.sv.contentOffset
+        let first = now.addingTimeInterval(4 * 3600)
+        sel.time = first
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.pendingTarget, first, "the request waits for the finger")
+        XCTAssertFalse(m.co.magneting, "nothing rides under a finger")
+        XCTAssertEqual(m.sv.contentOffset, grabbed, "the strip stays where the finger holds it")
+        let second = now.addingTimeInterval(7 * 3600)
+        sel.time = second
+        m.strip(2).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(m.co.pendingTarget, second, "a newer request replaces a waiting one")
+        XCTAssertEqual(m.sv.contentOffset, grabbed)
+
+        var momentum = CGPoint(x: grabbed.x - 900, y: 0)
+        m.co.scrollViewWillEndDragging(m.sv, withVelocity: CGPoint(x: -3, y: 0), targetContentOffset: &momentum)
+        XCTAssertEqual(momentum, grabbed, "the lift's fling is cancelled in favour of the request")
+        held.fingerDown = false
+        m.co.scrollViewDidEndDragging(m.sv, willDecelerate: false)
+        XCTAssertNil(m.co.pendingTarget)
+        XCTAssertTrue(m.co.magneting, "the waiting request rides once the finger lifts")
+        XCTAssertEqual(m.co.magnetTarget, second)
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, second)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(second),
+                       0, accuracy: 300)
+    }
+
+    /// `isDragging` follows a real pan only; this one says a finger is down when told to.
+    private final class HeldScrollView: UIScrollView {
+        var fingerDown = false
+        override var isDragging: Bool { fingerDown }
+    }
+
+    /// An unreachable target would leave the reading disagreeing with the curve under the line.
+    func testAnExternalSelectionPastTheEdgeIsClampedAndReadBack() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(data.start.addingTimeInterval(30 * 3600))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let reachable = data.time(atX: m.sv.bounds.width / 2)
+        sel.time = data.start.addingTimeInterval(-2 * 3600)
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        if m.co.magneting { XCTAssertEqual(m.co.magnetTarget, reachable, "the ride heads for the edge, not past it") }
+        try await settle(m.co)
+        XCTAssertEqual(m.sv.contentOffset.x, 0, accuracy: 0.5)
+        XCTAssertEqual(sel.time, reachable, "the reading is the reachable time, not the request")
+
+        // The far end, with nothing to ride: a direct landing reads back too.
+        m.co.move(m.sv, to: data.end.addingTimeInterval(3600), ride: false)
+        XCTAssertEqual(sel.time, data.time(atX: data.totalWidth - m.sv.bounds.width / 2))
+    }
+
+    /// One touch on a resting pill reaches the strip's tap recognizer too; scrubbing to the tapped instant would overwrite the pill's request.
+    func testATapOnARestingPillLeavesThePillsRequestStanding() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let pill = CGRect(x: 140, y: 124, width: 120, height: Timeline.pillTarget)
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, pills: [pill])
+        defer { m.window.isHidden = true }
+        let target = now.addingTimeInterval(2 * 3600)
+        // The pill's action runs first, then the strip's tap for the same touch.
+        sel.time = target
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + pill.midX, y: pill.midY))
+        XCTAssertEqual(sel.time, target, "the strip's tap must leave the pill's selection alone")
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, target)
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(target),
+                       0, accuracy: 300, "the strip moves to the stop the pill names")
+
+        // Off the pill, the same tap scrubs as ever.
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
+        try await settle(m.co)
+        XCTAssertLessThan(sel.time, target, "a tap left of the pill brings an earlier moment to the line")
+    }
+
+    /// A press held on a resting pill would park a moment, buzz, and name it in the alert line before the pill's button fires.
+    func testAPressOnARestingPillNeverReachesTheStrip() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let pill = CGRect(x: 140, y: 124, width: 120, height: Timeline.pillTarget)
+        let m = mountedStrip(data, Selection(now), now: now, pills: [pill], alerts: AlertHost(offered: true))
+        defer { m.window.isHidden = true }
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let press = try XCTUnwrap(m.co.pressRecognizer)
+        let tap = try XCTUnwrap(m.co.tapRecognizer)
+        let onPill = PlacedTouch(CGPoint(x: m.sv.contentOffset.x + pill.midX, y: pill.midY))
+        let offPill = PlacedTouch(CGPoint(x: m.sv.contentOffset.x + 20, y: pill.midY))
+        // UIKit asks the delegate, and a recognizer without one receives every touch.
+        func receives(_ g: UIGestureRecognizer, _ t: UITouch) -> Bool { g.delegate?.gestureRecognizer?(g, shouldReceive: t) ?? true }
+        for (name, g) in [("press", press as UIGestureRecognizer), ("tap", tap)] {
+            XCTAssertFalse(receives(g, onPill), "the \(name) must leave a resting pill's touch to the pill")
+            XCTAssertTrue(receives(g, offPill), "off the pill, the \(name) acts on the strip as ever")
+        }
+    }
+
+    private final class PlacedTouch: UITouch {
+        let point: CGPoint
+        init(_ point: CGPoint) { self.point = point; super.init() }
+        override func location(in view: UIView?) -> CGPoint { point }
+    }
+
+    /// A host with nothing to alert on gets no press and no "Set an alert"; a preview's model landing adds both under the same strip.
+    func testThePressAndItsActionFollowTheHostsAlertOffer() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let host = AlertHost(offered: false)
+        let m = mountedStrip(data, Selection(now), now: now, alerts: host)
+        defer { m.window.isHidden = true }
+        // UIScrollView brings long presses of its own; count the strip's against them.
+        func presses() -> Int { (m.sv.gestureRecognizers ?? []).filter { $0 is UILongPressGestureRecognizer }.count }
+        func actionNames() -> [String] { (m.sv.accessibilityCustomActions ?? []).map(\.name) }
+
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let builtIn = presses()
+        XCTAssertNil(m.co.pressRecognizer, "no alert offer, no press recognizer")
+        let plainTap = try XCTUnwrap(m.co.tapRecognizer, "every strip taps")
+        XCTAssertTrue(m.sv.gestureRecognizers?.contains(plainTap) ?? false)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event"], "no alert offer, no Set an alert")
+
+        host.offered = true
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        let press = try XCTUnwrap(m.co.pressRecognizer, "the offer arriving installs the press")
+        XCTAssertTrue(m.sv.gestureRecognizers?.contains(press) ?? false)
+        XCTAssertEqual(presses(), builtIn + 1)
+        let waitingTap = try XCTUnwrap(m.co.tapRecognizer)
+        XCTAssertFalse(waitingTap === plainTap, "the tap that waits for the press replaces the one that did not")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(plainTap) ?? true)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event", "Set an alert"])
+        let action = try XCTUnwrap(m.sv.accessibilityCustomActions?.last)
+        XCTAssertTrue(action.actionHandler?(action) ?? false)
+        XCTAssertEqual(host.actions, 1, "the action reaches the host")
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertEqual(presses(), builtIn + 1, "an update does not stack a second press")
+        XCTAssertTrue(m.co.tapRecognizer === waitingTap, "nor rebuild an unchanged tap")
+
+        host.offered = false
+        m.strip(0).updateUIView(m.sv, coordinator: m.co)
+        XCTAssertNil(m.co.pressRecognizer, "the offer leaving removes the press")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(press) ?? false)
+        XCTAssertEqual(presses(), builtIn)
+        XCTAssertFalse(m.co.tapRecognizer === waitingTap, "a fresh tap no longer waits on it")
+        XCTAssertFalse(m.sv.gestureRecognizers?.contains(waitingTap) ?? true)
+        XCTAssertEqual(actionNames(), ["Next event", "Previous event"])
+    }
+
+    /// A date tap lands where the date is drawn, on the daylight midpoint, not at clock noon.
+    func testADateTapLandsWhereTheDateIsDrawn() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let day = try XCTUnwrap(data.visibleDays.first { d in
+            d.sunset != nil && data.x(data.dayLabelTime(d)) - data.x(noonLocal(d.start, data.tz)) > 8
+        }, "no day here draws its date clear of noon: the fixture proves nothing")
+        let label = data.x(data.dayLabelTime(day))
+        let sunset = data.x(try XCTUnwrap(day.sunset))
+        let noon = data.x(noonLocal(day.start, data.tz))
+        // Nearer the drawn date than the sunset, but nearer the sunset than noon.
+        let x = (label + sunset) / 2 - 2
+        XCTAssertGreaterThan(x - noon, sunset - x, "the tap must sit where a noon anchor would lose to the sunset")
+        var picked = 0
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, onPickDate: { picked += 1 })
+        defer { m.window.isHidden = true }
+        let before = sel.time
+        m.co.tap(m.sv, at: CGPoint(x: x, y: geo.dayY + 17))
+        XCTAssertEqual(picked, 1, "a tap nearer the drawn date opens the picker")
+        XCTAssertEqual(sel.time, before, "and moves nothing")
+        XCTAssertFalse(m.co.magneting)
+    }
+
+    /// A left-edge publish mid-ride would move the origin under the animation.
+    func testATapRideMarksTheStoreBusy() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let gate = ScrollGate()
+        let sel = Selection(now)
+        let m = mountedStrip(data, sel, now: now, gate: gate)
+        defer { m.window.isHidden = true }
+        let geo = TimelineGeo(data: data)
+        m.co.tap(m.sv, at: CGPoint(x: m.sv.contentOffset.x + 380, y: geo.bodyTop + 20))
+        XCTAssertTrue(m.co.magneting, "a tap across most of the viewport rides")
+        XCTAssertFalse(gate.isQuiet, "the ride holds the store's left edge")
+        try await settle(m.co)
+        XCTAssertTrue(gate.isQuiet, "and releases it on landing")
     }
 
     /// #280: rotation keeps `contentOffset.x` while the viewport width
@@ -884,23 +1252,28 @@ import SlackwaterKit
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
 
-        let slacks = d.currentEvents.filter { $0.kind == .slack && $0.time >= d.start && $0.time <= d.end }
+        // A slack inside a run drawn as a dot is the dot's stop, its centre.
+        let dots = d.slackRuns.filter(\.isDot)
+        let slacks = d.currentEvents.filter { e in
+            e.kind == .slack && e.time >= d.start && e.time <= d.end && !dots.contains { $0.contains(e.time) }
+        }
         XCTAssertFalse(slacks.isEmpty, "no slacks at this station — pick another fixture")
         for e in slacks {
             XCTAssert(stops.contains(e.time),
                       "the strip labels slack at \(e.time) but the magnet cannot stop there")
         }
         // Maxes are labelled too, and they are snap stops for the same reason.
-        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end {
+        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end
+            && !dots.contains(where: { $0.contains(e.time) }) {
             XCTAssert(stops.contains(e.time),
                       "the strip labels a max at \(e.time) but the magnet cannot stop there")
         }
 
-        let windows = d.slackWindows.filter { $0.start >= d.start && $0.end <= d.end }
-        XCTAssertFalse(windows.isEmpty, "no windows at this station — pick another fixture")
-        for window in windows {
-            XCTAssert(stops.contains(window.start))
-            XCTAssert(stops.contains(window.end))
+        let runs = d.slackRuns.filter { $0.start >= d.start && $0.end <= d.end }
+        XCTAssertFalse(runs.isEmpty, "no windows at this station — pick another fixture")
+        for run in runs {
+            XCTAssert(stops.contains(run.axisMoment), "the strip prints \(run.axisMoment) but the magnet cannot stop there")
+            for moment in run.snapMoments { XCTAssert(stops.contains(moment)) }
         }
     }
 
@@ -976,6 +1349,10 @@ import SlackwaterKit
             XCTAssertTrue(body.contains("CurveDrawing.tideLine("), "\(file): the stroke takes its colour from the tide-rate ramp")
             XCTAssertFalse(body.contains("››››"), "\(file): chevrons are gone; the line carries the rate")
             XCTAssertFalse(body.contains("Gradient("), "\(file): no fill or stroke gradient of its own")
+            // The strip fills only below datum; the card, and the widgets and
+            // complications that draw it, keep the blue above datum.
+            XCTAssertEqual(body.contains("fillsAboveDatum: false"), file.hasSuffix("TimelineStrip.swift"),
+                           "\(file): only the strip leaves the water above datum unfilled")
         }
         // Both hues vanish on the datum line, so a low under datum reads as
         // less water than the chart shows with no seam at the crossing. Two
@@ -1060,15 +1437,18 @@ import SlackwaterKit
         XCTAssertEqual(window.end, points[1].time)
     }
 
-    /// No sub-threshold sample brackets the slack (a violent gate where the
-    /// 10-min sampling steps over the window) — no window, not a wrong one.
-    func testSlackWindowNilWhenSamplingStepsOver() {
+    /// A violent gate where the 10-min sampling steps over the band: the
+    /// reversal between +4 and −4 kn still crosses ±0.5 kn, so the window is
+    /// interpolated on that one segment — 262.5 s and 337.5 s into it.
+    func testSlackWindowInterpolatesAReversalThatStepsOverTheBand() throws {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let pts = (0...4).map { i in
             CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600),
                          speed: i < 2 ? 4.0 : -4.0)
         }
-        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+        let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+        XCTAssertEqual(w.start.timeIntervalSince(t0), 862.5, accuracy: 0.01)
+        XCTAssertEqual(w.end.timeIntervalSince(t0), 937.5, accuracy: 0.01)
     }
 
     /// A slack outside the sampled series has no window. Events are scanned with a
@@ -1107,9 +1487,9 @@ import SlackwaterKit
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
         let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
                                           anchor: todayLocal(station.tz), threshold: 1)
-        let window = try XCTUnwrap(timeline.slackWindows.first)
-        XCTAssertTrue(timeline.snapTimes.contains(window.start))
-        XCTAssertTrue(timeline.snapTimes.contains(window.end))
+        let run = try XCTUnwrap(timeline.slackRuns.first { !$0.isDot })
+        XCTAssertTrue(timeline.snapTimes.contains(run.start))
+        XCTAssertTrue(timeline.snapTimes.contains(run.end))
     }
 
     /// The window is half-open: parked on its opening the water is still
@@ -1117,27 +1497,16 @@ import SlackwaterKit
     /// a snap target, so the scrubber does park there. Reporting "Slack · 0m"
     /// at the edge you are being told to leave is the defect this shape
     /// prevents; the commentary names the run that begins instead.
-    func testSlackWindowContainsItsOpeningButNotItsClosing() throws {
+    func testSlackWindowContainsItsOpeningButNotItsClosing() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let window = (slack: t0.addingTimeInterval(1_200),
-                      start: t0.addingTimeInterval(300),
-                      end: t0.addingTimeInterval(2_400))
-        let timeline = TimelineData(tz: .gmt, anchor: t0, today: t0, start: t0,
-                                    end: t0.addingTimeInterval(3_600), days: [],
-                                    tidePoints: [], tideRates: [], tideExtremes: [],
-                                    currentPoints: [], currentEvents: [], snapTimes: [],
-                                    slackWindows: [window])
+        let run = WindowRun(start: t0.addingTimeInterval(300), end: t0.addingTimeInterval(2_400))
 
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.start)).slack,
-                       window.slack)
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.slack)).slack,
-                       window.slack)
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.end.addingTimeInterval(-1))).slack,
-                       window.slack, "a second before the closing is still inside")
-        XCTAssertNil(timeline.containingSlackWindow(at: window.end),
-                     "the closing itself is outside — the run has begun")
-        XCTAssertNil(timeline.containingSlackWindow(at: window.start.addingTimeInterval(-1)))
-        XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
+        XCTAssertTrue(run.holdsSlack(at: run.start))
+        XCTAssertTrue(run.holdsSlack(at: t0.addingTimeInterval(1_200)))
+        XCTAssertTrue(run.holdsSlack(at: run.end.addingTimeInterval(-1)), "a second before the closing is still inside")
+        XCTAssertFalse(run.holdsSlack(at: run.end), "the closing itself is outside — the run has begun")
+        XCTAssertFalse(run.holdsSlack(at: run.start.addingTimeInterval(-1)))
+        XCTAssertFalse(run.holdsSlack(at: run.end.addingTimeInterval(1)))
     }
 
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a
@@ -1333,6 +1702,15 @@ import SlackwaterKit
 
     /// One label, the shapes it has to take. Was three tests with one assert
     /// each and the same two setup lines.
+    /// Sunrise and sunset times share one ink wherever they print; the symbol tells them apart.
+    func testSunTimesShareTheSunriseInk() throws {
+        for (name, source) in try appSources() {
+            for line in source.components(separatedBy: .newlines) {
+                XCTAssertFalse(codeOnly(line).contains("SN.sunset"), "\(name) gives sunset its own ink: \(line)")
+            }
+        }
+    }
+
     func testWeekRangeLabel() {
         let tz = TimeZone(identifier: "America/Vancouver")!
         let today = vancouverMidnight(2026, 9, 12)

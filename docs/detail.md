@@ -237,8 +237,8 @@ Every kind also lists lunar and solar eclipses visible from the station, timed a
 
 Each day with at least one event gets a header. A day with no events gets none.
 
-- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday, with a localized short date beneath.
-- **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, in sunrise ink (`#F0D890`) and sunset ink (`#C8A86A`). They share the day/date header height.
+- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the station-local day of the scrubber session's `now` (scrubber §4.1), not the device clock, otherwise the short weekday, with a localized short date beneath.
+- **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, both in sunrise ink (`#F0D890`); their symbols tell them apart. They share the day/date header height.
 - **When expanded:** a full-width tappable row above the water events places sunrise left, solar noon centered, and sunset right. Each shows only its native symbol and local time, with a descriptive VoiceOver label. At accessibility text sizes these stack. The entire row opens Sun activity. Missing events display “—”.
 
 Only one day is open at a time. The anchor day starts open. Tapping an open day closes it; tapping another day opens it and closes the first.
@@ -397,7 +397,7 @@ A station the catalog lists without predictions opens this page: the header with
 
 ## 14. Alerts
 
-On tide, current, and derived-gate pages, a quiet "Set an alert" line sits under the scrubber; a press held on the scrubber parks that moment and the line names it, and the line's tap opens the alert sheet (scrubber §6.5.1; alerts.md §7). The online gate offers no alerts and no line.
+On tide, current, and derived-gate pages, a quiet "Set an alert" line sits under the scrubber; a press held on the scrubber parks that moment and the line names it, and the line's tap opens the alert sheet (scrubber §6.5.1; alerts.md §7). The online gate, and a Canadian tide station still in preview, offer no alerts: no line, no press, and no VoiceOver "Set an alert" action.
 
 ## 15. Sharing a moment
 
@@ -487,7 +487,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 27. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
 28. **Share at now:** sharing an untouched page shares the bare station link.
 29. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
-30. **Reduce Motion:** with Reduce Motion on, opening a day shows its rows at once, and the first-run tour reaches each mark without a glide.
+30. **Reduce Motion:** with Reduce Motion on, opening a day shows its rows at once, and the first-run tour lands on each mark directly. The tour's moves are ordinary scrubber requests, so with Reduce Motion off each one rides or lands directly by scrubber §8, like any other request.
 
 ### Footer
 

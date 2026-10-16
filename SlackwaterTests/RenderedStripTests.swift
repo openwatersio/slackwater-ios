@@ -57,6 +57,381 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
+    /// A run narrower than a turn's dot draws as that dot at its centre, and
+    /// its halo erases the ground under it the way a turn dot's does.
+    @MainActor
+    func testAShortSlackRunDrawsTheDot() throws {
+        let renderer = ImageRenderer(content:
+            Canvas { context, size in
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: 12))
+                line.addLine(to: CGPoint(x: 80, y: 12))
+                var run = Path()
+                run.move(to: CGPoint(x: 39, y: 12))
+                run.addLine(to: CGPoint(x: 41, y: 12))
+                CurveDrawing.currentLine(context, line, slackRuns: [run], samples: [],
+                                         nowX: 0, width: size.width, height: size.height)
+                CurveDrawing.runs(context, [run], nowX: 0, width: size.width, height: size.height)
+            }
+            .frame(width: 80, height: 24)
+            .background(Color.red))
+        let image = try XCTUnwrap(renderer.uiImage?.cgImage)
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: image.width, height: image.height,
+                                              bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let centre = (12 * image.width + 40) * 4
+        XCTAssertGreaterThan(pixels[centre + 1], pixels[centre + 2], "the dot is not the go colour")
+        let halo = (12 * image.width + 44) * 4
+        XCTAssertGreaterThan(pixels[halo], 200, "the halo must erase down to what is behind the strip")
+        XCTAssertLessThan(pixels[halo + 1], 80, "the halo must erase down to what is behind the strip")
+        let line = (12 * image.width + 50) * 4
+        XCTAssertGreaterThan(pixels[line + 2], pixels[line], "the curve continues beyond the halo")
+    }
+
+    /// A flood lobe fills beneath its curve; an ebb lobe's curve-to-zero area sits above the
+    /// curve, and a tide chart never fills there, so it stays clear.
+    @MainActor
+    func testOnlyTheFloodLobeIsFilled() throws {
+        let renderer = ImageRenderer(content:
+            Canvas { context, size in
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                var area = Path()
+                area.move(to: CGPoint(x: 0, y: 50))
+                area.addLine(to: CGPoint(x: 0, y: 10))
+                area.addLine(to: CGPoint(x: 40, y: 10))
+                area.addLine(to: CGPoint(x: 40, y: 90))
+                area.addLine(to: CGPoint(x: 80, y: 90))
+                area.addLine(to: CGPoint(x: 80, y: 50))
+                area.closeSubpath()
+                CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: 100, zeroY: 50)
+            }
+            .frame(width: 80, height: 100))
+        let image = renderer.uiImage
+        let p = try pixels(XCTUnwrap(image))
+        let flood = (12 * p.width + 20) * 4
+        XCTAssertLessThan(p.bytes[flood], 200, "the flood lobe is filled beneath its curve")
+        let ebb = (80 * p.width + 60) * 4
+        XCTAssertEqual(p.bytes[ebb], 255, "the ebb lobe above its curve stays unfilled")
+        XCTAssertEqual(p.bytes[ebb + 1], 255)
+    }
+
+    /// A tide held at 1 after one opening sample at 0, so the curve rides near the plot top and
+    /// the shade beneath it is at full strength.
+    private func flatTide(start: Date, end: Date, tz: TimeZone, days: [TimelineDay] = [],
+                          extremes: [TideExtreme] = []) -> TimelineData {
+        let count = Int(end.timeIntervalSince(start) / 600)
+        let times = (0...count).map { start.addingTimeInterval(Double($0) * 600) }
+        return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: days,
+                            tidePoints: times.enumerated().map { TidePoint(time: $1, height: $0 == 0 ? 0 : 1) },
+                            tideRates: times.map { TideRatePoint(time: $0, rate: 0) },
+                            tideExtremes: extremes, currentPoints: [], currentEvents: [],
+                            snapTimes: [], slackWindows: [])
+    }
+
+    /// RGBA bytes of a 1× render, row-major from the top.
+    private func pixels(_ image: UIImage) throws -> (bytes: [UInt8], width: Int) {
+        let cg = try XCTUnwrap(image.cgImage)
+        var px = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+        let ctx = try XCTUnwrap(CGContext(data: &px, width: cg.width, height: cg.height,
+                                          bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        return (px, cg.width)
+    }
+
+    private func brightness(_ p: (bytes: [UInt8], width: Int), x: CGFloat, y: CGFloat) -> Int {
+        let i = (Int(y) * p.width + Int(x)) * 4
+        return Int(p.bytes[i]) + Int(p.bytes[i + 1]) + Int(p.bytes[i + 2])
+    }
+
+    /// Where sunset follows local midnight, the afternoon takes the daylight tint and the small
+    /// hours the night band, rather than the civil day's sunset shading the whole day as night.
+    @MainActor
+    func testDaylightAndNightFollowTheSunWhereSunsetFollowsMidnight() throws {
+        let (tz, days) = try lateSunsetDays()
+        let start = days[0].start, end = try XCTUnwrap(days.last?.start)
+        let lit = flatTide(start: start, end: end, tz: tz, days: days)
+        let bare = flatTide(start: start, end: end, tz: tz)
+        let before = start.addingTimeInterval(-86_400)
+        let shaded = try pixels(XCTUnwrap(stripImage(lit, now: before)))
+        let plain = try pixels(XCTUnwrap(stripImage(bare, now: before)))
+        let y = TimelineGeo(data: lit).tideTop + 30
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        for d in days.dropFirst().dropLast() {
+            let rise = try XCTUnwrap(d.sunrise), set = try XCTUnwrap(d.sunset)
+            XCTAssertLessThan(set, rise, "\(d.start) sets before it rises: the fixture proves nothing")
+            let afternoon = try XCTUnwrap(cal.date(bySettingHour: 15, minute: 0, second: 0, of: d.start))
+            XCTAssertGreaterThan(brightness(shaded, x: lit.x(afternoon), y: y),
+                                 brightness(plain, x: lit.x(afternoon), y: y),
+                                 "\(d.start)'s afternoon is not tinted as daylight")
+            let smallHours = set.addingTimeInterval(rise.timeIntervalSince(set) / 2)
+            XCTAssertLessThan(brightness(shaded, x: lit.x(smallHours), y: y),
+                              brightness(plain, x: lit.x(smallHours), y: y),
+                              "\(d.start)'s small hours are not shaded as night")
+        }
+    }
+
+    /// The daylight tint is faint: `#A8CAE0` at 8% over the bare sea, where the curve's water
+    /// carries no fill above datum, so a lit afternoon reads close to the sea itself.
+    @MainActor
+    func testTheDaylightTintIsEightPercent() throws {
+        let (tz, days) = try lateSunsetDays()
+        let start = days[0].start, end = try XCTUnwrap(days.last?.start)
+        let lit = flatTide(start: start, end: end, tz: tz, days: days)
+        let bare = flatTide(start: start, end: end, tz: tz)
+        let before = start.addingTimeInterval(-86_400)
+        let shaded = try pixels(XCTUnwrap(stripImage(lit, now: before)))
+        let plain = try pixels(XCTUnwrap(stripImage(bare, now: before)))
+        // Inside the shade's full-strength top 35%, well under the curve.
+        let y = TimelineGeo(data: lit).tideTop + 30
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let tint = [0xA8, 0xCA, 0xE0]
+        for d in days.dropFirst().dropLast() {
+            let afternoon = try XCTUnwrap(cal.date(bySettingHour: 15, minute: 0, second: 0, of: d.start))
+            let over = rgb(shaded, x: lit.x(afternoon), y: y), under = rgb(plain, x: lit.x(afternoon), y: y)
+            for c in 0..<3 {
+                let alpha = Double(over[c] - under[c]) / Double(tint[c] - under[c])
+                XCTAssert((0.055...0.105).contains(alpha),
+                          "\(d.start)'s afternoon tint is \(alpha) in channel \(c), not 0.08")
+            }
+        }
+    }
+
+    /// The strip fills only below chart datum: no blue under a curve above datum, low amber
+    /// between datum and a curve below it, and nothing at all when the water never reaches datum.
+    @MainActor
+    func testTheStripFillsOnlyBelowDatum() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let before = start.addingTimeInterval(-86_400)
+        func tide(_ height: (Date) -> Double) -> TimelineData {
+            let times = (0...Int(end.timeIntervalSince(start) / 600)).map { start.addingTimeInterval(Double($0) * 600) }
+            return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: [],
+                                tidePoints: times.map { TidePoint(time: $0, height: height($0)) },
+                                tideRates: times.map { TideRatePoint(time: $0, rate: 0) },
+                                tideExtremes: [], currentPoints: [], currentEvents: [],
+                                snapTimes: [], slackWindows: [])
+        }
+        let morning = start.addingTimeInterval(6 * 3600 + 1000), evening = start.addingTimeInterval(18 * 3600 + 1000)
+
+        // 1 m until midday, −1 m after it: datum sits mid-plot.
+        let dips = tide { $0 < start.addingTimeInterval(12 * 3600) ? 1 : -1 }
+        let geo = TimelineGeo(data: dips)
+        let p = try pixels(XCTUnwrap(stripImage(dips, now: before)))
+        let sea = rgb(p, x: dips.x(morning), y: 2)
+        let above = rgb(p, x: dips.x(morning), y: geo.tideY(0.5))
+        XCTAssert(zip(above, sea).allSatisfy { abs($0 - $1) <= 4 },
+                  "the water above datum carries a fill: \(above) against the sea's \(sea)")
+        let below = rgb(p, x: dips.x(evening), y: geo.tideY(-0.8))
+        XCTAssertGreaterThan(below[0] - sea[0], 40, "no amber between datum and a curve below it: \(below)")
+        XCTAssertGreaterThan(below[0] - below[2], 40, "the fill below datum is not amber: \(below)")
+
+        // 2 m after an opening 1 m: the lowest water is above datum.
+        let high = tide { $0 == start ? 1 : 2 }
+        let highGeo = TimelineGeo(data: high)
+        let q = try pixels(XCTUnwrap(stripImage(high, now: before)))
+        let water = rgb(q, x: high.x(morning), y: highGeo.tideY(1.5))
+        let bare = rgb(q, x: high.x(morning), y: 2)
+        XCTAssert(zip(water, bare).allSatisfy { abs($0 - $1) <= 4 },
+                  "water that never reaches datum carries a fill: \(water) against the sea's \(bare)")
+    }
+
+    private func rgb(_ p: (bytes: [UInt8], width: Int), x: CGFloat, y: CGFloat) -> [Int] {
+        let i = (Int(y) * p.width + Int(x)) * 4
+        return [Int(p.bytes[i]), Int(p.bytes[i + 1]), Int(p.bytes[i + 2])]
+    }
+
+    /// A turn an hour inside a loaded edge would have its label cut by it, so it draws nothing;
+    /// two hours in, it draws whole.
+    @MainActor
+    func testATurnTooNearTheLoadedEdgeDrawsNoLabel() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let before = start.addingTimeInterval(-86_400)
+        let none = try XCTUnwrap(stripImage(flatTide(start: start, end: end, tz: tz), now: before))
+        for (hours, draws) in [(1.0, false), (2.0, true)] {
+            for t in [start.addingTimeInterval(hours * 3600), end.addingTimeInterval(-hours * 3600)] {
+                let turn = TideExtreme(time: t, height: 1, kind: .high)
+                let one = try XCTUnwrap(stripImage(flatTide(start: start, end: end, tz: tz, extremes: [turn]),
+                                                   now: before))
+                let changed = differingFraction(one, none)
+                if draws {
+                    XCTAssertGreaterThan(changed, 0, "a turn \(hours) h inside the edge drew nothing")
+                } else {
+                    XCTAssertEqual(changed, 0, "a turn \(hours) h inside the edge drew a clipped label")
+                }
+            }
+        }
+    }
+
+    /// A slack with no measured window, and every derived-gate slack, is still a mark with a time:
+    /// a dot on the curve and a time in the row beneath it, on the strip and on the card.
+    @MainActor
+    func testASlackWithoutAWindowDrawsItsDotAndTime() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let slack = start.addingTimeInterval(12 * 3600)
+        let before = start.addingTimeInterval(-86_400)
+        for schematic in [false, true] {
+            let plain = flatCurrent(start: start, end: end, tz: tz, slack: nil, schematic: schematic)
+            let marked = flatCurrent(start: start, end: end, tz: tz, slack: slack, schematic: schematic)
+            let geo = TimelineGeo(data: marked)
+            let a = try XCTUnwrap(stripImage(plain, now: before)), b = try XCTUnwrap(stripImage(marked, now: before))
+            let timeRow = Int(geo.timeY) - 8...Int(geo.timeY) + 8
+            XCTAssertGreaterThan(try differing(a, b, rows: timeRow), 0, "schematic \(schematic): no time under the slack")
+            let plot = Int(geo.curTop)...Int(geo.curBottom)
+            XCTAssertGreaterThan(try differing(a, b, rows: plot), 0, "schematic \(schematic): no dot at the slack")
+        }
+
+        let now = start.addingTimeInterval(6 * 3600)
+        let points = stride(from: now.addingTimeInterval(-StationCardGraph.backWindow),
+                            through: now.addingTimeInterval(StationCardGraph.forwardWindow), by: 600)
+            .map { StationCardGraph.Point(time: $0, value: 1) }
+        for schematic in [false, true] {
+            func card(_ slacks: [Date]) throws -> UIImage {
+                let graph = StationCardGraph(points: points, extremes: [], now: now, includesZero: true, tz: tz,
+                                             slacks: slacks, speedsAreSchematic: schematic)
+                return try XCTUnwrap(ImageRenderer(content: graph.frame(width: 350, height: 96)
+                    .background(SN.canvas)).uiImage)
+            }
+            let a = try card([]), b = try card([now.addingTimeInterval(3 * 3600)])
+            XCTAssertGreaterThan(try differing(a, b, rows: 78...95), 0, "schematic \(schematic): no time under the card's slack")
+            XCTAssertGreaterThan(try differing(a, b, rows: 0...77), 0, "schematic \(schematic): no dot at the card's slack")
+        }
+    }
+
+    /// A windowless slack's dot is its mark, so near a loaded edge it draws like a short run's dot,
+    /// while its time and a derived gate's dots still keep the edge margin (§12.3).
+    @MainActor
+    func testAWindowlessSlackDotDrawsToTheEdge() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let slack = start.addingTimeInterval(3600)
+        let before = start.addingTimeInterval(-86_400)
+        for schematic in [false, true] {
+            let plain = flatCurrent(start: start, end: end, tz: tz, slack: nil, schematic: schematic)
+            let marked = flatCurrent(start: start, end: end, tz: tz, slack: slack, schematic: schematic)
+            XCTAssertFalse(marked.clearsLabelEdges(slack), "the fixture slack sits inside the edge margin")
+            let geo = TimelineGeo(data: marked)
+            let a = try XCTUnwrap(stripImage(plain, now: before)), b = try XCTUnwrap(stripImage(marked, now: before))
+            let plot = try differing(a, b, rows: Int(geo.curTop)...Int(geo.curBottom))
+            if schematic {
+                XCTAssertEqual(plot, 0, "a derived gate's dot keeps the edge margin")
+            } else {
+                XCTAssertGreaterThan(plot, 0, "no dot at a windowless slack near the edge")
+            }
+            XCTAssertEqual(try differing(a, b, rows: Int(geo.timeY) - 8...Int(geo.timeY) + 8), 0,
+                           "schematic \(schematic): its time keeps the edge margin")
+        }
+    }
+
+    /// A card reading hangs toward the plot middle unless its value would leave the plot, where it hangs off the other side of its dot.
+    func testACardReadingFlipsWhenItsSideWouldLeaveThePlot() {
+        let plot: CGFloat = 108
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 80, high: false, plotHeight: plot), -1, "a low hangs up, toward the middle")
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 38, high: false, plotHeight: plot), -1, "a low with room above for its value keeps hanging up")
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 37, high: false, plotHeight: plot), 1, "a low whose value would leave the top hangs down")
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 20, high: true, plotHeight: plot), 1, "a high hangs down, toward the middle")
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 70, high: true, plotHeight: plot), 1, "a high with room below for its value keeps hanging down")
+        XCTAssertEqual(StationCardGraph.hangToward(dotY: 71, high: true, plotHeight: plot), -1, "a high whose value would reach the axis times hangs up")
+    }
+
+    /// The card's axis times stay 24pt in from each canvas edge and 48pt after the last time kept, in time order.
+    func testCardAxisTimesKeepClearOfTheEdgesAndEachOther() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let at = { (px: Double) in t0.addingTimeInterval(px * 60) }
+        let x = { (t: Date) in CGFloat(t.timeIntervalSince(t0) / 60) }
+        let moments = ([200, 23, 130, 24, 71, 72, 100, 332, 333] as [Double]).map(at)
+        XCTAssertEqual(StationCardGraph.thinAxisMoments(moments, x: x, width: 356),
+                       ([24, 72, 130, 200, 332] as [Double]).map(at),
+                       "130 is 30pt after a dropped time but 58pt after the last one kept")
+    }
+
+    /// On a rendered card, a low near the canvas top hangs its reading down, out of the identity rows
+    /// the canvas starts under, and a high near the bottom hangs up, clear of the axis times. A turn
+    /// too close to another, or to the edge, prints no time.
+    @MainActor
+    func testACardDrawsItsReadingsAndTimesInsideTheGraph() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let now = Date(timeIntervalSince1970: 1_780_000_000)
+        let start = now.addingTimeInterval(-StationCardGraph.backWindow)
+        let times = Array(stride(from: start, through: now.addingTimeInterval(StationCardGraph.forwardWindow), by: 600))
+        // Flat at mid-height with one sample at each end of the range, so the domain is exactly -0.25…1.25.
+        let points = times.enumerated().map { i, t in
+            StationCardGraph.Point(time: t, value: i == 0 ? 0 : i == times.count - 1 ? 1 : 0.5)
+        }
+        // The list card's canvas: 3pt past the card each side, and below its 54pt identity inset.
+        let width: CGFloat = 356, height: CGFloat = 114
+        func at(_ px: CGFloat) -> Date { start.addingTimeInterval(StationCardGraph.window * Double(px / width)) }
+        func turn(_ px: CGFloat, _ value: Double, high: Bool) -> StationCardGraph.Extreme {
+            .init(time: at(px), value: value, valueText: "8.8", spokenText: "8.8 ft",
+                  timeText: cardTime(at(px), tz), high: high)
+        }
+        func card(_ extremes: [StationCardGraph.Extreme], readings: Bool) throws -> UIImage {
+            var graph = StationCardGraph(points: points, extremes: extremes, now: now)
+            graph.showsReadings = readings
+            graph.showsNow = false
+            return try XCTUnwrap(ImageRenderer(content: graph.frame(width: width, height: height)
+                .background(SN.canvas)).uiImage)
+        }
+        func reading(_ extremes: [StationCardGraph.Extreme], rows: ClosedRange<Int>) throws -> Int {
+            try differing(card(extremes, readings: false), card(extremes, readings: true), rows: rows)
+        }
+
+        // On the 108pt plot, 0.8 sits 32pt down and 0.2 sits 76pt down; each dot and its halo span ±5.
+        let low = [turn(120, 0.8, high: false)], high = [turn(240, 0.2, high: true)]
+        XCTAssertEqual(try reading(low, rows: 0...26), 0, "a low near the top drew its reading above its dot")
+        XCTAssertGreaterThan(try reading(low, rows: 38...80), 0, "the low's reading hangs below its dot")
+        XCTAssertEqual(try reading(high, rows: 82...113), 0, "a high near the bottom drew its reading into the axis times")
+        XCTAssertGreaterThan(try reading(high, rows: 30...70), 0, "the high's reading hangs above its dot")
+
+        let axis = Int(height) - 18...Int(height) - 2
+        let first = turn(150, 0.5, high: true)
+        XCTAssertEqual(try differing(card([first], readings: false),
+                                     card([first, turn(190, 0.5, high: false)], readings: false), rows: axis), 0,
+                       "a turn 40pt after another printed its time over the first")
+        XCTAssertGreaterThan(try differing(card([first], readings: false),
+                                           card([first, turn(200, 0.5, high: false)], readings: false), rows: axis), 0,
+                             "a turn 50pt after another prints its own time")
+        XCTAssertEqual(try differing(card([], readings: false),
+                                     card([turn(width - 22, 0.5, high: true)], readings: false), rows: axis), 0,
+                       "a turn 22pt from the canvas edge printed a time the card clips")
+    }
+
+    private func flatCurrent(start: Date, end: Date, tz: TimeZone, slack: Date?, schematic: Bool) -> TimelineData {
+        let count = Int(end.timeIntervalSince(start) / 600)
+        let times = (0...count).map { start.addingTimeInterval(Double($0) * 600) }
+        return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: [],
+                            tidePoints: [], tideRates: [], tideExtremes: [],
+                            currentPoints: times.map { CurrentPoint(time: $0, speed: 1) },
+                            currentEvents: slack.map { [CurrentEvent(time: $0, speed: 0, kind: .slack)] } ?? [],
+                            snapTimes: [], slackWindows: [], speedsAreSchematic: schematic)
+    }
+
+    /// Pixels that differ between two same-size renders, within a band of rows.
+    private func differing(_ a: UIImage, _ b: UIImage, rows: ClosedRange<Int>) throws -> Int {
+        let pa = try pixels(a), pb = try pixels(b)
+        var count = 0
+        for y in rows where y >= 0 && (y + 1) * pa.width * 4 <= pa.bytes.count {
+            for x in 0..<pa.width {
+                let i = (y * pa.width + x) * 4
+                if (0..<3).contains(where: { abs(Int(pa.bytes[i + $0]) - Int(pb.bytes[i + $0])) > 4 }) { count += 1 }
+            }
+        }
+        return count
+    }
+
     private var friday: TideStationRecord {
         TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
     }
@@ -82,8 +457,7 @@ final class RenderedStripTests: XCTestCase {
     /// (Severn, 13.7 ft/hr peak) near the top, so between them they exercise
     /// both ends of the ramp rather than one colour twice.
     ///
-    /// Measured at 1× on the 396pt canvas: Friday Harbor 0.115, Avonmouth
-    /// 0.102, against a no-track floor of 0.028 (`drawnStripInk`).
+    /// Measured ink for both stations is tabled at `drawnStripInk`.
     @MainActor
     func testTideRateRampDrawsOnQuietAndExtremeStations() throws {
         let now = appNow()
@@ -108,8 +482,7 @@ final class RenderedStripTests: XCTestCase {
     /// its metres of range) is pinned in NationalScaleTests; what this adds is
     /// that the far end of the bundle reaches the chart.
     ///
-    /// Measured at 1× on the 396pt canvas: Boston 0.097, against a no-track
-    /// floor of 0.028.
+    /// Measured ink is tabled at `drawnStripInk`.
     @MainActor
     func testUsEastCoastStationDrawsItsCurve() throws {
         let now = appNow()
@@ -138,9 +511,8 @@ final class RenderedStripTests: XCTestCase {
     /// plausible harmonic shape gives SlackwaterKit real highs and lows to lag
     /// into slacks, which is all a gate reads from its reference.
     ///
-    /// Measured at 1× on the 396pt canvas: 0.090 against a no-track floor of
-    /// 0.028 — a thin ±1 shape carries no fill under it, so it clears the
-    /// floor by less than any tide curve does.
+    /// Measured ink is tabled at `drawnStripInk`: a thin ±1 shape with fill
+    /// only in its positive half, and no speed thread.
     @MainActor
     func testDerivedGateDrawsItsSchematicStrip() throws {
         let port = TideStationRecord(
@@ -180,10 +552,7 @@ final class RenderedStripTests: XCTestCase {
     /// sine at the 15-minute official-sample cadence, spanning exactly
     /// `Timeline.window(anchor:)`.
     ///
-    /// Measured at 1× on the 396pt canvas: 0.075 against a no-track floor of
-    /// 0.028 — the lowest drawn shape the app has, and the one that sets
-    /// `drawnStripInk`. A fetched curve spends the window near zero, so it
-    /// occupies less of the plot than a tide sweeping it top to bottom.
+    /// Measured ink is tabled at `drawnStripInk`.
     @MainActor
     func testOnlineGateDrawsItsFetchedStrip() throws {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })

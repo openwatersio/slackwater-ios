@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Tide detail: a continuous strip beneath a fixed
 // centerline and a rolling schedule anchored to the selected local week.
-// Product contract: docs/scrubber.md.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 
@@ -32,6 +32,8 @@ struct TideDetailView: View {
     /// The strip viewport's width, reported by the strip — the span the
     /// scale governor fits the curve against.
     @State private var viewportPts: CGFloat = 0
+    /// Bumped when a preview clamp moves the selection, so the strip moves for it.
+    @State private var clampRequests = 0
 
     private var timeline: TimelineData? { store?.timeline ?? previewTimeline }
     private var activePreview: ChsTidePreview? { store == nil ? preview ?? displayedPreview : nil }
@@ -66,7 +68,11 @@ struct TideDetailView: View {
     /// The stop the pill names and its tap walks to: the next turn, or the
     /// sun's next rise or set when that comes first.
     private var nextStop: CommentaryStop? {
-        nextCommentaryStop(nextExtreme.map {
+        let drawn = timeline?.drawnSpan
+        let turn = timeline.flatMap {
+            firstCommentaryStop($0.tideExtremes, at: \.time, after: scrubTime, drawn: drawn)
+        }
+        return nextCommentaryStop(turn.map {
             let high = $0.kind == .high
             return CommentaryStop(time: $0.time,
                                   label: high
@@ -77,7 +83,7 @@ struct TideDetailView: View {
                                     : String(localized: "Low tide", comment: "VoiceOver tide-event label."),
                                   systemImage: high ? "arrow.up" : "arrow.down")
         },
-                           sun: timeline?.days ?? [], after: scrubTime)
+                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
     }
     /// What the pill says: the rate while the tide is fast — it explains the
     /// yellow line under it — else the next stop.
@@ -115,7 +121,7 @@ struct TideDetailView: View {
                             onPicked: { picked in
                                 if let coverage = activePreview?.coverage {
                                     anchor = todayLocal(tz)
-                                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                                    clamp(into: coverage)
                                 } else { store?.jump(to: scrubTime, anchor: picked) }
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
@@ -138,7 +144,8 @@ struct TideDetailView: View {
                                                    commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
                                                    scrollGate: store?.gate ?? previewGate,
-                                                   onViewportWidth: { viewportPts = $0 })
+                                                   onViewportWidth: { viewportPts = $0 },
+                                                   moveRequests: clampRequests)
                                     .overlay(alignment: .top) { lead(sky: sky) }
                             },
                             links: { tl, jump in
@@ -173,7 +180,7 @@ struct TideDetailView: View {
                 if anchor == .distantPast { anchor = todayLocal(tz) }
                 if preview == nil, store == nil {
                     let s = TimelineWindowStore(source: .tide(record))
-                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
+                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : FoldHandoff.pending(record.id))
                     store = s
                 }
                 RecentsStore.shared.record(record.id)
@@ -191,7 +198,7 @@ struct TideDetailView: View {
                 if let preview, let coverage = preview.coverage {
                     displayedPreview = preview
                     anchor = todayLocal(tz)
-                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                    clamp(into: coverage)
                     let record = record, now = live, day = anchor
                     let built = await Task.detached(priority: .userInitiated) {
                         TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
@@ -219,9 +226,21 @@ struct TideDetailView: View {
             }
             .onChange(of: scrubTime) { _, t in
                 if let coverage = activePreview?.coverage {
-                    let clamped = min(max(t, coverage.lowerBound), coverage.upperBound)
-                    if t != clamped { scrubTime = clamped }
+                    clamp(into: coverage)
                 } else { store?.focus(t, viewportPts: viewportPts) }
+            }
+            .onChange(of: live) { _, now in
+                store?.setNow(now)
+                // A preview is built once per fetch, so only a rebuild relabels its days.
+                guard store == nil, let preview = displayedPreview, let built = previewTimeline,
+                      built.today != dayLocal(now, tz) else { return }
+                let record = record, day = built.anchor
+                Task {
+                    let relabelled = await Task.detached(priority: .userInitiated) {
+                        TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
+                    }.value
+                    if let relabelled, previewTimeline?.revision == built.revision { previewTimeline = relabelled }
+                }
             }
             // The schedule follows a scrub that has settled somewhere outside
             // its window — the strip is endless now, and a list still describing
@@ -321,7 +340,7 @@ struct TideDetailView: View {
     }
     /// The lead in words, for the strip's spoken value.
     private var spokenLead: String {
-        String(localized: "\(leadState) \(formatHeight(scrubHeight, imperial: imperial)) \(spokenUnit(unit))", comment: "VoiceOver tide reading. Values are tide state, formatted height, and spoken unit.")
+        spokenReading(leadState, formatHeight(scrubHeight, imperial: imperial), unit: unit)
     }
 
     private func lead(sky: SkyState) -> some View {
@@ -339,8 +358,8 @@ struct TideDetailView: View {
             // The graph's own two inks, so the eyebrow names the curve the
             // reader is looking at — unless the rate is out of the ordinary
             // (#95), which outranks direction.
-            Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
-                              ?? (rising ? "arrow.up.right" : "arrow.down.right"))
+            LeadGlyph(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
+                                  ?? (rising ? "arrow.up.right" : "arrow.down.right"))
                 .foregroundStyle(rateWarning(over: sky.chromeGround) ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
@@ -420,6 +439,13 @@ struct TideDetailView: View {
     private func exactHeight(at t: Date) -> Double {
         if let preview = activePreview { return preview.height(at: t) ?? 0 }
         return record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+    }
+
+    private func clamp(into coverage: ClosedRange<Date>) {
+        let clamped = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+        guard clamped != scrubTime else { return }
+        clampRequests += 1
+        scrubTime = clamped
     }
 
     private func returnToNow() {

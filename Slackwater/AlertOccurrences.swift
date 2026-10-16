@@ -34,10 +34,9 @@ func tideCrossings(_ samples: [(time: Date, height: Double)], level: Double, ris
     return found
 }
 
-/// The opening of every merged slack run, with its close, plus the bare instant of any
-/// slack no run covers (`end == nil`) — the moments `currentAxisMoments` prints. Series
-/// and events are padded 6 h beyond the range so a window straddling either end is whole;
-/// the caller clips to the range.
+/// The opening of every merged slack run, with its close, plus the instant of any slack no run
+/// covers (`end == nil`). Series and events are padded 6 h beyond the range so a window
+/// straddling either end is whole; the caller clips to the range.
 func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
@@ -45,10 +44,10 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
     let slacks = station.events(from: start, to: stop).filter { $0.kind == .slack }.map(\.time)
     let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
     let opened: [(event: Date, end: Date?)] = runs.map { ($0.start, $0.end) }
-    let hairline: [(event: Date, end: Date?)] = slacks
+    let uncovered: [(event: Date, end: Date?)] = slacks
         .filter { t in !runs.contains { $0.contains(t) } }
         .map { ($0, nil) }
-    return (opened + hairline).sorted { $0.event < $1.event }
+    return (opened + uncovered).sorted { $0.event < $1.event }
 }
 
 /// One dated event a rule found (docs/alerts.md §4).

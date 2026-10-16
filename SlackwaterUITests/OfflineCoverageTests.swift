@@ -152,7 +152,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "derived-gate strip missing")
         let ink = inkFraction(strip)
-        XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
+        XCTAssert(ink > Self.drawnStripInk, "the derived-gate strip drew nothing — ink \(ink)")
         sleep(1)  // the header's offline tile floor; MLNMapView reports nothing
         save(app, "m46-derived-gate-seeded.png")
 
@@ -437,7 +437,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // screenshot of it — this was the only offline render of the online
         // strip and nothing ever looked at it.
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
-        XCTAssert(ink > 0.05, "the online-gate strip drew nothing — ink \(ink)")
+        XCTAssert(ink > Self.drawnStripInk, "the online-gate strip drew nothing — ink \(ink)")
         sleep(1)  // the header's tile floor; MLNMapView reports nothing
         save(app, "online-gate-seeded.png")
     }
@@ -569,7 +569,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                   "a far week the app holds on disk must render offline, not honesty-card")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists)
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
-        XCTAssert(ink > 0.05, "the far block's strip drew nothing — ink \(ink)")
+        XCTAssert(ink > Self.drawnStripInk, "the far block's strip drew nothing — ink \(ink)")
         save(app, "online-gate-far-block.png")
     }
 }

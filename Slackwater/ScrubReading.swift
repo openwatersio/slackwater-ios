@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. The watch card's words at a scrub time: state,
 // reading and the next event, read off the loaded timeline (#522).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 import SlackwaterKit
 
@@ -12,9 +13,7 @@ struct ScrubReading: Equatable {
     let set: String?
     let next: String?
 
-    /// Within this of an event, the scrub is on it. One strip point: the
-    /// magnet leaves a rest within half a point of a stop where it is
-    /// (`TimelineData.magnetTarget`), so a Crown can stop up to ~100 s off.
+    /// One strip point: closer than that, the ring has not visibly left the event.
     private static let onEvent: TimeInterval = Timeline.scrubbedSeconds
 
     static func at(_ t: Date, in data: TimelineData, imperial: Bool, speedUnit: String, floodDeg: Double? = nil, ebbDeg: Double? = nil) -> ScrubReading {

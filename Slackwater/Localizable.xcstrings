@@ -7748,7 +7748,7 @@
       }
     },
     "%@ %@ %@" : {
-      "comment" : "VoiceOver tide reading. Values are tide state, formatted height, and spoken unit.",
+      "comment" : "VoiceOver tide or current reading. Values are the tide or current state, a formatted height or speed, and its spoken unit.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -8046,107 +8046,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ %@ mot flod"
-          }
-        }
-      }
-    },
-    "%@ %@%@ %@" : {
-      "comment" : "VoiceOver current reading. Values are current state, optional approximation mark, formatted speed, and spoken unit.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ %@%@ %@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ %@%@ %@"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ %@%@ %@"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ %2$@%3$@ %4$@"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ %@%@ %@"
           }
         }
       }

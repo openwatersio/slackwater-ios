@@ -322,6 +322,11 @@ enum CurrentPhase {
     }
 }
 
+/// The reader's slack is a mark the curve draws green, so a weak flood off one is still a flood.
+func currentPhase(signed: Double, inWindow: Bool) -> CurrentPhase {
+    inWindow ? .slack : signed >= 0 ? .flood : .ebb
+}
+
 func currentPhase(signed: Double) -> CurrentPhase {
     abs(signed) < slackKn ? .slack : signed > 0 ? .flood : .ebb
 }

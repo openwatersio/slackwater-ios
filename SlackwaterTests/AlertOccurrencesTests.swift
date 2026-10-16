@@ -61,8 +61,8 @@ import SlackwaterKit
     }
 
     func testTheFirstWindowOpeningAgreesWithTheSiriAnswer() throws {
-        // A generous threshold so no slack in the week is a hairline and the Siri query
-        // (which answers only a real window) has one to give.
+        // A generous threshold so every slack in the week has a real window for the Siri
+        // query to give.
         let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
         defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
         AppGroup.defaults.set(2.0, forKey: AppGroup.slackWindowSpeedKey)
@@ -266,7 +266,7 @@ import SlackwaterKit
             (TideStationRecord.fridayHarborID, .tideCrossing(heightM: 1.0, rising: true)),
             (TideStationRecord.fridayHarborID, .tideExtreme(high: false)),
             (TideStationRecord.fridayHarborID, .tideExtreme(high: true)),
-            (deception, .slackWindowOpens),          // at 0.5 kn this includes hairline slacks
+            (deception, .slackWindowOpens),          // at 0.5 kn this includes fast reversals
             (deception, .currentPeak(flood: true)),
             (deception, .currentPeak(flood: false)),
             ("chs-malibu-rapids", .slack),           // a derived gate, when its reference is fitted

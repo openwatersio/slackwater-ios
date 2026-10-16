@@ -3,6 +3,7 @@
 // window is the only source of truth. Modeled on CurrentDetailView's
 // post-split single-track anatomy, minus everything fit/provisional (there is
 // no fast answer here, only the real published numbers or an honest why-not).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import Combine
 import SlackwaterKit
@@ -156,7 +157,11 @@ struct OnlineGateDetailView: View {
                             })
             .onAppear {
                 let today = todayLocal(tz)
-                if anchor == .distantPast { anchor = today }
+                if anchor == .distantPast {
+                    // A fold rebuilds this view: hang the window from the folded day so the strip can land on it.
+                    let folded = FoldHandoff.pending(gate.id)
+                    anchor = folded.map { Timeline.reanchor(settledAt: $0, anchor: today, tz: tz) ?? today } ?? today
+                }
                 fetchState = ChsFitService.shared.onlineState(gate.id)
                 if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
                 rebuild()
@@ -193,6 +198,9 @@ struct OnlineGateDetailView: View {
             .onReceive(ChsFitService.shared.$onlineProgress
                 .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
+            .onChange(of: live) { _, now in
+                if let tl = timeline, tl.today != dayLocal(now, tz) { rebuild() }
+            }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
                 if online { fetchPending() }

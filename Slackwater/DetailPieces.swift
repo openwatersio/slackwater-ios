@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The detail views' shared pieces: sky, moon, formatters,
 // the lead card and its commentary. SwiftUI and Almanac only, so the watch
 // compiles them too (#522).
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Almanac
 import SwiftUI
 
@@ -723,6 +724,7 @@ struct LeadCard<Eyebrow: View>: View {
                 (Text(value).font(ReadoutType.lead(leadSize).monospacedDigit())
                     + Text(unit.map { " \($0)" } ?? "").font(ReadoutType.leadUnit))
                     .foregroundStyle(valueColor)
+                    .accessibilityLabel(leadSpokenValue(value, unit: unit))
             }
             Text(time)
                 .font(.caption.monospacedDigit())
@@ -730,6 +732,8 @@ struct LeadCard<Eyebrow: View>: View {
                 .accessibilityHidden(true)
         }
         .padding(.vertical, 12)
+        // A drag or tap that starts on the reading belongs to the strip under it.
+        .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
         .tourAnchor(.read)
@@ -741,6 +745,28 @@ struct LeadCard<Eyebrow: View>: View {
 /// The eyebrow's word, in the weight and ink every lead shares.
 func leadState(_ text: String, ink: Color = SN.foam) -> Text {
     Text(text).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
+}
+
+/// The eyebrow's glyph, silent because the word and compass point beside it already say it and VoiceOver reads a rotated symbol by its unrotated name.
+struct LeadGlyph: View {
+    let systemName: String
+    var degrees: Double = 0
+
+    var body: some View {
+        Image(systemName: systemName)
+            .rotationEffect(.degrees(degrees))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The lead's value as VoiceOver reads it: a provisional tilde is printed, not spoken.
+func leadSpokenValue(_ value: String, unit: String?) -> String {
+    [String(value.drop { $0 == "~" }), unit].compactMap { $0 }.joined(separator: " ")
+}
+
+/// A tide or current reading in words, for the strip's spoken value: the state, then the value with its unit written out.
+func spokenReading(_ state: String, _ value: String, unit: String) -> String {
+    String(localized: "\(state) \(value) \(spokenUnit(unit))", comment: "VoiceOver tide or current reading. Values are the tide or current state, a formatted height or speed, and its spoken unit.")
 }
 
 struct CommentaryStop: Equatable {
@@ -770,10 +796,11 @@ func commentaryEventStop(_ label: String, at time: Date,
     case "Ebb": (visible, spoken, systemImage) = (String(localized: "Ebb", comment: "Ebb-current event label."), String(localized: "Ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
     case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), "arrow.forward")
     case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
-    default: return CommentaryStop(time: time, label: prefix + label)
+    default: return CommentaryStop(time: time, label: prefix + label, spokenLabel: label)
     }
+    // The prefix is the printed provisional tilde, which VoiceOver would read as a word.
     return CommentaryStop(time: time, label: prefix + visible,
-                          spokenLabel: prefix + spoken,
+                          spokenLabel: spoken,
                           systemImage: systemImage)
 }
 
@@ -795,19 +822,30 @@ func commentaryContent(_ stop: CommentaryStop, from scrub: Date,
                              accessibilityLabel: String(localized: "\(stop.spokenLabel ?? stop.label) in \(spokenDuration)", comment: "VoiceOver label for the next tide, current, or sun event. Values are the event and a localized duration."))
 }
 
+/// Over a second ahead so landing on a stop advances the pill, and on the drawn samples so its tap stays on the data.
+func commentaryCanName(_ t: Date, after scrub: Date, drawn: ClosedRange<Date>?) -> Bool {
+    guard let drawn else { return false }
+    return t > scrub.addingTimeInterval(1) && drawn.contains(t)
+}
+
+/// The first of `stops`, in time order, that the commentary may name.
+func firstCommentaryStop<S: Sequence>(_ stops: S, at time: (S.Element) -> Date,
+                                      after scrub: Date, drawn: ClosedRange<Date>?) -> S.Element? {
+    stops.first { commentaryCanName(time($0), after: scrub, drawn: drawn) }
+}
+
 /// The stop the commentary names and its tap walks to: the water's next stop,
 /// or the sun's next rise or set when that comes first. Dark is an event a
 /// reader plans around the same way they plan around a slack.
 func nextCommentaryStop(_ water: CommentaryStop?,
                         sun days: [TimelineDay],
-                        after scrub: Date) -> CommentaryStop? {
-    // Strictly after the scrub, so landing on a stop advances to the next.
-    let cutoff = scrub.addingTimeInterval(1)
+                        after scrub: Date,
+                        drawn: ClosedRange<Date>?) -> CommentaryStop? {
     let sun = days
         .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
         .compactMap { time, word in time.map { commentaryEventStop(word, at: $0) } }
     return (sun + [water].compactMap { $0 })
-        .filter { $0.time > cutoff }
+        .filter { commentaryCanName($0.time, after: scrub, drawn: drawn) }
         .min { $0.time < $1.time }
 }
 

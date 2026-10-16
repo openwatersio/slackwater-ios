@@ -359,7 +359,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // old width. Nothing inside the strip is an accessibility element (it
         // is all one `Canvas`), so ink coverage is what a test can see.
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
-        XCTAssert(ink > 0.05, "the strip drew nothing after the pick — ink \(ink)")
+        XCTAssert(ink > Self.drawnStripInk, "the strip drew nothing after the pick — ink \(ink)")
         save(app, "picker-week-moved.png")
 
         // Back the other way, which is the same resize in reverse: today's
@@ -371,7 +371,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(bar, "label == '\(before)'"),
                   "return-to-now left the bar on '\(bar.label)', not '\(before)'")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
-        XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
+        XCTAssert(homeInk > Self.drawnStripInk, "the strip drew nothing back on today — ink \(homeInk)")
     }
 
     // The detail header carries the title, the day header carries the sun
