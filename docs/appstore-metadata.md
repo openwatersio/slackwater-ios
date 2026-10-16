@@ -90,14 +90,6 @@ Rules that are easy to break by accident:
 - **Premium is disclosed while it is on sale.** The paragraph under FREE, NO ACCOUNT, NO ADS names what Premium adds and that it is a yearly subscription or a lifetime purchase (App Review 2.3.2). Every prediction stays free, so the free claims hold either way.
 - **The description ends with Terms of Use and Privacy Policy links while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
 
-## Spanish (Mexico) and French (Canada)
-
-App Store listing locales are independent of the app's string catalogs. The current CLI pushes `en-US` only; existing `es-MX` and `fr-CA` records remain untouched. Multi-locale automation is tracked in #689.
-
-Every localization must describe the selected build: worldwide tides, currents in the US and Canada, Premium disclosure, the Watch app, and the nine Canadian current passes that download predictions rather than fitting an offline model. Translate the English listing in `appstore-listing.json`, including its Terms of Use and Privacy Policy links, and have a native speaker read it before submission. Do not reuse older copy that promises all Canadian passes work offline after a single download or omits Premium.
-
-Names, subtitles, keywords and promotional text have the same limits in every locale. A listing locale needs its own copy and keyword set; do not reuse English keywords. Screenshots can fall back to the English set, and every update localization needs What's New.
-
 ## What's New
 
 This field is the version's release notes without the beta testing instructions, so the two can never disagree. `asc.mjs localization` extracts it the same way as this line:
@@ -107,6 +99,22 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 ```
 
 [`release-notes/README.md`](release-notes/README.md) documents the format. An app's first version has no What's New field. Every subsequent App Store version requires release notes that lead with what changed.
+
+## Spanish (Mexico) and French (Canada)
+
+`localizations` in the listing file, keyed by App Store Connect locale. Each locale writes its own `name`, `subtitle`, `promotionalText`, `description` and `keywords`, and `scripts/appstore.mjs` refuses one that leaves any out. The privacy policy, support and marketing URLs come from `en-US`. `asc.mjs app-info` and `asc.mjs localization` push every locale. Screenshots go to `en-US` only, and the other locales show that set. What's New is the English notes in every locale.
+
+A listing locale is independent of the app's string catalogs, so `es-MX` needs no `es-MX` translation of the app. ASO tools report that the US store indexes Spanish (Mexico) alongside English (US), and the Canadian store French (Canada) alongside English (Canada); Apple does not document this. With no English (Canada) listing, the Canadian store shows English (US).
+
+The rules above hold, with these additions:
+
+- **Every coverage claim names currents as the United States and Canada**, the promotional text included.
+- **Keywords skip every word in the English (US) name, subtitle and keywords**, since both stores index that listing too. The one repeat is French `table`: Apple combines words across one localization's fields but does not document combining across localizations, so `table` stays to keep "table des marées" whole.
+- **Spanish puts "Tabla de mareas" in the name.** "Mareas y corrientes" does not fit beside the brand in 30 characters, and "tabla de mareas" is the Spanish search for a tide app the way `tide chart` is the English one. Currents move to the subtitle.
+- **French mirrors the English subtitle.** "Heures d’étale" is "slack water times", and "heures" pairs with "marées" in the name for "heures des marées".
+- **The copy uses the app's own words**: estoa, flujo and reflujo, pleamar and bajamar in Spanish; étale, flot and jusant, marée haute and marée basse in French. Spanish says tú and French says vous, as the app does.
+
+In the Spanish keywords, `alta` and `baja` pair with `marea` for the everyday "marea alta" and "marea baja", and `internet` pairs with the subtitle's "sin". In the French ones, `shc` is the Service hydrographique du Canada, the French name for CHS, and `fleuve` is the regional anchor the way `salish sea` is in English: Quebec calls the St. Lawrence "le fleuve", and its tide stations are the francophone home water.
 
 ## Privacy (App Store Connect "App Privacy" answers)
 

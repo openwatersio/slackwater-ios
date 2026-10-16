@@ -1,6 +1,6 @@
 # App Store releases
 
-An App Store version ships a build that already went through Nightly and Beta; nothing is rebuilt. `scripts/asc.mjs` pushes the English listing and review details from this repo, submits the version, and releases it once approved. The listing copy is [`appstore-listing.json`](appstore-listing.json), the rules it is written against are in [App Store metadata](appstore-metadata.md), and each version's What's New is its [release notes](release-notes/) above the `Worth testing:` line.
+An App Store version ships a build that already went through Nightly and Beta; nothing is rebuilt. `scripts/asc.mjs` pushes every listing locale and the review details from this repo, submits the version, and releases it once approved. The listing copy is [`appstore-listing.json`](appstore-listing.json), the rules it is written against are in [App Store metadata](appstore-metadata.md), and each version's What's New is its [release notes](release-notes/) above the `Worth testing:` line.
 
 Credentials are the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY` TestFlight uses ([TestFlight](testflight.md)). The review contact's phone number stays out of the repo: export `ASC_REVIEW_PHONE` when pushing review details, or the request leaves the phone out.
 
@@ -41,8 +41,8 @@ Every command takes `--dry-run`. `submit`, `release`, and `accessibility` reach 
 |---|---|
 | `prepare <version> <build> [screenshotDir]` | Everything below except submit, release, and accessibility, in order |
 | `version <version>` | Finds or creates the iOS version, sets release type `MANUAL` and the copyright |
-| `app-info` | Name, subtitle, privacy policy URL, primary and secondary category, content rights |
-| `localization <version>` | Description, keywords, promotional text, support and marketing URLs, What's New |
+| `app-info` | Name, subtitle and privacy policy URL in every locale, primary and secondary category, content rights |
+| `localization <version>` | Description, keywords, promotional text, support and marketing URLs, and What's New, in every locale |
 | `review-details <version>` | Review contact and notes |
 | `attach-build <version> <build>` | Attaches a `VALID`, unexpired, App Store–eligible build |
 | `screenshots <version> [screenshotDir]` | Replaces available `iphone-6.3/` (`APP_IPHONE_61`), `iphone-6.9/` (`APP_IPHONE_67`), `ipad-13/` (`APP_IPAD_PRO_3GEN_129`) and `watch/` (`APP_WATCH_ULTRA`) sets (default `/tmp/slackwater-appstore`) |
@@ -67,7 +67,7 @@ Neither the API nor `asc.mjs` covers these. Answer them before the first submiss
 - **App Privacy.** The API has no endpoint for the privacy questionnaire. The answers and the host check that justifies them are in [App Store metadata](appstore-metadata.md#privacy-app-store-connect-app-privacy-answers).
 - **Age rating.** The questionnaire has an API, but `asc.mjs` doesn't cover it. Nothing in the app rates above 4+.
 - **Pricing and availability.** Free, in the territories the data licences allow.
-- **Other listing locales.** The commands update `en-US` only. Check every existing locale for the selected build; #689 tracks automation for Spanish (Mexico) and French (Canada).
+- **Translated release notes.** Every locale receives the English What's New until per-locale notes are added. Check the copy in every listing locale against the selected build.
 - **Mac and iPhone Duo screenshots.** Capture and upload them through the UI using [the metadata guide](appstore-metadata.md#before-submission). The uploader handles iPhone, iPad and Watch only.
 - **In-app purchases.** Attaching one to a version is a UI decision, and `submit` refuses a submission that holds one.
 - **Phased release** for updates after the first.
