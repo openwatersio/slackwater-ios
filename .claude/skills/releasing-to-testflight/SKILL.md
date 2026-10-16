@@ -9,7 +9,8 @@ description: Use when cutting a Slackwater iOS release, bumping MARKETING_VERSIO
 been — read The rule that bites before touching either one.
 
 One-time infrastructure (ASC key, keychain, signing identity, profile) lives in
-`docs/testflight.md`. This skill is the per-release procedure only.
+`docs/testflight.md`. This skill is the per-release procedure only. Submitting a
+beta build to the App Store is `docs/appstore.md`.
 
 ## The rule that bites
 
@@ -38,10 +39,10 @@ rejected upload.** Nothing renumbers it for you.
 
 1. Merge version changes before Nightly builds the binary. Read the highest build with `node scripts/asc.mjs builds`, keep `CURRENT_PROJECT_VERSION` above it, and keep `MARKETING_VERSION` above 1.0.
 2. Confirm the nightly workflow and the offline `--full` suite passed for the commit.
-3. Run `Promote Nightly to Beta` on `main` with the nightly build number.
-4. Review the generated notes, promotion record, commit, nightly tag, and `.github/testflight-beta-groups.txt` in the release pull request. Replace the generic `Worth testing:` paragraph when the release needs specific checks.
-5. Have another maintainer merge the pull request to approve promotion (`CONTRIBUTING.md`). The merge adds the existing binary to the configured groups, submits beta review once, creates `v<MARKETING_VERSION>` at the nightly commit, and annotates the nightly prerelease.
-6. Confirm the promotion workflow passed, then run `node scripts/asc.mjs builds`. The selected version and build must be `VALID` and list the expected groups.
+3. Run `Promote Nightly to Beta` on `main` with the nightly build number. It sets the TestFlight notes, adds the existing binary to the groups in `.github/testflight-beta-groups.txt`, and submits beta review. Commit `docs/release-notes/<version>-<build>.md` first when the release needs notes other than the collected PR titles.
+4. Confirm the promotion workflow passed, then run `node scripts/asc.mjs builds`. The selected version and build must be `VALID` and list the expected groups.
+
+Once the build is submitted, App Review's approval and the App Store release have their own steps: use the `post-release` skill.
 
 ## Known answers
 
@@ -52,7 +53,7 @@ Settled, so they don't get re-litigated:
 | Does ASC accept a *lower* pre-release train? | It accepts it and no tester can install it. Builds 22 (0.6.0) and 23 (0.7.0) both went `VALID`, both reached `IN_BETA_TESTING` on the internal group — and the TestFlight app kept offering 1.0 (21), because it offers the highest version train it holds and does not even list the lower ones under Previous Builds. Two releases went nowhere this way. **`MARKETING_VERSION` must stay above 1.0** until the accidental 1.0 train (builds 1–21) is retired. |
 | Why do builds 1–21 sit under a `1.0` train? | They shipped the plist literal. The eventual real 1.0 needs a build number above 21. |
 | A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
-| Does a Nightly-only upload get a GitHub release? | **No.** The promotion pull request merge creates the final release. Every nightly upload remains a prerelease until selected. |
+| Does a Nightly-only upload get a GitHub release? | **Only a prerelease.** Every Nightly upload gets a `nightly-<version>-<build>` prerelease. The full `v<version>` release is made by hand once the version is live on the App Store; see the `post-release` skill. |
 | Why does Nightly need no promotion? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **External groups sit behind public links**, so a build reaches them only after the promotion workflow attaches it and Apple approves beta review. |
 | Which external groups does a release go to? | Exactly the groups in `.github/testflight-beta-groups.txt`. The workflow compares that list with App Store Connect before preparing and promoting a release. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |

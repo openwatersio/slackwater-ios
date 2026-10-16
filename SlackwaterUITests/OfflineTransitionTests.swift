@@ -81,7 +81,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
-        )).firstMatch.exists)
+        )).firstMatch.appears(within: 30), "final tide model never replaced the downloaded preview")
 
         app.terminate()
         app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])

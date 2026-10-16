@@ -1,6 +1,6 @@
 # Release notes
 
-One file per version, named for its `MARKETING_VERSION`. The promotion workflow drafts it from merged pull request titles, posts it as the build's TestFlight "What to Test", and uses it as the body of the `v$VERSION` GitHub release. Reviewers replace the generic `Worth testing:` paragraph when a release needs specific checks.
+One file per version, named for its `MARKETING_VERSION`. The promotion workflow posts it as the build's TestFlight "What to Test" (a `<version>-<build>.md` file wins when present; otherwise it collects merged pull request titles). Once the version is live on the App Store, everything above `Worth testing:` becomes the body of the `v$VERSION` GitHub release. Reviewers replace the generic `Worth testing:` paragraph when a release needs specific checks.
 
 ## Format
 
@@ -11,7 +11,7 @@ One file per version, named for its `MARKETING_VERSION`. The promotion workflow 
 
 ## The App Store takes the highlights only
 
-App Store Connect's "What's New" wants the highlights without the beta instructions. Everything between the version line and `Worth testing:` is that text:
+App Store Connect's "What's New" wants the highlights without the beta instructions. Everything between the version line and `Worth testing:` is that text, and `scripts/asc.mjs localization` pushes it ([App Store releases](../appstore.md)). An app's first version has no What's New field, so 1.14.0's notes stop at TestFlight and the GitHub release:
 
 ```sh
 sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
@@ -19,4 +19,4 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 
 So `Worth testing:` starts its own line and stays last, and anything a beta tester needs but an App Store reader does not belongs inside it — build numbers, simulator caveats, what to watch for in a specific lane.
 
-[App Store metadata](../appstore-metadata.md) names this file as the source of its What's New rather than holding a second copy, so the listing and the build's notes cannot drift apart.
+The listing reads What's New from this file rather than holding a second copy, so the listing and the build's notes cannot drift apart.
