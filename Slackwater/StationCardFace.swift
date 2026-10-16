@@ -282,14 +282,11 @@ struct ConditionsItem: View {
                 }
             }
 
-        case .current(let signed, let deg, let unit, let tilde, let inWindow):
+        case .current(let signed, let deg, let unit, let tilde, _):
             // Always the speed and the set (current-charts §15.2): a pill
             // states a phase without either.
-            let phase = currentPhase(signed: signed)
-            // Inside a slack window — the same run the curve draws green, from
-            // the shared predicate (current-charts §6.1, §15.2) — the word is
-            // Slack in the go colour whatever the instantaneous phase word says.
-            let slack = inWindow || phase == .slack
+            let phase = reading.currentWord ?? .flood
+            let slack = phase == .slack
             let spoken = "\(formatSpeed(abs(signed), unit: unit)) \(speedUnitLabel(unit)), \(slack ? "slack" : "\(phase.word), setting \(compass16(deg))")"
             let value = (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
@@ -348,5 +345,13 @@ struct ConditionsItem: View {
                 if !arrowFirst { CompassArrow(deg: deg) }
             }.font(font).foregroundStyle(tint)
         }
+    }
+}
+
+extension ConditionsItem.Reading {
+    /// Slack only on a mark the curve draws green (current-charts §6.1, §15.2), as the detail lead and the complication say it.
+    var currentWord: CurrentPhase? {
+        guard case .current(let signed, _, _, _, let inWindow) = self else { return nil }
+        return currentPhase(signed: signed, inWindow: inWindow)
     }
 }

@@ -119,6 +119,21 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(r.symbol, "arrow.up.right")
     }
 
+    /// The complication's Slack is the phone lead's: up to but not at a window's closing, and on a windowless slack's own second.
+    func testWordIsSlackOnTheLeadsSlackMarks() throws {
+        let bare = now.addingTimeInterval(3 * 3600)
+        let points = stride(from: -720, through: 1440, by: 10).map { minute in
+            CurrentPoint(time: now.addingTimeInterval(Double(minute) * 60), speed: minute == 0 ? 0 : 1)
+        }
+        let station = WidgetStation.current(GivenCurrent(points: points, slacks: [now, bare]), tz: utc, name: "Given")
+        let window = try XCTUnwrap(cardWindows(points: points, slacks: [now]).first)
+        let word = { (t: Date) in ComplicationReading.build(station, now: t)?.word }
+        XCTAssertEqual(word(now), CurrentPhase.slack.word)
+        XCTAssertEqual(word(window.end), "Flooding", "the closing is already leaving slack")
+        XCTAssertEqual(word(bare), CurrentPhase.slack.word, "a windowless slack's dot")
+        XCTAssertEqual(word(bare.addingTimeInterval(2)), "Flooding")
+    }
+
     func testCurrentGaugeEndsAtTheWindow() throws {
         let g = try XCTUnwrap(ComplicationReading.build(current, now: now)?.gauge)
         let start = try XCTUnwrap(g.windowStart)
@@ -156,4 +171,16 @@ private struct SteadyCurrent: CurrentPredicting {
         station.heights(from: from, to: to, step: step).map { CurrentPoint(time: $0.time, speed: $0.height) }
     }
     func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+}
+
+/// A current whose samples and slacks are given, clipped to the range asked for.
+private struct GivenCurrent: CurrentPredicting {
+    let points: [CurrentPoint]
+    let slacks: [Date]
+    func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+        points.filter { $0.time >= from && $0.time <= to }
+    }
+    func events(from: Date, to: Date) -> [CurrentEvent] {
+        slacks.filter { $0 >= from && $0 <= to }.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
+    }
 }

@@ -110,11 +110,11 @@ struct WidgetCard {
             let graph = r.cardGraph(at: now, unit: speedUnit, station: station)
             // Inside a window the widget counts down to the closing (§15.3),
             // decided here at the entry date — not later, at render time.
-            let inside = graph.windows.first { $0.contains(now) }
+            let inside = graph.windows.first { $0.holdsSlack(at: now) }
             let countdownEnd = inside.flatMap { $0.end.timeIntervalSince(now) <= 7_200 ? $0.end : nil }
             return .init(name: r.name, region: r.region,
                          reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
-                                           unit: speedUnit, inWindow: inside != nil),
+                                           unit: speedUnit, inWindow: graph.isSlack(at: now)),
                          graph: graph, nextSlack: nil,
                          locationMark: locationMark, countdownEnd: countdownEnd)
         case .derived(let r):

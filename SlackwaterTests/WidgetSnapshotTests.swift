@@ -249,6 +249,39 @@ import SlackwaterKit
         }
     }
 
+    /// The card says Slack only inside a window, as the detail lead and the complication do:
+    /// weak water outside one still names its direction, and a window holds Slack at any speed.
+    func testTheCardSaysSlackOnlyInsideAWindow() {
+        typealias Reading = ConditionsItem.Reading
+        XCTAssertEqual(Reading.current(signed: 0.1, deg: 0, unit: "kn").currentWord, .flood)
+        XCTAssertEqual(Reading.current(signed: -0.1, deg: 180, unit: "kn").currentWord, .ebb)
+        XCTAssertEqual(Reading.current(signed: 0.4, deg: 0, unit: "kn", inWindow: true).currentWord, .slack)
+        XCTAssertEqual(Reading.current(signed: 0, deg: 0, unit: "kn").currentWord, .flood, "zero counts as flood, as on the lead")
+        XCTAssertNil(Reading.gate(.slack).currentWord)
+    }
+
+    /// The widget and card read Slack on the marks their curve draws, as the detail lead does:
+    /// a window up to but not at its closing, and a windowless slack's own second.
+    func testWidgetCardSaysSlackOnTheCurvesSlackMarks() throws {
+        let record = try XCTUnwrap(CurrentStationRecord.all.first)
+        let t = Date(timeIntervalSince1970: 1_755_800_000)
+        let bare = t.addingTimeInterval(3 * 3600)
+        let points = stride(from: -720, through: 1440, by: 10).map { minute in
+            CurrentPoint(time: t.addingTimeInterval(Double(minute) * 60), speed: minute == 0 ? 0 : 1)
+        }
+        let station = FixedWidgetCurrent(points: points, slacks: [t, bare])
+        let window = try XCTUnwrap(record.cardGraph(at: t, unit: "kn", station: station).windows.first)
+        func card(_ now: Date) -> WidgetCard { WidgetCard.build(.current(record, station: station), now: now) }
+
+        XCTAssertEqual(card(t).reading.currentWord, .slack)
+        XCTAssertEqual(card(t).countdownEnd, window.end)
+        XCTAssertEqual(card(window.end).reading.currentWord, .flood, "the closing is already leaving slack")
+        XCTAssertNil(card(window.end).countdownEnd, "no countdown at the closing")
+        XCTAssertEqual(card(bare).reading.currentWord, .slack, "a windowless slack's dot")
+        XCTAssertNil(card(bare).countdownEnd, "no window to count down")
+        XCTAssertEqual(card(bare.addingTimeInterval(2)).reading.currentWord, .flood)
+    }
+
     /// §15.3: inside a slack window the widget's reading counts down to the
     /// window's close instead of showing a speed. Fixed epoch, not `Date()`
     /// — deterministic, not a flake.
@@ -361,5 +394,17 @@ import SlackwaterKit
             XCTAssertEqual(s.tz, tz)
             XCTAssertEqual(s.curveKind, .schematic)
         }
+    }
+}
+
+/// A current whose samples and slacks are given, clipped to the range asked for.
+private struct FixedWidgetCurrent: CurrentPredicting {
+    let points: [CurrentPoint]
+    let slacks: [Date]
+    func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+        points.filter { $0.time >= from && $0.time <= to }
+    }
+    func events(from: Date, to: Date) -> [CurrentEvent] {
+        slacks.filter { $0 >= from && $0 <= to }.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
     }
 }

@@ -24,15 +24,15 @@ struct CurrentLead: View {
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
 
-    private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil }
-    private var phase: CurrentPhase { isSlack ? .slack : signed >= 0 ? .flood : .ebb }
+    private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
+    private var phase: CurrentPhase { currentPhase(signed: signed, inWindow: isSlack) }
     private var tilde: String { provisional ? "~" : "" }
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
     /// The stops the commentary walks: a slack run's opening, its closing
     /// (the run that begins), each max, and the sun's next rise or set when
-    /// it beats all of them. A run drawn as a dot is one stop, its centre.
+    /// it beats all of them. A run drawn as a dot is one stop, its centre, and a slack no run covers is one stop, its instant.
     var nextSignificant: CommentaryStop? {
         var stops: [(time: Date, text: String)] = []
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
@@ -48,6 +48,9 @@ struct CurrentLead: View {
                 let v = timeline.velocityAt(run.end.addingTimeInterval(1))
                 stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
             }
+        }
+        for t in timeline.bareSlackTimes {
+            stops.append((t, "Slack"))
         }
         for e in timeline.currentEvents where e.kind != .slack {
             stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))

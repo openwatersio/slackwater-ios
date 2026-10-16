@@ -367,11 +367,24 @@ import notify
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
     }
 
+    /// "Something is on this strip", for `inkFraction` of `timeline-strip`.
+    /// Measured on iPhone 17:
+    ///
+    ///     blank (centerline, riding dot, ft axis)   0.008
+    ///     Friday Harbor tide, today                 0.035   ← the lowest drawn strip
+    ///     Malibu Rapids derived gate                0.042
+    ///     Sechelt Rapids online gate                0.045
+    ///
+    /// The blank strip's ink is all SwiftUI overlay, drawn ON TOP of the canvas.
+    /// A tide fills only below chart datum, so a tide day is mostly its line.
+    /// 0.017 sits at the geometric middle of the 4.3× gap, ~2× either side.
+    /// A strip paged to another week reads far higher (0.57 to 0.59) and never
+    /// sets the low end.
+    static let drawnStripInk = 0.017
+
     /// The share of an element's pixels that differ from its most common
-    /// colour — "is anything drawn here". Measured on this strip: 0.008 blank
-    /// (centerline, riding dot and the ft axis, all SwiftUI overlay ON TOP of
-    /// the canvas), 0.13 drawn. The 0.05 threshold sits in the order of
-    /// magnitude between them, so it needs no per-device tuning.
+    /// colour — "is anything drawn here". See `drawnStripInk` for the strip's
+    /// measured values.
     func inkFraction(_ element: XCUIElement) -> Double {
         guard let cg = element.screenshot().image.cgImage else { return 0 }
         let w = cg.width, h = cg.height

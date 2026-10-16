@@ -84,17 +84,23 @@ enum CurveDrawing {
     /// the fade ends at that trough instead, so the fill is clear where the
     /// plot is clipped rather than half-strong at a hard edge. `area` is the
     /// curve closed to the datum line; the fill is clipped to the plot box.
+    ///
+    /// `fillsAboveDatum` false draws the amber alone, and nothing when the
+    /// water never reaches datum: the detail strip, where the day and night
+    /// shading sits on the bare sea and a blue fill under it would make a
+    /// tide day read brighter than a current day.
     static func datumFill(_ ctx: GraphicsContext, _ area: Path,
                           plotTop: CGFloat, plotBottom: CGFloat, width: CGFloat,
-                          datumY: CGFloat, lowestY: CGFloat) {
+                          datumY: CGFloat, lowestY: CGFloat, fillsAboveDatum: Bool = true) {
         let datumInReach = lowestY >= datumY
+        guard fillsAboveDatum || datumInReach else { return }
         let fadeY = datumInReach ? datumY : lowestY
         let top = min(plotTop, fadeY), bottom = max(plotBottom, fadeY)
         let fadeStop = (fadeY - top) / (bottom - top)
-        var stops = [
+        var stops: [Gradient.Stop] = fillsAboveDatum ? [
             Gradient.Stop(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
             Gradient.Stop(color: SN.graphLine.opacity(0), location: fadeStop),
-        ]
+        ] : [Gradient.Stop(color: SN.graphLow.opacity(0), location: 0)]
         if datumInReach {
             stops.append(.init(color: SN.graphLow.opacity(0), location: fadeStop))
             stops.append(.init(color: SN.graphLow.opacity(CurveStyle.fillOpacity), location: 1))
@@ -248,7 +254,7 @@ enum CurveDrawing {
     }
 
     /// A reading hanging off a turn or peak in the direction `toward`
-    /// (+1 down, −1 up — toward the plot's middle): the glyph nearest the
+    /// (+1 down, −1 up — usually toward the plot's middle): the glyph nearest the
     /// dot in `tint`, the value beyond it in `ink`. Either may be absent.
     static func hangLabel(_ ctx: GraphicsContext, at p: CGPoint, toward: CGFloat,
                           value: String?, glyph: HangGlyph?, tint: Color, ink: Color,

@@ -178,10 +178,18 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: at(3600), signed: 0.4).spoken, "Slack 0.4 knots")
     }
 
+    /// Parked on a slack no window covers, the lead agrees with its green dot and the pill that named it.
+    func testTheLeadSaysSlackOnASlackNoWindowCovers() {
+        XCTAssertEqual(lead(scrub: at(12_600), signed: 0).spoken, "Slack 0.0 knots", "the magnet's own second")
+        XCTAssertEqual(lead(scrub: at(12_600.5), signed: 0.1).spoken, "Slack 0.1 knots", "within a second")
+        XCTAssertEqual(lead(scrub: at(12_602), signed: 0.1).spoken, "Flooding 0.1 knots N", "off the dot, the flow")
+    }
+
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes TWO stops — its opening is the
-    /// slack, its closing is the run that begins. Slack events are never stops
-    /// themselves, so the pill never says "Slack" twice for one turn.
+    /// slack, its closing is the run that begins. A slack inside a window is
+    /// never a stop itself, so the pill never says "Slack" twice for one turn;
+    /// a slack no window covers is drawn as a dot, so it is one stop, at its instant.
     func testNextSignificantNamesEveryKindOfStop() {
         assertNext(at(-100), t0, "Max flood", "the flood max is the first stop of the day")
         assertNext(at(10), at(3000), "Slack", "a window's opening is a slack")
@@ -190,7 +198,8 @@ import SlackwaterKit
         assertNext(at(6100), at(8400), "Slack", "the second window opens")
         assertNext(at(9000), at(9600), "Flood",
                    "a closing is named by the velocity after it, not by the one before")
-        XCTAssertNil(lead(scrub: at(9700)).nextSignificant, "a slack no window covers is not a stop")
+        assertNext(at(9700), at(12_600), "Slack", "a slack no window covers is one stop, at its instant")
+        XCTAssertNil(lead(scrub: at(12_600)).nextSignificant, "parked on it, nothing follows")
     }
 
     /// Land exactly on a stop and the pill points at the NEXT one. Otherwise

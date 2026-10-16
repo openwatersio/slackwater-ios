@@ -1349,6 +1349,10 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
             XCTAssertTrue(body.contains("CurveDrawing.tideLine("), "\(file): the stroke takes its colour from the tide-rate ramp")
             XCTAssertFalse(body.contains("››››"), "\(file): chevrons are gone; the line carries the rate")
             XCTAssertFalse(body.contains("Gradient("), "\(file): no fill or stroke gradient of its own")
+            // The strip fills only below datum; the card, and the widgets and
+            // complications that draw it, keep the blue above datum.
+            XCTAssertEqual(body.contains("fillsAboveDatum: false"), file.hasSuffix("TimelineStrip.swift"),
+                           "\(file): only the strip leaves the water above datum unfilled")
         }
         // Both hues vanish on the datum line, so a low under datum reads as
         // less water than the chart shows with no seam at the crossing. Two
@@ -1493,27 +1497,16 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
     /// a snap target, so the scrubber does park there. Reporting "Slack · 0m"
     /// at the edge you are being told to leave is the defect this shape
     /// prevents; the commentary names the run that begins instead.
-    func testSlackWindowContainsItsOpeningButNotItsClosing() throws {
+    func testSlackWindowContainsItsOpeningButNotItsClosing() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let window = (slack: t0.addingTimeInterval(1_200),
-                      start: t0.addingTimeInterval(300),
-                      end: t0.addingTimeInterval(2_400))
-        let timeline = TimelineData(tz: .gmt, anchor: t0, today: t0, start: t0,
-                                    end: t0.addingTimeInterval(3_600), days: [],
-                                    tidePoints: [], tideRates: [], tideExtremes: [],
-                                    currentPoints: [], currentEvents: [], snapTimes: [],
-                                    slackWindows: [window])
+        let run = WindowRun(start: t0.addingTimeInterval(300), end: t0.addingTimeInterval(2_400))
 
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.start)).slack,
-                       window.slack)
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.slack)).slack,
-                       window.slack)
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.end.addingTimeInterval(-1))).slack,
-                       window.slack, "a second before the closing is still inside")
-        XCTAssertNil(timeline.containingSlackWindow(at: window.end),
-                     "the closing itself is outside — the run has begun")
-        XCTAssertNil(timeline.containingSlackWindow(at: window.start.addingTimeInterval(-1)))
-        XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
+        XCTAssertTrue(run.holdsSlack(at: run.start))
+        XCTAssertTrue(run.holdsSlack(at: t0.addingTimeInterval(1_200)))
+        XCTAssertTrue(run.holdsSlack(at: run.end.addingTimeInterval(-1)), "a second before the closing is still inside")
+        XCTAssertFalse(run.holdsSlack(at: run.end), "the closing itself is outside — the run has begun")
+        XCTAssertFalse(run.holdsSlack(at: run.start.addingTimeInterval(-1)))
+        XCTAssertFalse(run.holdsSlack(at: run.end.addingTimeInterval(1)))
     }
 
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a

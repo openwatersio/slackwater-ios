@@ -173,7 +173,7 @@ Readings describe the moment the card was built (§6.5).
 
 Tide state is Rising when the next extreme is a high. With no next extreme it is Rising, except that a finite Canadian preview uses the local downloaded slope.
 
-Current state is "Slack" in go green when the instant lies inside a measured slack window or the speed is below 0.15 kn; otherwise "Flooding" or "Ebbing" in neutral foam. The set arrow is flood blue (`#4A9FD8`) or ebb amber (`#E8A33D`). Below 0.05 kn the bearing is replaced by a neutral dot, because the direction means nothing there. Slack windows use the person's slack threshold, 0.5 kn by default.
+Current state is "Slack" in go green only while the instant lies inside a measured slack window, closing excluded, or within a second of a slack no window covers, however slow the water, as on the detail lead and the watch complications; otherwise "Flooding" or "Ebbing" in neutral foam, with zero speed counting as flooding. The set arrow is flood blue (`#4A9FD8`) or ebb amber (`#E8A33D`). Below 0.05 kn the bearing is replaced by a neutral dot, because the direction means nothing there. Slack windows use the person's slack threshold, 0.5 kn by default.
 
 Changing the slack threshold refreshes already-mounted measured-current cards, including map previews and online current gates. Derived gates have no measured speed window. Settings includes an illustrative current curve labeled "Example": its green window and duration expand or contract with the comfort-current value. The example is not a place prediction. A chosen comfort current syncs through iCloud like the units, to the watch as well as other phones; the 0.5 kn default is never uploaded.
 
@@ -206,10 +206,11 @@ The curve spans 1.5 tidal swings back and 2.5 ahead of the card's moment, where 
 
 - The vertical range fits the data with 25% padding; a current's range always includes zero.
 - Tide highs and lows get a dot; current peaks do not.
-- Axis times hide within 20 units of either edge and value labels within 34, so nothing is clipped.
+- Each reading hangs off its turn or peak toward the plot middle (a current's toward the zero line), its arrow nearest the dot and its value beyond, about 38 units out. A reading that would leave the plot that way hangs off the other side of its dot: a low or an ebb peak near the top stays off the region row above the curve, and a high or a flood peak near the bottom stays clear of the axis times.
+- Axis times hide within 24 units of either canvas edge and value labels within 34, so nothing is clipped. In time order, an axis time less than 48 units after the last one kept is dropped, so neighbours never print over each other. Tide times and slack times follow the same rule.
 - The past fades to 45% opacity, and a now dot rides the curve.
-- A measured current's slack windows draw as green runs on the line, each with one axis time at its opening. A window narrower than a turn's dot at the card's scale draws as that dot, and its time sits at the dot, the window's centre.
-- A derived gate draws a schematic shape with green dots at its slack times.
+- A measured current's slack windows draw as green runs on the line, each with one axis time at its opening. A window narrower than a turn's dot at the card's scale draws as that dot, and its time sits at the dot, the window's centre. A slack no window covers draws the same dot at its own instant, with its time.
+- A derived gate draws a schematic shape with green dots at its slack times, each with its time under it.
 - Times use the station's time zone and the locale's hour format.
 
 The curve announces as "25-hour curve" with a value listing its extremes as "value unit at time", separated by commas.
@@ -342,7 +343,6 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 | Cached-fix maximum age | 600 s |
 | Requested accuracy | 100 m |
 | Card curve | 6.21 h swing; 1.5 back, 2.5 ahead; 10-minute samples |
-| Card slack word | below 0.15 kn |
 | Card neutral bearing | below 0.05 kn |
 | Default slack threshold | 0.5 kn |
 | Card minimum height | 96, or 168 with a curve |
