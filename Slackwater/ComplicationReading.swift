@@ -81,10 +81,9 @@ struct ComplicationReading: Equatable {
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             // The card's windows, so the complication's slack is the app's slack.
             let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
-            let windows = cardWindows(points: points, slacks: slacks)
-                .map { hours($0.start)...hours($0.end) }
-            // Slack only inside a measured window, as the phone's lead says it.
-            let phase: CurrentPhase = windows.contains { $0.contains(0) } ? .slack : signed >= 0 ? .flood : .ebb
+            let runs = cardWindows(points: points, slacks: slacks)
+            let windows = runs.map { hours($0.start)...hours($0.end) }
+            let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: runs, slacks: slacks))
             let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
             return ComplicationReading(

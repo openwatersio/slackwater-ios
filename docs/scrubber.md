@@ -350,7 +350,7 @@ The value is the absolute speed at `selectedTime`; the phase carries its sign. P
 
 The state is:
 
-- `Slack` while `selectedTime` lies in a measured slack window (§13.2), including its opening but excluding its closing, and never outside one, however slow the water;
+- `Slack` while `selectedTime` lies in a measured slack window (§13.2), including its opening but excluding its closing, or within one second of a slack no window covers, where the magnet parks on that slack's dot; never elsewhere, however slow the water;
 - `Max flood` or `Max ebb` within one second of that maximum; or
 - `Flooding` / `Ebbing` otherwise.
 
@@ -432,7 +432,7 @@ Walk strictly forward—more than one second after `selectedTime`—through thes
 2. its closing, named `Flood` or `Ebb` from the velocity one second after it (zero counts as `Flood`); and
 3. `Max flood` and `Max ebb`.
 
-A run drawn as a dot (§13.2) is one stop instead: its centre, named `Slack`, with no closing. A slack instant is never a stop of its own: its run's opening, or its dot's centre, names it.
+A run drawn as a dot (§13.2) is one stop instead: its centre, named `Slack`, with no closing. A slack inside a run is never a stop of its own: its run's opening, or its dot's centre, names it. A slack no window covers is one stop at its own instant, named `Slack`, with no closing, and parked on that instant the lead says `Slack` (§9.2).
 
 A run ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
 
@@ -470,7 +470,7 @@ x = viewportWidth / 2
 y = graphY(valueAt(selectedTime))
 ```
 
-Use a white 13-unit dot with a four-unit, 90%-white glow for tide, and a white 10-unit dot with a three-unit glow of the same colour for current and derived current. The larger tide dot keeps its presence against the more varied datum fill. The watch marks the selection with a 14-unit ring instead: a 3-unit white stroke over a canvas-colour fill, with no glow, for tide and current alike, and it draws no reading line.
+Use a white 13-unit dot with a four-unit, 90%-white glow for tide, and a white 10-unit dot with a three-unit glow of the same colour for current and derived current. The larger tide dot keeps its presence against the rate-coloured tide line. The watch marks the selection with a 14-unit ring instead: a 3-unit white stroke over a canvas-colour fill, with no glow, for tide and current alike, and it draws no reading line.
 
 At rest, a one-unit white line at 18% opacity runs from `topPad`, 6 units below the pill capsules, to the plot floor. Show it only when commentary exists; the riding dot alone carries the selection when there is no commentary. It fades with the pills. After a press, or VoiceOver's "Set an alert" action, parks a moment (§6.5.1), the line also runs from the plot floor to the bottom of the strip, with or without commentary, until the selection moves to a different minute. A host with nothing to alert on has neither the press nor the action, so it never draws the extension. The line must not intercept input.
 
@@ -510,7 +510,7 @@ A tide high's reading hangs below its dot and a low's above it, whatever the tur
 
 Absolute event times have one home: the event-time row beneath the plot, in foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
 
-Do not draw any event mark, hanging reading, or event time within 1.5 hours (27 units) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and every event time. The margin is half the widest of those labels, so an event near an edge is left out whole rather than cut by the edge; edge clipping makes a valid event look broken. The event still exists and remains magnetic. Slack runs, including a run drawn as a dot, the curve, and the now dot draw to the edge.
+Do not draw any event mark, hanging reading, or event time within 1.5 hours (27 units) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and every event time. The margin is half the widest of those labels, so an event near an edge is left out whole rather than cut by the edge; edge clipping makes a valid event look broken. The event still exists and remains magnetic. Slack runs, including a run drawn as a dot, the dot of a slack no window covers, the curve, and the now dot draw to the edge.
 
 ### 12.4 Colour tokens
 
@@ -523,7 +523,7 @@ These sRGB values are the portable reference palette:
 | Foam | `#E4F0E4` | Primary light ink |
 | Graph line | `#38BDF8` | Base water curve |
 | High | `#2DD4BF` | Tide high |
-| Low | `#FBBF24` | Tide low |
+| Low | `#FBBF24` | Tide low, and the tide fill below chart datum |
 | Flood | `#4A9FD8` | Flood set glyph and derived flood glyph in the lead, and the schedule's flood pill |
 | Ebb | `#E8A33D` | Ebb set glyph and derived ebb glyph in the lead, and the schedule's ebb pill |
 | Go | `#88B868` | A measured slack-window run, as a stroke or a dot, and a derived gate's known slack instant |
@@ -531,7 +531,7 @@ These sRGB values are the portable reference palette:
 | Sun | `#F0C860` | Sunrise/sunset dot |
 | Sunrise label | `#F0D890` | Every sunrise and sunset time, on the strip, in schedule day headers, and in the sun sheet, which also uses it for dawn and dusk; the symbol, not the colour, tells sunrise from sunset |
 | Night | `#00101F` | Night shading beneath the curve (70%) |
-| Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (14%) |
+| Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (8%) |
 | Paper | `#FCFCFC` | Absolute-now dot |
 | Attention | `#EF6F4A` | Provisional or exceptional state, not alarm |
 | Eclipse umbra | `#6B2A18` | Eclipse-only copper, drawn at 94% |
@@ -558,7 +558,7 @@ Fit tide heights around the midpoint of the fitted range, using half that range 
 Draw in this order:
 
 1. opaque canvas colour from the curve to the plot floor;
-2. a datum-anchored fill clipped to the plot;
+2. low amber below chart datum, clipped to the plot;
 3. daylight/night shading clipped beneath the curve;
 4. a dashed chart-datum line when zero lies inside the fitted span;
 5. the rate-coloured curve;
@@ -566,7 +566,7 @@ Draw in this order:
 7. absolute event times; and
 8. the absolute-now dot.
 
-The fill occupies the area between the curve and chart datum. Where the curve lies below datum, the fill lies above the curve, over the sky, not over the opaque water ground. The datum fill is graph blue at 50% at the top, fading to clear at chart datum. Below datum, low amber fades from clear at datum to 50% at the bottom. If the loaded series never reaches datum, finish the blue fade at its lowest trough and do not invent an amber region.
+Water above chart datum has no fill: between the curve and the plot floor there is only the opaque water ground, so day and night shading lies on the same dark sea on a tide strip as on a current strip. Where the curve lies below datum, low amber fills the area between datum and the curve, clear at datum and rising to 50% at the bottom of the plot. That area lies above the curve, over the sky, not over the opaque water ground. If the loaded series never reaches datum, draw no fill. Station cards draw a different tide fill: graph blue above datum as well as the amber below it.
 
 The tide curve is base graph blue while `abs(rate) < 0.6 m/hr`. At and above that floor it follows the absolute rate ramp in §12.4: from 0.6 to 1.0 m/hr the line is solid ramp yellow, and the step from blue is softened only by the gradient between adjacent samples. The past/future opacity split applies on top of the gradient.
 
@@ -590,8 +590,8 @@ Draw in this order:
 3. daylight/night shading beneath the curve;
 4. the dashed zero reference line;
 5. the base curve and its magnitude thread;
-6. measured slack runs, each a stroke or, when shorter than a turn dot, a dot;
-7. run-opening times, or a dot's centre time;
+6. measured slack marks: each run a stroke or, when shorter than a turn dot, a dot, and a dot at each slack no window covers;
+7. run-opening times, a dot's centre time, or a windowless slack's own time;
 8. derived-gate slack dots and peak readings; and
 9. the absolute-now dot.
 
@@ -606,7 +606,7 @@ Draw the curve in graph blue at 2.5 units. Down its middle, draw a two-unit abso
 
 An online sampled series derives its events from the samples. A slack falls at an exact-zero sample or at the linear crossing between opposite-sign samples. A maximum is the largest-magnitude sample of each signed run, without interpolation; the partial runs at the series ends also yield a maximum at their largest sample. Events are kept up to six hours beyond the fixed window.
 
-A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. A slack outside the sampled series, or between two above-threshold samples of the same sign, has no window and draws nothing. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band. Each run's opening and closing is magnetic, except for a run drawn as a dot.
+A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. Either way the window holds its own slack instant: where the event search puts the slack outside the interpolated edges, the window widens to it, so one slack is never both inside a run and windowless. A slack outside the sampled series, or between two above-threshold samples of the same sign, has no window. It still has a mark: the same go-colour dot as a short run, centred on the curve at the slack's own instant, which is its one magnetic target, commentary stop (§10.1), and event time. Every slack therefore has one mark: a run, or a dot for a short window or a slack with no window. Merge touching or overlapping visual windows into one run. Draw the curve itself in the go colour across that run at 3.5 units, slightly wider than the base curve. The base blue curve and speed thread must be absent under the green stroke, including the faded past section. Leave a small break around each round end cap, using a 2.5-unit halo gap, without erasing the underlying fill or sky. Do not outline the whole run, add endpoint dots, or add an area band. Each run's opening and closing is magnetic, except for a run drawn as a dot.
 
 A merged run narrower than a turn dot's five-unit diameter draws as that dot instead of a stroke: the derived gate's five-unit go-colour slack dot with its 2.5-unit clear halo, centred on the curve at the run's horizontal midpoint. At 18 units an hour that is a window shorter than about 17 minutes. The line is not cut around the run; the dot's halo erases the curve, fill, and shading beneath it as a turn dot's does (§12.2), and a past dot takes the 45% event-mark fade rather than the stroke's past opacity. A stroke that short would read as a blot rather than a duration. Decide this from the run's duration at the strip's 18 units an hour, with the same width test the drawing uses, so data code never needs the drawn geometry. A dot is one moment: its centre is the run's only magnetic target (§7), commentary stop (§10.1), and event time, and it replaces the slack instant inside it. Station cards draw the same dot at their own scale.
 
@@ -617,7 +617,7 @@ Current maxima are drawn as context rather than as marks:
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The event-time row contains each merged slack run's opening, or for a run drawn as a dot its centre. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
+The event-time row contains each merged slack run's opening, or for a run drawn as a dot its centre, and the instant of each slack no window covers. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
 
 ### 13.3 Schematic derived current
 
@@ -648,7 +648,7 @@ The day name is foam at 85% and the date foam at 48%, 17 units below the day nam
 
 Sunrise/sunset events are computed for the station coordinate and civil-day bounds; when a civil day has more than one rise or set, the first of each is used. A polar day may lack either event; omit missing marks without inventing a time.
 
-Night shading (`#00101F` at 70%) spans each sunset to the sunrise that follows it; daylight tint (`#A8CAE0` at 14%) spans each sunrise to the sunset that follows it. Pair the sun events by succession, from the time-sorted sunrises and sunsets of every day the strip holds, never by civil day: where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset comes before its sunrise and closes the previous day's daylight. A sun event followed by another of the same kind, or by none, opens no band. Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
+Night shading (`#00101F` at 70%) spans each sunset to the sunrise that follows it; daylight tint (`#A8CAE0` at 8%) spans each sunrise to the sunset that follows it. Pair the sun events by succession, from the time-sorted sunrises and sunsets of every day the strip holds, never by civil day: where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset comes before its sunrise and closes the previous day's daylight. A sun event followed by another of the same kind, or by none, opens no band. Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
 
 For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. Greatest eclipse is a magnetic target; the eclipse's other contacts are not (§7).
 
@@ -690,7 +690,7 @@ Do not rely on colour alone:
 
 - high/low have different to-bar glyphs;
 - current direction has bearing arrows and compass text;
-- measured slack is a wider run, or a dot when the run is shorter than one, derived slack is a dot, and both are named in text;
+- measured slack is a wider run, or a dot for a run shorter than one or a slack with no window, derived slack is a dot, and both are named in text;
 - speed magnitude remains printed at maxima; and
 - schematic magnitude is omitted rather than encoded only by colour.
 
@@ -768,10 +768,10 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 16. **Tide turn:** At an exact high, the lead says High, the high's reading hangs below its dot, and the commentary advances to the following event.
 17. **Fast tide:** At 0.6 m/hr or faster, the line and commentary share the same ramp position and activating commentary goes to that run's fastest point.
-18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and changes phase at the half-open closing, and never says Slack outside a window (§9.2).
-19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged run narrower than a turn dot draws as the go-colour dot with its halo, not a stroke, and its centre is its event time, its only magnetic target, and its one commentary stop.
+18. **Measured slack window:** The curve is green only across interpolated window edges; the lead says Slack at the opening and changes phase at the half-open closing, and outside a window says Slack only within a second of a windowless slack (§9.2).
+19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged run narrower than a turn dot draws as the go-colour dot with its halo, not a stroke, and its centre is its event time, its only magnetic target, and its one commentary stop. A slack with no window, at a sampled-series edge or between two same-sign samples, draws the same dot at its own instant, with the same single time, target, and stop, and the lead says Slack parked on it. When the engine's slack falls just outside the line's ±threshold span, the window widens to hold it, so that slack draws one mark, not a run and a dot.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
-21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill beneath its positive half only and no speed thread, and only known slack instants get green dots; there is no dashed zero line.
+21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill beneath its positive half only and no speed thread, and only known slack instants get green dots, each with its time in the event-time row; there is no dashed zero line.
 22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the absolute-now dot.
 
 ### Accessibility

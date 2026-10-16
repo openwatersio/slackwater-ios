@@ -238,7 +238,10 @@ line between the two samples either side of the crossing still crosses it,
 and the window is measured on that line (§8.3). A window too narrow to draw
 as a run draws as the go-colour dot a turn gets, at the window's centre, so
 a short window never pretends to be a usable duration. Where a run exists,
-the run is the mark — the crossing is already inside it. (Derived-gate
+the run is the mark — the crossing is already inside it. A slack with no
+window (outside the sampled span, or between two samples of the same sign)
+draws the same dot at its own instant, so every slack has one mark: a run,
+or a dot for a short window or a slack with no window. (Derived-gate
 presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
@@ -469,7 +472,7 @@ Handled by 8.1, not separately.
 
 **8.3 A window shorter than the sample step.** A violent gate stepped over by
 the sampling interval. Measured on the line between the samples either side
-of the crossing, and drawn as a dot when narrower than one (§5.3). The *events* still resolve,
+of the crossing, widened to hold the slack instant when the event search puts it outside that line's band, and drawn as a dot when narrower than one (§5.3). The *events* still resolve,
 because crossings are interpolated rather than looked up among the samples —
 this is why §4.1's interpolation rule is not an optimisation.
 
@@ -654,12 +657,18 @@ every mark that only earns its place at scale. The card and the widget are
   strength while it is ahead, the closing at half; inside the window they
   swap. Nothing else on a current curve gets a dot.
 - **Peaks are context** (§5.4): the speed, no unit, and the set arrow hang
-  off the peak inside its lobe. Values near the curve never carry a unit —
-  the reading in the top-right corner states the unit once.
+  off the peak inside its lobe, toward the zero line. A reading that would
+  leave the plot that way (its value reaches about 38 pt from the peak)
+  hangs off the other side instead, so it never lands on the card's name
+  rows or its axis times. Values near the curve never carry a unit — the
+  reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
   one time per run at its opening, or at its centre for a run drawn as a
-  dot (§5.3). Peak times are not shown; they are in
-  the schedule behind the detail.
+  dot, and one at each slack no window covers (§5.3). Peak times are not
+  shown; they are in the schedule behind the detail. The row keeps 24 pt
+  clear of each canvas edge, and in time order drops a time less than
+  48 pt after the last one kept, so two marks close together print one
+  time rather than two over each other.
 - **Colour is state** (§6): the go colour for the run and its dots, and
   nothing coloured by direction on the line or the marks. The card's fill is
   the detail's: blue beneath the curve in each flood lobe, fading to clear at
@@ -670,8 +679,9 @@ every mark that only earns its place at scale. The card and the widget are
 
 The top-right reading is the surface's readout: the speed with its unit,
 and under it the set — the phase word, the cardinal and the bearing arrow
-by the sign of the velocity. Inside a window the word is *Slack* in the go
-colour and the set still shows; under 0.05 kn the set gives way to a
+by the sign of the velocity. Inside a window, closing excluded, or within a
+second of a slack no window covers, the word is *Slack* in the go colour,
+as on the detail lead, and the set still shows; under 0.05 kn the set gives way to a
 neutral mark of the same footprint so the header never changes size. No
 pill: a pill states a phase without a speed or a set, which is two of the
 three things the reader came for.
@@ -691,16 +701,18 @@ countdown is one tap away in the detail readout.
 ### 15.4 Tides on the same surface
 
 A tide card draws its turns with a dot, the height (no unit) and a to-bar
-arrow hanging off the turn toward the plot middle, and every turn's time on
+arrow hanging off the turn toward the plot middle, and each turn's time on
 the bottom row. It follows the geometry of §15.1, not its thesis: on a tide
-the turns *are* the events (§1).
+the turns *are* the events (§1). A low near the top of the plot or a high
+near its bottom hangs its reading off the other side of the dot, and the
+turn times are thinned by the same edge and spacing rule as a current's.
 
 ### 15.5 The small widget
 
 The small widget is the same card one row shorter: the name, then the
 reading with its direction on one line — height and a rising/falling arrow,
 or speed and the set arrow with its cardinal, *Slack* in the go colour
-inside a window — and the curve below. The curve is the medium card's own
+where the reading says it (§15.2) — and the curve below. The curve is the medium card's own
 points over a narrower span: half a swing behind now and one and a half
 ahead, so now sits a quarter in and the next turn or window lands mid-card
 with its own value and time. No phase word and no caption line: the arrow's

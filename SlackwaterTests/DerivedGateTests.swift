@@ -109,6 +109,27 @@ import SlackwaterKit
             .allSatisfy { e in d.snapTimes.contains { abs($0.timeIntervalSince(e.time)) < 1 } })
     }
 
+    /// Each known slack is a timing claim, so it prints its time on the strip's row and the card's (scrubber §13.3).
+    func testEveryKnownSlackHasItsAxisTime() throws {
+        let port = TideStationRecord(
+            id: "chs-point-atkinson", name: "Point Atkinson", region: "West Vancouver",
+            aliases: [], latitude: 49.337, longitude: -123.254,
+            timezone: "America/Vancouver", chartDatum: "Chart", datumOffset: 3.0,
+            constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
+        let record = DerivedGateRecord(gate: try XCTUnwrap(malibu), port: port)
+        let now = Date(timeIntervalSince1970: 1_753_920_000)
+
+        let strip = TimelineData.build(gate: record, now: now, anchor: dayLocal(now, record.gate.tz))
+        let slacks = strip.currentEvents.filter { $0.kind == .slack }.map(\.time).sorted()
+        XCTAssertFalse(slacks.isEmpty)
+        XCTAssertEqual(strip.slackAxisTimes, slacks, "the strip's time row names every slack")
+
+        let card = record.cardGraph(at: now)
+        XCTAssertFalse(card.slacks.isEmpty)
+        XCTAssertEqual(StationCardGraph.axisMoments(card.windows, slacks: card.slacks, pointsPerHour: 14),
+                       card.slacks.sorted(), "the card's time row names every slack")
+    }
+
     func testCardGraphCarriesTheShapeSlackTimesAndFlowDirections() throws {
         let port = TideStationRecord(
             id: "chs-point-atkinson", name: "Point Atkinson", region: "West Vancouver",

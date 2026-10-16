@@ -33,7 +33,7 @@ func derivedAlertOffer(onEclipseContact: Bool) -> AlertTrigger {
     onEclipseContact ? .eclipse : .slack
 }
 
-/// The magnet parks `scrubTime` on a snap target's own second; ±1 s is `atTurn`'s tolerance too.
+/// The magnet parks only on greatest eclipse and an exact move lands on any contact's own second; ±1 s is `atTurn`'s tolerance too.
 func isOnEclipseContact(_ time: Date, _ eclipses: [WindowEclipse]) -> Bool {
     eclipses.contains { $0.contacts.contains { abs($0.timeIntervalSince(time)) < 1 } }
 }

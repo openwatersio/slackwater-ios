@@ -268,12 +268,6 @@ struct TimelineData {
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
 
-    /// Half-open: the end is a snap target, and parked there the water is
-    /// already leaving slack — the reading should say so, not "Slack · 0m".
-    func containingSlackWindow(at time: Date) -> (slack: Date, start: Date, end: Date)? {
-        slackWindows.first { $0.start <= time && time < $0.end }
-    }
-
     /// The list's window: the anchor's own midnight → +7d. Deliberately
     /// NARROWER than `start…end` — the strip carries `Timeline.centerPad` more
     /// so the last listed event can still park under the centerline.
@@ -364,6 +358,21 @@ struct TimelineData {
     /// The measured slack windows as the strip draws them: merged into runs.
     var slackRuns: [WindowRun] {
         mergeWindows(slackWindows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+    }
+
+    /// The slacks no run covers, each drawn and timed as a dot at its instant. On a derived gate, every slack.
+    var bareSlackTimes: [Date] {
+        bareSlacks(currentEvents.filter { $0.kind == .slack }.map(\.time), runs: slackRuns)
+    }
+
+    /// The lead's Slack, on the same marks the strip draws and the magnet parks on.
+    func isSlack(at time: Date) -> Bool {
+        readsSlack(at: time, runs: slackRuns, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time))
+    }
+
+    /// One event time per slack mark: each run's, and each bare slack's.
+    var slackAxisTimes: [Date] {
+        (slackRuns.map(\.axisMoment) + bareSlackTimes).sorted()
     }
 
     /// A run drawn as a dot is one stop at its centre, and the events inside it go with it.
@@ -987,7 +996,9 @@ struct TimelineCanvas: View {
         // window — correct under the clip, and increasingly wasteful.
         let xa = data.x(first.time), xb = data.x(last.time)
         seaBase(ctx, under: line, floor: geo.tideBottom, from: xa, to: xb)
-        // The card's fill, anchored at chart datum (CurveDrawing.datumFill).
+        // The card's fill below chart datum only (CurveDrawing.datumFill): no
+        // blue above it, so the day and night shading lies on the bare sea
+        // and a tide day reads as dark as a current day.
         let datumY = geo.tideY(0)
         var area = line
         area.addLine(to: CGPoint(x: xb, y: datumY))
@@ -997,7 +1008,8 @@ struct TimelineCanvas: View {
         // tile: a per-tile minimum would step the gradient at every seam.
         let lowest = data.tidePoints.lazy.map(\.height).min() ?? 0
         CurveDrawing.datumFill(ctx, area, plotTop: geo.tideTop, plotBottom: geo.tideBottom,
-                               width: data.totalWidth, datumY: datumY, lowestY: geo.tideY(lowest))
+                               width: data.totalWidth, datumY: datumY, lowestY: geo.tideY(lowest),
+                               fillsAboveDatum: false)
         nightShade(ctx, under: line, from: xa, to: xb, t0, t1)
 
         // Chart datum, the reference every printed height is quoted against.
@@ -1110,7 +1122,7 @@ struct TimelineCanvas: View {
             fadedBand(from: data.x(night.start), to: data.x(night.end), color: SN.night, opacity: 0.7)
         }
         for day in spans where day.daylight {
-            fadedBand(from: data.x(day.start), to: data.x(day.end), color: Color(hex: 0xA8CAE0), opacity: 0.14)
+            fadedBand(from: data.x(day.start), to: data.x(day.end), color: Color(hex: 0xA8CAE0), opacity: 0.08)
         }
     }
 
@@ -1169,19 +1181,26 @@ struct TimelineCanvas: View {
         // colour between each run's interpolated edges (CurveDrawing.runs).
         CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
-        axisTimes(ctx, allRuns.map(\.axisMoment).sorted().filter(data.clearsLabelEdges), t0, t1)
+        axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1)
+        let bare = data.bareSlackTimes
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.
-        for e in window(data.currentEvents, { $0.time }, t0, t1) where data.clearsLabelEdges(e.time) {
+        for e in window(data.currentEvents, { $0.time }, t0, t1) {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
                 if data.speedsAreSchematic {
+                    guard data.clearsLabelEdges(e.time) else { continue }
                     CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.zeroY),
+                                     color: SN.go.opacity(fade(e.time)))
+                } else if data.contains(e.time), bare.contains(e.time) {
+                    // A windowless slack's dot stands in for its run, so it draws to the edge as a short run's does (§12.3).
+                    CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.curY(data.velocityAt(e.time))),
                                      color: SN.go.opacity(fade(e.time)))
                 }
             case .maxFlood, .maxEbb:
+                guard data.clearsLabelEdges(e.time) else { continue }
                 // Context, not the event (§5.1): no dot. The speed hangs off
                 // the peak inside its lobe, toward the zero line, with the set
                 // arrow nearest the peak, in the reading's own ink — the fill
