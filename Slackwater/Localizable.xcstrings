@@ -7153,6 +7153,101 @@
     "%@" : {
       "shouldTranslate" : false
     },
+    "%@ — no longer in Slackwater." : {
+      "comment" : "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew. The value is the station region.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ikke længere i Slackwater."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — nicht mehr in Slackwater."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ya no está en Slackwater."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ei enää Slackwaterissa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — n’est plus dans Slackwater."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — níl sé in Slackwater a thuilleadh."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — chan eil e ann an Slackwater tuilleadh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — non è più in Slackwater."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — Slackwater での提供は終了しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — 더 이상 Slackwater에 없습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ikke lenger i Slackwater."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — niet meer in Slackwater."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — não está mais no Slackwater."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — já não está no Slackwater."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — inte längre i Slackwater."
+          }
+        }
+      }
+    },
     "%@ — no longer published." : {
       "comment" : "Removed-station explanation. The value is the station region.",
       "localizations" : {
@@ -46465,6 +46560,196 @@
         }
       }
     },
+    "Slackwater no longer carries this station, so it has no readings to show." : {
+      "comment" : "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har ikke længere denne station, så der er ingen målinger at vise."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater führt diese Station nicht mehr, daher sind keine Werte verfügbar."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater ya no incluye esta estación, así que no hay lecturas que mostrar."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater ei enää sisällä tätä asemaa, joten näytettäviä lukemia ei ole."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater n’offre plus cette station, elle ne fournit donc plus de relevés."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níl an stáisiún seo ag Slackwater a thuilleadh, mar sin níl aon léamha le taispeáint."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chan eil an stèisean seo aig Slackwater tuilleadh, mar sin chan eil leughaidhean ri shealltainn."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater non include più questa stazione, quindi non ci sono letture da mostrare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater はこの観測所の提供を終了したため、表示できるデータがありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater에서 더 이상 이 관측소를 제공하지 않아 표시할 데이터가 없습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har ikke lenger denne stasjonen, så det er ingen målinger å vise."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater heeft dit station niet meer, dus er zijn geen metingen om te tonen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Slackwater não inclui mais esta estação, então não há leituras para mostrar."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Slackwater já não inclui esta estação, por isso não há leituras para mostrar."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har inte längre den här stationen, så det finns inga mätvärden att visa."
+          }
+        }
+      }
+    },
+    "Slackwater no longer carries this station, so it has no readings to show. Swipe to remove it." : {
+      "comment" : "Removed favorite-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har ikke længere denne station, så der er ingen målinger at vise. Skub for at fjerne den."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater führt diese Station nicht mehr, daher sind keine Werte verfügbar. Streiche, um sie zu entfernen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater ya no incluye esta estación, así que no hay lecturas que mostrar. Desliza para eliminarla."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater ei enää sisällä tätä asemaa, joten näytettäviä lukemia ei ole. Poista pyyhkäisemällä."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater n’offre plus cette station, elle ne fournit donc plus de relevés. Balayez pour la supprimer."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níl an stáisiún seo ag Slackwater a thuilleadh, mar sin níl aon léamha le taispeáint. Svaidhpeáil chun é a bhaint."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chan eil an stèisean seo aig Slackwater tuilleadh, mar sin chan eil leughaidhean ri shealltainn. Grad-shlaighd gus a thoirt air falbh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater non include più questa stazione, quindi non ci sono letture da mostrare. Scorri per rimuoverla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater はこの観測所の提供を終了したため、表示できるデータがありません。スワイプして削除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater에서 더 이상 이 관측소를 제공하지 않아 표시할 데이터가 없습니다. 쓸어넘겨 삭제하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har ikke lenger denne stasjonen, så det er ingen målinger å vise. Sveip for å fjerne den."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater heeft dit station niet meer, dus er zijn geen metingen om te tonen. Veeg om het te verwijderen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Slackwater não inclui mais esta estação, então não há leituras para mostrar. Deslize para removê-la."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Slackwater já não inclui esta estação, por isso não há leituras para mostrar. Deslize para removê-la."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater har inte längre den här stationen, så det finns inga mätvärden att visa. Svep för att ta bort den."
+          }
+        }
+      }
+    },
     "Slackwater Premium" : {
       "comment" : "Settings section heading.",
       "localizations" : {
@@ -50775,97 +51060,97 @@
         }
       }
     },
-    "This station is no longer published." : {
-      "comment" : "Removed-station explanation.",
+    "This station is no longer in Slackwater." : {
+      "comment" : "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Denne station offentliggøres ikke længere."
+            "value" : "Denne station er ikke længere i Slackwater."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Station wird nicht mehr veröffentlicht."
+            "value" : "Diese Station ist nicht mehr in Slackwater."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta estación ya no se publica."
+            "value" : "Esta estación ya no está en Slackwater."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tämän aseman tietoja ei enää julkaista."
+            "value" : "Tämä asema ei ole enää Slackwaterissa."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette station n’est plus publiée."
+            "value" : "Cette station n’est plus dans Slackwater."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ní fhoilsítear an stáisiún seo a thuilleadh."
+            "value" : "Níl an stáisiún seo in Slackwater a thuilleadh."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chan eil an stèisean seo ga fhoillseachadh tuilleadh."
+            "value" : "Chan eil an stèisean seo ann an Slackwater tuilleadh."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa stazione non è più pubblicata."
+            "value" : "Questa stazione non è più in Slackwater."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この観測所の公開は終了しました。"
+            "value" : "この観測所は Slackwater での提供を終了しました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 관측소는 더 이상 공개되지 않습니다."
+            "value" : "이 관측소는 더 이상 Slackwater에 없습니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Denne stasjonen publiseres ikke lenger."
+            "value" : "Denne stasjonen er ikke lenger i Slackwater."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dit station wordt niet meer gepubliceerd."
+            "value" : "Dit station zit niet meer in Slackwater."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta estação não é mais publicada."
+            "value" : "Esta estação não está mais no Slackwater."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta estação já não é publicada."
+            "value" : "Esta estação já não está no Slackwater."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Den här stationen publiceras inte längre."
+            "value" : "Den här stationen finns inte längre i Slackwater."
           }
         }
       }

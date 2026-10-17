@@ -72,6 +72,28 @@ enum FavoritesCloud {
         return (order(cloud.merging(writes) { mine, _ in mine }), writes)
     }
 
+    /// Cloud stars on ids whose station left the bundle, moved to the station
+    /// that replaced it (`StationSuccessors`): the stamps to use, the keys to
+    /// write and the keys to remove. The successor takes the old star's stamp,
+    /// so it keeps its place in the global order; when both are starred the
+    /// earlier stamp wins for the same reason. Applying the result and running
+    /// again moves nothing.
+    static func migrate(_ stamps: [String: Double], successors: [String: String])
+        -> (stamps: [String: Double], writes: [String: Double], removals: [String]) {
+        var out = stamps
+        var writes: [String: Double] = [:]
+        var removals: [String] = []
+        for (old, stamp) in stamps.sorted(by: { $0.key < $1.key }) {
+            guard let new = successors[old] else { continue }
+            out[old] = nil
+            removals.append(old)
+            if let kept = out[new], kept <= stamp { continue }
+            out[new] = stamp
+            writes[new] = stamp
+        }
+        return (out, writes, removals)
+    }
+
     /// The one-time upgrade: stars this device made before it had a cloud copy.
     /// They keep their local order and land *after* everything already in the
     /// cloud, so whichever device upgrades second appends rather than

@@ -943,15 +943,12 @@ struct StationListView: View {
     /// Explains a tombstoned station and offers alternatives near its last location.
     @ViewBuilder private func removedCard(_ id: String) -> some View {
         let gone = StationTombstone.byId[id]
-        let origin = gone.map { (lat: $0.latitude, lon: $0.longitude) } ?? anchor
         let isFavorite = favorites.contains(id)
-        ChsAmberCard(title: gone?.name ?? String(localized: "Station removed", comment: "Removed-station card title."),
-                     headline: gone.map {
-                        String(localized: "\($0.region) — no longer published.", comment: "Removed-station explanation. The value is the station region.")
-                     } ?? String(localized: "This station is no longer published.", comment: "Removed-station explanation."),
-                     expectation: isFavorite
-                        ? String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show. Swipe to remove it.", comment: "Removed favorite-station explanation.")
-                        : String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show.", comment: "Removed-station explanation."),
+        let copy = RemovedStationCopy(id: id, tombstone: gone, isFavorite: isFavorite)
+        let origin = copy.origin(fallback: anchor)
+        ChsAmberCard(title: copy.title,
+                     headline: copy.headline,
+                     expectation: copy.expectation,
                      action: String(localized: "Choose another station", comment: "Removed-station action."),
                      identifier: "removed-station-card",
                      icon: "mappin.slash",
@@ -1436,5 +1433,39 @@ struct MyLocationLoadingTile: View {
             .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .padding(.horizontal, 16)
         }
+    }
+}
+
+/// What the removed-station card says, and where its "Choose another station"
+/// list ranks from. Only a CHS tombstone says the station was withdrawn: that
+/// is what CHS did. Any other station left because Slackwater stopped carrying
+/// it, which says nothing about its publisher.
+struct RemovedStationCopy {
+    let title: String
+    let headline: String
+    let expectation: String
+    private let position: (lat: Double, lon: Double)?
+
+    init(id: String, tombstone: StationTombstone?, isFavorite: Bool) {
+        title = tombstone?.name ?? String(localized: "Station removed", comment: "Removed-station card title.")
+        position = tombstone.map { (lat: $0.latitude, lon: $0.longitude) }
+        if let tombstone, tombstone.isChsWithdrawal {
+            headline = String(localized: "\(tombstone.region) — no longer published.", comment: "Removed-station explanation. The value is the station region.")
+            expectation = isFavorite
+                ? String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show. Swipe to remove it.", comment: "Removed favorite-station explanation.")
+                : String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show.", comment: "Removed-station explanation.")
+        } else {
+            headline = tombstone.map {
+                String(localized: "\($0.region) — no longer in Slackwater.", comment: "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew. The value is the station region.")
+            } ?? String(localized: "This station is no longer in Slackwater.", comment: "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.")
+            expectation = isFavorite
+                ? String(localized: "Slackwater no longer carries this station, so it has no readings to show. Swipe to remove it.", comment: "Removed favorite-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.")
+                : String(localized: "Slackwater no longer carries this station, so it has no readings to show.", comment: "Removed-station explanation for a station Slackwater stopped carrying, not one its publisher withdrew.")
+        }
+    }
+
+    /// Where the removed station was, else `fallback`.
+    func origin(fallback: (lat: Double, lon: Double)) -> (lat: Double, lon: Double) {
+        position ?? fallback
     }
 }

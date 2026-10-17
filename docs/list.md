@@ -290,11 +290,14 @@ Neither the unavailable section nor the removed-station card says *why* the stat
 
 ### 9.3 Stations that leave the catalog
 
-A favorite or deep-linked station that is no longer published stays in place as a removed-station card:
+When the station database publishes a departed station's gauge under another bundled record, the saved id moves to that record at launch (`Resources/station-successors.json`): favorites keep their slot and iCloud star time, recents keep their order, alert rules keep scheduling, and widget, watch and `slackwater://station/<id>` lookups resolve the old id to the new station. Nothing is shown; the station simply keeps working.
 
-- title: the station's last known name, or "Station removed";
-- text: "<region> — no longer published.", or "This station is no longer published."; then "It has been withdrawn from the hydrographic service, so it has no readings to show.", with " Swipe to remove it." added for a favorite; and
-- action: "Choose another station", which lists the five stations nearest the removed one under "Choose a replacement near the removed station." Choosing one replaces the favorite in its existing slot, keeping its iCloud star time.
+A favorite or deep-linked station with no successor stays in place as a removed-station card:
+
+- title: the station's last known name, from its tombstone (`chs-tombstones.json` or `station-tombstones.json`), or "Station removed";
+- text for a CHS port CHS withdrew: "<region> — no longer published."; then "It has been withdrawn from the hydrographic service, so it has no readings to show.", with " Swipe to remove it." added for a favorite;
+- text for any other station: "<region> — no longer in Slackwater.", or "This station is no longer in Slackwater." without a tombstone; then "Slackwater no longer carries this station, so it has no readings to show.", with " Swipe to remove it." added for a favorite; and
+- action: "Choose another station", which lists the five stations nearest the removed one's last position (its tombstone's, else the list's own anchor) under "Choose a replacement near the removed station." Choosing one replaces the favorite in its existing slot, keeping its iCloud star time.
 
 The trailing swipe on a removed favorite is "Remove", which deletes it outright without adding it to Recents.
 

@@ -570,10 +570,14 @@ enum StationItem: Identifiable, Hashable {
 
     /// Widget-safe lookup: decode only the requested large NOAA record; the
     /// three CHS identity catalogs are small enough to retain whole.
+    /// `id` may be one a widget was configured with releases ago, so it is
+    /// resolved through `StationSuccessors` first.
     static func widgetItem(
-        id: String, locator: CatalogFileLocator = .shared
+        id: String, locator: CatalogFileLocator = .shared,
+        successors: [String: String] = StationSuccessors.bundled
     ) -> StationItem? {
-        locator.load { directory in try widgetItem(id: id, directory: directory) }
+        let id = StationSuccessors.resolve(id, in: successors)
+        return locator.load { directory in try widgetItem(id: id, directory: directory) }
     }
 
     static func widgetItem(id: String, directory: URL) throws -> StationItem? {

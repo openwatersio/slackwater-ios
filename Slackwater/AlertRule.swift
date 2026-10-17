@@ -82,7 +82,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// written back, so moving between builds never loses them.
     private var unreadable: [Any] = []
 
-    init(defaults: UserDefaults) {
+    /// `successors` moves rules on a station that left the bundle to the
+    /// station that replaced it (`StationSuccessors`), so they keep scheduling.
+    /// A rule this build can't read keeps its station as stored.
+    init(defaults: UserDefaults, successors: [String: String] = StationSuccessors.bundled) {
         self.defaults = defaults
         let stored = defaults.data(forKey: AppGroup.alertRulesKey)
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [Any] } ?? []
@@ -96,8 +99,13 @@ struct AlertRule: Codable, Identifiable, Equatable {
                 kept.append(item)
             }
         }
-        rules = readable
+        rules = readable.map { rule in
+            var moved = rule
+            moved.stationID = StationSuccessors.resolve(rule.stationID, in: successors)
+            return moved
+        }
         unreadable = kept
+        if rules != readable { persist() }
     }
 
     func upsert(_ rule: AlertRule) {

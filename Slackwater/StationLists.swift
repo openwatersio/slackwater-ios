@@ -28,6 +28,17 @@ import WidgetKit
             AppGroup.defaults.removeObject(forKey: Self.key)
         }
         ids = AppGroup.defaults.stringArray(forKey: Self.key) ?? []
+        migrate(StationSuccessors.bundled)
+    }
+
+    /// Moves recents whose station left the bundle to the station that
+    /// replaced it (`StationSuccessors`). Runs on every load; a second run
+    /// finds nothing to move.
+    func migrate(_ successors: [String: String]) {
+        let next = StationSuccessors.remap(ids, in: successors)
+        guard next != ids else { return }
+        ids = next
+        AppGroup.defaults.set(next, forKey: Self.key)
     }
 
     func record(_ id: String) {
@@ -93,6 +104,7 @@ import WidgetKit
                 CommandLine.arguments[i + 1].split(separator: ",").map(String.init), forKey: Self.key)
         }
         ids = AppGroup.defaults.stringArray(forKey: Self.key) ?? []
+        migrate(StationSuccessors.bundled)
 
         // Nil under both kinds of test, so those hooks stay device-local
         // (FavoritesCloud.store).
@@ -162,6 +174,16 @@ import WidgetKit
         WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
+    /// Moves favorites whose station left the bundle to the station that
+    /// replaced it (`StationSuccessors`), through `replace`, so each keeps its
+    /// slot and its cloud stamp. Runs on every load; a second run finds
+    /// nothing to move.
+    func migrate(_ successors: [String: String]) {
+        for id in ids {
+            if let next = successors[id] { replace(id, with: next) }
+        }
+    }
+
     // MARK: - iCloud (see FavoritesCloud)
 
     private func persist() { AppGroup.defaults.set(ids, forKey: Self.key) }
@@ -190,9 +212,14 @@ import WidgetKit
     /// `FavoritesCloud.reconcile`, which is a pure function; this is its I/O.
     private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
         let migrated = AppGroup.defaults.bool(forKey: Self.migratedKey)
+        // A device on an older build can still star a station's departed id.
+        let moved = FavoritesCloud.migrate(FavoritesCloud.stamps(cloud.dictionaryRepresentation),
+                                           successors: StationSuccessors.bundled)
+        for (id, stamp) in moved.writes { cloud.set(stamp, forKey: FavoritesCloud.prefix + id) }
+        for id in moved.removals { cloud.removeObject(forKey: FavoritesCloud.prefix + id) }
         let (next, writes) = FavoritesCloud.reconcile(
             local: ids,
-            cloud: FavoritesCloud.stamps(cloud.dictionaryRepresentation),
+            cloud: moved.stamps,
             migrated: migrated,
             now: Date().timeIntervalSince1970)
         for (id, stamp) in writes { cloud.set(stamp, forKey: FavoritesCloud.prefix + id) }

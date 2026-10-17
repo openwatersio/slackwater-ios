@@ -28,7 +28,7 @@ import { join } from "node:path";
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
 import { stationRoutes } from "@slackwater/database";
-import { here, writeBundle } from "./bundle.mjs";
+import { here, writeBundle, stationSuccessors } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
 const out = join(res, "slugs.json");
@@ -53,7 +53,7 @@ function routesById(kind) {
   const table = new Map();
   for (const route of stationRoutes(kind)) {
     const former = route.formerPaths.map((path) => path.split("/").filter(Boolean).pop());
-    for (const id of route.stationIds) table.set(id, { slug: route.slug, former });
+    for (const id of route.stationIds) table.set(id, { slug: route.slug, former, ids: route.stationIds });
   }
   return table;
 }
@@ -109,6 +109,55 @@ const tide = narrow("tide", ["stations.json", "chs-stations.json"]);
 const current = narrow("current", ["currents.json", "chs-current-gates.json", "chs-gates.json"]);
 const slugs = { tide: tide.table, current: current.table, former: { tide: tide.former, current: current.former } };
 const size = writeBundle(out, slugs);
+
+/**
+ * Resources/station-successors.json and station-tombstones.json — see
+ * `stationSuccessors` in bundle.mjs. A departed station is one the previous
+ * table slugged and this one does not. Its successor is the bundled id on its
+ * database route; its identity, for a tombstone, is what the committed
+ * station-index.json still says, since gen-station-index runs after this.
+ * Keyed by `StationItem` id, the id a device saved: a NOAA current carries the
+ * app's `current:` prefix, everything else is the catalog id.
+ */
+const itemId = (kind, id) => (kind === "current" && !id.startsWith("chs-") ? `current:${id}` : id);
+const readOr = (file, fallback) => {
+  try {
+    return JSON.parse(readFileSync(join(res, file), "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+};
+const lastIndex = readOr("station-index.json", { tides: [], currents: [] });
+const lastIdentity = new Map([
+  ...lastIndex.tides.map((s) => [s.id, s]),
+  ...lastIndex.currents.map((s) => [itemId("current", s.id), s]),
+]);
+const live = new Set();
+const departed = [];
+const successorOf = new Map();
+for (const [kind, now] of [["tide", tide.table], ["current", current.table]]) {
+  for (const id of Object.keys(now)) live.add(itemId(kind, id));
+  const routes = routesById(kind);
+  for (const id of Object.keys(previous[kind] ?? {})) {
+    if (now[id]) continue;
+    departed.push(itemId(kind, id));
+    const twin = (routes.get(id)?.ids ?? []).filter((other) => now[other]).sort()[0];
+    if (twin) successorOf.set(itemId(kind, id), itemId(kind, twin));
+  }
+}
+const { successors, tombstones } = stationSuccessors({
+  departed,
+  live,
+  successorOf: (id) => successorOf.get(id),
+  identityOf: (id) => lastIdentity.get(id),
+  previousSuccessors: readOr("station-successors.json", {}),
+  previousTombstones: readOr("station-tombstones.json", []),
+  covered: new Set(readOr("chs-tombstones.json", []).map((t) => t.id)),
+});
+writeBundle(join(res, "station-successors.json"), successors);
+writeBundle(join(res, "station-tombstones.json"), tombstones);
+console.log(`station-successors.json: ${Object.keys(successors).length}; station-tombstones.json: ${tombstones.length}`);
 console.log(
   `slugs.json: ${Object.keys(slugs.tide).length} tide + ${Object.keys(slugs.current).length} current, ` +
     `${Object.keys(tide.former).length + Object.keys(current.former).length} former, ${size}`,
