@@ -37,6 +37,7 @@ test("every publisher that ships is credited in About", () => {
     "US National Oceanic and Atmospheric Administration": "NOAA",
     "TICON-4": "TICON-4",
     "Kartverket / Norwegian Mapping Authority, Hydrographic Service": "© Kartverket",
+    "Toitū Te Whenua Land Information New Zealand": "Toitū Te Whenua Land Information New Zealand",
   };
   const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
   const source = new Map(allStations.map((s) => [s.id, s.source?.name]));

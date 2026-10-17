@@ -8,7 +8,7 @@ Tides are worldwide. Currents are the United States and Canada. Any copy that de
 
 | What ships               | Count | Where it comes from                                                         |
 | ------------------------ | ----- | --------------------------------------------------------------------------- |
-| Bundled tide stations    | 4,793 | 3,261 NOAA, 1,499 TICON across 105 countries and territories, 33 Kartverket |
+| Bundled tide stations    | 4,835 | 3,261 NOAA, 1,485 TICON across 105 countries and territories, 56 LINZ, 33 Kartverket |
 | Bundled current stations | 2,534 | NOAA, not every NOAA station (`tools/gen-noaa-currents.mjs` lists the filters) |
 | Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good                        |
 | Canadian current passes  | 22    | CHS: 13 fetch once, then offline; 9 fetch a month at a time when online     |
@@ -32,7 +32,7 @@ console.log("countries and territories", ticonCountries.size);
 '
 ```
 
-Round down in copy. "More than 4,700" survives a catalog change; "4,793" needs an App Store review to correct.
+Round down in copy. "More than 4,700" survives a catalog change; "4,835" needs an App Store review to correct.
 
 Every feature the copy names must be in the build attached to the version. Release builds have sold Premium since `nightly-1.14.0-57`, and the watch app, alerts, station calendars, ship alongside it. The current app supports 16 languages; verify the count against the selected build before publishing it.
 
@@ -86,7 +86,7 @@ Rules that are easy to break by accident:
 
 - **Placement beats phrasing inside the first 200 characters.** "Works without signal" and "currents across the US and Canada" both sit in the first two sentences, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
 - **Currents are named as the US and Canada every time coverage is claimed.** The opening and the provenance block both say so, and neither can be trimmed for length.
-- **Provenance names every source.** Tides come from NOAA, CHS, Kartverket and TICON-4, a research catalogue rather than a national authority. Only stations that publish datums are checked against them, so the copy says "wherever it has them".
+- **Provenance names every source.** Tides come from NOAA, CHS, Kartverket, LINZ and TICON-4, a research catalogue rather than a national authority. Only stations that publish datums are checked against them, so the copy says "wherever it has them".
 - **Premium is disclosed while it is on sale.** The paragraph under FREE, NO ACCOUNT, NO ADS names what Premium adds and that it is a yearly subscription or a lifetime purchase (App Review 2.3.2). Every prediction stays free, so the free claims hold either way.
 - **The description ends with Terms of Use and Privacy Policy links while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
 

@@ -29,6 +29,9 @@ struct AboutView: View {
                         "Norwegian stations: harmonic constants © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)."
                     )
                     Text(
+                        "New Zealand stations: harmonic constants based on data from Toitū Te Whenua Land Information New Zealand under CC BY 4.0 (linz.govt.nz)."
+                    )
+                    Text(
                         "Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129)."
                     )
                     // Issue #401. The same deposit also holds a
