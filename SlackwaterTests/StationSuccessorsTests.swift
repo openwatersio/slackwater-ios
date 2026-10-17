@@ -13,6 +13,11 @@ import XCTest
     private let otherOld = "ticon/retired-twin-fixture"
     private let new = TideStationRecord.fridayHarborID
     private var map: [String: String] { [old: new, otherOld: new] }
+    /// The same moves as the generator writes them: `old` with a known datum
+    /// shift between the two records, `otherOld` without one.
+    private var entries: [String: StationSuccessor] {
+        [old: StationSuccessor(id: new, datumShiftM: 0.25), otherOld: StationSuccessor(id: new, datumShiftM: nil)]
+    }
 
     // MARK: - The map itself
 
@@ -91,6 +96,42 @@ import XCTest
         XCTAssertNil(merged.writes[new], "the cloud already has it")
     }
 
+    // MARK: - Favorites at launch, before and after the cloud
+
+    /// The local list moves alone at load; the cloud keys move only inside
+    /// `adopt`, so nothing here writes a stamp the cloud's own migration needs.
+    func testLaunchKeepsTheEarlierStampWhenBothIDsAreStarred() {
+        let launch = FavoritesCloud.launch(local: [old, new], cloud: [old: 1, new: 5],
+                                           migrated: true, now: 100, successors: map)
+        XCTAssertEqual(launch.ids, [new])
+        XCTAssertEqual(launch.writes, [new: 1], "the old star's stamp survives")
+        XCTAssertEqual(launch.removals, [old])
+    }
+
+    func testLaunchKeepsAStampAnotherDeviceAlreadyMoved() {
+        let launch = FavoritesCloud.launch(local: [old], cloud: [new: 7],
+                                           migrated: true, now: 100, successors: map)
+        XCTAssertEqual(launch.ids, [new])
+        XCTAssertTrue(launch.writes.isEmpty, "the other device's stamp is not overwritten with now")
+        XCTAssertTrue(launch.removals.isEmpty)
+    }
+
+    func testLaunchDoesNotResurrectAFavoriteRemovedElsewhere() {
+        // Unstarred on another device after this one last synced: the cloud
+        // no longer has it, and on a migrated device the cloud is the list.
+        let launch = FavoritesCloud.launch(local: [old, "chs-victoria"], cloud: ["chs-victoria": 3],
+                                           migrated: true, now: 100, successors: map)
+        XCTAssertEqual(launch.ids, ["chs-victoria"])
+        XCTAssertTrue(launch.writes.isEmpty)
+    }
+
+    func testFirstAdoptionKeepsLocalOrder() {
+        let launch = FavoritesCloud.launch(local: ["a", old, "b"], cloud: [:],
+                                           migrated: false, now: 100, successors: map)
+        XCTAssertEqual(launch.ids, ["a", new, "b"], "a moved favorite is not seeded ahead of the rest")
+        XCTAssertEqual(launch.writes, ["a": 100, new: 101, "b": 102])
+    }
+
     // MARK: - Recents
 
     func testRecentsMove() {
@@ -116,15 +157,80 @@ import XCTest
         AlertRuleStore(defaults: defaults, successors: [:]).upsert(rule)
         AlertRuleStore(defaults: defaults, successors: [:]).upsert(untouched)
 
-        let store = AlertRuleStore(defaults: defaults, successors: map)
+        let store = AlertRuleStore(defaults: defaults, successors: entries)
         XCTAssertEqual(store.rules.map(\.stationID), [new, "current:noaa/PUG1701"])
         XCTAssertEqual(store.rules.map(\.id), [rule.id, untouched.id], "the same rules, not new ones")
         XCTAssertNotNil(WidgetStationLoader.loadRecord(id: store.rules[0].stationID), "schedulable again")
 
         let reread = AlertRuleStore(defaults: defaults, successors: [:])
         XCTAssertEqual(reread.rules, store.rules, "the move is persisted")
-        XCTAssertEqual(AlertRuleStore(defaults: defaults, successors: map).rules, store.rules,
+        XCTAssertEqual(AlertRuleStore(defaults: defaults, successors: entries).rules, store.rules,
                        "running twice changes nothing")
+    }
+
+    /// A height is measured from a chart datum, and the successor's can sit
+    /// elsewhere on the same water. A known shift moves the threshold with it,
+    /// so the alert fires at the same water level it did.
+    func testATideHeightAlertMovesAcrossADatumChange() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let rule = AlertRule(stationID: old, trigger: .tideCrossing(heightM: 1.5, rising: true))
+        AlertRuleStore(defaults: defaults, successors: [:]).upsert(rule)
+
+        let moved = AlertRuleStore(defaults: defaults, successors: entries).rules[0]
+        XCTAssertEqual(moved.stationID, new)
+        guard case .tideCrossing(let height, let rising) = moved.trigger else { return XCTFail("Expected a crossing") }
+        XCTAssertEqual(height, 1.75, accuracy: 1e-9)
+        XCTAssertTrue(rising)
+        XCTAssertTrue(moved.enabled)
+        XCTAssertNil(moved.heightNeedsReview)
+        XCTAssertEqual(AlertRuleStore(defaults: defaults, successors: entries).rules, [moved],
+                       "running twice does not shift it twice")
+    }
+
+    /// With no established shift the threshold would sit on the wrong datum, so
+    /// the rule stops and says why, instead of firing at the wrong water level.
+    func testATideHeightAlertWithAnUnknownShiftStopsAndAsksAgain() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let crossing = AlertRule(stationID: otherOld, trigger: .tideCrossing(heightM: 1.5, rising: false))
+        let extreme = AlertRule(stationID: otherOld, trigger: .tideExtreme(high: false))
+        AlertRuleStore(defaults: defaults, successors: [:]).upsert(crossing)
+        AlertRuleStore(defaults: defaults, successors: [:]).upsert(extreme)
+
+        let rules = AlertRuleStore(defaults: defaults, successors: entries).rules
+        XCTAssertEqual(rules.map(\.stationID), [new, new])
+        XCTAssertEqual(rules[0].trigger, .tideCrossing(heightM: 1.5, rising: false), "the number is kept for the user to see")
+        XCTAssertFalse(rules[0].enabled)
+        XCTAssertEqual(rules[0].heightNeedsReview, true)
+        XCTAssertTrue(rules[1].enabled, "a high or low tide has no height to move")
+        XCTAssertNil(rules[1].heightNeedsReview)
+        XCTAssertEqual(alertStatusText(rules[0], AlertStatusSnapshot(), premium: true),
+                       "Set the height again: this place now measures from a different chart datum.")
+
+        // Saving it from the sheet is the user setting it again.
+        let store = AlertRuleStore(defaults: defaults, successors: entries)
+        var reset = rules[0]
+        reset.enabled = true
+        store.upsert(reset)
+        XCTAssertNil(AlertRuleStore(defaults: defaults, successors: entries).rules[0].heightNeedsReview)
+    }
+
+    // MARK: - Calendars
+
+    func testCalendarSubscriptionsMove() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let before = StationCalendarStore(defaults: defaults, successors: [:])
+        before.subscribe(old, notify: false)
+        before.setCalendarID("cal-1", for: old)
+        before.subscribe(otherOld, notify: false)
+        before.subscribe("noaa/9447130", notify: false)
+
+        let store = StationCalendarStore(defaults: defaults, successors: map)
+        XCTAssertEqual(store.subscriptions.map(\.stationID), [new, "noaa/9447130"])
+        XCTAssertEqual(store.calendarID(for: new), "cal-1", "the calendar it already published is kept")
+        XCTAssertEqual(StationCalendarStore(defaults: defaults, successors: map).subscriptions, store.subscriptions)
     }
 
     // MARK: - Widgets, the watch, and deep links

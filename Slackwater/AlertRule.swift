@@ -29,14 +29,20 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// Keep only occurrences inside this band of the Sun's day; nil is any time.
     var sun: SunWindow?
     var enabled = true
+    /// Set when the rule's station was replaced by a record whose chart datum
+    /// could not be related to the old one (`StationSuccessor.datumShiftM`):
+    /// a tide height is then a number on the wrong datum, so the rule is off
+    /// until the user sets it again. Nil otherwise, never false.
+    var heightNeedsReview: Bool?
 
     init(id: UUID = UUID(), stationID: String, trigger: AlertTrigger, once: Date? = nil,
-         lead: TimeInterval = 0, sun: SunWindow? = nil, enabled: Bool = true) {
+         lead: TimeInterval = 0, sun: SunWindow? = nil, enabled: Bool = true, heightNeedsReview: Bool? = nil) {
         self.id = id; self.stationID = stationID; self.trigger = trigger
         self.once = once; self.lead = lead; self.sun = sun; self.enabled = enabled
+        self.heightNeedsReview = heightNeedsReview
     }
 
-    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled }
+    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview }
 
     // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
     // It is still read as a fallback, and written for the two windows it can say; a golden- or
@@ -52,6 +58,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
         sun = try c.decodeIfPresent(SunWindow.self, forKey: .sun)
             ?? (try c.decodeIfPresent(Bool.self, forKey: .daylightOnly) == true ? .daylight : nil)
         enabled = try c.decode(Bool.self, forKey: .enabled)
+        heightNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .heightNeedsReview)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -67,6 +74,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
         case .goldenHour, .blueHour: break
         }
         try c.encode(enabled, forKey: .enabled)
+        try c.encodeIfPresent(heightNeedsReview, forKey: .heightNeedsReview)
     }
 }
 
@@ -84,8 +92,11 @@ struct AlertRule: Codable, Identifiable, Equatable {
 
     /// `successors` moves rules on a station that left the bundle to the
     /// station that replaced it (`StationSuccessors`), so they keep scheduling.
-    /// A rule this build can't read keeps its station as stored.
-    init(defaults: UserDefaults, successors: [String: String] = StationSuccessors.bundled) {
+    /// A tide-height rule moves its height by the datum shift between the two
+    /// records; when there is none to apply, it is switched off and marked
+    /// `heightNeedsReview` rather than kept on the wrong datum. A rule this
+    /// build can't read keeps its station as stored.
+    init(defaults: UserDefaults, successors: [String: StationSuccessor] = StationSuccessors.entries) {
         self.defaults = defaults
         let stored = defaults.data(forKey: AppGroup.alertRulesKey)
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [Any] } ?? []
@@ -100,15 +111,27 @@ struct AlertRule: Codable, Identifiable, Equatable {
             }
         }
         rules = readable.map { rule in
+            guard let successor = successors[rule.stationID] else { return rule }
             var moved = rule
-            moved.stationID = StationSuccessors.resolve(rule.stationID, in: successors)
+            moved.stationID = successor.id
+            if case .tideCrossing(let heightM, let rising) = rule.trigger {
+                if let shift = successor.datumShiftM {
+                    moved.trigger = .tideCrossing(heightM: heightM + shift, rising: rising)
+                } else {
+                    moved.enabled = false
+                    moved.heightNeedsReview = true
+                }
+            }
             return moved
         }
         unreadable = kept
         if rules != readable { persist() }
     }
 
+    /// Saving a rule is the user setting it, which settles a pending height review.
     func upsert(_ rule: AlertRule) {
+        var rule = rule
+        rule.heightNeedsReview = nil
         if let i = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[i] = rule
         } else {

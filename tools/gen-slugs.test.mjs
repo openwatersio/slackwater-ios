@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { here, stationSuccessors } from "./bundle.mjs";
+import { here, stationSuccessors, gateTombstones } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
 const read = (file) => JSON.parse(readFileSync(join(res, file), "utf8"));
@@ -65,15 +65,16 @@ test("the slugs this table published before are still reachable", () => {
 // --- Successors and tombstones (station-successors.json, station-tombstones.json)
 
 const who = (id, extra = {}) => ({ id, name: `Name ${id}`, region: "Region", latitude: -41, longitude: 174, ...extra });
+const to = (id, datumShiftM) => (datumShiftM === undefined ? { id } : { id, datumShiftM });
 
 test("a departed station with a bundled twin on its route gets that twin as successor", () => {
   const got = stationSuccessors({
     departed: ["ticon/wellington", "ticon/sumner"],
     live: new Set(["linz/071", "linz/370"]),
-    successorOf: (id) => ({ "ticon/wellington": "linz/071" })[id],
+    successorOf: (id) => ({ "ticon/wellington": to("linz/071", 0.12) })[id],
     identityOf: (id) => who(id),
   });
-  assert.deepEqual(got.successors, { "ticon/wellington": "linz/071" });
+  assert.deepEqual(got.successors, { "ticon/wellington": to("linz/071", 0.12) });
   assert.deepEqual(got.tombstones.map((t) => t.id), ["ticon/sumner"]);
   assert.deepEqual(got.tombstones[0], { id: "ticon/sumner", name: "Name ticon/sumner", region: "Region", latitude: -41, longitude: 174 });
 });
@@ -82,7 +83,7 @@ test("successors and tombstones are cumulative and stable across releases", () =
   const first = stationSuccessors({
     departed: ["a", "gone"],
     live: new Set(["b"]),
-    successorOf: (id) => ({ a: "b" })[id],
+    successorOf: (id) => ({ a: to("b", 0.1) })[id],
     identityOf: (id) => who(id),
   });
   // The next release: nothing departs, so the carried entries are the output.
@@ -91,19 +92,28 @@ test("successors and tombstones are cumulative and stable across releases", () =
     previousSuccessors: first.successors, previousTombstones: first.tombstones,
   });
   assert.deepEqual(again, first);
-  // A release after that moves `b` on to `c`: the old id follows the chain.
+  // A release after that moves `b` on to `c`: the old id follows the chain,
+  // and the datum shifts add up along it.
   const later = stationSuccessors({
-    departed: ["b"], live: new Set(["c"]), successorOf: (id) => ({ b: "c" })[id], identityOf: (id) => who(id),
+    departed: ["b"], live: new Set(["c"]), successorOf: (id) => ({ b: to("c", 0.25) })[id], identityOf: (id) => who(id),
     previousSuccessors: again.successors, previousTombstones: again.tombstones,
   });
-  assert.deepEqual(later.successors, { a: "c", b: "c" });
+  assert.deepEqual(later.successors, { a: to("c", 0.35), b: to("c", 0.25) });
   assert.deepEqual(later.tombstones.map((t) => t.id), ["gone"]);
+});
+
+test("a chain with one unknown datum shift has no shift", () => {
+  const got = stationSuccessors({
+    departed: ["b"], live: new Set(["c"]), successorOf: (id) => ({ b: to("c") })[id], identityOf: () => undefined,
+    previousSuccessors: { a: to("b", 0.1) },
+  });
+  assert.deepEqual(got.successors, { a: to("c"), b: to("c") });
 });
 
 test("a station that comes back drops out of both lists", () => {
   const got = stationSuccessors({
     departed: [], live: new Set(["a", "b", "gone"]), successorOf: () => undefined, identityOf: () => undefined,
-    previousSuccessors: { a: "b" }, previousTombstones: [who("gone")],
+    previousSuccessors: { a: to("b") }, previousTombstones: [who("gone")],
   });
   assert.deepEqual(got, { successors: {}, tombstones: [] });
 });
@@ -111,10 +121,32 @@ test("a station that comes back drops out of both lists", () => {
 test("a successor chain that ends nowhere is dropped, and one that ends in a tombstone is kept", () => {
   const got = stationSuccessors({
     departed: ["b"], live: new Set(), successorOf: () => undefined, identityOf: (id) => who(id),
-    previousSuccessors: { a: "b", x: "y" },
+    previousSuccessors: { a: to("b"), x: to("y") },
   });
-  assert.deepEqual(got.successors, { a: "b" });
+  assert.deepEqual(got.successors, { a: to("b") });
   assert.deepEqual(got.tombstones.map((t) => t.id), ["b"]);
+});
+
+test("a successor that arrives releases after the tombstone revives the id and its aliases", () => {
+  // Release 1 tombstones `a` (nothing else on its route ships) and keeps an
+  // older alias `z` ending at it. Release 2 ships nothing new. Release 3
+  // bundles `b` on a's route: a is no longer in any previous table, so only
+  // the carried tombstone can bring it back.
+  const r1 = stationSuccessors({
+    departed: ["a"], live: new Set(), successorOf: () => undefined, identityOf: (id) => who(id),
+    previousSuccessors: { z: to("a", 0.05) },
+  });
+  assert.deepEqual(r1.tombstones.map((t) => t.id), ["a"]);
+  const r2 = stationSuccessors({
+    departed: [], live: new Set(), successorOf: () => undefined, identityOf: () => undefined,
+    previousSuccessors: r1.successors, previousTombstones: r1.tombstones,
+  });
+  const r3 = stationSuccessors({
+    departed: [], live: new Set(["b"]), successorOf: (id) => ({ a: to("b", 0.2) })[id], identityOf: () => undefined,
+    previousSuccessors: r2.successors, previousTombstones: r2.tombstones,
+  });
+  assert.deepEqual(r3.successors, { a: to("b", 0.2), z: to("b", 0.25) });
+  assert.deepEqual(r3.tombstones, []);
 });
 
 test("a CHS port leaves through chs-tombstones, never twice", () => {
@@ -123,6 +155,23 @@ test("a CHS port leaves through chs-tombstones, never twice", () => {
     identityOf: (id) => who(id), covered: new Set(["chs-north-galiano"]),
   });
   assert.deepEqual(got, { successors: {}, tombstones: [] });
+});
+
+test("a departing CHS gate keeps its name and position", () => {
+  // gen-chs-gates.mjs records it before overwriting the gate catalogs, since
+  // station-index.json never held gates; gen-slugs then carries it.
+  const gate = { id: "chs-gone-pass", name: "Gone Pass", region: "Somewhere Sound", aliases: [],
+    latitude: 50.1, longitude: -125.2, timezone: "America/Vancouver", fitDays: 60 };
+  const stones = gateTombstones({ previous: [gate], shipping: [], existing: [who("ticon/sumner")] });
+  assert.deepEqual(stones.find((t) => t.id === "chs-gone-pass"),
+    { id: "chs-gone-pass", name: "Gone Pass", region: "Somewhere Sound", latitude: 50.1, longitude: -125.2 });
+  assert.ok(stones.some((t) => t.id === "ticon/sumner"), "other tombstones are kept");
+  const carried = stationSuccessors({
+    departed: ["chs-gone-pass"], live: new Set(), successorOf: () => undefined, identityOf: () => undefined,
+    previousTombstones: stones,
+  });
+  assert.ok(carried.tombstones.some((t) => t.id === "chs-gone-pass"));
+  assert.deepEqual(gateTombstones({ previous: [gate], shipping: [gate], existing: [] }), []);
 });
 
 test("every successor is bundled or tombstoned, and no tombstone is bundled", () => {
@@ -137,7 +186,8 @@ test("every successor is bundled or tombstoned, and no tombstone is bundled", ()
     ...read("chs-current-gates.json").map((s) => s.id),
   ]);
   const stoneIds = new Set(stones.map((t) => t.id));
-  for (const [old, next] of Object.entries(successors)) {
+  for (const [old, { id: next, datumShiftM }] of Object.entries(successors)) {
+    assert.ok(datumShiftM === undefined || Number.isFinite(datumShiftM), `${old}: datum shift ${datumShiftM}`);
     assert.ok(!itemIds.has(old), `${old} ships and still has a successor`);
     assert.ok(itemIds.has(next) || stoneIds.has(next) || chsStones.has(next), `${old} -> ${next}, which is nowhere`);
   }

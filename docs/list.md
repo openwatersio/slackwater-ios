@@ -290,7 +290,7 @@ Neither the unavailable section nor the removed-station card says *why* the stat
 
 ### 9.3 Stations that leave the catalog
 
-When the station database publishes a departed station's gauge under another bundled record, the saved id moves to that record at launch (`Resources/station-successors.json`): favorites keep their slot and iCloud star time, recents keep their order, alert rules keep scheduling, and widget, watch and `slackwater://station/<id>` lookups resolve the old id to the new station. Nothing is shown; the station simply keeps working.
+When the station database publishes a departed station's gauge under another bundled record, the saved id moves to that record at launch (`Resources/station-successors.json`): favorites keep their slot and iCloud star time, recents keep their order, calendar subscriptions keep their calendar, alert rules keep scheduling (a tide-height rule moves by the datum shift between the two records, or stops and asks to be set again when there is none; alerts.md §6), and widget, watch and `slackwater://station/<id>` lookups resolve the old id to the new station. Only this device's favorites move at load; iCloud's copy moves when it is reconciled, so a star removed on another device stays removed and the older of two stamps survives.
 
 A favorite or deep-linked station with no successor stays in place as a removed-station card:
 

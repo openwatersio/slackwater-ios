@@ -102,18 +102,23 @@ export function tombstones({ shipping, previous = [], existing = [] }) {
  * recents, alert rules and widget configurations store a bare `StationItem`
  * id, so an id that stops shipping strands everything saved under it.
  *
- * - `successors` — departed id → the bundled id the database publishes as the
- *   same station (`successorOf`, the other bundled id on its route). The app
- *   moves saved ids along it at launch.
+ * - `successors` — departed id → `{ id, datumShiftM? }`: the bundled id the
+ *   database publishes as the same station (`successorOf`, the other bundled
+ *   id on its route), and the metres to add to a height measured from the old
+ *   record's chart datum to measure it from the new one's. The shift is absent
+ *   when it cannot be established, and the app then asks the user to set a
+ *   tide-height alert again rather than keep a threshold on the wrong datum.
  * - `tombstones` — a departed id with no successor, with the identity it last
  *   shipped with (`identityOf`), so the removed-station card can name it and
  *   offer replacements near where it was.
  *
  * Both are cumulative: a device can skip any number of releases, so an entry
- * stays until its station ships again. A successor that later leaves too is
- * followed to wherever it went; a chain that ends in neither a bundled station
- * nor a tombstone is dropped. `covered` holds ids another tombstone file
- * already names (chs-tombstones.json), which never get a second tombstone.
+ * stays until its station ships again. Every carried tombstone is offered to
+ * `successorOf` again, so a gauge that comes back under another record revives
+ * the id. A successor that later leaves too is followed to wherever it went,
+ * adding the shifts along the way; a chain that ends in neither a bundled
+ * station nor a tombstone is dropped. `covered` holds ids another tombstone
+ * file already names (chs-tombstones.json), which never get a second one.
  */
 export function stationSuccessors({
   departed, live, successorOf, identityOf,
@@ -121,14 +126,16 @@ export function stationSuccessors({
 }) {
   const next = { ...previousSuccessors };
   const stones = new Map(previousTombstones.map((t) => [t.id, t]));
-  for (const id of departed) {
+  const reconsider = [...new Set([...departed, ...stones.keys()])];
+  for (const id of reconsider) {
+    if (live.has(id)) continue;
     const successor = successorOf(id);
     if (successor) {
       next[id] = successor;
       continue;
     }
     const last = identityOf(id);
-    if (last && !covered.has(id)) {
+    if (last && !covered.has(id) && !stones.has(id)) {
       stones.set(id, {
         id, name: last.name.trim(), region: last.region,
         latitude: last.latitude, longitude: last.longitude,
@@ -139,18 +146,34 @@ export function stationSuccessors({
   const successors = {};
   for (const old of Object.keys(next).sort()) {
     if (live.has(old)) continue;
-    let target = next[old];
+    let { id: target, datumShiftM: shift } = next[old];
     const seen = new Set([old]);
     while (!live.has(target) && next[target] && !seen.has(target)) {
       seen.add(target);
-      target = next[target];
+      const step = next[target];
+      shift = shift === undefined || step.datumShiftM === undefined ? undefined : round3(shift + step.datumShiftM);
+      target = step.id;
     }
-    if (landed(target)) successors[old] = target;
+    if (landed(target)) successors[old] = shift === undefined ? { id: target } : { id: target, datumShiftM: shift };
   }
   const tombstones = [...stones.values()]
     .filter((t) => !live.has(t.id) && !successors[t.id])
     .sort(byNameThenId);
   return { successors, tombstones };
+}
+
+/**
+ * station-tombstones.json with the CHS gates that stopped shipping added: the
+ * `previous` gate catalogs as they stood before gen-chs-gates.mjs rewrote them,
+ * against the `shipping` ones it wrote. Gates are not in station-index.json, so
+ * this is the only point where a departing gate's name and position survive.
+ * gen-slugs.mjs then treats the entry like any other carried tombstone.
+ */
+export function gateTombstones({ previous, shipping, existing = [] }) {
+  const gone = tombstones({ shipping, previous });
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  for (const t of gone) if (!byId.has(t.id)) byId.set(t.id, t);
+  return [...byId.values()].sort(byNameThenId);
 }
 
 /** Write the bundle as compact JSON; returns its size for the census line. */

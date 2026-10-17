@@ -174,14 +174,19 @@ import WidgetKit
         WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
-    /// Moves favorites whose station left the bundle to the station that
-    /// replaced it (`StationSuccessors`), through `replace`, so each keeps its
-    /// slot and its cloud stamp. Runs on every load; a second run finds
-    /// nothing to move.
+    /// Moves this device's favorites whose station left the bundle to the
+    /// station that replaced it (`StationSuccessors`), each in its slot. Local
+    /// only: the cloud's keys and stamps move inside `adopt`
+    /// (`FavoritesCloud.launch`), where they are reconciled with what other
+    /// devices wrote. Moving them here first would delete or overwrite stamps
+    /// that reconcile needs, and could re-star a favorite removed elsewhere.
+    /// Runs on every load; a second run finds nothing to move.
     func migrate(_ successors: [String: String]) {
-        for id in ids {
-            if let next = successors[id] { replace(id, with: next) }
-        }
+        let next = StationSuccessors.remap(ids, in: successors)
+        guard next != ids else { return }
+        ids = next
+        persist()
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
     // MARK: - iCloud (see FavoritesCloud)
@@ -213,15 +218,13 @@ import WidgetKit
     private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
         let migrated = AppGroup.defaults.bool(forKey: Self.migratedKey)
         // A device on an older build can still star a station's departed id.
-        let moved = FavoritesCloud.migrate(FavoritesCloud.stamps(cloud.dictionaryRepresentation),
-                                           successors: StationSuccessors.bundled)
-        for (id, stamp) in moved.writes { cloud.set(stamp, forKey: FavoritesCloud.prefix + id) }
-        for id in moved.removals { cloud.removeObject(forKey: FavoritesCloud.prefix + id) }
-        let (next, writes) = FavoritesCloud.reconcile(
+        let (next, writes, removals) = FavoritesCloud.launch(
             local: ids,
-            cloud: moved.stamps,
+            cloud: FavoritesCloud.stamps(cloud.dictionaryRepresentation),
             migrated: migrated,
-            now: Date().timeIntervalSince1970)
+            now: Date().timeIntervalSince1970,
+            successors: StationSuccessors.bundled)
+        for id in removals { cloud.removeObject(forKey: FavoritesCloud.prefix + id) }
         for (id, stamp) in writes { cloud.set(stamp, forKey: FavoritesCloud.prefix + id) }
         if !migrated { AppGroup.defaults.set(true, forKey: Self.migratedKey) }
         guard next != ids else { return }

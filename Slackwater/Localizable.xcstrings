@@ -43496,6 +43496,101 @@
         }
       }
     },
+    "Set the height again: this place now measures from a different chart datum." : {
+      "comment" : "Alert status for a tide-height alert switched off because its station's data moved to a record measured from another chart datum.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angiv højden igen: dette sted måles nu fra et andet kortdatum."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höhe neu festlegen: Dieser Ort wird jetzt von einem anderen Kartennull aus gemessen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a fijar la altura: este lugar se mide ahora desde otro datum de carta."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aseta korkeus uudelleen: tämän paikan korkeudet mitataan nyt eri karttanollasta."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglez de nouveau la hauteur : cet endroit est maintenant mesuré à partir d’un autre zéro des cartes."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Socraigh an airde arís: tomhaistear an áit seo anois ó dhatam cairte eile."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suidhich an àirde a-rithist: thathar a’ tomhas an àite seo a-nis o dhatum cairt eile."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imposta di nuovo l’altezza: questo luogo ora si misura da un altro zero idrografico."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高さを設定し直してください。この場所は別の海図基準面から測るようになりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "높이를 다시 설정하세요. 이 장소는 이제 다른 해도 기준면에서 측정합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angi høyden på nytt: dette stedet måles nå fra et annet kartnull."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stel de hoogte opnieuw in: deze plek wordt nu gemeten vanaf een ander kaartnulpunt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defina a altura de novo: este local agora é medido a partir de outro datum de carta."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defina a altura de novo: este local é agora medido a partir de outro datum de carta."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ange höjden igen: den här platsen mäts nu från ett annat sjökortsnollplan."
+          }
+        }
+      }
+    },
     "Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn)." : {
       "comment" : "Tide and current interface text.",
       "localizations" : {

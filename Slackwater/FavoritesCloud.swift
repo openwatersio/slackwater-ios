@@ -94,6 +94,19 @@ enum FavoritesCloud {
         return (out, writes, removals)
     }
 
+    /// What `FavoritesStore.adopt` does with a load: the local list moved to
+    /// successors (`StationSuccessors`, already done at load), the cloud's
+    /// stars moved, then the reconcile. Pure, so the order that decides which
+    /// stamp survives is testable without iCloud.
+    static func launch(local: [String], cloud: [String: Double], migrated: Bool, now: Double,
+                       successors: [String: String])
+        -> (ids: [String], writes: [String: Double], removals: [String]) {
+        let moved = migrate(cloud, successors: successors)
+        let (ids, seeded) = reconcile(local: StationSuccessors.remap(local, in: successors),
+                                      cloud: moved.stamps, migrated: migrated, now: now)
+        return (ids, moved.writes.merging(seeded) { _, seed in seed }, moved.removals)
+    }
+
     /// The one-time upgrade: stars this device made before it had a cloud copy.
     /// They keep their local order and land *after* everything already in the
     /// cloud, so whichever device upgrades second appends rather than

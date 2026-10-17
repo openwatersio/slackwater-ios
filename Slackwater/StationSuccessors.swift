@@ -15,11 +15,21 @@ import Foundation
 ///
 /// The generator follows chains and keeps entries across releases, so one
 /// lookup is the whole resolution, and applying it twice changes nothing.
+/// One entry of station-successors.json.
+struct StationSuccessor: Decodable, Equatable, Sendable {
+    /// The `StationItem` id that replaced the departed one.
+    let id: String
+    /// Metres to add to a height above the departed record's chart datum to
+    /// put it above this one's. Nil when the generator could not establish it,
+    /// which is never the same as zero.
+    let datumShiftM: Double?
+}
+
 enum StationSuccessors {
-    static let bundled: [String: String] = {
+    static let entries: [String: StationSuccessor] = {
         guard let url = Bundle.main.url(forResource: "station-successors", withExtension: "json"),
               let data = try? Data(contentsOf: url),
-              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
+              let map = try? JSONDecoder().decode([String: StationSuccessor].self, from: data) else {
             // Every target bundles the file (project.yml, PortableSources). An
             // empty map moves nothing, which is today's behavior, so a release
             // build degrades rather than crashing.
@@ -28,6 +38,9 @@ enum StationSuccessors {
         }
         return map
     }()
+
+    /// The departed id → successor id half, which is all that most lookups need.
+    static let bundled: [String: String] = entries.mapValues(\.id)
 
     /// The id to use now for one a device saved.
     static func resolve(_ id: String, in map: [String: String] = bundled) -> String {
