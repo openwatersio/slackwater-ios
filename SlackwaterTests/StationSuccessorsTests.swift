@@ -132,6 +132,38 @@ import XCTest
         XCTAssertEqual(launch.writes, ["a": 100, new: 101, "b": 102])
     }
 
+    /// The bundled map, not a fixture: the 1.0.0-beta.20261017 bump replaced
+    /// TICON's Wellington gauge with LINZ's record of it.
+    func testASavedWellingtonMovesToLINZsWellington() {
+        let store = FavoritesStore.shared
+        let original = store.ids
+        defer { restore(store, original) }
+
+        let ticon = "ticon/wellington-071-nzl-uhslc_fd"
+        XCTAssertNil(StationItem.byId[ticon], "TICON's Wellington no longer ships")
+        restore(store, ["chs-victoria", ticon])
+        store.migrate(StationSuccessors.bundled)
+        XCTAssertEqual(store.ids, ["chs-victoria", "linz/071"])
+        XCTAssertEqual(StationItem.byId["linz/071"]?.name, "Wellington")
+    }
+
+    /// LINZ's Wellington sits 0.416 m further above its chart datum than
+    /// TICON's did, so a saved height moves by that much and fires at the
+    /// same water.
+    func testASavedWellingtonTideHeightAlertMovesByTheDatumShift() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let ticon = "ticon/wellington-071-nzl-uhslc_fd"
+        XCTAssertEqual(StationSuccessors.entries[ticon], StationSuccessor(id: "linz/071", datumShiftM: 0.416))
+        AlertRuleStore(defaults: defaults, successors: [:])
+            .upsert(AlertRule(stationID: ticon, trigger: .tideCrossing(heightM: 1.0, rising: true)))
+        let moved = AlertRuleStore(defaults: defaults).rules[0]
+        XCTAssertEqual(moved.stationID, "linz/071")
+        guard case .tideCrossing(let height, _) = moved.trigger else { return XCTFail("Expected a crossing") }
+        XCTAssertEqual(height, 1.416, accuracy: 1e-9)
+        XCTAssertTrue(moved.enabled)
+    }
+
     // MARK: - Recents
 
     func testRecentsMove() {

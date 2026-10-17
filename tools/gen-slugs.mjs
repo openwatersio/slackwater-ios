@@ -48,6 +48,23 @@ const previous = (() => {
 const ids = (file) =>
   JSON.parse(readFileSync(join(res, file), "utf8")).filter((s) => !s.referenceOnly).map((s) => s.id);
 
+/**
+ * Tide slugs that published a neighbour's gauge and now publish the one they
+ * name, mirroring CORRECTED_PATHS in slackwater-database's
+ * validate-database.ts (slackwater-database#287). Each was this table's slug
+ * for the wrong id, so it is not history: it opens the station it names, and
+ * nothing redirects, because the old link pointed at the wrong water.
+ */
+const CORRECTED = new Map([
+  ["brighton", "ticon/brighton-btn-gbr-cco"],
+  ["hastings-pier", "ticon/hastings_pier-hgp-gbr-cco"],
+  ["teignmouth-pier", "ticon/teignmouth_pier-tnp-gbr-cco"],
+  ["port-isaac", "ticon/port_isaac-pti-gbr-cco"],
+  ["severn-bridge", "ticon/severn_bridge-ssc-gbr-cco"],
+  ["scarborough", "ticon/scarborough-sca-gbr-cco"],
+  ["west-bay-harbour", "ticon/west_bay_harbour-wbh-gbr-cco"],
+]);
+
 /** The database's route for every station id of one kind. */
 function routesById(kind) {
   const table = new Map();
@@ -72,12 +89,21 @@ function narrow(kind, files) {
     }
     table[id] = route.slug;
     for (const old of [previous[kind]?.[id], ...route.former]) {
-      if (old && old !== route.slug) former[old] = id;
+      const corrected = kind === "tide" && CORRECTED.has(old);
+      if (old && old !== route.slug && !corrected) former[old] = id;
     }
   }
   if (missing.length) {
     throw new Error(`${missing.length} bundled ${kind} station(s) have no published route: ${missing.slice(0, 5).join(", ")}`);
   }
+  if (kind === "tide") {
+    for (const [slug, id] of CORRECTED) {
+      if (table[id] !== slug) throw new Error(`corrected slug ${slug} no longer names ${id}`);
+    }
+  }
+  // A slug the database gave back to the station that used to answer to it is
+  // live again, not history.
+  for (const [old, id] of Object.entries(former)) if (table[id] === old) delete former[old];
   // History only for stations still in the bundle: the app cannot open an id
   // it does not carry, and the database's own former paths bring the entry
   // back if the station returns.

@@ -7,6 +7,41 @@ import { fileURLToPath } from "node:url";
 /** tools/ — every generator resolves its paths from here. */
 export const here = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Each source's credit line by `source.name`, null where the source needs none:
+ * what `buildDatabase` writes every station's notice from. The package
+ * publishes each station's finished notice (`attribution`) but not the credit
+ * it was assembled from, so this recovers the credit from the notice and
+ * throws unless rebuilding the notice from it gives back the same string, for
+ * every station of every source.
+ */
+export async function sourceCredits(stations) {
+  const { attributionWithCredit, PROJECT_CREDIT } = await import("@slackwater/database");
+  const credits = new Map();
+  for (const s of stations) {
+    if (!s.source) continue;
+    const bare = attributionWithCredit(null, s.license);
+    let credit = null;
+    if (s.attribution !== bare) {
+      // The credit sits between the project credit and the licence clauses.
+      const tail = bare.slice(PROJECT_CREDIT.length);
+      const head = `${PROJECT_CREDIT}. `;
+      if (s.attribution.startsWith(head) && s.attribution.endsWith(tail)) {
+        credit = s.attribution.slice(head.length, s.attribution.length - tail.length);
+      }
+      if (credit === null || attributionWithCredit(credit, s.license) !== s.attribution) {
+        throw new Error(`${s.id}: no credit rebuilds its attribution`);
+      }
+    }
+    const seen = credits.get(s.source.name);
+    if (seen !== undefined && seen !== credit) {
+      throw new Error(`${s.source.name}: stations disagree on its credit`);
+    }
+    credits.set(s.source.name, credit);
+  }
+  return credits;
+}
+
 /** The database's bare-id records by id, in the field names the CHS generators read. */
 export async function curatedRecords() {
   // Imported lazily: the database is tens of MB and most importers want constants.

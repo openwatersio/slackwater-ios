@@ -16,7 +16,19 @@ final class SeasonalWaterTests: XCTestCase {
         // so a regeneration that dropped it too would leave every screen silent
         // with nothing failing.
         let flagged = TideStationRecord.all.filter { $0.seasonalDominant == true }
-        XCTAssertEqual(flagged.count, 384)
+        XCTAssertEqual(flagged.count, 288)
+    }
+
+    /// The database flags a station when its seasonal peak exceeds the
+    /// principal tide by more than 3 mm, so every flagged station's ratio, as
+    /// the app computes it, is above 1. A station under 1 means the app's
+    /// formula and the bundled flags come from different rules — a formula
+    /// change without the database release that matches it, or the reverse.
+    func testEveryFlaggedStationClearsTheDatabaseThreshold() {
+        let flagged = TideStationRecord.all.filter { $0.seasonalDominant == true }
+        let under = flagged.filter { ($0.seasonalRatio ?? 0) <= 1 }
+        XCTAssertEqual(under.map(\.id), [], "\(under.count) of \(flagged.count) flagged stations sit at or under 1: " +
+                       under.prefix(10).map { "\($0.id) \($0.seasonalRatio ?? -1)" }.joined(separator: ", "))
     }
 
     func testLeadsWhereTheAnnualCycleIsTheSignal() {

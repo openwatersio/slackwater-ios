@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { stationRoutes } from "@slackwater/database";
 import { here, stationSuccessors, gateTombstones } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
@@ -196,4 +197,44 @@ test("every successor is bundled or tombstoned, and no tombstone is bundled", ()
     assert.ok(!chsStones.has(t.id), `${t.id} is tombstoned twice`);
     assert.ok(t.name && Number.isFinite(t.latitude) && Number.isFinite(t.longitude), `${t.id} has no identity`);
   }
+});
+
+test("a corrected UK slug opens the gauge it names, with no history", () => {
+  // slackwater-database#287: these seven published a neighbour's gauge, so the
+  // slug this table used to give each id is not that id's history.
+  assert.equal(slugs.tide["ticon/brighton-btn-gbr-cco"], "brighton");
+  assert.equal(slugs.tide["ticon/hastings_pier-hgp-gbr-cco"], "hastings-pier");
+  assert.equal(slugs.former.tide["brighton"], undefined);
+  assert.equal(slugs.former.tide["teignmouth-pier"], undefined);
+});
+
+test("a link to a merged station's departed record opens the record that replaced it", () => {
+  // TICON's Napier gauge left the bundle for LINZ's record of the same gauge,
+  // which the database publishes as one station.
+  assert.equal(slugs.tide["linz/097"], "napier");
+  assert.equal(slugs.former.tide["napier-ruawharo-harbour-te-whanga-o-ruawharo"], "linz/097");
+});
+
+test("no database route holds two bundled stations", () => {
+  // One gauge, one pin, and one id behind each slug (gen-tides.mjs, ONE
+  // STATION PER ROUTE): a shared link must not depend on which id the app's
+  // resolver happens to meet first.
+  for (const kind of ["tide", "current"]) {
+    const bundled = new Set(Object.keys(slugs[kind]));
+    const doubled = stationRoutes(kind)
+      .map((r) => r.stationIds.filter((id) => bundled.has(id)))
+      .filter((ids) => ids.length > 1);
+    assert.deepEqual(doubled, [], kind);
+  }
+});
+
+test("a saved New Zealand TICON station moves to LINZ's record of the same gauge", () => {
+  const successors = read("station-successors.json");
+  // A known datum shift moves a saved tide height; a CHS port has none.
+  assert.deepEqual(successors["ticon/wellington-071-nzl-uhslc_fd"], { id: "linz/071", datumShiftM: 0.416 });
+  assert.deepEqual(successors["noaa/8218617"], { id: "chs-mill-bay" });
+  const stones = read("station-tombstones.json").map((t) => t.id);
+  assert.deepEqual(stones.sort(), [
+    "ticon/auckland-070a-nzl-uhslc_rq", "ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw",
+  ]);
 });

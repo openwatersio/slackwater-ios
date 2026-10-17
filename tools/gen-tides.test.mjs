@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { allStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
-  undangle, countryOf,
+  undangle, countryOf, sourceCredits,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -37,11 +37,25 @@ test("every publisher that ships is credited in About", () => {
     "US National Oceanic and Atmospheric Administration": "NOAA",
     "TICON-4": "TICON-4",
     "Kartverket / Norwegian Mapping Authority, Hydrographic Service": "© Kartverket",
+    "Toitū Te Whenua Land Information New Zealand": "Toitū Te Whenua Land Information New Zealand",
   };
   const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
   const source = new Map(allStations.map((s) => [s.id, s.source?.name]));
   const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
   assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
+});
+
+// stations.tcdb writes each station's notice from these credits, so a credit
+// recovered wrong would mis-credit every station of its source.
+test("each source's credit rebuilds the notice the database publishes", async () => {
+  const credits = await sourceCredits(allStations);
+  assert.equal(credits.get("US National Oceanic and Atmospheric Administration"), null);
+  assert.match(credits.get("Toitū Te Whenua Land Information New Zealand"),
+    /^This work is based on Toitū Te Whenua Land Information New Zealand data/);
+  assert.match(credits.get("TICON-4"), /^Source: Hart-Davis/);
+  const shipped = new Set(stations.map((s) => s.id));
+  const sources = new Set(allStations.filter((s) => shipped.has(s.id)).map((s) => s.source.name));
+  assert.deepEqual([...sources].filter((name) => !credits.has(name)), []);
 });
 
 // TICON rows yield to anything already kept; NOAA-vs-NOAA pairs are NOAA's

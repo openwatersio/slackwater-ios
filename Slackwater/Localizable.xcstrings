@@ -32196,6 +32196,101 @@
         }
       }
     },
+    "New Zealand stations: harmonic constants based on Toitū Te Whenua Land Information New Zealand data, licensed by Toitū Te Whenua Land Information New Zealand for re-use under CC BY 4.0 (linz.govt.nz)." : {
+      "comment" : "Settings ▸ About attribution line. Keep \"Toitū Te Whenua Land Information New Zealand\" (twice), \"CC BY 4.0\" and \"linz.govt.nz\" exact; LINZ's licence asks for that credit in writing.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Zealand-stationer: harmoniske konstanter baseret på data fra Toitū Te Whenua Land Information New Zealand, licenseret af Toitū Te Whenua Land Information New Zealand til genbrug under CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuseeländische Stationen: harmonische Konstanten auf Grundlage von Daten von Toitū Te Whenua Land Information New Zealand, von Toitū Te Whenua Land Information New Zealand zur Weiterverwendung unter CC BY 4.0 lizenziert (linz.govt.nz)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones de Nueva Zelanda: constantes armónicas basadas en datos de Toitū Te Whenua Land Information New Zealand, cedidos por Toitū Te Whenua Land Information New Zealand para su reutilización bajo licencia CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uuden-Seelannin asemat: harmoniset vakiot perustuvat Toitū Te Whenua Land Information New Zealand -organisaation aineistoon, jonka Toitū Te Whenua Land Information New Zealand on lisensoinut uudelleenkäytettäväksi CC BY 4.0 -lisenssillä (linz.govt.nz)."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stations néo-zélandaises : constantes harmoniques fondées sur des données de Toitū Te Whenua Land Information New Zealand, sous licence de Toitū Te Whenua Land Information New Zealand pour réutilisation selon CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stáisiúin na Nua-Shéalainne: tairisigh armónacha bunaithe ar shonraí Toitū Te Whenua Land Information New Zealand, ceadúnaithe ag Toitū Te Whenua Land Information New Zealand lena n-athúsáid faoi CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stèiseanan Shealainn Nuaidh: luachan seirmeach stèidhichte air dàta Toitū Te Whenua Land Information New Zealand, air an ceadachadh le Toitū Te Whenua Land Information New Zealand airson ath-chleachdadh fo CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stazioni neozelandesi: costanti armoniche basate su dati di Toitū Te Whenua Land Information New Zealand, concessi in licenza da Toitū Te Whenua Land Information New Zealand per il riutilizzo con licenza CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニュージーランドの観測所：調和定数は Toitū Te Whenua Land Information New Zealand のデータに基づきます。このデータは Toitū Te Whenua Land Information New Zealand により CC BY 4.0 で再利用が許諾されています（linz.govt.nz）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "뉴질랜드 관측소: 조화 상수는 Toitū Te Whenua Land Information New Zealand의 데이터를 기반으로 하며, 이 데이터는 Toitū Te Whenua Land Information New Zealand가 CC BY 4.0에 따라 재사용을 허가했습니다 (linz.govt.nz)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Zealand-stasjoner: harmoniske konstanter basert på data fra Toitū Te Whenua Land Information New Zealand, lisensiert av Toitū Te Whenua Land Information New Zealand for gjenbruk under CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuw-Zeelandse stations: harmonische constanten gebaseerd op gegevens van Toitū Te Whenua Land Information New Zealand, door Toitū Te Whenua Land Information New Zealand in licentie gegeven voor hergebruik onder CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações da Nova Zelândia: constantes harmônicas baseadas em dados da Toitū Te Whenua Land Information New Zealand, licenciados pela Toitū Te Whenua Land Information New Zealand para reutilização sob CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações da Nova Zelândia: constantes harmónicas baseadas em dados da Toitū Te Whenua Land Information New Zealand, licenciados pela Toitū Te Whenua Land Information New Zealand para reutilização sob CC BY 4.0 (linz.govt.nz)."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nyzeeländska stationer: harmoniska konstanter baserade på data från Toitū Te Whenua Land Information New Zealand, licensierade av Toitū Te Whenua Land Information New Zealand för återanvändning enligt CC BY 4.0 (linz.govt.nz)."
+          }
+        }
+      }
+    },
     "Next" : {
       "comment" : "First position in the download queue.",
       "localizations" : {

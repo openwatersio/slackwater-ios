@@ -28,6 +28,10 @@ struct AboutView: View {
                     Text(
                         "Norwegian stations: harmonic constants © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)."
                     )
+                    // LINZ asks for this credit in writing, never its logo.
+                    Text(
+                        "New Zealand stations: harmonic constants based on Toitū Te Whenua Land Information New Zealand data, licensed by Toitū Te Whenua Land Information New Zealand for re-use under CC BY 4.0 (linz.govt.nz)."
+                    )
                     Text(
                         "Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129)."
                     )
