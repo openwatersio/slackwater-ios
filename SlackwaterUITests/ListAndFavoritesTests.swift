@@ -537,6 +537,26 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
     // MARK: - Issue #91: a favorite whose station left the bundle
 
+    /// A favorite whose station left with no tombstone: the card cannot name
+    /// it, and must not claim a withdrawal that only CHS tombstones record.
+    func testRemovedFavoriteWithoutATombstoneMakesNoClaim() throws {
+        let app = launch("-seedGate", "-resetRecents",
+                         "-seedFavorites", "ticon/departed-fixture",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        defer {
+            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
+            app.launch()
+        }
+
+        let headline = app.staticTexts["This station is no longer in Slackwater."].firstMatch
+        XCTAssert(headline.appears(within: 10), "the removed favorite rendered no row")
+        XCTAssert(app.staticTexts["Slackwater no longer carries this station, so it has no readings to show. Swipe to remove it."].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'hydrographic'")).firstMatch.exists,
+                       "a station with no tombstone was not withdrawn by anyone we know of")
+        scrollTo(headline, in: app)
+        save(app, "removed-favorite-no-tombstone.png")
+    }
+
     /// `chs-north-galiano` is one of the 28 CHS withdrew: it shipped, it is
     /// tombstoned, and it resolves to no StationItem. Such a favorite still
     /// gets a row — render nothing at all and, with one favorite, the
