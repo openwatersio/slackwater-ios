@@ -58,6 +58,18 @@ function routesById(kind) {
   return table;
 }
 
+/**
+ * Slugs the database moved to another station because they had been published
+ * on the wrong gauge: each Channel Coastal Observatory slug sat on its
+ * neighbour's TICON record, so `brighton` opened Hastings Pier
+ * (slackwater-database 5eb5a6c). The slug now names its own water, and the old
+ * owner's link follows the slug rather than staying behind as history.
+ */
+const REASSIGNED = {
+  tide: new Set(["brighton", "hastings-pier", "port-isaac", "scarborough", "severn-bridge", "teignmouth-pier", "west-bay-harbour"]),
+  current: new Set(),
+};
+
 /** The published `kind` table, narrowed to the ids in `files`, and its history. */
 function narrow(kind, files) {
   const routes = routesById(kind);
@@ -81,7 +93,11 @@ function narrow(kind, files) {
   // History only for stations still in the bundle: the app cannot open an id
   // it does not carry, and the database's own former paths bring the entry
   // back if the station returns.
-  for (const [old, id] of Object.entries(former)) if (!table[id]) delete former[old];
+  // A slug the database has handed back to its own station is live again, not
+  // former: noaa/8656483 went beaufort → beaufort-duke-marine-lab → beaufort.
+  for (const [old, id] of Object.entries(former)) {
+    if (!table[id] || table[id] === old || REASSIGNED[kind].has(old)) delete former[old];
+  }
   // A former slug that is some station's live slug would send an old link to
   // the wrong water. Against the bundle that is an error outright. Against the
   // whole database it is an error only when the live owner is bundled — the

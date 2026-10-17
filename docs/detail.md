@@ -310,7 +310,7 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 |---|---|
 | NOAA tide | "<datum> chart datum. NOAA harmonic prediction." |
 | NOAA subordinate tide | "<datum> chart datum. Based on <reference> tides and NOAA's published offsets; computed on this device." |
-| Other tide (TICON-4, Kartverket) | "<datum> chart datum. Harmonic constants from <publisher>." The publisher is the station database's `source.name`, so a new publisher is named rather than credited as another. |
+| Other tide (TICON-4, Kartverket, LINZ) | "<datum> chart datum. Harmonic constants from <publisher>." The publisher is the station database's `source.name`, so a new publisher is named rather than credited as another. |
 | Canadian tide | "<datum> chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." |
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |

@@ -76,7 +76,9 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations, buildDatabase } from "@slackwater/database";
+import {
+  allStations, attributionWithCredit, buildDatabase, PROJECT_CREDIT,
+} from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
@@ -668,6 +670,27 @@ const size = writeBundle(out, stations);
 const rawById = new Map(allStations.map((s) => [s.id, s]));
 const databaseVersion = JSON.parse(readFileSync(
   join(here, "node_modules", "@slackwater", "database", "package.json"), "utf8")).version;
+/**
+ * The builder needs each source's credit line, which the package publishes
+ * only inside each station's assembled attribution. Strip the notice down to
+ * the credit and rebuild it, so a change in how the package assembles notices
+ * fails here instead of shipping a mangled credit (slackwater-database#312).
+ */
+const credits = new Map();
+for (const s of allStations) {
+  if (!s.source) continue;
+  // The notice without a credit is the project credit plus the licence tail.
+  const tail = attributionWithCredit(null, s.license).slice(PROJECT_CREDIT.length);
+  const head = `${PROJECT_CREDIT}. `;
+  const credit = s.attribution.length > head.length + tail.length
+    ? s.attribution.slice(head.length, s.attribution.length - tail.length)
+    : null;
+  if (attributionWithCredit(credit, s.license) !== s.attribution)
+    throw new Error(`${s.id}: credit does not rebuild its attribution`);
+  if (credits.has(s.source.name) && credits.get(s.source.name) !== credit)
+    throw new Error(`${s.id}: ${s.source.name} credits differ between stations`);
+  credits.set(s.source.name, credit);
+}
 const tcdb = buildDatabase(stations.map((b) => ({
   ...rawById.get(b.id),
   name: b.name,
@@ -676,7 +699,7 @@ const tcdb = buildDatabase(stations.map((b) => ({
   quality: rawById.get(b.id).quality?.seasonal_dominant ? { seasonal_dominant: true } : undefined,
   harmonic_constituents: b.constituents,
   datums: b.reference ? {} : rawById.get(b.id).datums,
-})), { version: databaseVersion });
+})), { version: databaseVersion, credits });
 writeFileSync(join(here, "..", "Slackwater", "Resources", "stations.tcdb"), tcdb);
 
 const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
