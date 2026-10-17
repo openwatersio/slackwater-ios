@@ -40,6 +40,26 @@ nonisolated struct StationCardGraph: View {
     /// reading crowded that visibly clears the time below it.
     private static let digitInk: CGFloat = 0.72
 
+    /// The ink of a reading hanging below `dot`, as `CurveDrawing.hangLabel`
+    /// places it: the pointer, and the value beyond it when there is one.
+    static func hangingInk(below dot: CGPoint, valueWidth: CGFloat?) -> CGRect {
+        let hang = dot.y + CurveStyle.hangOffset
+        let glyphInk = CurveStyle.hangGlyphFontSize * digitInk
+        let pointer = CGRect(x: dot.x - CurveStyle.hangGlyphFontSize / 2,
+                             y: hang - CurveStyle.hangGlyphGap - glyphInk / 2,
+                             width: CurveStyle.hangGlyphFontSize, height: glyphInk)
+        guard let valueWidth else { return pointer }
+        let valueInk = CurveStyle.hangValueFontSize * digitInk
+        return pointer.union(CGRect(x: dot.x - valueWidth / 2, y: hang + CurveStyle.hangValueGap - valueInk / 2,
+                                    width: valueWidth, height: valueInk))
+    }
+
+    /// The ink of an axis time `width` wide, centred at `x` on a card `height` tall.
+    static func axisTimeInk(at x: CGFloat, width: CGFloat, height: CGFloat) -> CGRect {
+        let inkHeight = timeFontSize * digitInk
+        return CGRect(x: x - width / 2, y: height - timeBaseline - inkHeight / 2, width: width, height: inkHeight)
+    }
+
     struct Point {
         let time: Date
         let value: Double
@@ -212,10 +232,8 @@ nonisolated struct StationCardGraph: View {
                         .fontWeight(.medium)
                         .foregroundStyle(SN.foam.opacity(fade)))
                     let at = CGPoint(x: x(moment.time), y: size.height - Self.timeBaseline)
-                    let width = text.measure(in: size).width
-                    let inkHeight = Self.timeFontSize * Self.digitInk
                     return (text: text, at: at,
-                            ink: CGRect(x: at.x - width / 2, y: at.y - inkHeight / 2, width: width, height: inkHeight))
+                            ink: Self.axisTimeInk(at: at.x, width: text.measure(in: size).width, height: size.height))
                 }
 
             for e in extremes {
@@ -236,16 +254,17 @@ nonisolated struct StationCardGraph: View {
                 guard showsReadings, dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
                 // So does a reading that would hang onto an axis time: a
-                // shallow turn on a short card sits too low for its value.
-                if let value = e.valueText, e.high {
-                    let valueY = dotAt.y + CurveStyle.hangOffset + CurveStyle.hangValueGap
-                    let width = context.resolve(Text(value)
-                        .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit()))
-                        .measure(in: size).width
-                    let inkHeight = CurveStyle.hangValueFontSize * Self.digitInk
-                    let valueInk = CGRect(x: dotAt.x - width / 2, y: valueY - inkHeight / 2,
-                                          width: width, height: inkHeight)
-                    if axisTimes.contains(where: { $0.ink.intersects(valueInk) }) { continue }
+                // shallow turn on a short card sits too low for it. The whole
+                // reading counts, pointer and value — on a turn low enough,
+                // the value hangs past the row and the pointer lands on it.
+                if e.high {
+                    let valueWidth = e.valueText.map {
+                        context.resolve(Text($0)
+                            .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit()))
+                            .measure(in: size).width
+                    }
+                    let reading = Self.hangingInk(below: dotAt, valueWidth: valueWidth)
+                    if axisTimes.contains(where: { $0.ink.intersects(reading) }) { continue }
                 }
                 // The reading hangs off the turn toward the plot middle with
                 // its pointer nearest the dot (current-charts §15.1). The set
