@@ -35,6 +35,30 @@ nonisolated struct StationCardGraph: View {
     private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
     private static let timeBaseline: CGFloat = 10
+    /// The height digits actually fill, as a fraction of their point size.
+    /// Overlap is judged on ink: line boxes carry leading, and would call a
+    /// reading crowded that visibly clears the time below it.
+    private static let digitInk: CGFloat = 0.72
+
+    /// The ink of a reading hanging below `dot`, as `CurveDrawing.hangLabel`
+    /// places it: the pointer, and the value beyond it when there is one.
+    static func hangingInk(below dot: CGPoint, valueWidth: CGFloat?) -> CGRect {
+        let hang = dot.y + CurveStyle.hangOffset
+        let glyphInk = CurveStyle.hangGlyphFontSize * digitInk
+        let pointer = CGRect(x: dot.x - CurveStyle.hangGlyphFontSize / 2,
+                             y: hang - CurveStyle.hangGlyphGap - glyphInk / 2,
+                             width: CurveStyle.hangGlyphFontSize, height: glyphInk)
+        guard let valueWidth else { return pointer }
+        let valueInk = CurveStyle.hangValueFontSize * digitInk
+        return pointer.union(CGRect(x: dot.x - valueWidth / 2, y: hang + CurveStyle.hangValueGap - valueInk / 2,
+                                    width: valueWidth, height: valueInk))
+    }
+
+    /// The ink of an axis time `width` wide, centred at `x` on a card `height` tall.
+    static func axisTimeInk(at x: CGFloat, width: CGFloat, height: CGFloat) -> CGRect {
+        let inkHeight = timeFontSize * digitInk
+        return CGRect(x: x - width / 2, y: height - timeBaseline - inkHeight / 2, width: width, height: inkHeight)
+    }
 
     struct Point {
         let time: Date
@@ -187,6 +211,31 @@ nonisolated struct StationCardGraph: View {
                                       nowX: nowX, width: size.width, height: size.height)
             }
 
+            // The axis row: each tide turn's time under its dot, and for a
+            // current each run's opening, or a bare slack only where no run
+            // covers it — the same moments the detail strip prints. One edge
+            // rule for all of them.
+            // A tide turn arrives with its time already formatted.
+            var axisMoments: [(time: Date, text: String?)] = []
+            if showsTimes {
+                axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText) }
+                if includesZero {
+                    axisMoments += currentAxisMoments(runs: windows, slacks: slacks).map { ($0, nil) }
+                }
+            }
+            let axisTimes = axisMoments
+                .filter { x($0.time) >= Self.axisEdgeMargin && x($0.time) <= size.width - Self.axisEdgeMargin }
+                .map { moment in
+                    let fade = moment.time < now ? CurveStyle.pastLabelFade : 1.0
+                    let text = context.resolve(Text(moment.text ?? cardTime(moment.time, tz))
+                        .font(.system(size: Self.timeFontSize).monospacedDigit())
+                        .fontWeight(.medium)
+                        .foregroundStyle(SN.foam.opacity(fade)))
+                    let at = CGPoint(x: x(moment.time), y: size.height - Self.timeBaseline)
+                    return (text: text, at: at,
+                            ink: Self.axisTimeInk(at: at.x, width: text.measure(in: size).width, height: size.height))
+                }
+
             for e in extremes {
                 // A past extreme fades like the past line.
                 let fade = e.time < now ? CurveStyle.pastLabelFade : 1.0
@@ -199,21 +248,24 @@ nonisolated struct StationCardGraph: View {
                 if !isCurrent {
                     CurveDrawing.dot(context, at: dotAt, color: tint)
                 }
-                // The extreme's time joins the bottom axis under the axis's
-                // own edge rule — the same one the slack crossing times use.
-                if showsTimes, !isCurrent, dotAt.x >= Self.axisEdgeMargin,
-                   dotAt.x <= size.width - Self.axisEdgeMargin {
-                    context.draw(Text(e.timeText)
-                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(ink),
-                                 at: CGPoint(x: dotAt.x, y: size.height - Self.timeBaseline))
-                }
                 // An extreme hugging the card edge keeps its dot and axis
                 // time but drops its value label — a shifted label detaches
                 // from its dot and reads as belonging to the wrong spot.
                 guard showsReadings, dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
+                // So does a reading that would hang onto an axis time: a
+                // shallow turn on a short card sits too low for it. The whole
+                // reading counts, pointer and value — on a turn low enough,
+                // the value hangs past the row and the pointer lands on it.
+                if e.high {
+                    let valueWidth = e.valueText.map {
+                        context.resolve(Text($0)
+                            .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit()))
+                            .measure(in: size).width
+                    }
+                    let reading = Self.hangingInk(below: dotAt, valueWidth: valueWidth)
+                    if axisTimes.contains(where: { $0.ink.intersects(reading) }) { continue }
+                }
                 // The reading hangs off the turn toward the plot middle with
                 // its pointer nearest the dot (current-charts §15.1). The set
                 // arrow wears the reading's ink, not a direction colour. No
@@ -233,21 +285,7 @@ nonisolated struct StationCardGraph: View {
 
             CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
 
-            // The axis names each run's opening, and a bare slack only where
-            // no run covers it — the same moments the detail strip prints.
-            if includesZero && showsTimes {
-                for when in currentAxisMoments(runs: windows, slacks: slacks) {
-                    let cx = x(when)
-                    let fade = when < now ? CurveStyle.pastLabelFade : 1.0
-                    guard cx >= Self.axisEdgeMargin,
-                          cx <= size.width - Self.axisEdgeMargin else { continue }
-                    context.draw(Text(cardTime(when, tz))
-                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(SN.foam.opacity(fade)),
-                                 at: CGPoint(x: cx, y: size.height - Self.timeBaseline))
-                }
-            }
+            for time in axisTimes { context.draw(time.text, at: time.at) }
 
             if speedsAreSchematic {
                 for when in slacks where when >= start && when <= end {
