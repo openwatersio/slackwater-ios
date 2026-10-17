@@ -19,8 +19,8 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// guarantees the reference ships (tools/gen-tides.mjs, isSubordinate).
     var reference: String? = nil
     var offsets: TideOffsets? = nil
-    /// The station's yearly swing is larger than its largest tidal constituent:
-    /// a Great Lakes gauge, a river reach, a Baltic bodden. The database decides
+    /// The station's seasonal swing is larger than its principal tide: a Great
+    /// Lakes gauge, a river reach, a Baltic bodden. The database decides
     /// this (`quality.seasonal_dominant`) so the app and slackwater.xyz cannot
     /// describe the same water two ways; the detail view decides what to say.
     ///
@@ -52,18 +52,21 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// the signal — so the detail view leads with it rather than footnoting it.
     ///
     /// 3 is where the bundle turns into rivers, lakes and lagoons: Rochester on
-    /// Lake Ontario at 273x, Algonac on the St Clair at 100x. Below it are Gulf
-    /// and Chesapeake ports with a real tide and a comparable annual signal, and
-    /// Annapolis is why the line is not at 1 — it carries the database's flag at
-    /// 1.008 and calling that "mostly seasonal" would be false in effect while
-    /// true in arithmetic. slackwater.xyz splits at the same place, which is the
-    /// point: the flag is the database's and the loudness has to agree too.
+    /// Lake Ontario at 147x, Algonac on the St Clair at 55x. Below it are Gulf,
+    /// Carolina and Baltic water with a real tide and a comparable seasonal
+    /// swing, such as Cedar Island at 1.8, where "mostly seasonal" would be
+    /// false in effect while true in arithmetic. slackwater.xyz splits at the
+    /// same place, which is the point: the flag is the database's and the
+    /// loudness has to agree too.
     static let seasonalLeadRatio = 3.0
 
-    /// How many times the yearly swing exceeds the largest tidal constituent,
-    /// for a flagged station. Computed rather than stored: the bundle carries
-    /// the database's verdict as one bit and the constituents are already here,
-    /// so a second field would be a second thing to keep in step.
+    /// How many times the seasonal curve's peak exceeds the principal tide, for
+    /// a flagged station: the ratio the database's `seasonal_dominant` flag is
+    /// set on (slackwater-database docs/database-format.md). Any other ratio,
+    /// such as the larger of Sa and Ssa over the largest single constituent,
+    /// disagrees with the flag. Infinite where the principal tide is zero, which
+    /// the database labels too. Computed rather than stored: the bundle carries
+    /// the verdict as one bit and the constituents are already here.
     ///
     /// Measured on the model the station predicts from, which for a subordinate
     /// is its reference's — it ships none of its own, and reading its empty list
@@ -71,24 +74,18 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     var seasonalRatio: Double? {
         guard seasonalDominant == true else { return nil }
         let model = constituents.isEmpty ? referenceRecord?.constituents ?? [] : constituents
-        let amplitude = { (name: String) in
-            abs(model.first { $0.name == name }?.amplitude ?? 0)
+        let peak = seasonalPeak(model)
+        let principal = TideStationRecord.principalConstituents.reduce(0) { sum, name in
+            sum + abs(model.first { $0.name == name }?.amplitude ?? 0)
         }
-        let seasonal = max(amplitude("SA"), amplitude("SSA"))
-        let tidal = TideStationRecord.tidalConstituents.map(amplitude).max() ?? 0
-        guard tidal > 0 else { return nil }
-        return seasonal / tidal
+        guard principal > 0 else { return peak > 0 ? .infinity : nil }
+        return peak / principal
     }
 
-    /// The constituents that are the tide itself, mirroring the database's own
-    /// list. The minor terms are not padding: at some flagged stations the
-    /// largest tidal constituent is one of them, and dropping them would inflate
-    /// the ratio and make those screens overstate their case.
-    private static let tidalConstituents = [
-        "M2", "S2", "N2", "K2", "L2", "T2", "NU2", "MU2", "2N2", "LDA2",
-        "K1", "O1", "P1", "Q1", "J1", "M1", "OO1", "RHO1", "2Q1", "SIGMA1",
-        "CHI1", "PI1", "PHI1", "THETA1", "S1",
-    ]
+    /// The database's `PRINCIPAL_TIDAL_CONSTITUENTS`: their amplitudes sum to
+    /// the tide's height when spring and tropic tides coincide.
+    private static let principalConstituents = ["M2", "S2", "K1", "O1"]
+
     var referenceRecord: TideStationRecord? { reference.flatMap(TideStationRecord.record(id:)) }
 
     var engineStation: any TidePredicting {
@@ -119,6 +116,26 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     static let fridayHarborID = "noaa/9449880"
 }
 
+/// The largest departure of the seasonal curve Sa·cos(θ − g) + Ssa·cos(2θ − g)
+/// from mean level over a year, as slackwater-database's `seasonalPeak` takes
+/// it: half-degree steps, and each term under every name the sources use.
+/// Kartverket's SA_KV is referenced to perihelion (argument h − p′), so its
+/// phase moves by p′ = 283.4° to read on SA's clock.
+func seasonalPeak(_ model: [Con]) -> Double {
+    let term = { (names: [String]) in model.first { names.contains($0.name) } }
+    let annual = term(["SA", "Sa"]) ?? term(["SA_KV"]).map {
+        Con(name: $0.name, amplitude: $0.amplitude, phase: ($0.phase + 283.4).truncatingRemainder(dividingBy: 360))
+    }
+    let semiannual = term(["SSA", "Ssa"])
+    let rad = Double.pi / 180
+    return (0..<720).reduce(0) { peak, step in
+        let theta = Double(step) / 2
+        let level = (annual.map { $0.amplitude * cos((theta - $0.phase) * rad) } ?? 0)
+            + (semiannual.map { $0.amplitude * cos((2 * theta - $0.phase) * rad) } ?? 0)
+        return max(peak, abs(level))
+    }
+}
+
 /// The Range tile's caption where the water is seasonal: two words standing in
 /// for the swing's direction, graded by how far the tide has been left behind.
 /// The sheet behind the tile carries the rest.
@@ -132,6 +149,7 @@ func seasonalCaption(_ ratio: Double) -> String {
 /// to round to, so the number reads as the estimate "about" promises. 43.3 is
 /// "about 40", not "about 43", which invites a reader to trust a figure that
 /// came out of a constituent fit. slackwater.xyz rounds identically.
+/// Finite ratios only: an infinite one has no multiple to state.
 func seasonalTimes(_ ratio: Double) -> String {
     let rounded = ratio >= 10 ? (ratio / 10).rounded() * 10 : (ratio * 10).rounded() / 10
     return rounded.formatted(.number.grouping(.automatic))
