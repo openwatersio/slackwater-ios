@@ -23858,6 +23858,18 @@
             "value" : "bien plus grand que la marée quotidienne, trop faible pour être mesurée"
           }
         },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "i bhfad níos mó ná an taoide laethúil, atá róbheag le tomhas"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fada nas motha na seòl-mara an latha, a tha ro bheag airson a thomhas"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
