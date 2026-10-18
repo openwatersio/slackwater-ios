@@ -126,4 +126,30 @@ final class AlertLineTests: XCTestCase {
                                    tz: utc, imperial: false, locale: en)
         XCTAssertTrue(label.hasPrefix("Set alert for falling past 1.00 m · Tue"), label)
     }
+
+    func testAlertSpansCoverEachOccurrenceOfTheStationsRules() throws {
+        let id = TideStationRecord.fridayHarborID
+        let every = AlertRule(stationID: id, trigger: .tideExtreme(high: false), lead: 1_800)
+        let other = AlertRule(stationID: "current:noaa/PUG1701", trigger: .slackWindowOpens)
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(10 * 86_400)
+
+        let spans = alertSpans(stationID: id, rules: [every, other], from: from, to: to, threshold: 0.5)
+
+        XCTAssertFalse(spans.isEmpty)
+        XCTAssertTrue(spans.allSatisfy { $0.ruleID == every.id }, "another station's rule draws nothing here")
+        XCTAssertTrue(spans.allSatisfy { $0.event.timeIntervalSince($0.fire) == 1_800 && $0.end == nil })
+        XCTAssertEqual(spans.map(\.event), spans.map(\.event).sorted())
+        // Review Focus 2: one span per occurrence, none overlapping.
+        for (a, b) in zip(spans, spans.dropFirst()) { XCTAssertLessThan(a.event, b.fire) }
+    }
+
+    func testAlertSpansRunAcrossASlackWindow() throws {
+        let id = "current:noaa/PUG1701"
+        let rule = AlertRule(stationID: id, trigger: .slackWindowOpens, lead: 900)
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(3 * 86_400)
+        let spans = alertSpans(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5)
+        XCTAssertFalse(spans.isEmpty)
+        XCTAssertTrue(spans.contains { $0.end != nil }, "a merged window carries its close")
+        XCTAssertTrue(spans.allSatisfy { ($0.end ?? $0.event) >= $0.event })
+    }
 }

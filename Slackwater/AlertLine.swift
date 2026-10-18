@@ -49,6 +49,29 @@ func alertNextOccurrence(stationID: String, offer: AlertTrigger, after: Date, th
         .map(\.event).first { $0 > after }
 }
 
+/// Where the strip tints: one span per occurrence of the station's enabled rules inside the
+/// loaded window, from the reminder time to the event, and across the window where there is
+/// one. Resolved the way the Rest tap resolves (`alertNextOccurrence`): on the main actor,
+/// against the bundled record, for the ten days a strip holds.
+struct AlertSpan: Hashable, Sendable {
+    let ruleID: UUID
+    let fire: Date
+    let event: Date
+    let end: Date?
+}
+
+func alertSpans(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertSpan] {
+    let mine = rules.filter { $0.stationID == stationID && $0.enabled }
+    guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
+    let station = WidgetStationLoader.station(from: record)
+    return mine.flatMap { rule in
+        alertOccurrences(rule, station: station, position: record.alertPosition,
+                         from: from, to: to, threshold: threshold)
+            .map { AlertSpan(ruleID: rule.id, fire: $0.fire, event: $0.event, end: $0.end) }
+    }
+    .sorted { $0.event < $1.event }
+}
+
 /// "Set an alert" · "Set alert for low tide · Sat 14:32" · "Alert set · low tide · Sat 14:32" ·
 /// "Alert set · every low tide". The event in a small letter mid-sentence, the moment in the
 /// station's zone.
