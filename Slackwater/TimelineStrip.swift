@@ -906,19 +906,28 @@ struct TimelineCanvas: View {
     private func draw(_ ctx: GraphicsContext, from t0: Date, to t1: Date) {
         // Tracks first: their night shade runs down through the axis rows,
         // and the day chrome's labels go over it.
+        let bands = alertBandFrames(alertSpans, in: data, between: t0, and: t1)
+        drawAlertTints(ctx, bands)
         if geo.hasTide { drawTide(ctx, t0, t1) }
         if geo.hasCurrent { drawCurrent(ctx, t0, t1) }
-        drawAlertBands(ctx, t0, t1)
+        drawAlertMarkers(ctx, bands)
         drawDayChrome(ctx, t0, t1)
     }
 
-    /// Where an alert will fire: a tint from the reminder time across the window, a bright
-    /// hairline on the moment. Under the chrome, so the day's labels stay readable.
-    private func drawAlertBands(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+    /// Where an alert will fire: a tint from the reminder time across the window, under the
+    /// tracks so the curve, its fill and a slack band keep their own colour over it.
+    private func drawAlertTints(_ ctx: GraphicsContext, _ bands: [AlertBandFrame]) {
         let top = geo.padTop, bottom = geo.bodyBottom
-        for f in alertBandFrames(alertSpans, in: data, between: t0, and: t1) {
+        for f in bands {
             let rect = CGRect(x: f.x0, y: top, width: max(f.x1 - f.x0, 2), height: bottom - top)
             ctx.fill(Path(rect), with: .color(SN.sun.opacity(0.16)))
+        }
+    }
+
+    /// The moment itself: a bright hairline over the tracks, under the day chrome.
+    private func drawAlertMarkers(_ ctx: GraphicsContext, _ bands: [AlertBandFrame]) {
+        let top = geo.padTop, bottom = geo.bodyBottom
+        for f in bands {
             ctx.fill(Path(CGRect(x: f.eventX - 0.75, y: top, width: 1.5, height: bottom - top)),
                      with: .color(SN.sun.opacity(0.9)))
         }

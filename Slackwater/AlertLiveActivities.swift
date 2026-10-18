@@ -39,7 +39,8 @@ func liveActivityCurve(_ station: WidgetStation, around event: Date) -> AlertLiv
     case .current(let s, _, _): values = s.speeds(from: start, to: end, step: 600).filter { $0.time <= end }.map(\.speed)
     case .derived: return nil
     }
-    return values.isEmpty ? nil : AlertLiveActivityCurve(start: start, step: 600, values: values)
+    // One sample draws nothing; the face then takes the plain layout rather than a blank frame.
+    return values.count < 2 ? nil : AlertLiveActivityCurve(start: start, step: 600, values: values)
 }
 
 /// Off the main actor on purpose: `Activity` is not `Sendable`, so ending one from an actor
