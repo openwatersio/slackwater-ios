@@ -65,8 +65,11 @@ func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {
 /// `lastPathComponent`) splits on that "/" once the escape is resolved and
 /// hands back "noaa", which matches no station and dies as a lookup miss
 /// (#167). This works whichever way the URL arrives, escaped or resolved.
-func stationID(from url: URL) -> String {
-    String(url.path(percentEncoded: false).dropFirst())
+///
+/// The id is resolved through `StationSuccessors`: a widget configured releases
+/// ago links with the id it was configured with.
+func stationID(from url: URL, successors: [String: String] = StationSuccessors.bundled) -> String {
+    StationSuccessors.resolve(String(url.path(percentEncoded: false).dropFirst()), in: successors)
 }
 
 /// The host whose station links this app claims, matching the

@@ -330,7 +330,16 @@ and the Alerts screen shows each rule's "Scheduled through" date, so the horizon
 rather than a silent stop.
 
 **Rule states** (Alerts screen): Scheduled through *date* · Waiting for station data (a CHS
-station not yet fitted) · Notifications off in Settings · Premium needed · Off.
+station not yet fitted) · Notifications off in Settings · Premium needed · Off · Set the height
+again (below).
+
+**A rule's station replaced by another record** (`Resources/station-successors.json`, list.md
+§9.3) moves to the new record at launch. A tide-height rule's height is measured from a chart
+datum, and the new record's can sit elsewhere on the same water, so the height moves by the
+datum shift the generator measured between the two records' mean sea level. Where no shift
+could be measured — a CHS port, a subordinate, a record without MSL — the rule is switched off
+and reads "Set the height again: this place now measures from a different chart datum." until
+it is saved from the sheet again. A high- or low-tide rule has no height and just moves.
 
 ## 7. Entry points
 

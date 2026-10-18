@@ -4,6 +4,9 @@ import SwiftUI
 /// The first thing that explains a quiet rule, or when its deliveries run out.
 func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: Bool,
                      tz: TimeZone = .current, locale: Locale = .autoupdatingCurrent) -> String {
+    if rule.heightNeedsReview == true {
+        return String(localized: "Set the height again: this place now measures from a different chart datum.", comment: "Alert status for a tide-height alert switched off because its station's data moved to a record measured from another chart datum.")
+    }
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
     if !premium { return "Notifications are Premium" }

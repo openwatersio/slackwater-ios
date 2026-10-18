@@ -24,17 +24,22 @@ enum WidgetRecord: Sendable {
 
 enum WidgetStationLoader {
     /// Capture storage once; online coverage still depends on each entry's date.
+    /// `id` may be one saved releases ago, so it is resolved through
+    /// `StationSuccessors` first.
     static func recordSource(
-        id: String, locator: CatalogFileLocator = .shared
+        id: String, locator: CatalogFileLocator = .shared,
+        successors: [String: String] = StationSuccessors.bundled
     ) -> (Date) -> WidgetRecord? {
-        locator.load { directory in try recordSource(id: id, directory: directory) } ?? { _ in nil }
+        let id = StationSuccessors.resolve(id, in: successors)
+        return locator.load { directory in try recordSource(id: id, directory: directory) } ?? { _ in nil }
     }
 
     /// Online gates need a saved window; widgets cannot request one themselves.
     static func loadRecord(
-        id: String, at date: Date = .now, locator: CatalogFileLocator = .shared
+        id: String, at date: Date = .now, locator: CatalogFileLocator = .shared,
+        successors: [String: String] = StationSuccessors.bundled
     ) -> WidgetRecord? {
-        recordSource(id: id, locator: locator)(date)
+        recordSource(id: id, locator: locator, successors: successors)(date)
     }
 
     private static func recordSource(id: String, directory: URL) throws -> ((Date) -> WidgetRecord?)? {
@@ -152,8 +157,10 @@ enum WidgetStationLoader {
 
     /// The station a widget's chosen station resolves to now, and the prefix
     /// its name carries when the choice follows the nearest one.
-    static func configured(_ selectedID: String?) -> (id: String, prefix: String?) {
-        let selected = selectedID ?? defaultStationID()
+    static func configured(
+        _ selectedID: String?, successors: [String: String] = StationSuccessors.bundled
+    ) -> (id: String, prefix: String?) {
+        let selected = StationSuccessors.resolve(selectedID ?? defaultStationID(), in: successors)
         let prefix: String? = switch selected {
         case AppGroup.currentLocationStationID: "Current Location"
         case AppGroup.nearestTideStationID: "Nearest Tide"

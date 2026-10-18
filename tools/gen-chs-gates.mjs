@@ -17,11 +17,22 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { here, curatedRecords } from "./bundle.mjs";
+import { here, curatedRecords, gateTombstones, writeBundle } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
 const registry = await curatedRecords();
 const ports = JSON.parse(readFileSync(join(res, "chs-stations.json"), "utf8"));
+const readOr = (file, fallback) => {
+  try {
+    return JSON.parse(readFileSync(join(res, file), "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+};
+// The gate catalogs as they stood before this run rewrites them: the only
+// record of a departing gate's name and position (see the end of this file).
+const previousGates = [...readOr("chs-gates.json", []), ...readOr("chs-current-gates.json", [])];
 
 const gates = [];
 for (const [id, e] of Object.entries(registry)) {
@@ -215,3 +226,13 @@ for (const g of currentGates) {
      : g.provisionalSlackMinutes ? `  provisional ±${g.provisionalSlackMinutes} min`
      : `  NO provisional — over the ${PROVISIONAL_FLOOR_MIN} min floor`));
 }
+
+// A gate that stopped shipping keeps its identity in station-tombstones.json,
+// which gen-slugs.mjs then carries like any other tombstone, or drops when the
+// gate ships again or a station on its route replaces it.
+const stones = gateTombstones({
+  previous: previousGates,
+  shipping: [...gates, ...currentGates],
+  existing: readOr("station-tombstones.json", []),
+});
+writeBundle(join(res, "station-tombstones.json"), stones);

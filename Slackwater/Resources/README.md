@@ -15,6 +15,14 @@ Do not edit these committed artifacts directly:
   `stations.json` is not bundled. It stays here as the reviewable record of the
   same stations and as input to the generators that follow gen-tides.
 - `currents.json` — `tools/gen-noaa-currents.mjs`
+- `slugs.json`, `station-successors.json` and `station-tombstones.json` —
+  `tools/gen-slugs.mjs`. The last two say where a saved station id goes once
+  its station stops shipping: the bundled station the database publishes as
+  the same one, with the chart-datum shift between the two records where it
+  can be measured, else a tombstone naming where it was. Both are cumulative,
+  because a device can skip any number of releases. A departing CHS gate's
+  tombstone is written by `tools/gen-chs-gates.mjs`, the last step that still
+  sees the gate catalogs as they were.
 - `chs-gates.json` and `chs-current-gates.json` — `tools/gen-chs-gates.mjs`
 - `station-index.json` — `tools/gen-station-index.mjs`, the identity fields of
   `stations.json` and `currents.json` and nothing else. It is what the station

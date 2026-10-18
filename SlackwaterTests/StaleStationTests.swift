@@ -32,7 +32,7 @@ import XCTest
     /// (Ogdensburg NY, Peace Bridge Below at Buffalo), and three of them are
     /// tombstoned. A tighter bound fails on real data — it already did.
     func testTombstonePositionsAreNotDefaultsOrTransposed() {
-        for stone in StationTombstone.all {
+        for stone in StationTombstone.all where stone.isChsWithdrawal {
             XCTAssertTrue((40...85).contains(stone.latitude),
                           "\(stone.id) latitude \(stone.latitude) — transposed with longitude?")
             XCTAssertTrue((-142...(-40)).contains(stone.longitude),

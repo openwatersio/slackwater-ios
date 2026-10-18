@@ -71,7 +71,9 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     var onChange: () -> Void = {}
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults) {
+    /// `successors` moves a subscription whose station left the bundle to the
+    /// station that replaced it (`StationSuccessors`), keeping its calendar.
+    init(defaults: UserDefaults, successors: [String: String] = StationSuccessors.bundled) {
         self.defaults = defaults
         // UI-test hook, like FavoritesStore's `-resetFavorites`: this store and the
         // EventKit calendars it names both persist across a run's separate app launches
@@ -80,8 +82,15 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
         if CommandLine.arguments.contains("-resetCalendars") {
             defaults.removeObject(forKey: AppGroup.stationCalendarsKey)
         }
-        subscriptions = defaults.data(forKey: AppGroup.stationCalendarsKey)
+        let stored = defaults.data(forKey: AppGroup.stationCalendarsKey)
             .flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) } ?? []
+        var seen = Set<String>()
+        subscriptions = stored.compactMap { subscription in
+            var moved = subscription
+            moved.stationID = StationSuccessors.resolve(subscription.stationID, in: successors)
+            return seen.insert(moved.stationID).inserted ? moved : nil
+        }
+        if subscriptions != stored { persist(notify: false) }
     }
 
     func calendarID(for stationID: String) -> String? {

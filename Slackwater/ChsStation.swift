@@ -30,8 +30,10 @@ struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
 /// thing left that can name what someone starred — and its last known position
 /// is what a replacement gets offered from.
 ///
-/// Written by `gen-chs-stations.mjs`, which is also the only producer today;
-/// the app looks tombstones up by id, so a NOAA one would just be more rows.
+/// Two files, one per producer: chs-tombstones.json from
+/// `gen-chs-stations.mjs` for the CHS ports CHS withdrew, and
+/// station-tombstones.json from `gen-slugs.mjs` for tide and current stations
+/// that left with no successor (`StationSuccessors`).
 struct StationTombstone: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
@@ -43,7 +45,14 @@ struct StationTombstone: Decodable, Identifiable, Hashable, StationIdentity {
     /// tombstone data.
     var aliases: [String] { [] }
 
-    static let all: [StationTombstone] = bundled("chs-tombstones")
+    /// Tide and current stations that left with no successor
+    /// (station-tombstones.json, written by `gen-slugs.mjs`).
+    static let stations: [StationTombstone] = bundled("station-tombstones")
+    static let all: [StationTombstone] = bundled("chs-tombstones") + stations
+
+    /// CHS withdrew the station. Every other tombstone is a station Slackwater
+    /// stopped carrying, which says nothing about its publisher.
+    var isChsWithdrawal: Bool { id.hasPrefix("chs-") }
     static let byId: [String: StationTombstone] =
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 }

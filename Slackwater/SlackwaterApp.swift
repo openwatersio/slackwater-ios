@@ -13,6 +13,11 @@ struct SlackwaterApp: App {
         // shared suite on a fresh install, and migrating on that read would
         // burn the app's own standard-defaults history the appex never had.
         AppGroup.migrateIfNeeded(into: AppGroup.defaults, from: .standard)
+        // Loading the stores moves saved ids whose station left the bundle to
+        // its successor (StationSuccessors), so the first frame and the
+        // alert scheduler only ever see ids that ship.
+        _ = FavoritesStore.shared
+        _ = RecentsStore.shared
         _ = ChsModelTransfer.shared
         // The widget-reload hook (ChsStation.swift's `WidgetReload`): a no-op
         // until the app assigns it, so the widget extension — which also

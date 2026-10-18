@@ -68,6 +68,10 @@ targetTemplates:
       - path: Slackwater/Resources/chs-gates.json
       - path: Slackwater/Resources/chs-current-gates.json
       - path: Slackwater/Resources/chs-tombstones.json
+      # Saved ids of stations that left the bundle (StationSuccessors.swift):
+      # every target resolves widget, watch and deep-link ids through them.
+      - path: Slackwater/Resources/station-tombstones.json
+      - path: Slackwater/Resources/station-successors.json
       # 20 KB, and no widget reads it today. It is here because ChsStation.swift
       # (compiled from this list below) declares `bundled("unavailable-stations")`,
       # and `bundled` is a preconditionFailure on a missing file — the first
@@ -78,6 +82,7 @@ targetTemplates:
       - Slackwater/Units.swift
       - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
+      - Slackwater/StationSuccessors.swift
       - Slackwater/SlackWindow.swift
       - Slackwater/CardStatus.swift
       - Slackwater/StationCardFace.swift

@@ -27,8 +27,8 @@ import { join } from "node:path";
 // catalog generators can stay on the release their output was built from until
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
-import { stationRoutes } from "@slackwater/database";
-import { here, writeBundle } from "./bundle.mjs";
+import { stationRoutes, stationsById } from "@slackwater/database";
+import { here, writeBundle, stationSuccessors, round3 } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
 const out = join(res, "slugs.json");
@@ -53,7 +53,7 @@ function routesById(kind) {
   const table = new Map();
   for (const route of stationRoutes(kind)) {
     const former = route.formerPaths.map((path) => path.split("/").filter(Boolean).pop());
-    for (const id of route.stationIds) table.set(id, { slug: route.slug, former });
+    for (const id of route.stationIds) table.set(id, { slug: route.slug, former, ids: route.stationIds });
   }
   return table;
 }
@@ -109,6 +109,85 @@ const tide = narrow("tide", ["stations.json", "chs-stations.json"]);
 const current = narrow("current", ["currents.json", "chs-current-gates.json", "chs-gates.json"]);
 const slugs = { tide: tide.table, current: current.table, former: { tide: tide.former, current: current.former } };
 const size = writeBundle(out, slugs);
+
+/**
+ * Resources/station-successors.json and station-tombstones.json — see
+ * `stationSuccessors` in bundle.mjs. A departed station is one the previous
+ * table slugged and this one does not. Its successor is the bundled id on its
+ * database route; its identity, for a tombstone, is what the committed
+ * station-index.json still says, since gen-station-index runs after this.
+ * Gates are not in that index, so gen-chs-gates.mjs writes a departing gate's
+ * tombstone before it rewrites the gate catalogs, and this carries it.
+ * Keyed by `StationItem` id, the id a device saved: a NOAA current carries the
+ * app's `current:` prefix, everything else is the catalog id.
+ */
+const itemId = (kind, id) => (kind === "current" && !id.startsWith("chs-") ? `current:${id}` : id);
+const readOr = (file, fallback) => {
+  try {
+    return JSON.parse(readFileSync(join(res, file), "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+};
+const lastIndex = readOr("station-index.json", { tides: [], currents: [] });
+const lastIdentity = new Map([
+  ...lastIndex.tides.map((s) => [s.id, s]),
+  ...lastIndex.currents.map((s) => [itemId("current", s.id), s]),
+]);
+const live = new Set();
+const departed = [];
+const nowByKind = { tide: tide.table, current: current.table };
+const routesByKind = { tide: routesById("tide"), current: routesById("current") };
+for (const [kind, now] of Object.entries(nowByKind)) {
+  for (const id of Object.keys(now)) live.add(itemId(kind, id));
+  for (const id of Object.keys(previous[kind] ?? {})) {
+    if (!now[id]) departed.push(itemId(kind, id));
+  }
+}
+
+/**
+ * Metres to add to a height above `from`'s chart datum to put it above `to`'s:
+ * both records are one gauge, so their mean sea level is the same water, and
+ * each record's MSL above its own chart datum is exactly the `datumOffset`
+ * gen-tides ships. Undefined unless both are harmonic references carrying MSL
+ * and their chart datum; a subordinate's heights come from its reference's
+ * datum and offsets, and a CHS port is fitted on the device from heights the
+ * database does not carry.
+ */
+const msl = (id) => {
+  const s = stationsById.get(id);
+  const zero = s?.datums?.[s?.chart_datum];
+  return s && s.type === "reference" && s.datums?.MSL != null && zero != null ? s.datums.MSL - zero : undefined;
+};
+const datumShift = (from, to) => {
+  const a = msl(from);
+  const b = msl(to);
+  return a === undefined || b === undefined ? undefined : round3(b - a);
+};
+
+/** The bundled station on a departed id's database route, as `{ id, datumShiftM? }`. */
+const successorOf = (item) => {
+  const kind = item.startsWith("current:") || (!routesByKind.tide.has(item) && routesByKind.current.has(item))
+    ? "current" : "tide";
+  const id = item.replace(/^current:/, "");
+  const twin = (routesByKind[kind].get(id)?.ids ?? []).filter((other) => nowByKind[kind][other]).sort()[0];
+  if (!twin) return undefined;
+  const shift = kind === "tide" ? datumShift(id, twin) : undefined;
+  return shift === undefined ? { id: itemId(kind, twin) } : { id: itemId(kind, twin), datumShiftM: shift };
+};
+const { successors, tombstones } = stationSuccessors({
+  departed,
+  live,
+  successorOf,
+  identityOf: (id) => lastIdentity.get(id),
+  previousSuccessors: readOr("station-successors.json", {}),
+  previousTombstones: readOr("station-tombstones.json", []),
+  covered: new Set(readOr("chs-tombstones.json", []).map((t) => t.id)),
+});
+writeBundle(join(res, "station-successors.json"), successors);
+writeBundle(join(res, "station-tombstones.json"), tombstones);
+console.log(`station-successors.json: ${Object.keys(successors).length}; station-tombstones.json: ${tombstones.length}`);
 console.log(
   `slugs.json: ${Object.keys(slugs.tide).length} tide + ${Object.keys(slugs.current).length} current, ` +
     `${Object.keys(tide.former).length + Object.keys(current.former).length} former, ${size}`,
