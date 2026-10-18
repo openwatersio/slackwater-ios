@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. Shared palette, typography, chart geometry, and unit formatting.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 extension Color {
@@ -70,8 +71,7 @@ enum SN {
     /// misread as `ebb`. Same value the web app uses. (The retired literal is
     /// not spelled here — `testNoSourceFileSpellsARetiredColour` bans it.)
     static let amber = Color(hex: 0xEF6F4A)
-    static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
-    static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
+    static let sunrise = Color(hex: 0xF0D890)      // every sun time: its symbol, not its ink, says rise or set
     static let shadow = Color(hex: 0x001432)       // every drop shadow; sites pick the opacity
     static let moonLimb = Color(hex: 0x00122C, opacity: 0.92)  // the moon's dark limb, glyph and strip
     static let umbra = Color(hex: 0x6B2A18, opacity: 0.94)     // the eclipse shadow — copper, not black
@@ -183,6 +183,8 @@ enum CurveStyle {
     /// The slack run's stroke: a step fatter than the line, so the go mark
     /// reads as a segment laid over it rather than a recolour of it.
     static let runWidth: CGFloat = 3.5
+    /// A slack run narrower than a turn dot would read as a blot, so it draws as the dot.
+    static func runDrawsAsDot(width: CGFloat) -> Bool { width < dotRadius * 2 }
     static let nowDotDiameter: CGFloat = 7
     /// Clearance beyond a dot or slack run's end.
     static let haloGap: CGFloat = 2.5

@@ -2,6 +2,7 @@
 // for every station with real velocities, harmonic or CHS-published: the
 // speed as the hero, the set arrow and phase word above it, the time below,
 // and the next significant stop the commentary pill walks to.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 
@@ -23,46 +24,44 @@ struct CurrentLead: View {
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
 
-    private var phase: CurrentPhase { currentPhase(signed: signed) }
-    private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil || phase == .slack }
+    private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
+    private var phase: CurrentPhase { currentPhase(signed: signed, inWindow: isSlack) }
     private var tilde: String { provisional ? "~" : "" }
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
-    /// The stops the commentary walks: a window opening, its closing (the
-    /// run that begins), each max, a bare slack where no window exists, and
-    /// the sun's next rise or set when it beats all of them.
+    /// The stops the commentary walks: a slack run's opening, its closing
+    /// (the run that begins), each max, and the sun's next rise or set when
+    /// it beats all of them. A run drawn as a dot is one stop, its centre, and a slack no run covers is one stop, its instant.
     var nextSignificant: CommentaryStop? {
         var stops: [(time: Date, text: String)] = []
-        // The windows' own slacks, gathered once: the event loop below asks
-        // this of every slack event, and the linear scan it replaces made
-        // that quadratic across a week of events.
-        var windowSlacks = Set<Date>()
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
-        for w in timeline.slackWindows {
-            stops.append((w.start, "Slack"))
-            // A window that runs to the series' end never closes, so no run
+        for run in timeline.slackRuns {
+            if run.isDot {
+                stops.append((run.centre, "Slack"))
+                continue
+            }
+            stops.append((run.start, "Slack"))
+            // A run that reaches the series' end never closes, so no run
             // begins there. Direction is read a second past the edge.
-            if w.end < seriesEnd {
-                let v = timeline.velocityAt(w.end.addingTimeInterval(1))
-                stops.append((w.end, v >= 0 ? "Flood" : "Ebb"))
-            }
-            windowSlacks.insert(w.slack)
-        }
-        for e in timeline.currentEvents {
-            switch e.kind {
-            case .slack:
-                if !windowSlacks.contains(e.time) { stops.append((e.time, "Slack")) }
-            case .maxFlood, .maxEbb:
-                stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
+            if run.end < seriesEnd && !timeline.isSlack(at: run.end) {
+                let v = timeline.velocityAt(run.end.addingTimeInterval(1))
+                stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
             }
         }
+        for t in timeline.bareSlackTimes {
+            stops.append((t, "Slack"))
+        }
+        for e in timeline.currentEvents where e.kind != .slack {
+            stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
+        }
+        let drawn = timeline.drawnSpan
         // The tilde belongs to the water's numbers, not to the sun's clock,
         // so it goes on here rather than in `commentary`.
-        let water = stops.filter { $0.time > scrubTime.addingTimeInterval(1) }
+        let water = stops.filter { commentaryCanName($0.time, after: scrubTime, drawn: drawn) }
             .min { $0.time < $1.time }
             .map { commentaryEventStop($0.text, at: $0.time, prefix: tilde) }
-        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime)
+        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime, drawn: drawn)
     }
 
     var commentary: CommentaryContent? {
@@ -108,13 +107,14 @@ struct CurrentLead: View {
         return phase.word
     }
 
-    /// The lead in words, for the strip's spoken value.
+    /// The lead in words, for the strip's spoken value: the set's compass point follows outside slack, as on the watch.
     var spoken: String {
-        String(localized: "\(state) \(tilde)\(formatSpeed(abs(signed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))", comment: "VoiceOver current reading. Values are current state, optional approximation mark, formatted speed, and spoken unit.")
+        let reading = spokenReading(state, formatSpeed(abs(signed), unit: speedUnit), unit: speedUnitLabel(speedUnit))
+        return isSlack ? reading : "\(reading) \(compass16(setDegrees))"
     }
 
     var body: some View {
-        let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(isSlack ? .slack : phase)
+        let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(phase)
         LeadCard(value: "\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))",
                  unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),
@@ -125,9 +125,9 @@ struct CurrentLead: View {
             // word. In slack the water goes both ways, so the glyph does too.
             HStack(spacing: 4) {
                 if isSlack {
-                    Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                    LeadGlyph(systemName: "arrow.right.and.line.vertical.and.arrow.left")
                 } else {
-                    CompassArrow(deg: setDegrees)
+                    LeadGlyph(systemName: "arrow.up", degrees: setDegrees)
                     Text(compass16(setDegrees))
                 }
             }

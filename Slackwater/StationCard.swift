@@ -379,7 +379,7 @@ struct OnlineGateCardView: View {
                 signed: state.signed,
                 deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection,
                 unit: speedUnit,
-                inWindow: graph.windows.contains { $0.contains(now) }))
+                inWindow: graph.isSlack(at: now)))
         }
     }
 }
@@ -464,7 +464,7 @@ struct CurrentCardView: View {
                     deg: record.setDegrees(signed: state.signed),
                     unit: speedUnit,
                     tilde: provisional != nil,
-                    inWindow: graph?.windows.contains { $0.contains(appNow()) } ?? false))
+                    inWindow: graph?.isSlack(at: appNow()) ?? false))
             }
         }
         .task(id: graphInputKey) {

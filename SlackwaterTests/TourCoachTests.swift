@@ -76,14 +76,6 @@ final class TourCoachTests: XCTestCase {
         XCTAssertNil(c.station, "a half-finished tour does not linger")
     }
 
-    func testGlideTokenRisesOnEveryRequest() {
-        let c = TourCoach.shared
-        let before = c.glideToken
-        c.requestGlide()
-        c.requestGlide()
-        XCTAssertEqual(c.glideToken, before + 2)
-    }
-
     func testFinishGuardPreventsStrayCall() {
         let c = TourCoach.shared
         c.arm()

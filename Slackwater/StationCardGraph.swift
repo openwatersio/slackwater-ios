@@ -31,7 +31,12 @@ nonisolated struct StationCardGraph: View {
     /// time but drops its value label; every axis time — extreme or slack
     /// crossing — uses the tighter margin.
     private static let labelEdgeMargin: CGFloat = 34
-    private static let axisEdgeMargin: CGFloat = 20
+    /// The canvas bleeds 3pt past the card on each side, so this keeps a time 21pt inside the card.
+    private static let axisEdgeMargin: CGFloat = 24
+    /// About one printed time's width, so neighbours never print over each other.
+    private static let axisMinGap: CGFloat = 48
+    /// How far a hanging reading reaches from its dot: the value's center plus half its 16pt line.
+    private static let hangReach = CurveStyle.hangOffset + CurveStyle.hangValueGap + 8
     private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
     private static let timeBaseline: CGFloat = 10
@@ -82,6 +87,7 @@ nonisolated struct StationCardGraph: View {
         var deg: Double? = nil
         /// A derived gate knows flood versus ebb, but has no compass bearing.
         var flow: DerivedPhase? = nil
+        var isCurrent: Bool { deg != nil || flow != nil }
     }
 
     let points: [Point]
@@ -108,8 +114,7 @@ nonisolated struct StationCardGraph: View {
     /// effective threshold — never re-derived in the canvas (§6.1). Only
     /// signed current curves carry them.
     var windows: [WindowRun] = []
-    /// Every slack instant on the curve, so the axis can print the bare
-    /// instant where no run covers a slack. Only signed current curves.
+    /// Every slack instant in the span. One no window covers draws as a dot at its instant; a derived gate's are all such dots, on the zero line.
     var slacks: [Date] = []
     /// A normalized phase shape, never a speed measurement.
     var speedsAreSchematic = false
@@ -122,6 +127,36 @@ nonisolated struct StationCardGraph: View {
     var showsNow = true
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
+
+    /// The card's reading says Slack on the marks this curve draws, as the detail lead does.
+    func isSlack(at t: Date) -> Bool {
+        readsSlack(at: t, runs: windows, slacks: slacks)
+    }
+
+    /// One time per slack mark, under the mark at the card's own scale: each run, and each slack no run covers.
+    static func axisMoments(_ runs: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
+        (runs.map { $0.axisMoment(pointsPerHour: pointsPerHour) } + bareSlacks(slacks, runs: runs)).sorted()
+    }
+
+    /// Which way a reading hangs from its dot (+1 down, −1 up): toward the plot middle, unless
+    /// that side runs off the plot, where it would land on the card's identity rows or its axis times.
+    static func hangToward(dotY: CGFloat, high: Bool, plotHeight: CGFloat) -> CGFloat {
+        if high { return dotY + hangReach > plotHeight ? -1 : 1 }
+        return dotY - hangReach < 0 ? 1 : -1
+    }
+
+    /// The axis times the card prints, in time order: clear of both edges, and each at least a
+    /// time's width after the last one kept.
+    static func thinAxisMoments(_ moments: [Date], x: (Date) -> CGFloat, width: CGFloat) -> [Date] {
+        var kept: [Date] = []
+        for t in moments.sorted() {
+            let at = x(t)
+            guard at >= axisEdgeMargin, at <= width - axisEdgeMargin else { continue }
+            if let last = kept.last, at - x(last) < axisMinGap { continue }
+            kept.append(t)
+        }
+        return kept
+    }
 
     var body: some View {
         Canvas { context, size in
@@ -168,7 +203,7 @@ nonisolated struct StationCardGraph: View {
             // Slack: each run is a REAL sub-path of the curve (interpolated
             // endpoints), computed by the builders from the SHARED
             // slackWindow predicate — never re-derived here.
-            let segs = windows.filter { $0.end > $0.start }.map { w -> Path in
+            let segs = windows.map { w -> Path in
                 var seg = Path()
                 seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
                 for p in points where p.time > w.start && p.time < w.end {
@@ -220,11 +255,12 @@ nonisolated struct StationCardGraph: View {
             if showsTimes {
                 axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText) }
                 if includesZero {
-                    axisMoments += currentAxisMoments(runs: windows, slacks: slacks).map { ($0, nil) }
+                    axisMoments += Self.axisMoments(windows, slacks: slacks, pointsPerHour: xScale * 3600).map { ($0, nil) }
                 }
             }
+            let keptAxisTimes = Self.thinAxisMoments(axisMoments.map(\.time), x: x, width: size.width)
             let axisTimes = axisMoments
-                .filter { x($0.time) >= Self.axisEdgeMargin && x($0.time) <= size.width - Self.axisEdgeMargin }
+                .filter { keptAxisTimes.contains($0.time) }
                 .map { moment in
                     let fade = moment.time < now ? CurveStyle.pastLabelFade : 1.0
                     let text = context.resolve(Text(moment.text ?? cardTime(moment.time, tz))
@@ -242,7 +278,7 @@ nonisolated struct StationCardGraph: View {
                 let tint = (e.high ? SN.graphHigh : SN.graphLow).opacity(fade)
                 let ink = SN.foam.opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
-                let isCurrent = e.deg != nil || e.flow != nil
+                let isCurrent = e.isCurrent
                 // A tide turn is the event and gets a dot; a current peak is
                 // context inside its lobe and does not.
                 if !isCurrent {
@@ -257,7 +293,7 @@ nonisolated struct StationCardGraph: View {
                 // shallow turn on a short card sits too low for it. The whole
                 // reading counts, pointer and value — on a turn low enough,
                 // the value hangs past the row and the pointer lands on it.
-                if e.high {
+                if Self.hangToward(dotY: dotAt.y, high: e.high, plotHeight: plotHeight) > 0 {
                     let valueWidth = e.valueText.map {
                         context.resolve(Text($0)
                             .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit()))
@@ -277,7 +313,8 @@ nonisolated struct StationCardGraph: View {
                 } else {
                     .toBar(high: e.high)
                 }
-                CurveDrawing.hangLabel(context, at: dotAt, toward: e.high ? 1 : -1,
+                CurveDrawing.hangLabel(context, at: dotAt,
+                                       toward: Self.hangToward(dotY: dotAt.y, high: e.high, plotHeight: plotHeight),
                                        value: e.valueText, glyph: glyph,
                                        tint: isCurrent ? ink : tint, ink: ink,
                                        valueFontSize: CurveStyle.hangValueFontSize)
@@ -287,9 +324,12 @@ nonisolated struct StationCardGraph: View {
 
             for time in axisTimes { context.draw(time.text, at: time.at) }
 
-            if speedsAreSchematic {
-                for when in slacks where when >= start && when <= end {
+            for when in bareSlacks(slacks, runs: windows) where when >= start && when <= end {
+                if speedsAreSchematic {
                     CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(0)), color: SN.go)
+                } else {
+                    CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(valueAt(when))),
+                                     color: SN.go.opacity(when < now ? CurveStyle.pastLabelFade : 1))
                 }
             }
 

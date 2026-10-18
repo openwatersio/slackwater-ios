@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. The workable sub-threshold window around a slack — shared by the timeline strip and the widget extension.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import Foundation
 import SlackwaterKit
 
@@ -39,8 +40,8 @@ var slackThresholdKn: Double {
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
 /// the same series the strip renders, so the window can never disagree with
-/// the curve. Clamped to the series; nil when no sub-threshold sample
-/// brackets the slack.
+/// the curve. Clamped to the series and widened to hold the slack itself; nil
+/// for a slack outside it or between two above-threshold samples of one sign.
 func slackWindow(_ points: [CurrentPoint], around slack: Date,
                  threshold: Double) -> (start: Date, end: Date)? {
     // A slack outside the sampled series has no measurable window. Events are
@@ -53,6 +54,14 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     let k: Int
     if abs(points[i].speed) <= threshold { k = i }
     else if i + 1 < points.count, abs(points[i + 1].speed) <= threshold { k = i + 1 }
+    else if i + 1 < points.count, (points[i].speed > 0) != (points[i + 1].speed > 0) {
+        // Both samples sit outside the band but the reversal between them crosses it.
+        let a = points[i], b = points[i + 1]
+        let span = abs(a.speed) + abs(b.speed), dt = b.time.timeIntervalSince(a.time)
+        // Keep the window connected to the engine's slack when it differs from the sampled crossing.
+        return (min(a.time.addingTimeInterval(dt * (abs(a.speed) - threshold) / span), slack),
+                max(a.time.addingTimeInterval(dt * (abs(a.speed) + threshold) / span), slack))
+    }
     else { return nil }
     func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
         let va = abs(a.speed), vb = abs(b.speed)
@@ -71,7 +80,7 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
         if abs(points[b + 1].speed) > threshold { end = cross(points[b], points[b + 1]); break }
         b += 1
     }
-    return (start, end)
+    return (min(start, slack), max(end, slack))
 }
 
 /// One usable run of slack water. Touching or overlapping windows merge into
@@ -81,6 +90,8 @@ struct WindowRun: Equatable {
     let start: Date
     let end: Date
     func contains(_ t: Date) -> Bool { start <= t && t <= end }
+    /// Half-open: parked on the closing, the water is already leaving slack (scrubber §9.2).
+    func holdsSlack(at t: Date) -> Bool { start <= t && t < end }
 }
 
 /// Windows in chronological order → runs. Two windows join when the later
@@ -97,12 +108,27 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
     return runs
 }
 
-/// The moments a current axis prints: each run's opening (the time a planner
-/// is aiming at — spec §4 rule 7), plus the bare instant of any slack no run
-/// covers, which is the hairline case (§5.3). Sorted.
-func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
-    let bare = slacks.filter { t in !runs.contains { $0.contains(t) } }
-    return (runs.map(\.start) + bare).sorted()
+extension WindowRun {
+    var centre: Date { start.addingTimeInterval(end.timeIntervalSince(start) / 2) }
+    /// From the duration at a surface's scale, so data code agrees with that surface's drawing without a Path.
+    func drawsAsDot(pointsPerHour: CGFloat) -> Bool {
+        CurveStyle.runDrawsAsDot(width: CGFloat(end.timeIntervalSince(start) / 3600) * pointsPerHour)
+    }
+    /// The axis prints where the run's mark is: a dot's centre, a stroke's opening (spec §4 rule 7).
+    func axisMoment(pointsPerHour: CGFloat) -> Date {
+        drawsAsDot(pointsPerHour: pointsPerHour) ? centre : start
+    }
+}
+
+/// The slacks no run covers. Each keeps one mark, a dot at its own instant, so every slack the alerts and the magnet know is drawn and timed.
+func bareSlacks(_ slacks: [Date], runs: [WindowRun]) -> [Date] {
+    slacks.filter { t in !runs.contains { $0.holdsSlack(at: t) } }
+}
+
+/// The reading says Slack inside a run, or within a second of a bare slack, where the magnet parks on its dot (scrubber §9.2).
+func readsSlack(at t: Date, runs: [WindowRun], slacks: [Date]) -> Bool {
+    runs.contains { $0.holdsSlack(at: t) }
+        || bareSlacks(slacks, runs: runs).contains { abs($0.timeIntervalSince(t)) < 1 }
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

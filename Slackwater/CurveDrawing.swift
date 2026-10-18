@@ -4,6 +4,7 @@
 // widget extension compiles this file too, so nothing here reads a Date, an
 // engine type or the strip's geometry — callers map to points first. The
 // knobs live in `CurveStyle` (Palette.swift); this is what they drive.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
 /// The pointer under a hanging reading: the to-bar arrow for a tide turn
@@ -83,17 +84,23 @@ enum CurveDrawing {
     /// the fade ends at that trough instead, so the fill is clear where the
     /// plot is clipped rather than half-strong at a hard edge. `area` is the
     /// curve closed to the datum line; the fill is clipped to the plot box.
+    ///
+    /// `fillsAboveDatum` false draws the amber alone, and nothing when the
+    /// water never reaches datum: the detail strip, where the day and night
+    /// shading sits on the bare sea and a blue fill under it would make a
+    /// tide day read brighter than a current day.
     static func datumFill(_ ctx: GraphicsContext, _ area: Path,
                           plotTop: CGFloat, plotBottom: CGFloat, width: CGFloat,
-                          datumY: CGFloat, lowestY: CGFloat) {
+                          datumY: CGFloat, lowestY: CGFloat, fillsAboveDatum: Bool = true) {
         let datumInReach = lowestY >= datumY
+        guard fillsAboveDatum || datumInReach else { return }
         let fadeY = datumInReach ? datumY : lowestY
         let top = min(plotTop, fadeY), bottom = max(plotBottom, fadeY)
         let fadeStop = (fadeY - top) / (bottom - top)
-        var stops = [
+        var stops: [Gradient.Stop] = fillsAboveDatum ? [
             Gradient.Stop(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
             Gradient.Stop(color: SN.graphLine.opacity(0), location: fadeStop),
-        ]
+        ] : [Gradient.Stop(color: SN.graphLow.opacity(0), location: 0)]
         if datumInReach {
             stops.append(.init(color: SN.graphLow.opacity(0), location: fadeStop))
             stops.append(.init(color: SN.graphLow.opacity(CurveStyle.fillOpacity), location: 1))
@@ -107,23 +114,23 @@ enum CurveDrawing {
                                               endPoint: CGPoint(x: 0, y: bottom)))
     }
 
-    /// The current fill, anchored at zero: clear at slack and intensifying
-    /// outward, blue in both directions — the set arrows and the schedule
-    /// pills carry flood against ebb; the fill only says how far from slack
-    /// the water is. Symmetric about zero even when the plot is not: the
-    /// gradient spans the larger half either side, so a 3 kn flood against a
-    /// 1 kn ebb intensifies at the same rate per point on both sides.
+    /// The current fill, beneath the curve only: blue at the flood peaks,
+    /// clear at slack. In an ebb lobe the curve-to-zero area lies above the
+    /// curve, over the sky, and a tide chart never fills there. The gradient
+    /// spans the larger half of the plot, so its rate per point does not
+    /// depend on how strong the flood is against the ebb.
     static func zeroFill(_ ctx: GraphicsContext, _ area: Path,
                          plotTop: CGFloat, plotBottom: CGFloat, zeroY: CGFloat) {
         let half = max(zeroY - plotTop, plotBottom - zeroY)
-        ctx.fill(area, with: .linearGradient(
+        var flood = ctx
+        flood.clip(to: Path(CGRect(x: -1e6, y: -1e6, width: 2e6, height: zeroY + 1e6)))
+        flood.fill(area, with: .linearGradient(
             Gradient(stops: [
                 .init(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
-                .init(color: SN.graphLine.opacity(0), location: 0.5),
-                .init(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 1),
+                .init(color: SN.graphLine.opacity(0), location: 1),
             ]),
             startPoint: CGPoint(x: 0, y: zeroY - half),
-            endPoint: CGPoint(x: 0, y: zeroY + half)))
+            endPoint: CGPoint(x: 0, y: zeroY)))
     }
 
     // MARK: Lines
@@ -184,7 +191,7 @@ enum CurveDrawing {
         var track = ctx
         let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
         let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
-        for run in slackRuns {
+        for run in slackRuns where !isDot(run) {
             let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
             let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
             let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
@@ -203,18 +210,51 @@ enum CurveDrawing {
     // MARK: Marks
 
     /// The slack runs: the line itself turns the go colour along each
-    /// segment. No end dots: a run is one mark, and its opening time goes on
-    /// the axis.
+    /// segment. No end dots: a run is one mark, with one time on the axis.
+    /// A run shorter than a turn's dot draws as that dot: a stroke that short reads as a blot.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
         for seg in segments {
-            strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
-                             lineWidth: CurveStyle.runWidth)
+            if isDot(seg) {
+                let centre = runCentre(seg)
+                dot(ctx, at: centre,
+                    color: SN.go.opacity(centre.x < nowX ? CurveStyle.pastLabelFade : 1))
+            } else {
+                strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
+                                 lineWidth: CurveStyle.runWidth)
+            }
         }
     }
 
+    static func isDot(_ run: Path) -> Bool {
+        let xs = vertices(run).map(\.x)
+        return CurveStyle.runDrawsAsDot(width: (xs.max() ?? 0) - (xs.min() ?? 0))
+    }
+
+    static func runCentre(_ run: Path) -> CGPoint {
+        let points = vertices(run)
+        let xs = points.map(\.x)
+        let midX = ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2
+        for (a, b) in zip(points, points.dropFirst()) where min(a.x, b.x) <= midX && midX <= max(a.x, b.x) {
+            let f = b.x == a.x ? 0.5 : (midX - a.x) / (b.x - a.x)
+            return CGPoint(x: midX, y: a.y + (b.y - a.y) * f)
+        }
+        return points.first ?? .zero
+    }
+
+    private static func vertices(_ run: Path) -> [CGPoint] {
+        var points: [CGPoint] = []
+        run.forEach { element in
+            switch element {
+            case .move(let p), .line(let p): points.append(p)
+            default: break
+            }
+        }
+        return points
+    }
+
     /// A reading hanging off a turn or peak in the direction `toward`
-    /// (+1 down, −1 up — toward the plot's middle): the glyph nearest the
+    /// (+1 down, −1 up — usually toward the plot's middle): the glyph nearest the
     /// dot in `tint`, the value beyond it in `ink`. Either may be absent.
     static func hangLabel(_ ctx: GraphicsContext, at p: CGPoint, toward: CGFloat,
                           value: String?, glyph: HangGlyph?, tint: Color, ink: Color,

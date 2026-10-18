@@ -490,23 +490,19 @@ final class EclipseTests: XCTestCase {
 
     // MARK: - On the timeline
 
-    func testTheTimelineCarriesTheEclipseAndSnapsToEveryContact() throws {
+    func testTheTimelineSnapsToGreatestEclipseAndNoOtherContact() throws {
         let (tl, e) = try eclipseTimeline()
         XCTAssertEqual(e.kind, .partial)
-        for c in e.contacts where tl.contains(c) {
-            XCTAssertTrue(tl.snapTimes.contains(c), "contact \(c) is not magnetic")
-        }
+        assertOnlyGreatestEclipseSnaps(tl, peak: e.peak, contacts: e.contacts)
     }
 
-    func testTheTimelineCarriesTheSolarEclipseAndSnapsToEveryContact() throws {
+    func testTheTimelineSnapsToGreatestSolarEclipseAndNoOtherContact() throws {
         let (tl, e) = try solarEclipseTimeline()
         XCTAssertEqual(e.kind, .partial)
-        for c in e.contacts where tl.contains(c) {
-            XCTAssertTrue(tl.snapTimes.contains(c), "solar contact \(c) is not magnetic")
-        }
+        assertOnlyGreatestEclipseSnaps(tl, peak: e.peak, contacts: e.contacts)
     }
 
-    func testTheChunkedTimelineCarriesTheSolarEclipseAndSnapsToEveryContact() throws {
+    func testTheChunkedTimelineSnapsToGreatestSolarEclipseAndNoOtherContact() throws {
         let start = anchor("2017-08-21T12:00:00Z", friday.tz)
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = friday.tz
@@ -515,8 +511,18 @@ final class EclipseTests: XCTestCase {
         let chunk = TimelineChunk.build(source, index: 0, start: start, end: end)
         let tl = TimelineData.merged([chunk], source: source, anchor: start, today: start)
         let e = try XCTUnwrap(tl.solarEclipses.first)
-        for contact in e.contacts {
-            XCTAssertTrue(tl.snapTimes.contains(contact), "solar contact \(contact) is not magnetic")
+        assertOnlyGreatestEclipseSnaps(tl, peak: e.peak, contacts: e.contacts)
+    }
+
+    /// Greatest eclipse is an eclipse's one magnetic stop; its other contacts are not.
+    private func assertOnlyGreatestEclipseSnaps(_ tl: TimelineData, peak: Date, contacts: [Date],
+                                                file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(tl.snapTimes.contains(peak), "greatest eclipse is not magnetic", file: file, line: line)
+        let others = contacts.filter { $0 != peak && tl.contains($0) }
+        XCTAssertFalse(others.isEmpty, "no other contact inside the window: the fixture proves nothing",
+                       file: file, line: line)
+        for c in others {
+            XCTAssertFalse(tl.snapTimes.contains(c), "contact \(c) is magnetic", file: file, line: line)
         }
     }
 

@@ -2,6 +2,7 @@
 // schematic current strip with phase readout and slack times, one-tap link to
 // the reference port's tide. A derived gate has honest slack times and phase,
 // but no speed prediction.
+// Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 import SlackwaterKit
 
@@ -27,12 +28,13 @@ struct DerivedGateDetailView: View {
     private var port: TideStationRecord { record.port }
     private var tz: TimeZone { gate.tz }
     private var phase: DerivedPhase { record.engineGate.phase(at: scrubTime, slacks: slacks) }
-    private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
     /// The stop the pill names and its tap walks to: the next slack, or the
     /// sun's next rise or set when that comes first.
     private var nextStop: CommentaryStop? {
-        nextCommentaryStop(nextSlack.map { commentaryEventStop("Slack", at: $0.time) },
-                           sun: timeline?.days ?? [], after: scrubTime)
+        let drawn = timeline?.drawnSpan
+        return nextCommentaryStop(firstCommentaryStop(slacks, at: \.time, after: scrubTime, drawn: drawn)
+                                    .map { commentaryEventStop("Slack", at: $0.time) },
+                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
     }
 
     var body: some View {
@@ -99,13 +101,14 @@ struct DerivedGateDetailView: View {
                     let linked = anchor != .distantPast
                     if !linked { anchor = todayLocal(tz) }
                     let s = TimelineWindowStore(source: .gate(record))
-                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
+                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : FoldHandoff.pending(gate.id))
                     store = s
                     refreshSlacks()
                 }
                 RecentsStore.shared.record(gate.id)
             }
             .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .onChange(of: live) { _, now in store?.setNow(now) }
             // Chunks landing widen the strip; the phase readout's slacks must
             // cover whatever it now spans.
             .onChange(of: timeline.map { $0.start...$0.end }) { _, _ in refreshSlacks() }
@@ -141,7 +144,7 @@ struct DerivedGateDetailView: View {
         let word = phase.word
         return LeadCard(time: leadWhen(scrubTime, tz), timeColor: ink) {
             leadState(word, ink: ink)
-            Image(systemName: glyph)
+            LeadGlyph(systemName: glyph)
                 .foregroundStyle(Self.phaseColor(phase))
         }
     }

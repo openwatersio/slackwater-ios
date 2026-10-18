@@ -116,7 +116,7 @@ Every trigger reads a producer that exists today:
 
 | Trigger | Source |
 |---|---|
-| `.slackWindowOpens` | `CurrentPredicting.events()` slacks → `speeds(step: 600)` over the span ±6 h → `slackWindow()` → `mergeWindows()`. One occurrence per run, at its opening — the moment `currentAxisMoments()` prints as "the time a planner is aiming at". A slack no run covers is an occurrence at the slack with `noWindow`. |
+| `.slackWindowOpens` | `CurrentPredicting.events()` slacks → `speeds(step: 600)` over the span ±6 h → `slackWindow()` → `mergeWindows()`. One occurrence per run, at its opening, the time a planner is aiming at. That holds for a run the strip or card draws as a dot, though their axes print a dot's time at its centre. A slack no run covers (one outside the sampled span, or between two samples of the same sign) is an occurrence at the slack with `noWindow`; a reversal the sampling steps over still has a short window, widened to hold its slack, so that slack is one occurrence. |
 | `.slack` | `DerivedSlackStation.slacks(from:to:)` |
 | `.currentPeak` | `events()` filtered to `.maxFlood` or `.maxEbb` |
 | `.tideExtreme` | `TidePredicting.extremes()` filtered by kind. `ofDay`: the query reaches a day past either end and keeps the lowest low (highest high) of each station-local calendar day, so a mixed tide's lower low is judged against its whole day, not the range |
@@ -374,10 +374,7 @@ rather than seen on the first.
 
 #### The long press
 
-A `UILongPressGestureRecognizer` alongside the tap recognizer already on the scroll view, with
-`tap.require(toFail: press)` so a press held and then lifted does not also scrub. There is no
-`DragGesture` anywhere near the strip — the scrub is `UIScrollView`'s own pan, which never starts
-from a stationary touch — so the press needs nothing taken away from it.
+A `UILongPressGestureRecognizer` alongside the tap recognizer on the scroll view, with `tap.require(toFail: press)` so a press held and then lifted does not also scrub. The strip carries the press, and VoiceOver's "Set an alert" action, only while the scaffold has an `alertOffer`: an online gate and a CHS tide preview have neither, and a preview gains both when its model lands. A failure requirement cannot be withdrawn, so the strip replaces its tap recognizer whenever the press comes or goes. There is no `DragGesture` anywhere near the strip — the scrub is `UIScrollView`'s own pan, which never starts from a stationary touch — so the press needs nothing taken away from it.
 
 On recognition: stop the intro slide, cancel any fling or magnet ride, take a haptic, **park the
 pressed moment on the centerline**, and say so. Parking it is what keeps the rest simple. The
@@ -553,10 +550,7 @@ subscription stay, read "Premium needed", and deliver again the moment the entit
 | CHS derived gate | `.derived` once its reference port is fitted | `.slack`, `.eclipse` | once fitted |
 | CHS current gate, online | nil | none | no |
 
-Online gates predict only from a network fetch ([chs-data-model](chs-data-model.md))
-and the loader returns nil for them, so nothing could be scheduled offline. A long press there does
-nothing, the alert line is absent, and their Settings row is unavailable, rather than offering an
-alert that never fires.
+Online gates predict only from a network fetch ([chs-data-model](chs-data-model.md)) and the loader returns nil for them, so nothing could be scheduled offline. Their strip has no long press and no VoiceOver "Set an alert" action, the alert line is absent, and their Settings row is unavailable, rather than offering an alert that never fires.
 
 ## 9. Technical shape
 
@@ -576,9 +570,8 @@ alert that never fires.
   instructions, availability, the session per parse, the word list, and the pure mapping from a
   draft to an `AlertSentenceOutcome`
 - `Slackwater/AlertsView.swift`, `Slackwater/CalendarStationsView.swift` — the lists
-- `Slackwater/TimelineStrip.swift` — the press recognizer
-- `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `onLongPress` closure, the line's place
-  between the strip card and `links`, and the sheet's presentation
+- `Slackwater/TimelineScrubber.swift` — the press recognizer and the "Set an alert" action
+- `Slackwater/Theme.swift` (`ScrubDetailScaffold`) — the `stripPressed` and `stripAlertAction` closures, nil without an `alertOffer`, the line's place between the strip card and `links`, and the sheet's presentation
 - `SlackwaterWidgets/AlertLiveActivity.swift` — plan 2, the attributes and the three presentations;
   the attributes are shared with the app through the `PortableSources` template
 
@@ -600,7 +593,7 @@ No engine or Almanac version change.
 **Unit** (`SlackwaterTests`, failing test first):
 
 - Occurrences — one case per trigger on the fixtures `SlackWindowTests` and `TideShortcutTests`
-  already use. Merged runs yield one occurrence; a hairline slack yields a `noWindow` occurrence;
+  already use. Merged runs yield one occurrence; a reversal the sampling steps over yields its own short window;
   the first opening agrees with `SlackWindowShortcutQuery.next`; crossings interpolate and respect
   direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.
