@@ -267,7 +267,7 @@ Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit
 
 Nightly builds are GitHub prereleases and stay marked that way. The stable `v<version>` release is published once the version is live on the App Store, following the `post-release` skill, and appears on [openwaters.io/updates](https://openwaters.io/updates/). Write its title and notes for people using the app, following the [org guidance on release notes](https://github.com/openwatersio/.github/blob/main/docs/agents/releases.md#release-notes).
 
-The notes come from [`docs/release-notes/<version>.md`](docs/release-notes/README.md) without the `Worth testing:` paragraph, so the file's one-line summary is the opening of the notes. Title the release with a headline that says what changed, with no version, in sentence case and without a closing period; patch releases get one too, and a new minimum iOS version goes in the headline. Pass it as `--title` when creating the release, or fix a published one with `gh release edit v<version> --repo openwatersio/slackwater-ios --title "<headline>"`.
+The notes come from [`docs/release-notes/<version>.md`](docs/release-notes/README.md) without its version line or the `Worth testing:` paragraph, so the file's one-line summary is the opening of the notes. Title the release with a headline that says what changed, with no version, in sentence case and without a closing period; patch releases get one too, and a new minimum iOS version goes in the headline. Pass it as `--title` when creating the release, or fix a published one with `gh release edit v<version> --repo openwatersio/slackwater-ios --title "<headline>"`.
 
 ## Documentation
 
