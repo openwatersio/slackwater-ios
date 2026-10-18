@@ -273,8 +273,12 @@ start into two faces:
 | | Counting down | Stale, after `event` |
 |---|---|---|
 | Island compact | tide or current glyph · `14:32` · timer to the event | glyph · timer to `end` ("open 38m"), or the height for a tide |
-| Island expanded, Lock Screen | "Race Passage · Slack window" · timer · "14:32–15:10, under 0.5 kn" | "Open" · timer to close · the same line |
+| Island expanded, Lock Screen | "Race Passage · Slack window" · timer · a six-hour slice of the curve with the window shaded and the moment marked (`AlertCurveView`, absent on a derived gate) · "14:32–15:10, under 0.5 kn" | "Open" · timer to close · the same slice and line |
 | Minimal | glyph | glyph |
+
+The attributes carry the slice as 37 samples at ten minutes, three hours either side of the
+event, in the engine's units; the face scales to the slice's own range, so a flat current reads
+as a flat line.
 
 A tide extreme, a peak and a derived slack have no `end`: the stale face names the moment and
 the height, and the activity is ended on the next run. `noWindow` never shows "Open". The tap
