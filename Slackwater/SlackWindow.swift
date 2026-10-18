@@ -58,7 +58,7 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
         // Both samples sit outside the band but the reversal between them crosses it.
         let a = points[i], b = points[i + 1]
         let span = abs(a.speed) + abs(b.speed), dt = b.time.timeIntervalSince(a.time)
-        // The engine's slack can miss the linear crossing; outside its window it would count as bare and mark twice.
+        // Keep the window connected to the engine's slack when it differs from the sampled crossing.
         return (min(a.time.addingTimeInterval(dt * (abs(a.speed) - threshold) / span), slack),
                 max(a.time.addingTimeInterval(dt * (abs(a.speed) + threshold) / span), slack))
     }
@@ -122,7 +122,7 @@ extension WindowRun {
 
 /// The slacks no run covers. Each keeps one mark, a dot at its own instant, so every slack the alerts and the magnet know is drawn and timed.
 func bareSlacks(_ slacks: [Date], runs: [WindowRun]) -> [Date] {
-    slacks.filter { t in !runs.contains { $0.contains(t) } }
+    slacks.filter { t in !runs.contains { $0.holdsSlack(at: t) } }
 }
 
 /// The reading says Slack inside a run, or within a second of a bare slack, where the magnet parks on its dot (scrubber §9.2).

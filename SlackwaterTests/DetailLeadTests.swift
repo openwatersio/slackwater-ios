@@ -185,6 +185,13 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: at(12_602), signed: 0.1).spoken, "Flooding 0.1 knots N", "off the dot, the flow")
     }
 
+    func testAClosingSlackIsNamedSlackByBothTheCommentaryAndLead() {
+        let tl = timeline(windows: [(slack: at(3600), start: at(1800), end: at(3600))])
+        assertNext(at(2000), at(3600), "Slack", "the slack owns the closing instant", in: tl)
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0, timeline: tl).spoken, "Slack 0.0 knots")
+        assertNext(at(3600), at(6000), "Max ebb", "parked on the slack, the commentary advances", in: tl)
+    }
+
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes TWO stops — its opening is the
     /// slack, its closing is the run that begins. A slack inside a window is

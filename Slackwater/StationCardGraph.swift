@@ -177,10 +177,6 @@ nonisolated struct StationCardGraph: View {
             let plotHeight = max(0, size.height - timeLabelSpace)
             func y(_ v: Double) -> CGFloat { plotHeight * (1 - (v - lo) / (hi - lo)) }
             let nowX = x(now)
-            let tideTimes = showsTimes
-                ? Set(Self.thinAxisMoments(extremes.filter { !$0.isCurrent }.map(\.time),
-                                           x: x, width: size.width))
-                : []
 
             /// Linear interpolation over the drawn samples, so a run's ends
             /// and the now dot ride the curve as rendered.

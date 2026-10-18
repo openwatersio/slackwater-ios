@@ -44,7 +44,7 @@ struct CurrentLead: View {
             stops.append((run.start, "Slack"))
             // A run that reaches the series' end never closes, so no run
             // begins there. Direction is read a second past the edge.
-            if run.end < seriesEnd {
+            if run.end < seriesEnd && !timeline.isSlack(at: run.end) {
                 let v = timeline.velocityAt(run.end.addingTimeInterval(1))
                 stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
             }

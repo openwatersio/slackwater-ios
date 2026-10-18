@@ -395,7 +395,7 @@ struct TimelineData {
                                  windows: [(slack: Date, start: Date, end: Date)]) -> [Date] {
         let runs = mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
         let dots = runs.filter(\.isDot)
-        return events.map(\.time).filter { t in !dots.contains { $0.contains(t) } }
+        return events.map(\.time).filter { t in !dots.contains { $0.holdsSlack(at: t) } }
             + runs.flatMap(\.snapMoments)
     }
     func day(of t: Date) -> TimelineDay? {
