@@ -6,15 +6,20 @@ import WidgetKit
 struct AlertLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlertLiveActivityAttributes.self) { context in
-            // Lock Screen and banner
-            HStack(spacing: 12) {
-                glyph(context)
-                VStack(alignment: .leading, spacing: 2) {
+            // Lock Screen and banner: the title row, the station's six hours, the line.
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    glyph(context)
                     Text(context.attributes.title).font(.headline)
-                    detail(context).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    timer(context).font(.title3.monospacedDigit())
                 }
-                Spacer()
-                timer(context).font(.title3.monospacedDigit())
+                if let curve = context.attributes.curve {
+                    AlertCurveView(curve: curve, event: context.attributes.event, end: context.attributes.end,
+                                   water: context.attributes.water)
+                        .frame(height: 44)
+                }
+                detail(context).font(.caption).foregroundStyle(.secondary)
             }
             .padding()
             .widgetURL(context.attributes.url)
@@ -23,7 +28,16 @@ struct AlertLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) { glyph(context) }
                 DynamicIslandExpandedRegion(.trailing) { timer(context).monospacedDigit() }
                 DynamicIslandExpandedRegion(.center) { Text(context.attributes.title).font(.headline) }
-                DynamicIslandExpandedRegion(.bottom) { detail(context).font(.caption) }
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let curve = context.attributes.curve {
+                            AlertCurveView(curve: curve, event: context.attributes.event, end: context.attributes.end,
+                                           water: context.attributes.water)
+                                .frame(height: 36)
+                        }
+                        detail(context).font(.caption)
+                    }
+                }
             } compactLeading: {
                 glyph(context)
             } compactTrailing: {
@@ -60,6 +74,54 @@ struct AlertLiveActivity: Widget {
         case .countdown: Text(timerInterval: liveActivityCountdown(now: .now, event: a.event), countsDown: true)
         case .open: Text(timerInterval: a.event...(a.end ?? a.event), countsDown: true)
         case .moment: Text(a.event.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: a.tz)))
+        }
+    }
+}
+
+/// Six hours of the station around its event, drawn the way the strip draws it: the curve, a
+/// fill beneath, the window shaded, the moment marked. Static: the timers beside it move.
+struct AlertCurveView: View {
+    let curve: AlertLiveActivityCurve
+    let event: Date
+    let end: Date?
+    let water: AlertLiveActivityAttributes.Water
+
+    var body: some View {
+        Canvas { ctx, size in
+            let n = curve.values.count
+            guard n > 1 else { return }
+            let lo = curve.values.min()!, hi = curve.values.max()!
+            // A flat slice is a flat line, never a division by zero.
+            let span = max(hi - lo, 0.01)
+            let total = curve.step * Double(n - 1)
+            func x(_ t: Date) -> CGFloat { CGFloat(t.timeIntervalSince(curve.start) / total) * size.width }
+            func y(_ v: Double) -> CGFloat { size.height - CGFloat((v - lo) / span) * (size.height - 6) - 3 }
+
+            if let end {
+                let r = CGRect(x: x(event), y: 0, width: max(x(end) - x(event), 2), height: size.height)
+                ctx.fill(Path(r), with: .color(.yellow.opacity(0.18)))
+            }
+            var line = Path()
+            for (i, v) in curve.values.enumerated() {
+                let p = CGPoint(x: CGFloat(i) / CGFloat(n - 1) * size.width, y: y(v))
+                if i == 0 { line.move(to: p) } else { line.addLine(to: p) }
+            }
+            var fill = line
+            fill.addLine(to: CGPoint(x: size.width, y: size.height))
+            fill.addLine(to: CGPoint(x: 0, y: size.height))
+            fill.closeSubpath()
+            ctx.fill(fill, with: .color(.white.opacity(0.10)))
+            ctx.stroke(line, with: .color(.white.opacity(0.85)), lineWidth: 1.5)
+            if water == .current {
+                let zero = y(0)
+                if zero > 0, zero < size.height {
+                    var axis = Path()
+                    axis.move(to: CGPoint(x: 0, y: zero)); axis.addLine(to: CGPoint(x: size.width, y: zero))
+                    ctx.stroke(axis, with: .color(.white.opacity(0.25)), lineWidth: 0.5)
+                }
+            }
+            ctx.fill(Path(CGRect(x: x(event) - 0.75, y: 0, width: 1.5, height: size.height)),
+                     with: .color(.yellow.opacity(0.9)))
         }
     }
 }
