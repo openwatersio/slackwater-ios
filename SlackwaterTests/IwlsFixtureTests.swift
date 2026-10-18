@@ -1,6 +1,7 @@
 import XCTest
 import notify
 import SlackwaterKit
+import SlackwaterIWLS
 @testable import Slackwater
 
 final class IwlsFixtureTests: XCTestCase {
@@ -42,6 +43,8 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 429)))
         XCTAssert(ChsError.isPermanent(IwlsFetcher.terminalError(status: 404)))
         XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 503)))
+        XCTAssertTrue(ChsError.isPermanent(IwlsError.permanent("no station")))
+        XCTAssertFalse(ChsError.isPermanent(IwlsError.transient("HTTP 429")))
     }
 
     func testThePacerSerialisesAcrossFetchers() async {
