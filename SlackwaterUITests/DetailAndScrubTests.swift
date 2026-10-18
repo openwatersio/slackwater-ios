@@ -46,7 +46,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         } else {
             XCTAssertLessThan(range.frame.minY, row.frame.minY)
         }
-        XCTAssertTrue(row.label.hasPrefix("Sun,"), row.label)
+        XCTAssertTrue(row.label.hasPrefix("Sun, Sunrise"), row.label)
         XCTAssertFalse(app.buttons["sun-card-previous"].exists)
         XCTAssertFalse(app.buttons["sun-card-next"].exists)
         save(app, "sun-card.png")

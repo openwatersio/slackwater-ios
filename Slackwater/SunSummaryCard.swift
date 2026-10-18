@@ -44,12 +44,12 @@ struct SunSummaryCard: View {
         let duration = state.daylight.map {
             Duration.seconds($0.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
         } ?? "—"
-        let caption = state.next.map { event in
+        let nextEvent = state.next.map { event in
             let name = event.isRise ? String(localized: "Sunrise") : String(localized: "Sunset")
             return String(localized: "\(name) · \(chartTime(event.time, tz))",
                           comment: "Sun event name and local time.")
         } ?? "—"
-        return ReadoutTile(label: String(localized: "Sun"), caption: caption,
+        return ReadoutTile(label: String(localized: "Sun"), caption: duration,
                            accessibility: String(localized: "Sun"), detail: {
             AnyView(SunDetailSheet(at: at, latitude: latitude, longitude: longitude,
                                   tz: tz, onJump: onJump, days: days))
@@ -57,9 +57,7 @@ struct SunSummaryCard: View {
             Image(systemName: state.next.map { $0.isRise ? "sunrise" : "sunset" } ?? "sun.max")
                 .foregroundStyle(SN.sunrise)
         } value: {
-            Text(duration).font(ReadoutType.tileText.monospacedDigit())
-                .accessibilityLabel(Text("Daylight"))
-                .accessibilityValue(duration)
+            Text(nextEvent).font(ReadoutType.tileText.monospacedDigit())
         }
         .accessibilityIdentifier("sun-card-details")
     }
