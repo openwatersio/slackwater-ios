@@ -28,6 +28,20 @@ func liveActivityEntriesAhead(_ entries: [AlertEntry], of now: Date, running: Se
     entries.filter { $0.occurrence.event > now && !running.contains($0.occurrence.key) }
 }
 
+/// Three hours either side of the event at ten minutes: 37 samples in the engine's units. A
+/// derived gate knows slacks and no series, so it has none.
+func liveActivityCurve(_ station: WidgetStation, around event: Date) -> AlertLiveActivityCurve? {
+    let start = event.addingTimeInterval(-3 * 3_600), end = event.addingTimeInterval(3 * 3_600)
+    let values: [Double]
+    switch station {
+    // The engine hands back one sample past `end`; the slice is the six hours and no more.
+    case .tide(let s, _, _): values = s.heights(from: start, to: end, step: 600).filter { $0.time <= end }.map(\.height)
+    case .current(let s, _, _): values = s.speeds(from: start, to: end, step: 600).filter { $0.time <= end }.map(\.speed)
+    case .derived: return nil
+    }
+    return values.isEmpty ? nil : AlertLiveActivityCurve(start: start, step: 600, values: values)
+}
+
 /// Off the main actor on purpose: `Activity` is not `Sendable`, so ending one from an actor
 /// would be a send across its boundary. Nothing here touches app state.
 enum AlertLiveActivities {
@@ -35,6 +49,7 @@ enum AlertLiveActivities {
     /// returns the keys it placed. `entries` carry the §5.2 copy without the lead: the line
     /// outlives the event on the open face.
     nonisolated static func apply(_ entries: [AlertEntry], water: @Sendable (String) -> AlertLiveActivityAttributes.Water,
+                      curve: @Sendable (AlertEntry) -> AlertLiveActivityCurve?,
                       liveRuleIDs: Set<UUID>, imperial: Bool, now: Date) async -> Set<String> {
         let ours = Activity<AlertLiveActivityAttributes>.activities
         let records = ours.map { a in
@@ -58,7 +73,7 @@ enum AlertLiveActivities {
                 key: o.key, ruleID: o.ruleID, water: water(entry.stationID),
                 title: entry.copy.title, line: entry.copy.body,
                 event: o.event, end: o.end, noWindow: o.noWindow, heightM: o.heightM,
-                imperial: imperial, tz: entry.place.tz, url: entry.url)
+                imperial: imperial, tz: entry.place.tz, curve: curve(entry), url: entry.url)
             let content = ActivityContent(state: AlertLiveActivityAttributes.ContentState(), staleDate: o.event)
             let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: entry.copy.title),
                                            body: LocalizedStringResource(stringLiteral: entry.copy.body), sound: .default)

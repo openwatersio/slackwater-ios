@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. Live Activity attributes and the face a context resolves to (docs/alerts.md §5.3).
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
 
 final class AlertLiveActivityTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -8,10 +9,36 @@ final class AlertLiveActivityTests: XCTestCase {
     private let pacific = TimeZone(identifier: "America/Los_Angeles")!
 
     private func attrs(end: Date? = nil, noWindow: Bool = false, water: AlertLiveActivityAttributes.Water = .current,
-                       heightM: Double? = nil) -> AlertLiveActivityAttributes {
+                       heightM: Double? = nil, curve: AlertLiveActivityCurve? = nil) -> AlertLiveActivityAttributes {
         AlertLiveActivityAttributes(key: "k", ruleID: UUID(), water: water, title: "Race Passage - Slack window",
                                     line: "2:32–3:10 PM, under 0.5 kn", event: now, end: end, noWindow: noWindow,
-                                    heightM: heightM, imperial: true, tz: pacific, url: URL(string: "slackwater://station/x"))
+                                    heightM: heightM, imperial: true, tz: pacific, curve: curve, url: URL(string: "slackwater://station/x"))
+    }
+
+    func testTheCurveIsSixHoursAroundTheEventAtTenMinutes() throws {
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: TideStationRecord.fridayHarborID))
+        let curve = try XCTUnwrap(liveActivityCurve(WidgetStationLoader.station(from: record), around: now))
+        XCTAssertEqual(curve.start, now.addingTimeInterval(-3 * 3_600))
+        XCTAssertEqual(curve.step, 600)
+        XCTAssertEqual(curve.values.count, 37)
+        XCTAssertTrue(curve.values.allSatisfy { $0.isFinite })
+    }
+
+    func testADerivedGateHasNoCurve() {
+        // Review Focus 3: slacks only, no series. Built directly: a bundled gate loads only once
+        // its reference port has a fitted model on the device.
+        let reference = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 1.5, phase: 0)], offset: 3)
+        let gate = DerivedSlackStation(reference: reference, hwLagMinutes: 25, lwLagMinutes: 35)
+        XCTAssertNil(liveActivityCurve(.derived(gate, tz: pacific, name: "Gate"), around: now))
+    }
+
+    func testTheCurveSurvivesCoding() throws {
+        let curve = AlertLiveActivityCurve(start: now, step: 600, values: [1, 2, 3])
+        let a = attrs(curve: curve)
+        let back = try JSONDecoder().decode(AlertLiveActivityAttributes.self, from: JSONEncoder().encode(a))
+        XCTAssertEqual(back.curve, curve)
+        let full = attrs(curve: AlertLiveActivityCurve(start: now, step: 600, values: Array(repeating: 1.2345678, count: 37)))
+        XCTAssertLessThan(try JSONEncoder().encode(full).count, 2_000, "well under ActivityKit's 4 KB")
     }
 
     func testTheMomentReadsInTheStationsZone() {
