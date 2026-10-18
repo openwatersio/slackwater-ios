@@ -24,6 +24,8 @@ struct ResolvedAlerts: Sendable {
     var places: [String: AlertPlace] = [:]
     /// Keyed by station id: which glyph a Live Activity draws.
     var kinds: [String: StationCalendarKind] = [:]
+    /// Keyed by station id: the series a Live Activity's face is cut from.
+    var stations: [String: WidgetStation] = [:]
     /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
     /// device, or an id that left the catalog.
     var unresolved: Set<UUID> = []
@@ -47,7 +49,9 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
         }
         resolved.places[rule.stationID] = record.alertPlace
         resolved.kinds[rule.stationID] = record.calendarKind
-        resolved.occurrences += alertOccurrences(rule, station: WidgetStationLoader.station(from: record),
+        let station = WidgetStationLoader.station(from: record)
+        resolved.stations[rule.stationID] = station
+        resolved.occurrences += alertOccurrences(rule, station: station,
                                                  position: record.alertPosition,
                                                  from: now, to: until, threshold: threshold)
     }
@@ -165,10 +169,11 @@ struct AlertStatusSnapshot: Equatable {
                             subscribed: subscriptions, skipping: resolved.unresolvedStations, now: now)
         // Candidates first: an occurrence the system takes as a scheduled activity is delivered by
         // that activity's start alert, so it leaves the notification list for this run (spec §5.3).
-        let kinds = resolved.kinds
+        let kinds = resolved.kinds, stations = resolved.stations
         let placed = await AlertLiveActivities.apply(
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
+            curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
             liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial, now: now)
         await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))

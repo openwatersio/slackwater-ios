@@ -2,6 +2,14 @@
 import ActivityKit
 import Foundation
 
+/// A fixed slice of the station's series for the face to draw: nothing updates after the
+/// request, so six hours around the event is the whole story the activity can tell.
+struct AlertLiveActivityCurve: Codable, Hashable, Sendable {
+    let start: Date
+    let step: TimeInterval
+    let values: [Double]
+}
+
 /// Shared by the app, which requests, and the widget extension, which draws. The title and
 /// line are the notification's own copy, so the Island and the banner never disagree, and the
 /// widget never links the rule types (its target does not link Almanac). Nothing updates the
@@ -22,6 +30,8 @@ struct AlertLiveActivityAttributes: ActivityAttributes, Sendable {
     let imperial: Bool
     /// The station's zone: the face formats `event` itself, and the phone may be elsewhere.
     let tz: TimeZone
+    /// Six hours around the event in the engine's units; nil on a derived gate, which has no series.
+    let curve: AlertLiveActivityCurve?
     let url: URL?
 }
 
