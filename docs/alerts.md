@@ -376,7 +376,9 @@ line takes it the moment the station can alert. A CHS current gate on a provisio
 alert (§8), so there the notice and the line both show. An online gate has neither.
 
 The line lives in `ScrubDetailScaffold`, not in the detail views, so the four phone details draw
-it from one place.
+it from one place. The scaffold also resolves where the station's rules will fire inside the
+loaded window and the strip tints those spans (docs/scrubber.md §12.5), so a set alert is visible
+while scrubbing and a return from its Live Activity lands inside it.
 
 | State | Reads | Tap |
 |---|---|---|

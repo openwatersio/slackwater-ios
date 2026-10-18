@@ -53,13 +53,6 @@ func alertNextOccurrence(stationID: String, offer: AlertTrigger, after: Date, th
 /// loaded window, from the reminder time to the event, and across the window where there is
 /// one. Resolved the way the Rest tap resolves (`alertNextOccurrence`): on the main actor,
 /// against the bundled record, for the ten days a strip holds.
-struct AlertSpan: Hashable, Sendable {
-    let ruleID: UUID
-    let fire: Date
-    let event: Date
-    let end: Date?
-}
-
 func alertSpans(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertSpan] {
     let mine = rules.filter { $0.stationID == stationID && $0.enabled }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }

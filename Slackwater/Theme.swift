@@ -65,6 +65,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @State private var pressedMoment: Date? = nil
     @State private var alertSubject: AlertSheetSubject? = nil
     @ObservedObject private var alertRules = AlertRuleStore.shared
+    @State private var alertSpans: [AlertSpan] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -193,6 +194,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
             .environment(\.stripAlertAction, stripAlertAction)
+            .environment(\.stripAlertSpans, alertSpans)
+            .onChange(of: alertRules.rules, initial: true) { _, _ in refreshAlertSpans() }
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -224,6 +227,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // no moon tile and no scrubber — nothing to teach — so the tour
             // stays armed and fires on the next detail that does.
             .onChange(of: timeline?.revision, initial: true) { _, _ in
+                refreshAlertSpans()
                 guard let days = timeline?.days else { return }
                 TourCoach.shared.begin(
                     on: favoriteId,
@@ -382,6 +386,14 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
 
     /// VoiceOver's "Set an alert" has no line to go and find: it parks the moment and opens the
     /// sheet in one step.
+    /// The station's alert spans over the loaded window, for the strip's bands. Nothing where
+    /// there is nothing to alert on (no `alertOffer`) or no timeline yet.
+    private func refreshAlertSpans() {
+        guard alertOffer != nil, let timeline else { alertSpans = []; return }
+        alertSpans = Slackwater.alertSpans(stationID: favoriteId, rules: alertRules.rules,
+                                           from: timeline.start, to: timeline.end, threshold: slackThresholdKn)
+    }
+
     private var stripAlertAction: (@MainActor () -> Void)? {
         guard let alertOffer else { return nil }
         return {
@@ -508,6 +520,18 @@ private struct StripTrailingBleedKey: EnvironmentKey {
 
 /// The station a detail's strip belongs to, so a fold hands its moment only
 /// to the same station's rebuilt strip. Nil outside a detail.
+private struct StripAlertSpansKey: EnvironmentKey {
+    static let defaultValue: [AlertSpan] = []
+}
+
+extension EnvironmentValues {
+    /// Where the host's alerts will fire, for the strip to tint (docs/scrubber.md §12).
+    var stripAlertSpans: [AlertSpan] {
+        get { self[StripAlertSpansKey.self] }
+        set { self[StripAlertSpansKey.self] = newValue }
+    }
+}
+
 private struct StripStationIDKey: EnvironmentKey {
     static let defaultValue: String? = nil
 }
