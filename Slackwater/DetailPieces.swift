@@ -922,6 +922,7 @@ struct SummaryTiles: View {
     /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
     @Environment(\.timeZone) private var tz
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var widePane = false
     @State private var apsides: (day: Date, perigee: Date?, apogee: Date?)?
 
     /// Non-nil only when the caller gave both somewhere to go and somewhere to
@@ -938,10 +939,14 @@ struct SummaryTiles: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        let singleRow = widePane && !dynamicTypeSize.isAccessibilitySize
+        let layout = singleRow
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            : AnyLayout(VStackLayout(spacing: 12))
+        layout {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail, trailing: primaryOutlook) {
+                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail, fillsRow: singleRow, trailing: primaryOutlook) {
                     if let primarySymbol, primaryOutlook == nil {
                         Image(systemName: primarySymbol).foregroundStyle(SN.foam.opacity(0.55))
                     }
@@ -989,6 +994,10 @@ struct SummaryTiles: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: Bool.self) { geometry in
+            geometry.size.width >= 700
+        } action: { widePane = $0 }
         .task(id: dayLocal(at, tz)) {
             guard moon != nil else { return }
             let day = dayLocal(at, tz)

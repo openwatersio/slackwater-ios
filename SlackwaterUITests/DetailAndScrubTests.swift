@@ -7,6 +7,26 @@ import UIKit
 import XCTest
 
 final class DetailAndScrubTests: ScreenshotTestCase {
+    func testWideSummaryCards() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad layout") }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launch("-seedGate", "-locDenied")
+        openFridayHarbor(app)
+        let sun = app.buttons["sun-card-details"].firstMatch
+        scrollTo(sun, in: app)
+        XCTAssertTrue(sun.appears(within: 5))
+        let moon = app.buttons["tile-moon"].firstMatch
+        let range = app.buttons["tile-primary"].firstMatch
+        XCTAssertGreaterThan(sun.frame.maxX - range.frame.minX, 700)
+        XCTAssertEqual(sun.frame.width, moon.frame.width, accuracy: 1)
+        XCTAssertGreaterThan(range.frame.width, sun.frame.width * 1.9)
+        XCTAssertEqual(range.frame.minY, sun.frame.minY, accuracy: 1)
+        XCTAssertEqual(moon.frame.minY, sun.frame.minY, accuracy: 1)
+        XCTAssertEqual(range.frame.height, sun.frame.height, accuracy: 1)
+        save(app, "summary-cards-ipad.png")
+    }
+
     func testScheduleSunDetails() throws {
         let app = launch("-seedGate", "-locDenied")
         openFridayHarbor(app)
@@ -21,7 +41,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertEqual(row.frame.height, moon.frame.height, accuracy: 1)
         XCTAssertGreaterThan(range.frame.width, row.frame.width * 1.9)
         XCTAssertLessThanOrEqual(range.frame.height, moon.frame.height + 1)
-        XCTAssertLessThan(range.frame.minY, row.frame.minY)
+        if row.frame.maxX - range.frame.minX >= 700 {
+            XCTAssertEqual(range.frame.minY, row.frame.minY, accuracy: 1)
+        } else {
+            XCTAssertLessThan(range.frame.minY, row.frame.minY)
+        }
         XCTAssertTrue(row.label.hasPrefix("Sun,"), row.label)
         XCTAssertFalse(app.buttons["sun-card-previous"].exists)
         XCTAssertFalse(app.buttons["sun-card-next"].exists)
