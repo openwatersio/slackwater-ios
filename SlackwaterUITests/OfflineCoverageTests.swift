@@ -422,8 +422,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(provenance.label.contains("CHS-published"),
                   "the fetched footer must say CHS-published — never claim an on-device computation")
 
-        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
-            .firstMatch.appears(within: 5), "today's schedule row missing")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "sun-card-details")
+            .firstMatch.appears(within: 5), "Sun card missing from the online-current detail")
 
         // No fitted-station provisional story belongs anywhere near this page.
         XCTAssertFalse(app.staticTexts.matching(

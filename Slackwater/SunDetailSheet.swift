@@ -47,10 +47,12 @@ struct SunDetailSheet: View {
     let tz: TimeZone
     /// Moves the timeline to a row's time; the sheet closes after.
     let onJump: (Date) -> Void
+    var days: [TimelineDay] = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .subheadline) private var iconWidth = 24
     @State private var facts: SunDayFacts?
+    @State private var orbit: SunOrbitFacts?
     @State private var failed = false
 
     var body: some View {
@@ -60,6 +62,22 @@ struct SunDetailSheet: View {
                     Text(monthDayYear(at, tz))
                         .font(.headline)
                     if let facts {
+                        let navigation = SunSummaryState(days: days, at: at, tz: tz)
+                        if navigation.previous != nil || navigation.next != nil {
+                            let layout = dynamicTypeSize.isAccessibilitySize
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+                            layout {
+                                if let previous = navigation.previous { eventLink(previous, previous: true) }
+                                if let next = navigation.next { eventLink(next, previous: false) }
+                            }
+                        }
+                        if let orbit {
+                            SunDistanceView(facts: orbit, tz: tz) { time in
+                                onJump(time)
+                                dismiss()
+                            }
+                        }
                         table(facts)
                     } else if failed {
                         Text("Sun times unavailable.")
@@ -76,13 +94,16 @@ struct SunDetailSheet: View {
         }
         .task {
             facts = nil
+            orbit = nil
             failed = false
             let result = await Task.detached {
-                try? SunDayFacts(at: at, tz: tz, latitude: latitude, longitude: longitude)
+                (try? SunDayFacts(at: at, tz: tz, latitude: latitude, longitude: longitude),
+                 try? SunOrbitFacts(at: at))
             }.value
             guard !Task.isCancelled else { return }
-            facts = result
-            failed = result == nil
+            facts = result.0
+            orbit = result.1
+            failed = result.0 == nil
         }
     }
 
@@ -157,5 +178,39 @@ struct SunDetailSheet: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(time != nil ? .isButton : [])
         .accessibilityIdentifier("sun-event-\(moment.rawValue)")
+    }
+
+    private func eventLink(_ event: SunSummaryState.Event, previous: Bool) -> some View {
+        let direction: LocalizedStringKey = previous ? "Previous event" : "Next event"
+        let name: LocalizedStringKey = event.isRise ? "Sunrise" : "Sunset"
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                if previous { Image(systemName: "arrow.left") }
+                Text(direction)
+                if !previous { Image(systemName: "arrow.right") }
+            }
+            .font(.caption)
+            .foregroundStyle(SN.foam.opacity(0.65))
+            Label(name, systemImage: event.isRise ? "sunrise" : "sunset")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(SN.sunrise)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(relativeDayLabel(dayLocal(event.time, tz), tz, today: todayLocal(tz)))
+                Text(chartTime(event.time, tz))
+            }
+            .font(.caption.monospacedDigit())
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onJump(event.time)
+            dismiss()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(chartTime(event.time, tz))
+        .accessibilityIdentifier(previous ? "sun-previous-event" : "sun-next-event")
     }
 }

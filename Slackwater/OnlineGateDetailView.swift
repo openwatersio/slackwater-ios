@@ -125,7 +125,8 @@ struct OnlineGateDetailView: View {
                                     // on every read, and the scaffold has
                                     // already built the one on screen.
                                     SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
-                                                 moon: sky.illumination, at: scrubTime,
+                                                 moon: sky.illumination, at: scrubTime, sunDays: tl.days,
+                                                 moonAngle: sky.moonLightAngle,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
                                                  solarObscuration: sky.obscuration,

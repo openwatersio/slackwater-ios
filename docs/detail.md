@@ -174,7 +174,7 @@ There is deliberately **no section measured against the station's own ends**, as
 
 ### 6.6 Moon (every kind)
 
-- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant, upright: lit on the right while waxing.
+- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant and place. The bright limb uses Almanac's observer orientation, matching the sky and Moon sheet instead of an upright calendar-phase convention.
 - **Value:** an eclipse in progress ("Solar Eclipse", "Total Eclipse", "Partial Eclipse", "Penumbral Eclipse"), otherwise the phase: "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous", "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent". New and full span 1.7 days either side; the quarters span 1.4.
 - **Caption:** the tide the Moon is driving: "Perigean spring tide", "Apogean spring tide", "Perigean neap tide", "Apogean neap tide", "Perigean tide", "Apogean tide", "Spring tide", or "Neap tide". Perigee and apogee count within 2 days. When none applies, "<N>% lit".
 - **Absent** outside the years the astronomy library supports (1950–2101 today).
@@ -239,13 +239,23 @@ Each day with at least one event gets a header. A day with no events gets none.
 
 - **Left:** "Today", "Tomorrow", or "Yesterday" relative to the station-local day of the scrubber session's `now` (scrubber §4.1), not the device clock, otherwise the short weekday, with a localized short date beneath.
 - **Right, when collapsed:** sunrise and sunset stacked beside the disclosure chevron, both in sunrise ink (`#F0D890`); their symbols tell them apart. They share the day/date header height.
-- **When expanded:** a full-width tappable row above the water events places sunrise left, solar noon centered, and sunset right. Each shows only its native symbol and local time, with a descriptive VoiceOver label. At accessibility text sizes these stack. The entire row opens Sun activity. Missing events display “—”.
+- **When expanded:** the water events appear directly below the day header. Sun activity is available in the persistent Sun card beside Moon, below the water summary.
 
 Only one day is open at a time. The anchor day starts open. Tapping an open day closes it; tapping another day opens it and closes the first.
+
+#### Sun card
+
+The full-width water summary sits above a paired row of equal Moon and Sun cards. On a tide detail, Range includes seven station-local calendar days starting with the selected day: one small bar per day's biggest swing, with a shared height scale. The unlabeled bars fill the open right side beside the Range readout, keeping the card at its original compact height. At accessibility text sizes, the bars stack below the readout to preserve room for the text. The selected swing's day is highlighted. Only complete days from the loaded timeline appear; the comparison follows timeline jumps and does not start another prediction request. The full comparison remains available in the Range sheet.
+
+The Sun card matches Moon's size. At accessibility text sizes, Moon and Sun stack vertically. Its value is total daylight in hours and minutes, and its caption names and times the next sunrise or sunset relative to the selected instant. Missing values display “—”. A disclosure chevron and a tap anywhere on the card open Sun activity.
 
 #### Sun activity sheet
 
 The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
+
+Previous event and Next event links in the popup jump the timeline to the nearest sunrise or sunset strictly before or after the selected instant and close the popup. Their event names, day labels, and times identify the destination across midnight. Solar noon and twilight events are available through the sheet. A direction with no sunrise or sunset in the loaded timeline has no link, including during polar day or night; navigation uses only the loaded timeline.
+
+Between the previous/next event cards and the event table, “Distance from Earth” shows the Sun's distance in kilometres rounded to 10,000, with a schematic view of Earth orbiting the Sun. Almanac supplies the current distance and nearest perihelion and aphelion, including their dates and distances. Each endpoint jumps the timeline and dismisses the sheet. The diagram exaggerates eccentricity to make the Sun’s offset visible, with a caption explaining the schematic scale. All printed values use Almanac’s actual results. Orbit facts and the day's event calculations run off the main actor.
 
 The golden and blue hours sit among those events in time order, one row per edge. Golden hour is the Sun's center between the horizon and +6°: the morning row “Golden hour ends” (+6° rising) follows Sunrise, and the evening row “Golden hour begins” (+6° falling) precedes Sunset. Blue hour is the Sun's center between −4° and −8°: “Blue hour begins” and “Blue hour ends” at −8° then −4° rising in the morning, and at −4° then −8° falling in the evening. A golden- or blue-hour edge the day does not reach, as at high latitude, has no row. `sunWindowEdges` (`SunWindows.swift`) supplies these edges, and `sunWindowSpans` pairs the same edges into spans.
 
@@ -406,7 +416,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 ## 16. Accessibility
 
 - The header's three buttons have labels "Back", "Share", and "Add favorite" / "Remove favorite", and stay 44 units at every text size.
-- A day header is one button whose value is "Expanded" or "Collapsed". The collapsed header’s sunrise and sunset read "Sunrise <time>" and "Sunset <time>"; when expanded, these labels belong to the Sun activity button.
+- A day header is one button whose value is "Expanded" or "Collapsed". The collapsed header’s sunrise and sunset read "Sunrise <time>" and "Sunset <time>"; when expanded, sun details remain available through the Sun card.
 - A schedule row is one button whose value is its time; the pill's glyphs are hidden.
 - The week-range bar reads "Showing <range>. Tap to choose a date."
 - Each tile is one element; it is a button only when it has a sheet.

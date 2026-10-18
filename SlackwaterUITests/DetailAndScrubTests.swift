@@ -10,18 +10,50 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testScheduleSunDetails() throws {
         let app = launch("-seedGate", "-locDenied")
         openFridayHarbor(app)
-        let tomorrow = app.buttons["schedule-day-d1"].firstMatch
-        scrollTo(tomorrow, in: app)
-        save(app, "sun-schedule-collapsed.png")
-        let sun = tomorrow.descendants(matching: .any)["day-sun-d1"].firstMatch
-        XCTAssertTrue(sun.exists)
-        XCTAssertGreaterThan(sun.frame.minX, tomorrow.frame.midX)
-        tomorrow.tap()
-        let row = app.buttons["day-sun-d1"].firstMatch
-        XCTAssertTrue(row.appears(within: 5))
+        let row = app.buttons["sun-card-details"].firstMatch
         scrollTo(row, in: app)
-        XCTAssertTrue(row.label.contains("Solar noon"))
-        save(app, "sun-schedule-expanded.png")
+        XCTAssertTrue(row.appears(within: 5))
+        XCTAssertFalse(row.label.contains("Solar noon"))
+        let moon = app.buttons["tile-moon"].firstMatch
+        let range = app.buttons["tile-primary"].firstMatch
+        XCTAssertEqual(row.frame.width, moon.frame.width, accuracy: 1)
+        XCTAssertEqual(row.frame.minY, moon.frame.minY, accuracy: 1)
+        XCTAssertEqual(row.frame.height, moon.frame.height, accuracy: 1)
+        XCTAssertGreaterThan(range.frame.width, row.frame.width * 1.9)
+        XCTAssertLessThanOrEqual(range.frame.height, moon.frame.height + 1)
+        XCTAssertLessThan(range.frame.minY, row.frame.minY)
+        XCTAssertTrue(row.label.hasPrefix("Sun,"), row.label)
+        XCTAssertFalse(app.buttons["sun-card-previous"].exists)
+        XCTAssertFalse(app.buttons["sun-card-next"].exists)
+        save(app, "sun-card.png")
+        row.tap()
+        let next = app.buttons["sun-next-event"]
+        XCTAssertTrue(next.appears(within: 5))
+        let initialPrevious = app.buttons["sun-previous-event"]
+        XCTAssertTrue(initialPrevious.label.contains("Sunset"), initialPrevious.label)
+        XCTAssertTrue(initialPrevious.label.contains("Yesterday"), initialPrevious.label)
+        XCTAssertTrue(next.label.contains("Sunrise"), next.label)
+        let distance = app.descendants(matching: .any)["sun-distance"].firstMatch
+        XCTAssertTrue(distance.exists)
+        XCTAssertGreaterThan(distance.frame.minY, next.frame.maxY)
+        let dawn = app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch
+        XCTAssertLessThan(distance.frame.maxY, dawn.frame.minY)
+        XCTAssertTrue(app.buttons["sun-perihelion"].exists)
+        XCTAssertTrue(app.buttons["sun-aphelion"].exists)
+        save(app, "sun-details.png")
+        let destination = try XCTUnwrap(next.value as? String)
+        next.tap()
+        XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10))
+        XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(destination)'"))
+        row.tap()
+        let previous = app.buttons["sun-previous-event"]
+        XCTAssertTrue(previous.appears(within: 5))
+        XCTAssertTrue(previous.label.contains("Yesterday"), previous.label)
+        let earlier = try XCTUnwrap(previous.value as? String)
+        XCTAssertNotEqual(earlier, destination)
+        previous.tap()
+        XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10))
+        XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(earlier)'"))
         row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))
         XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
@@ -37,7 +69,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         }
         let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
         XCTAssertGreaterThan(daylight.frame.minY, previousY)
-        save(app, "sun-details.png")
         // Every row is a destination: the sheet closes and the timeline lands on the row's time.
         let golden = app.descendants(matching: .any)["sun-event-eveningGoldenStart"].firstMatch
         let clock = try XCTUnwrap(golden.label.components(separatedBy: ", ").last)
@@ -48,6 +79,13 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(clock)'"),
                       "the timeline did not land on \(clock): \(scrubClock(app))")
         XCTAssertTrue(row.appears(within: 5))
+        row.tap()
+        let perihelion = app.buttons["sun-perihelion"]
+        XCTAssertTrue(perihelion.appears(within: 5))
+        let apsisClock = try XCTUnwrap(perihelion.value as? String)
+        perihelion.tap()
+        XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10))
+        XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(apsisClock)'"))
     }
 
     func testM1Walkthrough() throws {
@@ -205,14 +243,18 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // sun rises 4–7 hours before noon whatever the season, so a quarter of
         // the way across the strip is nearer the sunrise than the date by a
         // clear margin at any anchor the picker can reach.
-        let sun = app.descendants(matching: .any)["day-sun-d0"].firstMatch
-        XCTAssert(sun.exists, "no sun times in the schedule's day column")
+        let sun = app.buttons["sun-card-details"].firstMatch
+        XCTAssert(sun.exists, "no Sun card below the summary tiles")
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.95)).tap()
         settleScrub(app)
         XCTAssertFalse(picker.exists, "a tap on the sunrise opened the picker")
         let sunrise = scrubClock(app)
-        XCTAssertTrue(sun.label.contains("Sunrise \(sunrise)"),
-                      "the sunrise tap left the centerline on \(sunrise), outside '\(sun.label)' (noon was \(noon))")
+        sun.tap()
+        let rise = app.descendants(matching: .any)["sun-event-rise"].firstMatch
+        XCTAssertTrue(rise.appears(within: 5))
+        XCTAssertTrue(rise.label.contains(sunrise),
+                      "the sunrise tap left the centerline on \(sunrise), outside '\(rise.label)' (noon was \(noon))")
+        app.buttons["Done"].tap()
         save(app, "strip-tap-sunrise.png")
     }
 
@@ -381,9 +423,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),
                   "header missing from tide detail")
-        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "sun-card-details")
             .firstMatch.appears(within: 5),
-                  "sun times missing from the schedule day header")
+                  "Sun card missing below the summary tiles")
         XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
                        "sun rows have moved to the day header — none in the schedule")
         // The eclipse names belong here too (#222): on an eclipse night the
@@ -403,9 +445,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),
                   "header missing from current detail")
         save(app, "m41-current-detail-header.png")
-        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "sun-card-details")
             .firstMatch.appears(within: 5),
-                  "sun times missing from the current-station day header")
+                  "Sun card missing from the current detail")
         XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
                        "sun rows have moved to the day header — none in the current-station schedule")
     }
@@ -770,6 +812,25 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
     /// #222: the Moon tile is the way into the moon's own facts, and the
     /// eclipse rows are destinations — tapping one moves the window to it.
+    func testMoonOrientationAcrossTheDetailAndSheet() throws {
+        let app = XCUIApplication()
+        var arguments = testArguments(["-seedGate", "-locDenied"])
+        let now = try XCTUnwrap(arguments.firstIndex(of: "-nowEpoch"))
+        let at = ISO8601DateFormatter().date(from: "2026-10-19T01:17:00Z")!
+        arguments[now + 1] = String(at.timeIntervalSince1970)
+        app.launchArguments = arguments
+        app.launch()
+        openFridayHarbor(app)
+        save(app, "moon-orientation-sky.png")
+        let moon = app.buttons["tile-moon"].firstMatch
+        scrollTo(moon, in: app)
+        save(app, "moon-orientation-card.png")
+        moon.tap()
+        XCTAssertTrue(app.navigationBars["Moon"].appears(within: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["moon-rise"].firstMatch.appears(within: 5))
+        save(app, "moon-orientation-sheet.png")
+    }
+
     func testTheMoonTileOpensItsSheetAndTheEclipseRowJumps() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)

@@ -387,8 +387,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
                              tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
-                             scrubTime: scrubTime, onTap: { moveRequests += 1; scrubTime = $0 },
-                             sunLocation: StationItem.byId[favoriteId])
+                             scrubTime: scrubTime, onTap: { moveRequests += 1; scrubTime = $0 })
         }
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
