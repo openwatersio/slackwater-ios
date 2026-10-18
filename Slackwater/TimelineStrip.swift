@@ -813,12 +813,44 @@ struct TimelineGeo {
 
 // MARK: - The strip content (drawn once; pans under the fixed centerline)
 
+/// Where one of the host's alerts will fire: from the reminder time to the event, and across
+/// the window where there is one. Declared here, not with the alerts, because the watch
+/// compiles this file and knows nothing of rules; it draws no band (docs/scrubber.md §12).
+struct AlertSpan: Hashable, Sendable {
+    let ruleID: UUID
+    let fire: Date
+    let event: Date
+    let end: Date?
+}
+
+/// One drawn alert band: the tile-clipped x of the reminder time and of the window's close
+/// (or the event, for a moment), and the event's own x for its marker.
+struct AlertBandFrame: Equatable {
+    let x0: CGFloat
+    let x1: CGFloat
+    let eventX: CGFloat
+}
+
+/// The bands that touch `t0…t1`, clipped to the window the data holds: a span whose reminder
+/// time is before the window still tints from the edge.
+func alertBandFrames(_ spans: [AlertSpan], in data: TimelineData, between t0: Date, and t1: Date) -> [AlertBandFrame] {
+    spans.compactMap { s in
+        let stop = s.end ?? s.event
+        guard stop >= max(t0, data.start), s.fire <= min(t1, data.end) else { return nil }
+        return AlertBandFrame(x0: data.x(max(s.fire, data.start)),
+                              x1: data.x(min(stop, data.end)),
+                              eventX: data.x(s.event))
+    }
+}
+
 struct TimelineCanvas: View {
     let data: TimelineData
     let geo: TimelineGeo
     let imperial: Bool
     let speedUnit: String
     let now: Date
+    /// Where the station's alerts will fire (docs/scrubber.md §12, alert bands).
+    var alertSpans: [AlertSpan] = []
 
     /// True set bearings for this station's flood and ebb, so a max's glyph on
     /// the chart is the compass arrow the schedule pill and the readout already
@@ -890,7 +922,20 @@ struct TimelineCanvas: View {
         // and the day chrome's labels go over it.
         if geo.hasTide { drawTide(ctx, t0, t1) }
         if geo.hasCurrent { drawCurrent(ctx, t0, t1) }
+        drawAlertBands(ctx, t0, t1)
         drawDayChrome(ctx, t0, t1)
+    }
+
+    /// Where an alert will fire: a tint from the reminder time across the window, a bright
+    /// hairline on the moment. Under the chrome, so the day's labels stay readable.
+    private func drawAlertBands(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+        let top = geo.padTop, bottom = geo.bodyBottom
+        for f in alertBandFrames(alertSpans, in: data, between: t0, and: t1) {
+            let rect = CGRect(x: f.x0, y: top, width: max(f.x1 - f.x0, 2), height: bottom - top)
+            ctx.fill(Path(rect), with: .color(SN.sun.opacity(0.16)))
+            ctx.fill(Path(CGRect(x: f.eventX - 0.75, y: top, width: 1.5, height: bottom - top)),
+                     with: .color(SN.sun.opacity(0.9)))
+        }
     }
 
     /// The samples inside `t0…t1`, plus one either side so a curve crossing

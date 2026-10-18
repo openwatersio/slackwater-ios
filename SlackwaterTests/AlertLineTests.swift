@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The line under the strip: which rule it reads, and what it says (docs/alerts.md §7.1).
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
 
 final class AlertLineTests: XCTestCase {
     private let moment = Date(timeIntervalSince1970: 1_700_000_040)
@@ -151,5 +152,33 @@ final class AlertLineTests: XCTestCase {
         XCTAssertFalse(spans.isEmpty)
         XCTAssertTrue(spans.contains { $0.end != nil }, "a merged window carries its close")
         XCTAssertTrue(spans.allSatisfy { ($0.end ?? $0.event) >= $0.event })
+    }
+
+    private func flatTimeline(hours: Int) -> TimelineData {
+        let tz = TimeZone(identifier: "America/Los_Angeles")!
+        let start = Date(timeIntervalSince1970: 1_755_800_000), end = start.addingTimeInterval(Double(hours) * 3_600)
+        let times = stride(from: 0.0, through: end.timeIntervalSince(start), by: 600).map { start.addingTimeInterval($0) }
+        return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: [],
+                            tidePoints: times.map { TidePoint(time: $0, height: 1) },
+                            tideRates: times.map { TideRatePoint(time: $0, rate: 0) },
+                            tideExtremes: [], currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+    }
+
+    func testAlertBandFramesClipToTheTileAndKeepTheMoment() throws {
+        let data = flatTimeline(hours: 48)
+        let event = data.start.addingTimeInterval(5 * 3_600)
+        let early = AlertSpan(ruleID: UUID(), fire: data.start.addingTimeInterval(-3_600), event: data.start.addingTimeInterval(1_800), end: nil)
+        let window = AlertSpan(ruleID: UUID(), fire: event.addingTimeInterval(-1_800), event: event, end: event.addingTimeInterval(2_400))
+        let far = AlertSpan(ruleID: UUID(), fire: data.end.addingTimeInterval(3_600), event: data.end.addingTimeInterval(7_200), end: nil)
+
+        let frames = alertBandFrames([early, window, far], in: data, between: data.start, and: data.start.addingTimeInterval(8 * 3_600))
+
+        XCTAssertEqual(frames.count, 2, "the span past the window draws nothing")
+        // Review Focus 1: a reminder time before the window still draws, clipped at the edge.
+        XCTAssertEqual(frames[0].x0, data.x(data.start), accuracy: 0.01)
+        XCTAssertEqual(frames[0].eventX, data.x(early.event), accuracy: 0.01)
+        XCTAssertEqual(frames[1].x0, data.x(window.fire), accuracy: 0.01)
+        XCTAssertEqual(frames[1].x1, data.x(window.end!), accuracy: 0.01)
+        XCTAssertEqual(frames[1].eventX, data.x(event), accuracy: 0.01)
     }
 }

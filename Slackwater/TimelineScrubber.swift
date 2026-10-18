@@ -113,6 +113,8 @@ struct TimelineScrubber: UIViewRepresentable {
     var foldPage: FoldHandoff.Page? = nil
     /// The resting pills' frames in the strip's viewport; empty while they are hidden and inert.
     var restingPills: [CGRect] = []
+    /// Where the station's alerts will fire, tinted on the canvas.
+    var alertSpans: [AlertSpan] = []
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -345,6 +347,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let imperial: Bool, speedUnit: String
             let floodDeg: Double?, ebbDeg: Double?
             let tiles: Range<Int>
+            let alertSpans: [AlertSpan]
         }
         var canvasKey: CanvasKey?
 
@@ -363,12 +366,12 @@ struct TimelineScrubber: UIViewRepresentable {
                                 now: parent.now, imperial: parent.imperial,
                                 speedUnit: parent.speedUnit,
                                 floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
-                                tiles: tiles)
+                                tiles: tiles, alertSpans: parent.alertSpans)
             guard key != canvasKey else { return }
             canvasKey = key
             host?.rootView = TimelineCanvas(data: data, geo: geo,
                                             imperial: parent.imperial, speedUnit: parent.speedUnit,
-                                            now: parent.now,
+                                            now: parent.now, alertSpans: parent.alertSpans,
                                             floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
                                             tileRange: tiles)
         }
@@ -889,6 +892,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.stripTrailingBleed) private var trailingBleed
     @Environment(\.stripStationID) private var stationID
     @Environment(\.stripFoldPage) private var foldPage
+    @Environment(\.stripAlertSpans) private var alertSpans
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.stripPressed) private var stripPressed
@@ -910,7 +914,7 @@ struct TimelineScrubStrip: View {
                          onAlertAction: stripAlertAction,
                          stationID: stationID,
                          foldPage: foldPage,
-                         restingPills: restingPills)
+                         restingPills: restingPills, alertSpans: alertSpans)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the
             // centerline stays at the visible center while the drawing runs

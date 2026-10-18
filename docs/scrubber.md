@@ -560,6 +560,10 @@ The magnitude ramp contains no green:
 
 Interpolate piecewise in sRGB and clamp beyond the ends. Geometry auto-fits per station; magnitude colour remains absolute so equal speeds mean equal colours.
 
+### 12.5 Alert bands
+
+Where one of the host's alert rules will fire, the plot body is tinted with the sun colour at low opacity from the reminder time to the event, and on across a slack window to its close; a 1.5-unit hairline in the sun colour marks the moment. Bands draw after the tracks and before the day chrome, so the chrome's labels stay readable over them. The spans are the host's: it resolves them from the rule store against the loaded window (`alertSpans`, `Slackwater/AlertLine.swift`) whenever the rules or the window change, and hands them to the strip through the environment (`stripAlertSpans`). A list card, an online gate and the watch hand none and draw none. A return from an alert's Live Activity lands the centerline on its event, inside the band (docs/alerts.md §5.3).
+
 ## 13. Track variants
 
 ### 13.1 Tide
@@ -826,7 +830,7 @@ The living implementation is split by responsibility:
 
 | Concern | iOS source |
 |---|---|
-| Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, schedule list | `Slackwater/TimelineStrip.swift` |
+| Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, alert bands (`AlertSpan`, `alertBandFrames`), schedule list | `Slackwater/TimelineStrip.swift` |
 | Scroll host, opening, taps, press and hold, accessibility actions, resize and fold follow, magnet settle, fixed overlay, commentary and Now pill row, rescale glide | `Slackwater/TimelineScrubber.swift` |
 | Continuous chunks, merging, scroll gate, scale governor | `Slackwater/TimelineChunks.swift` |
 | Detail scaffold: date picker, alert line wiring, shared-link jump, week bar, fold restoration | `Slackwater/Theme.swift` |
