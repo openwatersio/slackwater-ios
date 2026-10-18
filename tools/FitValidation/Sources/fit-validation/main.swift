@@ -2,8 +2,10 @@
 // held-out window, the M0 spike's methodology (15-min fit; 7-day validation
 // window 4 weeks after fit end; RMSE on the 15-min grid vs wlp; extreme timing
 // vs wlp-hilo, classified against a neighbour, matched by kind within 180 min).
-// Fit runs in JSCore via tools/chs-reference's frozen JavaScript oracle;
-// prediction runs in SlackwaterKit. Native-fit parity and holdouts run in IwlsFixtureTests.
+// Tide fits run in SlackwaterKit's native fitter with ChsFitter's basis, the
+// app's shipping path; `--js` fits with tools/chs-reference's frozen JavaScript
+// oracle in JSCore instead, to compare against measurements taken before #496.
+// Current fits still run in JSCore. Prediction always runs in SlackwaterKit.
 //
 //   swift run fit-validation <name> <lat> <lon> [cacheDir]            # tide (wlp)
 //   swift run fit-validation --current <name> <lat> <lon> [cacheDir]  # current gate (wcsp1)
@@ -30,6 +32,7 @@ import SlackwaterKit
 import os
 
 let isCurrentMode = CommandLine.arguments.contains("--current")
+let isJsTideFit = CommandLine.arguments.contains("--js")
 let isFileMode = CommandLine.arguments.contains("--samples")
 // File-input mode (Task 5): --samples/--events/--flood/--ebb/--label replace
 // IWLS discovery+fetch entirely; see runFileMode() below.
@@ -41,7 +44,7 @@ func flagValue(_ flag: String) -> String? {
 /// Positional args only: every flag, and the value following a valued flag, is
 /// dropped so `<name> <lat> <lon> [cacheDir]` keeps its indices whatever flags
 /// are passed. Without this, a trailing `--days 35` reads as the cacheDir.
-let valuedFlags: Set<String> = ["--days", "--samples", "--events", "--flood", "--ebb", "--label"]
+let valuedFlags: Set<String> = ["--days", "--holdout", "--samples", "--events", "--flood", "--ebb", "--label"]
 let args: [String] = {
     var out: [String] = []
     var skip = false
@@ -141,14 +144,18 @@ if !isFileMode {
 }
 
 // --- windows: fit the longest requested window ending today 00Z; validate +28 d .. +35 d ---
+// `--holdout 180` moves the 7-day validation window to +180 d. A fitted model
+// never expires (docs/chs-data-model.md), and its seasonal level error swings
+// over the year, so one holdout week cannot show it.
 struct IwlsSample: Decodable { let eventDate: String; let value: Double }
 let dayS = 86_400.0
 let today = floor(Date().timeIntervalSince1970 / dayS) * dayS
 let longestWindow = fitWindows.max() ?? 60
 let fitStart = Date(timeIntervalSince1970: today - longestWindow * dayS)
 let fitEnd = Date(timeIntervalSince1970: today)
-let valStart = Date(timeIntervalSince1970: today + 28 * dayS)
-let valEnd = Date(timeIntervalSince1970: today + 35 * dayS)
+let holdoutDays = flagValue("--holdout").flatMap(Double.init) ?? 28
+let valStart = Date(timeIntervalSince1970: today + holdoutDays * dayS)
+let valEnd = Date(timeIntervalSince1970: today + (holdoutDays + 7) * dayS)
 
 @MainActor
 func fetchSeries(_ code: String, _ from: Date, _ to: Date) throws -> [(t: Double, v: Double)] {
@@ -465,6 +472,37 @@ struct Fit: Decodable {
     let constituents: [Con], unseparable: [String]
 }
 
+/// Slackwater/ChsFitter.swift `basis`, copied because this package cannot
+/// import the app. Keep the two lists identical.
+let chsTideBasis = [
+    "M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1",
+    "M4", "MS4", "MN4", "2N2", "MU2", "NU2", "L2", "T2",
+    "J1", "MM", "MSF", "MF", "M6", "S4", "M3",
+]
+
+@MainActor
+func fitTide(_ samples: [(t: Double, v: Double)], days: Double) throws -> Fit {
+    if isJsTideFit {
+        let samplesJson = "[" + samples.map { "{\"t\":\($0.t),\"v\":\($0.v)}" }.joined(separator: ",") + "]"
+        jsError = nil
+        guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [samplesJson]), jsError == nil else {
+            fatalError("fitTides threw at \(Int(days)) d: \(jsError ?? "?")")
+        }
+        return try JSONDecoder().decode(Fit.self, from: Data(out.toString()!.utf8))
+    }
+    let start = ContinuousClock.now
+    let result = try SlackwaterKit.fit(
+        samples: samples.map { HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v) },
+        constituents: chsTideBasis)
+    let elapsed = start.duration(to: .now).components
+    return Fit(fitMs: Double(elapsed.seconds) * 1000 + Double(elapsed.attoseconds) / 1e15,
+               offset: result.offset, rms: result.rms,
+               constituents: result.constituents.map { Fit.Con(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
+               unseparable: result.unseparable.map { $0.constituents.joined(separator: "/") })
+}
+let fitterName = isJsTideFit ? "js" : "native"
+print("fitter: \(fitterName)")
+
 /// The bar, set before scoring — docs/validation/chs-tides.md.
 ///
 /// Height is not slack: nobody transits a port *at* high water the way a gate
@@ -508,12 +546,7 @@ for days in fitWindows {
     // Trailing slice of the one fetched series — no window refetches anything.
     let cut = (today - days * dayS) * 1000
     let windowSamples = fitSamples.filter { $0.t >= cut }
-    let samplesJson = "[" + windowSamples.map { "{\"t\":\($0.t),\"v\":\($0.v)}" }.joined(separator: ",") + "]"
-    jsError = nil
-    guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [samplesJson]), jsError == nil else {
-        fatalError("fitTides threw at \(Int(days)) d: \(jsError ?? "?")")
-    }
-    let fit = try JSONDecoder().decode(Fit.self, from: Data(out.toString()!.utf8))
+    let fit = try fitTide(windowSamples, days: days)
 
     // --- predict with SlackwaterKit (the app's shipping path) and score ---
     let engine = Station(constituents: fit.constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
@@ -522,13 +555,17 @@ for days in fitWindows {
                                    to: valEnd, step: 900)
     var predByMs: [Double: Double] = [:]
     for p in predicted { predByMs[p.time.timeIntervalSince1970 * 1000] = p.height }
-    var n = 0, sq = 0.0, maxAbs = 0.0
+    var n = 0, sq = 0.0, sum = 0.0, maxAbs = 0.0
     for s in valSamples {
         guard let pred = predByMs[s.t] else { continue }
         let e = (pred - s.v) * 100
-        n += 1; sq += e * e; maxAbs = max(maxAbs, abs(e))
+        n += 1; sq += e * e; sum += e; maxAbs = max(maxAbs, abs(e))
     }
     let rmse = (sq / Double(n)).squareRoot()
+    // Mean signed error. When it carries most of the RMSE, the curve's shape is
+    // right and its mean level is not: a seasonal level change between the fit
+    // and held-out windows, which the basis has no SA or SSA to carry.
+    let bias = sum / Double(n)
 
     // Extreme timing vs wlp-hilo (no high/low qualifier — classify vs neighbours).
     let extremes = engine.extremes(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970 - dayS),
@@ -567,7 +604,7 @@ for days in fitWindows {
     let fmt = { (x: Double?) in x.map { String(format: "%.1f", $0) } ?? "-" }
     print("""
     == \(name) [\(Int(days)) d] \(windowSamples.count) pts, fit rms \(String(format: "%.1f", r.fitRmsCm)) cm, \(fit.constituents.count) constituents
-       RMSE     \(String(format: "%.2f", rmse)) cm  (n=\(n), max abs \(String(format: "%.1f", maxAbs)) cm)
+       RMSE     \(String(format: "%.2f", rmse)) cm  (n=\(n), bias \(String(format: "%+.1f", bias)), max abs \(String(format: "%.1f", maxAbs)) cm)
        timing   median \(fmt(r.timingMedian)) / worst \(fmt(r.timingWorst)) min  (\(matched)/\(hilo.count) matched)
        height   median \(fmt(r.heightMedian)) cm
        unseparable [\(fit.unseparable.joined(separator: " "))]
@@ -575,20 +612,20 @@ for days in fitWindows {
     """)
 
     let report: [String: Any] = [
-        "station": name, "windowDays": days, "iwlsId": station.id, "iwlsName": station.officialName,
+        "station": name, "fitter": fitterName, "windowDays": days, "iwlsId": station.id, "iwlsName": station.officialName,
         "resolvedKm": distance, "samples": windowSamples.count,
         "fitRmsCm": r.fitRmsCm, "constituents": fit.constituents.count,
         "unseparable": fit.unseparable,
         "valStart": iso.string(from: valStart), "valEnd": iso.string(from: valEnd),
         "rangeCm": rangeCm, "heightBarCm": heightBar,
-        "rmseCm": rmse, "maxAbsCm": maxAbs,
+        "rmseCm": rmse, "biasCm": bias, "maxAbsCm": maxAbs,
         "timingMedianMin": r.timingMedian ?? -1, "timingWorstMin": r.timingWorst ?? -1,
         "heightMedianCm": r.heightMedian ?? -1,
         "matched": matched, "hiloTotal": hilo.count,
         "absolutePass": r.absolutePass,
     ]
     try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
-        .write(to: reportsDir.appendingPathComponent("\(slug)-tide-\(Int(days))d-report.json"))
+        .write(to: reportsDir.appendingPathComponent("\(slug)-tide-\(Int(days))d-\(fitterName)-h\(Int(holdoutDays))-report.json"))
 }
 
 // --- the relative clause: is a short window as good as the one shipping? ---

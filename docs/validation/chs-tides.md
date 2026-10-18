@@ -1,6 +1,6 @@
 # CHS tide fit window validation
 
-This record supports the 60-day tide fit in [the CHS data model](../chs-data-model.md). Measurements below come from the September 20, 2026 sweep; they are evidence for that decision, not a claim about every future fit. `tools/FitValidation` reads its tide numbers against the bar set here.
+This record supports the 60-day tide fit in [the CHS data model](../chs-data-model.md). Measurements below come from the September 20, 2026 window sweep and the October 18 national sample; they are evidence for that decision, not a claim about every future fit. `tools/FitValidation` reads its tide numbers against the bar set here.
 
 `ChsFitService.tideFitDays` is 60. The fit window is the highest-leverage lever on first-run download time: wall clock is linear in request count, 1,058 of the 1,073 fittable CHS stations are tide ports, and `chunkPlan`'s 7-day grid turns 60 days into 10 IWLS requests per port against 6 for 35 days. At Victoria's 25 km tier that is 11 minutes against 7.
 
@@ -35,7 +35,7 @@ Harness: `tools/FitValidation`, the same tool and the same committed `chs-bundle
 
 1. **Resolve by position, never by name** — nearest IWLS station serving `wlp` within 3 km of the registry position.
 2. **Fetch `wlp` once per station**, 60 days ending today 00Z, decimated to the 15-minute grid the app fits on. Each shorter window is the trailing slice of that one series, so the sweep costs no extra IWLS requests — the shape `--current` mode already uses for its 210/60 pair.
-3. **Fit each window in JavaScriptCore** with the app's own artifacts.
+3. **Fit each window in JavaScriptCore** with the app's own artifacts. The harness now fits tides with `SlackwaterKit.fit` and `ChsFitter.basis`, the shipping path since #496; `--js` still runs the September fitter.
 4. **Predict with SlackwaterKit `Station`** — the shipping synthesis.
 5. **Score against CHS's own published `wlp` and `wlp-hilo`**, held out +28..+35 days into the future: RMSE on the 15-minute grid, and extreme timing and height against `wlp-hilo`, classified high/low against neighbours and matched by kind within 180 minutes.
 
@@ -122,7 +122,7 @@ The mechanism is margin above a Rayleigh threshold, not distance below one. A wi
 
 Four of eight ports fail the absolute bar at the window currently shipping. Two are near-misses on a single clause: Point Atkinson's timing median is 9.2 min and its RMSE 9.4 cm, failed only by one extreme 48.4 min out; Churchill fails on RMSE by 0.3 cm. Two are not near-misses — **Saint John and Vieux-Québec fail at every window tested**, at 14.7 cm and 20.4 cm held-out RMSE respectively at 60 days.
 
-Those two are the tidal-river and extreme-range cases, where the 23-constituent basis has no higher overtides to give and seasonal discharge moves the answer. That is a coverage finding, not a window finding, and it belongs in its own issue: the window sweep cannot fix a port that the basis cannot represent.
+Those two are the tidal-river and extreme-range cases. That is a coverage finding, not a window finding: the window sweep cannot fix a port that the basis cannot represent. [Where 60-day fits miss](#where-60-day-fits-miss) measures how common it is.
 
 One clause looks mis-specified in hindsight, and is reported as written rather than quietly revised: **extreme timing, worst ≤ 40 min** fails ports whose height error is small, because near a flat stand the time of the extremum is poorly determined even when the curve is right. Point Atkinson fails it at every window including 60. A revision would score timing only at extremes whose curvature exceeds some floor, the way the currents bar already skips extrema below 0.75 kn. It was not revised here because it was set before scoring.
 
@@ -133,4 +133,78 @@ One clause looks mis-specified in hindsight, and is reported as written rather t
 **Deferred refinement is not worth designing for tide ports.** It is the right machinery for a provisional answer that is *degraded* — which is what the 60-day current gate is, badged, with a measured 20–35 min worst-case slack error. A 35-day tide fit is not degraded, it is wrong, and no badge makes a 121 cm error publishable. Raising the provisional window to the safe floor removes the reason to defer: 48 d saves two requests over 60 d, which does not pay for a retention policy on `ChsChunkStore`, a purge-point move, and a second fit per port.
 
 The download-time lever is real, but it is not this constant.
+
+## Where 60-day fits miss
+
+Measured on 2026-10-18 with the native fitter (#456). Fits end at 00Z that day and are scored against the same bar, held out +28..+35 days unless noted.
+
+The sample is every 18th station of `chs-stations.json` in id order plus the eight ports above, 66 in all. Montréal (rue Frontenac) and Sorel serve no `wlp-hilo` for the held-out week, so 64 were scored. The eastern Arctic is undersampled: the Iqaluit zone's 73 stations contribute one.
+
+Reproduce one station with:
+
+```sh
+cd tools/FitValidation && swift run -c release fit-validation --days 60,67 <name> <lat> <lon>
+```
+
+`--holdout 180` scores the week 180 days out instead of 28. `--js` refits with the frozen JavaScript oracle. On the same cached data it matches the native fitter to the printed precision at 48, 60 and 67 days at Saint John and Vieux-Québec. The miss is not a porting artefact.
+
+### Most of Canada does not clear the bar at 60 days
+
+| Outcome at 60 d | Stations |
+|---|---:|
+| Pass | 27 |
+| Fail on timing only | 11 |
+| Fail a height clause, mostly a mean-level offset | 14 |
+| Fail a height clause, curve shape | 12 |
+
+67 days, the longest window `chunkPlan` delivers, passes 30. The ranking is the same.
+
+All 11 timing-only failures fail the worst-timing clause. Some also fail the median or leave an extreme unmatched. Five are Arctic and Gulf ports with a 22–70 cm range: Eureka, Kugluktuk, Jenny Lind Island, Cooks Harbour and East Margaree River. The other six are Victoria, Prideaux Haven, Grande-Entrée, Shoal Cove West, Middle Cove and Cape Kater. Their height clauses pass. This is the clause [60 days does not clear this bar either](#60-days-does-not-clear-this-bar-either) already reads as mis-specified.
+
+### The common miss is the seasonal mean level
+
+At 14 stations, the held-out error is mostly a constant offset. The mean signed error (prediction minus CHS) carries most of the RMSE. Removing it brings RMSE under the bar:
+
+| Station | Range | RMSE | Bias | RMSE without bias |
+|---|---:|---:|---:|---:|
+| Humpback Bay | 421 | 17.2 | −17.0 | 3.0 |
+| Digges Harbour | 188 | 17.6 | −17.0 | 4.4 |
+| Casey Cove | 450 | 18.6 | −17.2 | 7.0 |
+| Lax Kw'alaams | 432 | 17.1 | −16.4 | 5.1 |
+| Sulphur Passage | 261 | 15.2 | −14.1 | 5.7 |
+| Cypress Bay | 253 | 14.5 | −14.0 | 3.6 |
+| Ford Harbour | 127 | 14.4 | −13.9 | 4.0 |
+| Lowe Inlet | 410 | 16.1 | −13.8 | 8.2 |
+| Bella Bella | 337 | 14.4 | −13.7 | 4.5 |
+| Gold River | 273 | 10.6 | −10.2 | 2.7 |
+| Thurlow Point | 300 | 10.6 | −8.7 | 6.0 |
+| Port Moody | 351 | 11.3 | −5.9 | 9.6 |
+| Point Atkinson | 328 | 10.8 | −5.3 | 9.4 |
+| Winchelsea Island | 336 | 10.4 | −5.2 | 9.0 |
+
+All values are in centimetres. These ports time their extremes well (Humpback Bay's median is 0.6 min). The curve has the right shape at the wrong mean level.
+
+CHS's `wlp` carries the annual cycle, and the basis cannot. `ChsFitter.basis` leaves out SA and SSA because a 60-day fit cannot separate them from Z0 (183 days are needed). CHS's weekly mean level at Humpback Bay rises about 17 cm between the August weeks of the fit window and the November held-out week, and Ford Harbour's rises about as much. The weekly means also wobble a few centimetres with the fortnightly cycle. The fit learns the window's average level, and the held-out week sits above it.
+
+A fitted model does not expire ([CHS data model](../chs-data-model.md)), so the offset depends on the calendar. It swings with the season instead of growing. The same 60-day fits, scored further out (RMSE, with the bias in parentheses):
+
+| Station | +28 d | +90 d | +180 d | +270 d |
+|---|---|---|---|---|
+| Humpback Bay | 17.2 (−17.0) | 16.0 (−15.6) | 2.1 (−1.3) | 7.4 (+7.3) |
+| Lax Kw'alaams | 17.1 (−16.4) | 15.1 (−12.7) | 6.8 (+2.9) | 10.7 (+8.6) |
+| Digges Harbour | 17.6 (−17.0) | 8.1 (−5.2) | 20.7 (+20.4) | 9.0 (+8.6) |
+| Ford Harbour | 14.4 (−13.9) | 5.4 (+1.7) | 11.7 (+11.4) | 12.3 (+12.1) |
+| Victoria | 9.3 (−7.4) | 14.0 (−11.6) | 6.6 (+2.1) | 8.8 (+4.6) |
+| Halifax | 6.4 (−5.3) | 6.6 (−4.4) | 3.6 (−1.0) | 3.2 (+1.3) |
+| Rimouski | 5.5 (−3.7) | 4.9 (+1.1) | 5.3 (−0.5) | 3.9 (−1.6) |
+| Saint John | 13.7 (−2.2) | 28.0 (−0.6) | 18.8 (−1.8) | 10.0 (−3.6) |
+| Vieux-Québec | 19.8 (−5.0) | 33.7 (+2.6) | 33.7 (−22.5) | 19.1 (−0.4) |
+
+Any single held-out week understates this. The +28-day score depends on where the fit window and the test week sit in the annual cycle, and a model read months after it was fitted can be off by 20 cm at a port that passed.
+
+### The rest is curve shape
+
+12 stations still miss once the bias is removed. Kemano Bay, Patterson Inlet and Cape Ball carry the seasonal offset as well, about −14 cm. The 12 are Saint John and West Dipper Harbour (Fundy), Abbotts Harbour and Little Harbour (Nova Scotia), Vieux-Québec and La Grosse Île (St Lawrence river), Indian Arm Head, Porpoise Bay, Okeover Inlet, Kemano Bay and Patterson Inlet (BC mainland inlets), and Cape Ball (Haida Gwaii).
+
+The in-sample residual splits them. CHS predictions are noise-free, so a large in-sample rms means the basis cannot reproduce the curve even inside the window. That is the case at Vieux-Québec (15.1 cm), La Grosse Île (10.7), Indian Arm Head (9.1), Porpoise Bay (7.1) and Okeover Inlet (6.8). The others fit in-sample at 3.8–5.4 cm and miss held-out by 10–18 cm. That is the out-of-window failure [the window sweep](#the-cliff-is-at-40-days-and-it-is-a-conditioning-cliff) found, which the in-sample rms cannot see. At Saint John it reaches 28 cm at +90 days.
 
