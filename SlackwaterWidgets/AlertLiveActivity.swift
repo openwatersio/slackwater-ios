@@ -22,6 +22,10 @@ struct AlertLiveActivity: Widget {
                 detail(context).font(.caption).foregroundStyle(.secondary)
             }
             .padding()
+            // The app's own dark canvas, so the white curve and its fill read in both
+            // appearances instead of vanishing on a light platter.
+            .activityBackgroundTint(SN.canvas)
+            .foregroundStyle(.white)
             .widgetURL(context.attributes.url)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -94,7 +98,8 @@ struct AlertCurveView: View {
             // A flat slice is a flat line, never a division by zero.
             let span = max(hi - lo, 0.01)
             let total = curve.step * Double(n - 1)
-            func x(_ t: Date) -> CGFloat { CGFloat(t.timeIntervalSince(curve.start) / total) * size.width }
+            // Clamped: a window longer than the three hours after the event stops at the edge.
+            func x(_ t: Date) -> CGFloat { min(max(CGFloat(t.timeIntervalSince(curve.start) / total) * size.width, 0), size.width) }
             func y(_ v: Double) -> CGFloat { size.height - CGFloat((v - lo) / span) * (size.height - 6) - 3 }
 
             if let end {

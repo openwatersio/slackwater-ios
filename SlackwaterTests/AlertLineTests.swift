@@ -152,6 +152,8 @@ final class AlertLineTests: XCTestCase {
         XCTAssertFalse(spans.isEmpty)
         XCTAssertTrue(spans.contains { $0.end != nil }, "a merged window carries its close")
         XCTAssertTrue(spans.allSatisfy { ($0.end ?? $0.event) >= $0.event })
+        // Review Focus 2: one rule's spans never stack.
+        XCTAssertTrue(zip(spans, spans.dropFirst()).allSatisfy { ($0.end ?? $0.event) <= $1.fire })
     }
 
     private func flatTimeline(hours: Int) -> TimelineData {
@@ -180,5 +182,21 @@ final class AlertLineTests: XCTestCase {
         XCTAssertEqual(frames[1].x0, data.x(window.fire), accuracy: 0.01)
         XCTAssertEqual(frames[1].x1, data.x(window.end!), accuracy: 0.01)
         XCTAssertEqual(frames[1].eventX, data.x(event), accuracy: 0.01)
+    }
+
+    func testASpanRequestChangesOnlyWithTheRulesOrTheWindow() {
+        // Review: the strip's window republishes on every chunk arrival and right-edge append;
+        // the spans are re-resolved only when the rules or the window's edges change.
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let start = Date(timeIntervalSince1970: 1_755_800_000), end = start.addingTimeInterval(7 * 86_400)
+        let a = AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end)
+        XCTAssertEqual(a, AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end))
+        XCTAssertNotEqual(a, AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end.addingTimeInterval(86_400)))
+        var edited = rule; edited.lead = 900
+        XCTAssertNotEqual(a, AlertSpanRequest(stationID: "a", rules: [edited], start: start, end: end))
+        // The query reaches past both edges so a window open at the start, or a reminder for a
+        // moment just past the end, still draws (alertBandFrames clips what the window holds).
+        XCTAssertEqual(a.from, start.addingTimeInterval(-(6 * 3_600 + 86_400)))
+        XCTAssertEqual(a.to, end.addingTimeInterval(6 * 3_600))
     }
 }
