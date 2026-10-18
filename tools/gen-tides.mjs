@@ -76,10 +76,11 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations, buildDatabase } from "@slackwater/database";
+import { allStations, buildDatabase, stationRoutes } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
+  sourceCredits,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
@@ -334,6 +335,28 @@ const servedByChs = (s) =>
   countryOf(s) === "Canada" &&
   chs.some((c) => km(s, c) <= CHS_COVERAGE_KM);
 
+/**
+ * ONE STATION PER ROUTE. The database publishes every record of one gauge as
+ * one station, with one URL: a NOAA copy of a CHS port (Mill Bay), a TICON
+ * refit of a NOAA gauge (Moku o Loe), a TICON copy of a Kartverket one (Vardø).
+ * Two of them in the bundle are two pins for one gauge, and two ids behind
+ * one slug, where the link would open whichever the resolver met first.
+ *
+ * A route is claimed in the order the pipeline below keeps stations: CHS
+ * first, since its ports are identity this app fits on device and the cede
+ * rule already yields Canadian water to them; then NOAA; then everyone else
+ * by id; subordinates last. This is the one rule a NOAA row yields to. The id
+ * a device saved for the row that yields moves to the survivor at launch
+ * (`StationSuccessors` in the app, `station-successors.json` here).
+ */
+const routeOf = new Map(stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
+const claimedRoutes = new Set(chs.map((c) => routeOf.get(c.id)).filter(Boolean));
+let sameRoute = 0;
+const routeTaken = (s) => {
+  const route = routeOf.get(s.id);
+  return route !== undefined && claimedRoutes.has(route);
+};
+
 let dropped = 0;
 let failedDatum = 0;
 let orphaned = 0;
@@ -414,15 +437,21 @@ const kept = shippable
   // built station object, so it's carried alongside.
   .map(({ s, passes }) =>
     ({ station: buildStation(s), isNoaa: s.source?.name === NOAA && !isSubordinate(s), passes }))
-  // A NOAA row is never dropped. It was already shipping, users have fits and
-  // favourites keyed on its id, and NOAA publishing two gauges a few hundred
+  // A NOAA row is never dropped by distance (only by ONE STATION PER ROUTE
+  // above). It was already shipping, users have fits and favourites keyed on
+  // its id, and NOAA publishing two gauges a few hundred
   // metres apart ("Garden City Pier (ocean)") is a judgement it is entitled to
   // make. Deduplication is about what TICON ADDS, so only TICON rows yield.
   .filter(({ station, isNoaa, passes }) => {
+    if (routeTaken(station)) {
+      sameRoute++; return false;
+    }
     if ((collides(station) || samePlace(station) || sameGauge(station)) && !isNoaa) {
       dropped++; return false;
     }
     remember(station);
+    const route = routeOf.get(station.id);
+    if (route !== undefined) claimedRoutes.add(route);
     return passes;  // a gate-failing NOAA row blocks its mirror, then leaves
   })
   .map(({ station }) => station)
@@ -676,7 +705,7 @@ const tcdb = buildDatabase(stations.map((b) => ({
   quality: rawById.get(b.id).quality?.seasonal_dominant ? { seasonal_dominant: true } : undefined,
   harmonic_constituents: b.constituents,
   datums: b.reference ? {} : rawById.get(b.id).datums,
-})), { version: databaseVersion });
+})), { version: databaseVersion, credits: await sourceCredits(allStations) });
 writeFileSync(join(here, "..", "Slackwater", "Resources", "stations.tcdb"), tcdb);
 
 const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
@@ -689,7 +718,7 @@ console.log(
   `(${stations.length - derivedCount - codes} own contexts, ${derivedCount} derived, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
-  `${dropped} duplicates dropped; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);
+  `${dropped} duplicates dropped, ${sameRoute} yielded their route; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);
 console.log(
   `${unavailable.length} unavailable stations, ${unavailableSize} ` +
   `(non-commercial, no bundled station within ${UNAVAILABLE_GAP_KM} km)`);
