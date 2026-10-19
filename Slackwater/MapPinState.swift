@@ -33,9 +33,10 @@ let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
 let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
 /// SlackwaterKit drops any high and low closer than 1 cm, so the curve can dip
 /// against the next extreme it reports, but never by 1 cm. A diff under this
-/// floor may be one of those dips and falls back to the exact search. It
-/// decides at gauges whose whole tide is a few centimetres, such as the Great
-/// Lakes and the upper St Lawrence, where the relative floor admits sub-cm diffs.
+/// floor may be one of those dips and falls back to the exact search. It binds
+/// wherever the relative floor admits less than 1 cm, which is any station
+/// whose speed-weighted range (A·ω) is under 25: an M2-equivalent amplitude
+/// under about 0.86 m, roughly half the bundle.
 let PIN_TIDE_TURN_FLOOR_M: Double = 0.01
 private let constituentSpeed: [String: Double] = [   // degrees/hour
     "M2": 28.9841, "S2": 30.0, "N2": 28.4397, "K2": 30.0821,
@@ -51,9 +52,9 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 /// is 12:00 and 12:30) — which is what the sweep measured and trusts.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     // A subordinate has no cheap path: its curve is only defined by its
-    // extremes, so the exact search is the only search. 2,017 of them cost
-    // ~0.26 ms each here (debug), which is why the budget is per CAMERA and
-    // not per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
+    // extremes, so the exact search is the only search. Thousands of them at a
+    // fraction of a millisecond each is why the budget is per CAMERA and not
+    // per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     if record.isSubordinate { return fallback() }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
@@ -102,7 +103,7 @@ let PIN_GAUGE_BUCKETS = 8
 func tidePinState(_ record: TideStationRecord, at now: Date,
                   imperial: Bool, detailed: Bool, station override: (any TidePredicting)? = nil) -> PinState {
     let previewRising = override.flatMap { predictor in
-        predictor.extremes(from: now, to: now.addingTimeInterval(30 * 3600)).first.map { $0.kind == .high }
+        predictor.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first.map { $0.kind == .high }
             ?? predictor.rates(from: now, to: now.addingTimeInterval(1), step: 1).first.map { $0.rate >= 0 }
     }
     guard let rising = previewRising ?? tidePinRisingHybrid(record, at: now) else {

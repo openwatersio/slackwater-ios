@@ -54,9 +54,11 @@ struct ComplicationReading: Equatable {
                 .map { Sample(hours: hours($0.time), value: $0.height) }
                 .filter { span.contains($0.hours) }
             let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
-            let extremes = s.extremes(from: now.addingTimeInterval(-15 * 3600), to: now.addingTimeInterval(15 * 3600))
-            let last = extremes.last { $0.time <= now }
-            let next = extremes.first { $0.time > now }
+            // The next turn comes from the card's own search: where turns are a
+            // few centimetres, the engine's extremes can differ between windows
+            // (slackwater#436), and the next turn can be more than 15h out.
+            let last = s.extremes(from: now.addingTimeInterval(-15 * 3600), to: now).last { $0.time <= now }
+            let next = s.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first { $0.time > now }
             let rising = next.map { $0.kind == .high } ?? true
             var gauge: Gauge?
             if let last, let next {
