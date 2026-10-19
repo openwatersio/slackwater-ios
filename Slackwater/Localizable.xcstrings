@@ -26296,7 +26296,7 @@
       }
     },
     "Help" : {
-      "comment" : "Link to the Slackwater support website in the main list footer and Settings.",
+      "comment" : "Link to the Slackwater support website in Settings.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

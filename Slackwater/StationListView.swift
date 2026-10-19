@@ -1070,12 +1070,6 @@ struct StationListView: View {
             .padding(.horizontal, 16)
             .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 20))
 
-            Link("Help", destination: URL(string: "https://slackwater.xyz/support/")!)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(SN.leaf)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityIdentifier("list-help")
-
             VStack(spacing: 4) {
                 Text("Slackwater").font(.subheadline.weight(.semibold))
                 Text("by Open Waters").font(.caption)
