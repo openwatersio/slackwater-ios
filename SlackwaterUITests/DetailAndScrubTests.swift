@@ -579,7 +579,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     // the settle recomputes everything, the dot floats off the curve. The read
     // lands mid-deceleration, before any settle.
     func testM43FirstScrubDotRidesCurve() throws {
-        let app = launch("-seedGate")
+        let app = launch("-seedGate", "-scrubTrace", "\(shotDir)/first-scrub-\(UUID().uuidString).log")
         openFridayHarbor(app)
 
         // First frame after appearance — no scrub, no settle yet.
@@ -590,8 +590,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // gesture itself (read mid-deceleration, pre-settle), not only after
         // the magnet settles.
         scrubStrip(app)
-        XCTAssertNotEqual(before, scrubClock(app),
-                          "first scrub left the readout frozen — initial centering raced layout again")
+        let after = scrubClock(app)
+        if before == after {
+            save(app, "first-scrub-frozen.png")
+            XCTContext.runActivity(named: "First-drag UI hierarchy") { activity in
+                let attachment = XCTAttachment(string: app.debugDescription)
+                attachment.lifetime = .keepAlways
+                activity.add(attachment)
+            }
+        }
+        XCTAssertNotEqual(before, after,
+                          "first scrub left the readout frozen — see the gesture trace and UI hierarchy")
     }
 
     /// #280: rotating an iPad kept the strip's `contentOffset` while its width
