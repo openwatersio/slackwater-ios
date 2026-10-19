@@ -42,15 +42,21 @@ final class WebsiteScreenshots: ShotWalk {
             save(app, name)
         }
 
-        // Currents: Deception Pass at noon and at sunrise.
-        for (time, name) in [("13:00", "currents-day.png"),
-                             ("07:10", "currents-sunrise.png")] {
-            app = launchShots(scrubTo: time)
-            openSearch(app, "deception")
-            pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-            assertCurrentDetailRendered(app)
-            settleScrub(app, at: localizedClock(time))
-            save(app, name)
-        }
+        // Currents: Deception Pass at 1pm.
+        app = launchShots(scrubTo: "13:00")
+        openSearch(app, "deception")
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
+        assertCurrentDetailRendered(app)
+        settleScrub(app, at: localizedClock("13:00"))
+        save(app, "currents-day.png")
+
+        // The same afternoon off Victoria, for readers on the Canadian side.
+        // 3:30pm keeps the sun clear of the reading; at 1pm it sits on it.
+        app = launchShots(scrubTo: "15:30")
+        openSearch(app, "trial island")
+        pickSearchResult(app, app.staticTexts["Trial Island, 4.5 nm SSW of"].firstMatch)
+        assertCurrentDetailRendered(app)
+        settleScrub(app, at: localizedClock("15:30"))
+        save(app, "currents-victoria.png")
     }
 }
