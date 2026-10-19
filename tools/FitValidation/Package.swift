@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
-// Reference harness: fit a CHS station with the frozen JS artifacts
-// (tools/chs-reference in JavaScriptCore), predict the
-// held-out validation window with SlackwaterKit (the app's shipping predictor),
-// and score against live IWLS — the M0 spike's methodology, on the M3 path.
+// Reference harness: fit a CHS current gate with the frozen JS artifacts
+// (tools/chs-reference in JavaScriptCore), predict the held-out validation
+// window with SlackwaterKit (the app's shipping predictor), and score against
+// live IWLS. Pinned to the same slackwater revision as project.yml.
 import PackageDescription
 
 let package = Package(
@@ -13,7 +13,7 @@ let package = Package(
         // 4), so no post-rename semver tag exists yet. Becomes `from:` at the
         // deliberate 1.0.0 release.
         .package(url: "https://github.com/openwatersio/slackwater",
-                 revision: "6021524a3f2c5f609cd41af645ebea4a0e135bf8"),
+                 revision: "5405c54faa8059eae83b17b895ca1c4c4a62b724"),
     ],
     targets: [
         .executableTarget(

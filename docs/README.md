@@ -24,7 +24,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
-| [CHS tide validation](validation/chs-tides.md) | Tide fit-window bar, the window sweep, and why 60 days stays |
+| [CHS tide validation](https://github.com/openwatersio/slackwater/blob/main/docs/validation/chs-tides.md) | In the engine repo: the tide fit bar, the window sweep, and where 60-day fits miss |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
 | [Generated resources](../Slackwater/Resources/README.md) | Bundle inputs, generation order, and provenance |
 | [Fill pipeline](../tools/fill-pipeline/README.md) | SSCOFS speed-fill certification, fitting, and packing |

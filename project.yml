@@ -38,9 +38,9 @@ packages:
   slackwater:
     # Exact-commit pin: the stack is in prerelease (slackwater#338 stage 4),
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
-    # at the deliberate 1.0.0 release. Native CHS fitting requires #341.
+    # at the deliberate 1.0.0 release. The CHS tide fit recipe requires slackwater#429.
     url: https://github.com/openwatersio/slackwater
-    revision: bd9f1b2424c1c8abd580499329af3b14c7debe07
+    revision: 5405c54faa8059eae83b17b895ca1c4c4a62b724
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

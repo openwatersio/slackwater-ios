@@ -10,13 +10,9 @@ struct ChsFitResult: Decodable {
 }
 
 struct ChsFitter {
-    // SA/SSA absorb Z0 in a 60-day fit and worsen held-out heights.
-    // Preserve the validated basis for both provisional and full fits.
-    static let basis = [
-        "M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1",
-        "M4", "MS4", "MN4", "2N2", "MU2", "NU2", "L2", "T2",
-        "J1", "MM", "MSF", "MF", "M6", "S4", "M3",
-    ]
+    // The engine's shared CHS tide recipe. Current gates fit the same basis
+    // until the engine carries a current recipe (slackwater#431).
+    static let basis = ChsTideFit.basis
 
     func fit(samples: [ChsSample]) async throws -> ChsFitResult {
         try Task.checkCancellation()

@@ -4,6 +4,7 @@
 // background; each one lands as its fit completes.
 import Combine
 import Foundation
+import SlackwaterKit
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
 /// stand-in: every IWLS request throws before the socket).
@@ -1008,9 +1009,9 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    /// 60 d @ 15 min ending yesterday — a validated fit window. Deliberately
+    /// The engine's validated tide window, ending yesterday. Deliberately
     /// not per-gate: per-gate windows are a currents-only concern.
-    nonisolated static let tideFitDays = 60.0
+    nonisolated static let tideFitDays = Double(ChsTideFit.days)
 
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
                                  fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
