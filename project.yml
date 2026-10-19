@@ -42,7 +42,7 @@ packages:
     # SlackwaterIWLS product (slackwater#430). This consumer commit keeps
     # SlackwaterKit identical to bd9f1b2; newer extrema filtering needs its own adoption.
     url: https://github.com/openwatersio/slackwater
-    revision: 2c7255d32b00e046f7656ea26642385904cb2307
+    revision: f3e13e8a3ad76c6bdbf0dcc1e3bcda95faa7ac10
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

@@ -148,6 +148,13 @@ final class ChsProvisionalTests: XCTestCase {
             _ = try await offline.series("wcsp1", stationID: "test-station", chunk: missing)
             XCTFail("a chunk that was never fetched must still need the network")
         } catch ChsError.networkDisabled {}
+
+        // An empty week an older build stored must refetch, not stand in for data.
+        ChsChunkStore.save([], "test-station", "wlp", chunk)
+        do {
+            _ = try await offline.wlp(stationID: "test-station", chunk: chunk)
+            XCTFail("a cached empty week must still need the network")
+        } catch ChsError.networkDisabled {}
     }
 
     /// A model stored before M51 has no `fitDays` and was always the full

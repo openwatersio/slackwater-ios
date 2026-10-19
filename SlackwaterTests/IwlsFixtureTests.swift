@@ -40,21 +40,11 @@ final class IwlsFixtureTests: XCTestCase {
     }
 
     func testAnExhaustedRateLimitRemainsRetryableByTheQueue() {
-        XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 429)))
-        XCTAssert(ChsError.isPermanent(IwlsFetcher.terminalError(status: 404)))
-        XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 503)))
+        XCTAssertFalse(ChsError.isPermanent(IwlsFetch.terminalError(status: 429)))
+        XCTAssert(ChsError.isPermanent(IwlsFetch.terminalError(status: 404)))
+        XCTAssertFalse(ChsError.isPermanent(IwlsFetch.terminalError(status: 503)))
         XCTAssertTrue(ChsError.isPermanent(IwlsError.permanent("no station")))
         XCTAssertFalse(ChsError.isPermanent(IwlsError.transient("HTTP 429")))
-    }
-
-    func testThePacerSerialisesAcrossFetchers() async {
-        let pacer = IwlsPacer(interval: 0.1)
-        let start = Date.now
-        async let first: Void? = try? pacer.wait()
-        async let second: Void? = try? pacer.wait()
-        async let third: Void? = try? pacer.wait()
-        _ = await (first, second, third)
-        XCTAssertGreaterThanOrEqual(Date.now.timeIntervalSince(start), 0.2)
     }
 
     struct Recording: Decodable {
@@ -77,7 +67,7 @@ final class IwlsFixtureTests: XCTestCase {
     }
 
     private func samples(_ station: Recording.Station, _ code: String) throws -> [ChsSample] {
-        try IwlsFetcher.decode(JSONEncoder().encode(try XCTUnwrap(station.series[code], "\(station.key): missing \(code)")))
+        try IwlsFetch.decode(JSONEncoder().encode(try XCTUnwrap(station.series[code], "\(station.key): missing \(code)")))
     }
 
     private func golden(_ key: String, resource: String = "chs-fit-parity") throws -> ChsFitResult {
@@ -109,20 +99,20 @@ final class IwlsFixtureTests: XCTestCase {
     }
 
     func testDecoderRejectsMalformedJSONAndDropsBadDatesAndDuplicateTimestamps() throws {
-        XCTAssertThrowsError(try IwlsFetcher.decode(Data("{}".utf8)))
+        XCTAssertThrowsError(try IwlsFetch.decode(Data("{}".utf8)))
         let data = Data("""
         [{"eventDate":"2026-01-01T00:00:00Z","value":1},
          {"eventDate":"bad","value":2},
          {"eventDate":"2026-01-01T00:00:00Z","value":3}]
         """.utf8)
-        XCTAssertEqual(try IwlsFetcher.decode(data), [ChsSample(t: 1_767_225_600_000, v: 1)])
+        XCTAssertEqual(try IwlsFetch.decode(data), [ChsSample(t: 1_767_225_600_000, v: 1)])
     }
 
     /// A dropped link is worth another try; a server refusing this request, or
     /// a portal demanding a login, is not.
     func testRetriesOnlyWhatAnotherAttemptCouldGetPast() {
         func delay(_ outcome: Result<Int, Error>) -> Double? {
-            IwlsFetcher.retryDelay(after: outcome, attempt: 1)
+            IwlsFetch.retryDelay(after: outcome, attempt: 1)
         }
         XCTAssertEqual(delay(.failure(URLError(.timedOut))), 2)
         XCTAssertEqual(delay(.failure(URLError(.networkConnectionLost))), 2)
@@ -148,16 +138,16 @@ final class IwlsFixtureTests: XCTestCase {
     /// limit inside the minute-long window that just rejected it.
     func testBackoffDoublesStopsAndWaitsOutARateLimitWindow() {
         let dropped = Result<Int, Error>.failure(URLError(.timedOut))
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 1), 2)
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 2), 4)
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 3), 8)
-        XCTAssertNil(IwlsFetcher.retryDelay(after: dropped, attempt: IwlsFetcher.maxAttempts),
+        XCTAssertEqual(IwlsFetch.retryDelay(after: dropped, attempt: 1), 2)
+        XCTAssertEqual(IwlsFetch.retryDelay(after: dropped, attempt: 2), 4)
+        XCTAssertEqual(IwlsFetch.retryDelay(after: dropped, attempt: 3), 8)
+        XCTAssertNil(IwlsFetch.retryDelay(after: dropped, attempt: IwlsFetch.maxAttempts),
                      "the last attempt is the last word")
         // 2/4/8 s all land inside IWLS's 30-per-minute window, and each retry
         // spends another slot in it.
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(429), attempt: 1), 60)
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(429), attempt: 1, retryAfter: 90), 90)
-        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(503), attempt: 1, retryAfter: 30), 30,
+        XCTAssertEqual(IwlsFetch.retryDelay(after: .success(429), attempt: 1), 60)
+        XCTAssertEqual(IwlsFetch.retryDelay(after: .success(429), attempt: 1, retryAfter: 90), 90)
+        XCTAssertEqual(IwlsFetch.retryDelay(after: .success(503), attempt: 1, retryAfter: 30), 30,
                        "the server's own ask outranks our backoff")
     }
 

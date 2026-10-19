@@ -131,20 +131,6 @@ final class IwlsFetcher {
         self.killSwitch = killSwitch
     }
 
-    static let maxAttempts = IwlsFetch.maxAttempts
-
-    static func retryDelay(after outcome: Result<Int, Error>, attempt: Int,
-                           retryAfter: Double? = nil) -> Double? {
-        IwlsFetch.retryDelay(after: outcome, attempt: attempt, retryAfter: retryAfter)
-    }
-
-    static func terminalError(status: Int) -> ChsError {
-        switch IwlsFetch.terminalError(status: status) {
-        case .permanent(let reason): .permanent(reason)
-        case .transient(let reason): .transient(reason)
-        }
-    }
-
     // The station list changes rarely and is expensive to download repeatedly.
     static let stationListCache = ChsChunkStore.dir.deletingLastPathComponent()
         .appendingPathComponent("IwlsStations.json")
@@ -240,7 +226,8 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if cache, let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
+        // Builds before `canCache` stored empty weeks; treat those as misses so they refetch.
+        if cache, let hit = ChsChunkStore.load(stationID, code, chunk), !hit.isEmpty { return transform(hit) }
         let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
@@ -254,15 +241,12 @@ final class IwlsFetcher {
         raw = try await client.series(code, stationID: stationID, chunk: chunk)
 #endif
         let samples = transform(raw)
-        // Only whole grid chunks are cached: the newest one runs to "now" and
-        // would be a different chunk tomorrow.
-        if cache, chunk.isCacheable {
+        // Only whole, non-empty grid chunks are cached: the newest one runs to
+        // "now" and would be a different chunk tomorrow, and an empty week kept
+        // under a stable identity would never be fetched again.
+        if cache, chunk.canCache(samples) {
             ChsChunkStore.save(samples, stationID, code, chunk)
         }
         return samples
-    }
-
-    static func decode(_ data: Data) throws -> [ChsSample] {
-        try IwlsFetch.decode(data)
     }
 }
