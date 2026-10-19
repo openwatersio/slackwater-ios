@@ -15,7 +15,8 @@ struct ChsFitter {
     /// Current gates keep their own copy of the 23 constituents their bar was
     /// measured with (docs/validation/chs-currents.md), so a change to the
     /// engine's tide recipe can't move a current fit without its own
-    /// validation. It moves to the engine with slackwater#431.
+    /// validation. The engine's `ChsCurrentFit` (slackwater#431) now carries
+    /// the current recipe; adopting it here comes with a current revalidation.
     static let currentBasis = [
         "M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1",
         "M4", "MS4", "MN4", "2N2", "MU2", "NU2", "L2", "T2",

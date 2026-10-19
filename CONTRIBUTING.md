@@ -263,6 +263,12 @@ Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit
 - App Groups are not in the App Store Connect API (`/v1/appGroups` is a 404). Creating one is developer.apple.com UI work; budget a human for it.
 - **The widget's station picker never applies in the simulator.** linkd cannot read a simulator process's team id, so the App Intents runtime logs "StationChoice is not a registered AppEntity identifier" and resolves the configured station to nil — every widget shows the default station. Re-signing the simulator build with a real identity does not help. Verify the picker on a device.
 
+### GitHub release title and notes
+
+Nightly builds are GitHub prereleases and stay marked that way. The stable `v<version>` release is published once the version is live on the App Store, following the `post-release` skill, and appears on [openwaters.io/updates](https://openwaters.io/updates/). Write its title and notes for people using the app, following the [org guidance on release notes](https://github.com/openwatersio/.github/blob/main/docs/agents/releases.md#release-notes).
+
+The notes come from [`docs/release-notes/<version>.md`](docs/release-notes/README.md) without its version line or the `Worth testing:` paragraph, so the file's one-line summary is the opening of the notes. Title the release with a headline that says what changed, with no version, in sentence case and without a closing period; patch releases get one too, and a new minimum iOS version goes in the headline. Pass it as `--title` when creating the release, or fix a published one with `gh release edit v<version> --repo openwatersio/slackwater-ios --title "<headline>"`.
+
 ## Documentation
 
 Keep documentation that has an ongoing reader: product contracts, architecture constraints, operating procedures, release notes, and validation evidence. Describe the current behavior and update the existing document when it changes. [docs/README.md](docs/README.md) is the index.

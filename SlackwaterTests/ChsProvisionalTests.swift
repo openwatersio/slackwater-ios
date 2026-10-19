@@ -137,7 +137,7 @@ final class ChsProvisionalTests: XCTestCase {
         let missing = ChsChunk(start: start.addingTimeInterval(-7 * 86_400), end: start)
         defer { ChsChunkStore.purge("test-station") }
 
-        let grid = (start.timeIntervalSince1970 / ChsGrid.current.seconds).rounded(.up) * ChsGrid.current.ms
+        let grid = (start.timeIntervalSince1970 / ChsGrid.seconds).rounded(.up) * ChsGrid.ms
         ChsChunkStore.save([ChsSample(t: grid, v: 2), ChsSample(t: grid + 60_000, v: 3)],
                            "test-station", "wcsp1", chunk)
         let offline = IwlsFetcher(killSwitch: true)
@@ -147,6 +147,13 @@ final class ChsProvisionalTests: XCTestCase {
         do {
             _ = try await offline.series("wcsp1", stationID: "test-station", chunk: missing)
             XCTFail("a chunk that was never fetched must still need the network")
+        } catch ChsError.networkDisabled {}
+
+        // An empty week an older build stored must refetch, not stand in for data.
+        ChsChunkStore.save([], "test-station", "wlp", chunk)
+        do {
+            _ = try await offline.wlp(stationID: "test-station", chunk: chunk)
+            XCTFail("a cached empty week must still need the network")
         } catch ChsError.networkDisabled {}
     }
 

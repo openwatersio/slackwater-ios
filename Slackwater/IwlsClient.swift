@@ -1,31 +1,17 @@
-// Slackwater — GPL v3. The IWLS client (Swift/URLSession — never JSCore), the
-// sample types it decodes, and the on-disk chunk cache behind it.
-//
-// Constraints this client is built to:
-//   - no fetch inside JSCore — IWLS goes over URLSession here
-//   - series are requested on their `ChsGrid`: tides on the engine recipe's (IWLS is 1-min native)
-//   - 7-day request cap; queries by resolved Mongo id, never station code
+// Slackwater — GPL v3. App-owned IWLS caches and UI-test fixtures.
+// Fetching rules and HTTP behavior live in the MIT SlackwaterIWLS module.
 import Foundation
 #if DEBUG
 import notify
 #endif
 
-struct IwlsStation: Decodable {
-    struct Series: Decodable { let code: String }
-    let id: String
-    let officialName: String
-    let latitude: Double
-    let longitude: Double
-    let timeSeries: [Series]
-}
+import SlackwaterIWLS
 
-struct IwlsSample: Codable { let eventDate: String; let value: Double }
-
-/// A decimated sample as bridged to JS: epoch-ms + metres.
-struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
-
-/// One request's worth of series: a 7-day slot on the absolute epoch grid.
-struct ChsChunk: Equatable { let start: Date; let end: Date }
+typealias IwlsStation = SlackwaterIWLS.IwlsStation
+typealias IwlsSample = SlackwaterIWLS.IwlsSample
+typealias ChsSample = SlackwaterIWLS.ChsSample
+typealias ChsChunk = SlackwaterIWLS.ChsChunk
+typealias IwlsPacer = SlackwaterIWLS.IwlsPacer
 
 /// Fetched chunks, on disk, keyed by what identifies them and nothing else —
 /// so a job that retries mid-download resumes where it stopped instead of
@@ -38,12 +24,7 @@ enum ChsChunkStore {
     }()
 
     static func url(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> URL {
-        // Every cached chunk so far was written on the 15-minute grid, so only
-        // another grid needs its own name. Filtering can coarsen a cached
-        // chunk, but nothing can refine one.
-        let minutes = ChsGrid.of(code).minutes
-        let grid = minutes == 15 ? "" : "-\(minutes)m"
-        return dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970))\(grid).json")
+        dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970)).json")
     }
 
     static func load(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> [ChsSample]? {
@@ -73,27 +54,11 @@ enum ChsChunkStore {
     }
 }
 
-actor IwlsPacer {
-    private let interval: TimeInterval
-    private var last = Date.distantPast
-
-    init(interval: TimeInterval = 2.5) { self.interval = interval }
-
-    func wait() async throws {
-        let now = Date.now
-        let slot = max(now, last.addingTimeInterval(interval))
-        last = slot
-        let gap = slot.timeIntervalSince(now)
-        if gap > 0 { try await Task.sleep(for: .seconds(gap)) }
-    }
-}
-
-/// Polite serial IWLS client: one request at a time, 2.5 s apart (~24/min,
-/// safely under the documented 3/s and 30/min caps), 7-day chunks.
 final class IwlsFetcher {
-    static let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
     private let killSwitch: Bool
-    static let pacer = IwlsPacer()
+    private let client = IwlsClient { seconds in
+        await MainActor.run { ChsFitService.shared.observeRequest(seconds: seconds) }
+    }
     private var fixtureRequests: [String: Int] = [:]
 
 #if DEBUG
@@ -153,7 +118,7 @@ final class IwlsFetcher {
             default: value = 3 + 1.5 * sin(phase) + 0.4 * sin(phase / 2)
             }
             out.append(ChsSample(t: date.timeIntervalSince1970 * 1000, v: value))
-            date = date.addingTimeInterval(ChsGrid.of(code).seconds)
+            date = date.addingTimeInterval(ChsGrid.seconds)
         }
         return out
     }
@@ -166,124 +131,7 @@ final class IwlsFetcher {
         self.killSwitch = killSwitch
     }
 
-    /// Waits for a network path instead of failing without one, so a queue
-    /// started offline resumes when the link returns.
-    private static let session: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.waitsForConnectivity = true
-        // That wait is bounded by this and NOTHING else, and the default is a
-        // week. A path the user has denied — cellular switched off for
-        // Slackwater, with no Wi-Fi — is never coming, so an unbounded wait
-        // parks the claimed job on "Downloading" and the run behind it for the
-        // life of the process. Five minutes still clears the 851 KB station
-        // list at ~3 KB/s, well under anything a ship link does.
-        // The phone's path monitor gates the queue. watchOS cannot use that
-        // check (TN3135), so URLSession waits here and the queue retries failures.
-        config.timeoutIntervalForResource = 300
-        return URLSession(configuration: config)
-    }()
-
-    /// How many times one request is tried in total, first attempt included.
-    static let maxAttempts = 4
-
-    /// Errors a later attempt can get past: the link dropped, stalled, or was
-    /// not there yet.
-    ///
-    /// An allowlist, deliberately. The denylist this replaced retried
-    /// everything except an explicit cancel, so a TLS failure behind a marina's
-    /// captive portal — which answers identically every time — cost four
-    /// attempts and 14 s of backoff per request before the app could say so.
-    static func isTransient(_ error: Error) -> Bool {
-        if let url = error as? URLError { return transientCodes.contains(url.code) }
-        // A socket torn down while the app was suspended arrives as a bare
-        // POSIX error, not a URLError: ECONNABORTED, ECONNRESET, ETIMEDOUT.
-        // That is the commonest drop on a phone — lock it mid-chunk and the
-        // fit used to fail on exactly the case retrying exists for.
-        let ns = error as NSError
-        return ns.domain == NSPOSIXErrorDomain && [53, 54, 60].contains(ns.code)
-    }
-
-    private static let transientCodes: Set<URLError.Code> = [
-        .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
-        .networkConnectionLost, .notConnectedToInternet, .resourceUnavailable,
-        .badServerResponse, .zeroByteResource,
-    ]
-
-    /// Seconds to wait before the next attempt, or nil when another attempt
-    /// cannot help. `attempt` is 1-based and counts the try that just failed.
-    ///
-    /// Pure, and the whole retry policy: what is worth another try, and how
-    /// long to leave it. `get` below only obeys it.
-    static func retryDelay(after outcome: Result<Int, Error>, attempt: Int,
-                           retryAfter: Double? = nil) -> Double? {
-        guard attempt < maxAttempts else { return nil }
-        // ponytail: fixed 2/4/8 s, no jitter; add jitter if IWLS ever rate-limits
-        // many devices in step.
-        let backoff = pow(2, Double(attempt))
-        switch outcome {
-        case .failure(let error):
-            return isTransient(error) ? backoff : nil
-        case .success(429):
-            // A rate limit is per WINDOW — IWLS counts 30 requests a minute —
-            // so 2, 4 and 8 s all land inside the window that just rejected
-            // us, and each retry spends another slot in it. Wait the window
-            // out, or as long as the server asked for.
-            return max(retryAfter ?? 0, 60)
-        case .success(let status):
-            // 501 and 505 are the server refusing this request's shape, and
-            // 511 is a captive portal demanding a login: same answer next time.
-            guard (500...599).contains(status), ![501, 505, 511].contains(status) else { return nil }
-            return max(retryAfter ?? 0, backoff)
-        }
-    }
-
-    static func terminalError(status code: Int) -> ChsError {
-        (400...499).contains(code) && code != 429
-            ? .permanent("HTTP \(code)") : .transient("HTTP \(code)")
-    }
-
-    private func get(_ path: String) async throws -> Data {
-        guard !killSwitch else { throw ChsError.networkDisabled }
-        let url = URL(string: Self.base + path)!
-        var attempt = 0
-        while true {
-            attempt += 1
-            let result = await request(url)
-            if let data = result.data { return data }
-            guard let delay = Self.retryDelay(after: result.outcome, attempt: attempt,
-                                              retryAfter: result.retryAfter) else {
-                switch result.outcome {
-                case .success(let code):
-                    throw Self.terminalError(status: code)
-                case .failure(let error): throw error
-                }
-            }
-            try await Task.sleep(for: .seconds(delay))
-        }
-    }
-
-    private func request(_ url: URL) async
-        -> (data: Data?, outcome: Result<Int, Error>, retryAfter: Double?) {
-        let began = Date.now
-        let result: (Data?, Result<Int, Error>, Double?)
-        do {
-            try await Self.pacer.wait()
-            let (data, response) = try await Self.session.data(from: url)
-            let http = response as? HTTPURLResponse
-            let code = http?.statusCode ?? 0
-            let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
-            result = (code == 200 ? data : nil, .success(code), retryAfter)
-        } catch {
-            result = (nil, .failure(error), nil)
-        }
-        await MainActor.run {
-            ChsFitService.shared.observeRequest(seconds: Date.now.timeIntervalSince(began))
-        }
-        return result
-    }
-
-    /// The raw /stations JSON, beside the chunk store: at ~850 KB it is the
-    /// costliest request IWLS serves, and its stations rarely change.
+    // The station list changes rarely and is expensive to download repeatedly.
     static let stationListCache = ChsChunkStore.dir.deletingLastPathComponent()
         .appendingPathComponent("IwlsStations.json")
 
@@ -305,8 +153,9 @@ final class IwlsFetcher {
         // ponytail: a week-old list can hold an id IWLS has since retired; drop the cache on a 404 if that bites.
         if let modified, Date.now.timeIntervalSince(modified) < 7 * 86_400, let list = cached() { return list }
         do {
-            let data = try await get("/stations")
-            let list = try JSONDecoder().decode([IwlsStation].self, from: data)
+            guard !killSwitch else { throw ChsError.networkDisabled }
+            let list = try await client.stationList()
+            let data = try JSONEncoder().encode(list)
             try? FileManager.default.createDirectory(at: cache.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
             try? data.write(to: cache, options: .atomic)
@@ -325,7 +174,7 @@ final class IwlsFetcher {
         }
     }
 
-    struct Metadata: Decodable { let floodDirection: Double?; let ebbDirection: Double? }
+    typealias Metadata = IwlsClient.Metadata
 
     /// Per-station metadata — the only place IWLS serves the flood/ebb axis
     /// (the /stations list entries carry none).
@@ -333,22 +182,23 @@ final class IwlsFetcher {
 #if DEBUG
         if Self.usesFixture { return Metadata(floodDirection: 45, ebbDirection: 225) }
 #endif
-        return try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
+        guard !killSwitch else { throw ChsError.networkDisabled }
+        return try await client.metadata(stationID: stationID)
     }
 
     /// A current series (wcsp1/wcdp1) for one chunk. Cached on disk,
     /// so this costs a request exactly once across retries and days.
     func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
         try await cached(code, stationID: stationID, chunk: chunk) {
-            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.of(code).ms) == 0 }
+            IwlsFetch.onGrid($0)
         }
     }
 
-    /// wlp for one chunk on the grid the fit wants. The filter holds that
-    /// grid for chunks cached on disk at IWLS's native 1-min rate.
+    /// wlp for one chunk on the 15-min grid the fit wants. The filter holds
+    /// that grid for chunks cached on disk at IWLS's native 1-min rate.
     func wlp(stationID: String, chunk: ChsChunk, cache: Bool = true) async throws -> [ChsSample] {
         try await cached("wlp", stationID: stationID, chunk: chunk, cache: cache) {
-            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.tide.ms) == 0 }
+            IwlsFetch.onGrid($0)
         }
     }
 
@@ -376,47 +226,27 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if cache, let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
+        // Builds before `canCache` stored empty weeks; treat those as misses so they refetch.
+        if cache, let hit = ChsChunkStore.load(stationID, code, chunk), !hit.isEmpty { return transform(hit) }
         let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
             raw = Self.fixtureSamples(code, chunk)
         } else {
-            raw = try Self.decode(try await get(try Self.dataPath(code, stationID, chunk)))
+            guard !killSwitch else { throw ChsError.networkDisabled }
+            raw = try await client.series(code, stationID: stationID, chunk: chunk)
         }
 #else
-        raw = try Self.decode(try await get(try Self.dataPath(code, stationID, chunk)))
+        guard !killSwitch else { throw ChsError.networkDisabled }
+        raw = try await client.series(code, stationID: stationID, chunk: chunk)
 #endif
         let samples = transform(raw)
-        // Only whole grid chunks are cached: the newest one runs to "now" and
-        // would be a different chunk tomorrow.
-        if cache, chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
+        // Only whole, non-empty grid chunks are cached: the newest one runs to
+        // "now" and would be a different chunk tomorrow, and an empty week kept
+        // under a stable identity would never be fetched again.
+        if cache, chunk.canCache(samples) {
             ChsChunkStore.save(samples, stationID, code, chunk)
         }
         return samples
-    }
-
-    /// Samples at the fit's step: a fraction of the 1-minute default's bytes,
-    /// with identical values at those stamps.
-    static func dataPath(_ code: String, _ stationID: String, _ chunk: ChsChunk) throws -> String {
-        guard let resolution = ChsGrid.of(code).resolution else {
-            throw ChsError.permanent("IWLS serves no \(ChsGrid.of(code).minutes)-minute resolution")
-        }
-        let iso = ISO8601DateFormatter()
-        return "/stations/\(stationID)/data?time-series-code=\(code)" +
-            "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))" +
-            "&resolution=\(resolution)"
-    }
-
-    static func decode(_ data: Data) throws -> [ChsSample] {
-        let iso = ISO8601DateFormatter()
-        let raw = try JSONDecoder().decode([IwlsSample].self, from: data)
-        var out: [ChsSample] = []
-        for s in raw {
-            guard let date = iso.date(from: s.eventDate) else { continue }
-            let ms = date.timeIntervalSince1970 * 1000
-            if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
-        }
-        return out
     }
 }

@@ -179,7 +179,7 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
     while t <= end {
         times.append(t.timeIntervalSince1970)
         speeds.append(amplitude * sin(2 * .pi * t.timeIntervalSince(start) / period))
-        t = t.addingTimeInterval(ChsGrid.current.seconds)  // the official-sample cadence
+        t = t.addingTimeInterval(ChsGrid.seconds)  // the official-sample cadence
     }
     let window = ChsOnlineWindow(
         stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,

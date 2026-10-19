@@ -18,7 +18,7 @@ struct ChsTidePreview: Codable, Sendable {
               zip(samples, samples.dropFirst()).allSatisfy({
                   let gap = $1.time.timeIntervalSince($0.time)
                   // Two grid steps: one missing sample is a seam, more is a hole.
-                  return gap > 0 && gap <= 2 * ChsGrid.tide.seconds
+                  return gap > 0 && gap <= 2 * ChsGrid.seconds
               }) else { return nil }
         return samples[0].time...samples[samples.count - 1].time
     }

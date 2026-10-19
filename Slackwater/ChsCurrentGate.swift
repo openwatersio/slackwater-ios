@@ -146,7 +146,7 @@ struct ChsOnlineWindow: Codable, Sendable {
     let end: Date              // anchor + Timeline.onlineFetchDays, clamped to the samples
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
-    let times: [Double]        // epoch seconds, official samples on `ChsGrid.current`
+    let times: [Double]        // epoch seconds, official samples on `ChsGrid`
     let speeds: [Double]       // signed kn along the flood axis (project())
 
     var points: [CurrentPoint] {
@@ -159,7 +159,7 @@ struct ChsOnlineWindow: Codable, Sendable {
     /// tolerates exactly that much at the seam and no more: a wider gap means a
     /// sample is genuinely missing, which is a hole, and a hole must stay
     /// disjoint rather than be papered over.
-    static let sampleInterval = ChsGrid.current.seconds
+    static let sampleInterval = ChsGrid.seconds
 
     /// Union `other`'s samples into this window by timestamp and widen the
     /// bounds, dropping everything before `prunedBefore`.

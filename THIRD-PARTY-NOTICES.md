@@ -4,7 +4,7 @@ Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.m
 
 ## Code
 
-- [Slackwater](https://github.com/openwatersio/slackwater) — harmonic prediction and native least-squares fitting (`SlackwaterKit`). MIT. The fitter is ported from [chs-constituents](https://github.com/openwatersio/chs-constituents) (MIT, © 2026 Bryan Clark).
+- [Slackwater](https://github.com/openwatersio/slackwater) — harmonic prediction and native least-squares fitting (`SlackwaterKit`), and on-device CHS IWLS fetching (`SlackwaterIWLS`). MIT. The fitter is ported from [chs-constituents](https://github.com/openwatersio/chs-constituents) (MIT, © 2026 Bryan Clark).
 - [MapLibre Native](https://github.com/maplibre/maplibre-native) — map rendering. BSD-2-Clause.
 - [Almanac](https://github.com/openwatersio/almanac) — sun and moon calculations. MIT, with algorithms translated from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, © Don Cross).
 - [@slackwater/database](https://github.com/openwatersio/slackwater-database) and [@slackwater/engine](https://github.com/openwatersio/slackwater) — build-time inputs for the bundled stations: tide stations, station names, regions, aliases, and tide/current pairings. MIT.

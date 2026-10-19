@@ -4,6 +4,7 @@
 // background; each one lands as its fit completes.
 import Combine
 import Foundation
+import SlackwaterIWLS
 import SlackwaterKit
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
@@ -1004,6 +1005,7 @@ final class ChsFitService: ObservableObject {
             case .permanent(let reason), .transient(let reason): return reason
             case .networkDisabled: return "no connection"
             }
+        case let iwls as IwlsError: return iwls.localizedDescription
         case let url as URLError: return url.localizedDescription
         default: return (error as NSError).localizedDescription
         }
@@ -1019,7 +1021,7 @@ final class ChsFitService: ObservableObject {
         // The STATION's today, on the app clock — not the device's. A phone
         // set to UTC, or a traveller outside Pacific time, would otherwise
         // anchor the window a day off (#230).
-        let end = todayLocal(info.tz)
+        let end = IwlsFetch.localMidnight(now: appNow(), timeZone: info.tz)
         let plan = Self.chunkPlan(days: Self.tideFitDays, end: end)
         await MainActor.run { self.queue.setProgress(info.id, done: 0, total: plan.count) }
         var samples: [ChsSample] = []
@@ -1060,7 +1062,7 @@ final class ChsFitService: ObservableObject {
                                         fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
                                        series: "wcsp1", in: list)
-        let end = todayLocal(gate.tz)
+        let end = IwlsFetch.localMidnight(now: appNow(), timeZone: gate.tz)
         let plan = Self.chunkPlan(days: gate.fitDays, end: end)
         let total = plan.count * 2 + 1
         await MainActor.run { self.queue.setProgress(gate.id, done: 0, total: total) }
@@ -1122,25 +1124,8 @@ final class ChsFitService: ObservableObject {
             offset: fit.offset, rms: fit.rms, constituents: fit.constituents)
     }
 
-    /// 7-day chunks covering at least `days` back from `end`, NEWEST FIRST.
-    ///
-    /// Boundaries sit on an absolute 7-day epoch grid, not on `end` — so a
-    /// chunk's identity (and its cache file) is the same tomorrow as today, and
-    /// the 60-day plan is exactly the newest chunks of the 210-day plan. The
-    /// price is up to 7 days more data than asked for, which a harmonic fit can
-    /// only like. Only the newest chunk is short (grid boundary → `end`), and
-    /// it is the one chunk that is never cached.
     nonisolated static func chunkPlan(days: Double, end: Date) -> [ChsChunk] {
-        let week = 7 * 86_400.0
-        let endS = end.timeIntervalSince1970
-        var out: [ChsChunk] = []
-        var t = (((endS - days * 86_400) / week).rounded(.down)) * week
-        while t < endS {
-            out.append(ChsChunk(start: Date(timeIntervalSince1970: t),
-                                end: Date(timeIntervalSince1970: min(t + week, endS))))
-            t += week
-        }
-        return out.reversed()
+        IwlsFetch.chunkPlan(days: days, end: end)
     }
 
     /// Signed along-channel velocity: speed · cos(direction − floodDirection).
@@ -1157,10 +1142,7 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    /// Position is the match key, never name (web chs/resolve.ts): nearest
-    /// station serving the series within tolerance, else throw — a silent
-    /// mis-bind would put the wrong water under a trusted name.
-    nonisolated static let resolveToleranceKm = 3.0
+    nonisolated static let resolveToleranceKm = IwlsFetch.resolveToleranceKm
 
     nonisolated static func resolve(_ info: ChsStationInfo, in list: [IwlsStation]) throws -> IwlsStation {
         try resolve(name: info.name, latitude: info.latitude, longitude: info.longitude,
@@ -1169,16 +1151,8 @@ final class ChsFitService: ObservableObject {
 
     nonisolated static func resolve(name: String, latitude: Double, longitude: Double,
                                     series: String, in list: [IwlsStation]) throws -> IwlsStation {
-        let candidates = list.filter { st in st.timeSeries.contains { $0.code == series } }
-        guard let best = candidates.min(by: {
-            distanceKm(latitude, longitude, $0.latitude, $0.longitude) <
-            distanceKm(latitude, longitude, $1.latitude, $1.longitude)
-        }) else { throw ChsError.permanent("no IWLS station serves \(series)") }
-        let km = distanceKm(latitude, longitude, best.latitude, best.longitude)
-        guard km <= resolveToleranceKm else {
-            throw ChsError.permanent("\(name): nearest \(series) station \(best.officialName) is \(String(format: "%.1f", km)) km away")
-        }
-        return best
+        try IwlsFetch.resolve(name: name, latitude: latitude, longitude: longitude,
+                              series: series, in: list)
     }
 }
 
@@ -1189,8 +1163,9 @@ enum ChsError: Error {
     case transient(String)
 
     static func isPermanent(_ error: Error) -> Bool {
-        guard case .permanent = error as? ChsError else { return false }
-        return true
+        if case .permanent = error as? ChsError { return true }
+        if case .permanent = error as? IwlsError { return true }
+        return false
     }
 }
 

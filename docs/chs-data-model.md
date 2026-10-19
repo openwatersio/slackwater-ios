@@ -26,16 +26,15 @@ Both halves of that sentence constrain more work than people expect.
 
 | Series | What | Used for |
 |---|---|---|
-| `wlp` | water-level predictions, 1-minute native | tide ports — preview samples and full-model fitting on `ChsGrid.tide`, the engine recipe's grid (15 minutes) |
+| `wlp` | water-level predictions, 1-minute native | tide ports — preview samples and full-model fitting on the 15-minute grid SlackwaterIWLS fetches (`ChsGrid`) |
 | `wcsp1` | current speed predictions | current gates |
 | `wcdp1` | current direction predictions | current gates — projected onto the flood axis |
 | `wcp1-events` | CHS's own published slack/max events | **validation only**, never shipped |
 | `/metadata` | station metadata incl. the flood/ebb axis | the gate's axis, fetched at fit time |
 
-Stations are resolved **by position, never by name** — nearest IWLS station
-serving the required series within 3 km of the registry position
-(`ChsFitService.swift`, and see the resolve rule in
-`docs/validation/chs-currents.md`).
+The phone and watch use the MIT `SlackwaterIWLS` module for station resolution, chunk planning, HTTP pacing and retries, and sample decoding. The shared [IWLS fetching contract](https://github.com/openwatersio/slackwater/blob/main/docs/iwls-fetch.md) and its synthetic fixtures define compatibility across clients. `IwlsFetcher` keeps the app's cache storage, network kill switch, and UI-test fixtures; `ChsFitService` owns queueing, progress, and model persistence.
+
+Stations are resolved by position: the nearest IWLS station serving the required series within 3 km of the registry position. Fits end at the station's local midnight and fetch newest-first chunks on an absolute seven-day epoch grid. Cached and fetched samples use the same 15-minute filter; duplicate timestamps between chunks retain their fit weight.
 
 All of these are point series at a gauge. None is a field.
 
