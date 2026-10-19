@@ -174,6 +174,11 @@ extension Station: TidePredicting {}
 extension SubordinateTideStation: TidePredicting {}
 extension ChsTidePreview: TidePredicting {}
 
+/// How far ahead a card looks for its next turn. 30h guarantees one wherever
+/// the tide turns by at least the engine's 1 cm (web predicts ±30h for the
+/// same reason).
+let TIDE_NEXT_TURN_REACH: TimeInterval = 30 * 3600
+
 /// What a list card shows: height now, direction, next turn. Heights in metres.
 struct CardState {
     let height: Double
@@ -193,8 +198,7 @@ extension TideStationRecord {
     }
 
     func cardState(at now: Date, station: any TidePredicting) -> CardState {
-        // 30h forward guarantees a "next" exists (web predicts ±30h for the same reason).
-        let extremes = station.extremes(from: now, to: now.addingTimeInterval(30 * 3600))
+        let extremes = station.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH))
         let next = extremes.first { $0.time > now }
         let height = station.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
         // Direction from the next turn, not neighbouring samples (web tides.ts:

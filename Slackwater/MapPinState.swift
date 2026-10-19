@@ -5,15 +5,18 @@
 import Foundation
 import SlackwaterKit
 
-/// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
-/// half-period, so it always finds the next turn. Only the minority of
-/// stations flagged by the cheap check below pay for it.
-let PIN_TIDE_FALLBACK_WINDOW: TimeInterval = 13 * 3600
+/// The exact-search fallback's window is the card's own. Where the tide's
+/// turns are a few centimetres, SlackwaterKit's extremes can differ between
+/// windows (a sub-centimetre run longer than its search context filters
+/// differently), so only the same window guarantees the pin and the card name
+/// the same next turn. The engine searches 25h past each end anyway, so this
+/// costs little over a shorter window, and only the minority of stations
+/// flagged by the cheap check below pay for it.
+let PIN_TIDE_FALLBACK_WINDOW = TIDE_NEXT_TURN_REACH
 
-/// Exact direction via the same search `cardState(at:)` uses, just over a
-/// shorter (but still turn-guaranteeing) window. nil only if even that comes
-/// up empty — draw neutral rather than default "rising" the way the card
-/// does; a wrong colour is worse than an admitted grey.
+/// Exact direction via the same search `cardState(at:)` uses. nil only if it
+/// comes up empty — draw neutral rather than default "rising" the way the
+/// card does; a wrong colour is worse than an admitted grey.
 func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterval) -> Bool? {
     let next = record.engineStation.extremes(from: now, to: now.addingTimeInterval(window))
         .first { $0.time > now }
@@ -28,6 +31,12 @@ func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterv
 /// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment.
 let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
 let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
+/// SlackwaterKit drops any high and low closer than 1 cm, so the curve can dip
+/// against the next extreme it reports, but never by 1 cm. A diff under this
+/// floor may be one of those dips and falls back to the exact search. It
+/// decides at gauges whose whole tide is a few centimetres, such as the Great
+/// Lakes and the upper St Lawrence, where the relative floor admits sub-cm diffs.
+let PIN_TIDE_TURN_FLOOR_M: Double = 0.01
 private let constituentSpeed: [String: Double] = [   // degrees/hour
     "M2": 28.9841, "S2": 30.0, "N2": 28.4397, "K2": 30.0821,
     "K1": 15.0411, "O1": 13.9430, "P1": 14.9589, "Q1": 13.3987,
@@ -45,15 +54,15 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     // extremes, so the exact search is the only search. 2,017 of them cost
     // ~0.26 ms each here (debug), which is why the budget is per CAMERA and
     // not per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
-    if record.isSubordinate { return tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
+    if record.isSubordinate { return fallback() }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
     guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it
     let pts = record.engineStation.heights(from: now, to: now.addingTimeInterval(PIN_TIDE_DIFF_DT),
                                            step: PIN_TIDE_DIFF_DT)
     guard pts.count >= 2 else { return fallback() }
     let delta = pts[1].height - pts[0].height
-    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD else { return fallback() }
+    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD, abs(delta) >= PIN_TIDE_TURN_FLOOR_M else { return fallback() }
     return delta > 0
 }
 
