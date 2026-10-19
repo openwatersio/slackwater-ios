@@ -98,7 +98,7 @@ final class IwlsFixtureTests: XCTestCase {
 
     func testInvalidFitIsPermanent() async {
         do {
-            _ = try await ChsFitter().fit(samples: [])
+            _ = try await ChsFitter().fit(samples: [], basis: ChsFitter.tideBasis)
             XCTFail("empty samples must fail")
         } catch {
             XCTAssertTrue(ChsError.isPermanent(error))
@@ -181,9 +181,9 @@ final class IwlsFixtureTests: XCTestCase {
     func testRealFitterPredictsHeldOutVictoriaSamples() async throws {
         let fixture = try recording()
         let victoria = try XCTUnwrap(fixture.stations.first { $0.key == "victoria" })
-        let all = try samples(victoria, "wlp").filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
+        let all = try samples(victoria, "wlp").filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.tide.ms) == 0 }
         let split = all.count * 5 / 6
-        let fit = try await ChsFitter().fit(samples: Array(all[..<split]))
+        let fit = try await ChsFitter().fit(samples: Array(all[..<split]), basis: ChsFitter.tideBasis)
         try assertGolden(fit, "victoria")
         XCTAssertGreaterThanOrEqual(fit.constituents.count, 20)
         XCTAssertLessThan(fit.rms, 0.15)
@@ -229,8 +229,8 @@ final class IwlsFixtureTests: XCTestCase {
         let holdoutStart = try XCTUnwrap(projected.last).t - 7 * 86_400_000
         let training = projected.filter { $0.t < holdoutStart }
         let provisionalStart = holdoutStart - 60 * 86_400_000
-        let provisional = try await ChsFitter().fit(samples: training.filter { $0.t >= provisionalStart })
-        let full = try await ChsFitter().fit(samples: training)
+        let provisional = try await ChsFitter().fit(samples: training.filter { $0.t >= provisionalStart }, basis: ChsFitter.currentBasis)
+        let full = try await ChsFitter().fit(samples: training, basis: ChsFitter.currentBasis)
         try assertGolden(provisional, "dodd60")
         try assertGolden(full, "doddFull")
         XCTAssertGreaterThanOrEqual(provisional.constituents.count, 20)

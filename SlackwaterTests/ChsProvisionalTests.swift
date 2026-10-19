@@ -137,7 +137,7 @@ final class ChsProvisionalTests: XCTestCase {
         let missing = ChsChunk(start: start.addingTimeInterval(-7 * 86_400), end: start)
         defer { ChsChunkStore.purge("test-station") }
 
-        let grid = (start.timeIntervalSince1970 / 900).rounded(.up) * 900_000
+        let grid = (start.timeIntervalSince1970 / ChsGrid.current.seconds).rounded(.up) * ChsGrid.current.ms
         ChsChunkStore.save([ChsSample(t: grid, v: 2), ChsSample(t: grid + 60_000, v: 3)],
                            "test-station", "wcsp1", chunk)
         let offline = IwlsFetcher(killSwitch: true)

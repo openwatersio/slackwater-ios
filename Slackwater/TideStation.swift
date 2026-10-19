@@ -179,6 +179,16 @@ extension ChsTidePreview: TidePredicting {}
 /// same reason).
 let TIDE_NEXT_TURN_REACH: TimeInterval = 30 * 3600
 
+/// The heights a gauge draws between, or nil unless `prev` and `next` are a
+/// low and a high and `next` is the turn the direction points at. Two searches
+/// over different windows can return turns of one kind, or disagree with the
+/// direction, where the engine's extremes depend on the window
+/// (slackwater#436); no gauge beats one with a high for its low.
+func tideGaugeBounds(prev: TideExtreme, next: TideExtreme, rising: Bool) -> (lo: Double, hi: Double)? {
+    guard prev.kind != next.kind, (next.kind == .high) == rising else { return nil }
+    return (min(prev.height, next.height), max(prev.height, next.height))
+}
+
 /// What a list card shows: height now, direction, next turn. Heights in metres.
 struct CardState {
     let height: Double

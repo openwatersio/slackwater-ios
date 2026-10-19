@@ -133,7 +133,7 @@ private func seedCurrentModel(stationID: String, provisional: Bool) {
 /// for a real fetch (`covers`'s neighborhood, ChsCurrentGate.swift) — so
 /// `OnlineGateDetailView` reads it as
 /// current and renders the fetched detail on first launch, no network
-/// involved. An M2-ish sine (12.42h period, ~2 kn amplitude) at 15-min samples
+/// involved. An M2-ish sine (12.42h period, ~2 kn amplitude) at official-sample cadence
 /// gives the strip real slacks and maxima to assert against, not a flat line.
 ///
 /// `-chsResetModels` (ChsStation.swift) already clears this file too: it
@@ -179,7 +179,7 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
     while t <= end {
         times.append(t.timeIntervalSince1970)
         speeds.append(amplitude * sin(2 * .pi * t.timeIntervalSince(start) / period))
-        t = t.addingTimeInterval(900)  // 15-min official-sample cadence
+        t = t.addingTimeInterval(ChsGrid.current.seconds)  // the official-sample cadence
     }
     let window = ChsOnlineWindow(
         stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,

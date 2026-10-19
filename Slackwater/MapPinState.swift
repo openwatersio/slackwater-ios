@@ -8,10 +8,11 @@ import SlackwaterKit
 /// The exact-search fallback's window is the card's own. Where the tide's
 /// turns are a few centimetres, SlackwaterKit's extremes can differ between
 /// windows (a sub-centimetre run longer than its search context filters
-/// differently), so only the same window guarantees the pin and the card name
-/// the same next turn. The engine searches 25h past each end anyway, so this
-/// costs little over a shorter window, and only the minority of stations
-/// flagged by the cheap check below pay for it.
+/// differently, slackwater#436), so only the card's own search guarantees the
+/// pin and the card name the same next turn for the same instant. The engine
+/// searches 25h past each end anyway, so this costs little over a shorter
+/// window, and only the minority of stations flagged by the cheap check below
+/// pay for it.
 let PIN_TIDE_FALLBACK_WINDOW = TIDE_NEXT_TURN_REACH
 
 /// Exact direction via the same search `cardState(at:)` uses. nil only if it
@@ -103,7 +104,7 @@ let PIN_GAUGE_BUCKETS = 8
 func tidePinState(_ record: TideStationRecord, at now: Date,
                   imperial: Bool, detailed: Bool, station override: (any TidePredicting)? = nil) -> PinState {
     let previewRising = override.flatMap { predictor in
-        predictor.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first.map { $0.kind == .high }
+        predictor.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first { $0.time > now }.map { $0.kind == .high }
             ?? predictor.rates(from: now, to: now.addingTimeInterval(1), step: 1).first.map { $0.rate >= 0 }
     }
     guard let rising = previewRising ?? tidePinRisingHybrid(record, at: now) else {
@@ -115,13 +116,15 @@ func tidePinState(_ record: TideStationRecord, at now: Date,
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
     else { return PinState(state: state) }
     // The gauge: where the height sits between the surrounding extremes.
-    // ±15h brackets any station's cycle.
+    // ±15h brackets a turn either side almost everywhere; where it doesn't,
+    // or its turns disagree with the colour, the pin draws a dot.
     let gauge: Int? = {
         let extremes = station.extremes(from: now.addingTimeInterval(-15 * 3600),
                                         to: now.addingTimeInterval(15 * 3600))
         guard let prev = extremes.last(where: { $0.time <= now }),
-              let next = extremes.first(where: { $0.time > now }) else { return nil }
-        let lo = min(prev.height, next.height), hi = max(prev.height, next.height)
+              let next = extremes.first(where: { $0.time > now }),
+              let bounds = tideGaugeBounds(prev: prev, next: next, rising: rising) else { return nil }
+        let lo = bounds.lo, hi = bounds.hi
         guard hi - lo > 0.01 else { return nil }
         let f = min(1, max(0, (height - lo) / (hi - lo)))
         return Int((f * Double(PIN_GAUGE_BUCKETS)).rounded())

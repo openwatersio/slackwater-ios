@@ -61,8 +61,8 @@ struct ComplicationReading: Equatable {
             let next = s.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first { $0.time > now }
             let rising = next.map { $0.kind == .high } ?? true
             var gauge: Gauge?
-            if let last, let next {
-                let lo = min(last.height, next.height), hi = max(last.height, next.height)
+            if let last, let next, let bounds = tideGaugeBounds(prev: last, next: next, rising: rising) {
+                let lo = bounds.lo, hi = bounds.hi
                 gauge = Gauge(fraction: hi > lo ? min(1, max(0, (height - lo) / (hi - lo))) : 0.5,
                               startText: formatHeight(lo, imperial: imperial),
                               endText: formatHeight(hi, imperial: imperial),

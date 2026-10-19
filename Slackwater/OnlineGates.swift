@@ -177,8 +177,8 @@ extension ChsOnlineWindow {
         return start <= need.start && end >= need.end
     }
 
-    /// The list/search card's reading: nearest 15-min sample to `now` (a card
-    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
+    /// The list/search card's reading: nearest official sample to `now` (a card
+    /// tolerates half a sample interval of slop; `OnlineGateDetailView`'s scrub is where
     /// interpolating the drawn curve earns its keep), and the next event from
     /// the same fetched series `sampleEvents` scans — the same shape
     /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the

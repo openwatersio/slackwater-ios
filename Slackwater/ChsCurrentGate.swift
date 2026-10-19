@@ -146,20 +146,20 @@ struct ChsOnlineWindow: Codable, Sendable {
     let end: Date              // anchor + Timeline.onlineFetchDays, clamped to the samples
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
-    let times: [Double]        // epoch seconds, 15-min official samples
+    let times: [Double]        // epoch seconds, official samples on `ChsGrid.current`
     let speeds: [Double]       // signed kn along the flood axis (project())
 
     var points: [CurrentPoint] {
         zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
     }
 
-    /// IWLS's last returned sample routinely lands one 15-min interval short of
+    /// IWLS's last returned sample routinely lands one sample interval short of
     /// the requested end, and `fetchOnlineWindow` clamps `end` down to it — so
     /// two blocks that ought to abut can arrive one sample apart. `merging`
     /// tolerates exactly that much at the seam and no more: a wider gap means a
     /// sample is genuinely missing, which is a hole, and a hole must stay
     /// disjoint rather than be papered over.
-    static let sampleInterval = 900.0
+    static let sampleInterval = ChsGrid.current.seconds
 
     /// Union `other`'s samples into this window by timestamp and widen the
     /// bounds, dropping everything before `prunedBefore`.

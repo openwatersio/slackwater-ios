@@ -46,6 +46,33 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertLessThan(lo, hi)
     }
 
+    /// At Kemi Ajos at 17:20 on the new engine, the last turn before now and
+    /// the card's next turn are both highs, because the engine's extremes
+    /// depend on the search window there (slackwater#436). A gauge between two
+    /// highs labels one of them the low, so the complication draws none, and
+    /// its word still follows the card. If #436 is fixed and the turns
+    /// alternate here, pick another instant for the gauge assertion.
+    func testNoGaugeBetweenTwoTurnsOfOneKindAndTheWordFollowsTheCard() throws {
+        let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == "ticon/kemi_ajos-100539-fin-fmi" })
+        let now = Date(timeIntervalSince1970: 1_785_777_600)
+        let station = WidgetStation.tide(record.engineStation, tz: utc, name: record.name)
+        let r = try XCTUnwrap(ComplicationReading.build(station, now: now))
+        XCTAssertNil(r.gauge, "the two turns are both highs here (slackwater#436)")
+        XCTAssertEqual(r.word, record.cardState(at: now).rising ? "Rising" : "Falling")
+    }
+
+    func testGaugeBoundsNeedALowAndAHighAgreeingWithTheDirection() {
+        let t = Date(timeIntervalSince1970: 0)
+        let low = TideExtreme(time: t, height: 0.1, kind: .low)
+        let high = TideExtreme(time: t.addingTimeInterval(6 * 3600), height: 0.9, kind: .high)
+        let otherHigh = TideExtreme(time: t.addingTimeInterval(-6 * 3600), height: 0.8, kind: .high)
+        XCTAssertNil(tideGaugeBounds(prev: otherHigh, next: high, rising: true), "two highs")
+        XCTAssertNil(tideGaugeBounds(prev: low, next: high, rising: false), "next is a high but the direction says falling")
+        let bounds = tideGaugeBounds(prev: low, next: high, rising: true)
+        XCTAssertEqual(bounds?.lo, 0.1)
+        XCTAssertEqual(bounds?.hi, 0.9)
+    }
+
     func testValueTextCarriesNoUnit() throws {
         let saved = AppGroup.defaults.string(forKey: unitsKey)
         defer { AppGroup.defaults.set(saved, forKey: unitsKey) }

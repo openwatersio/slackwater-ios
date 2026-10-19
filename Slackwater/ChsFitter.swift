@@ -10,17 +10,25 @@ struct ChsFitResult: Decodable {
 }
 
 struct ChsFitter {
-    // The engine's shared CHS tide recipe. Current gates fit the same basis
-    // until the engine carries a current recipe (slackwater#431).
-    static let basis = ChsTideFit.basis
+    /// The engine's shared CHS tide recipe.
+    static let tideBasis = ChsTideFit.basis
+    /// Current gates keep their own copy of the 23 constituents their bar was
+    /// measured with (docs/validation/chs-currents.md), so a change to the
+    /// engine's tide recipe can't move a current fit without its own
+    /// validation. It moves to the engine with slackwater#431.
+    static let currentBasis = [
+        "M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1",
+        "M4", "MS4", "MN4", "2N2", "MU2", "NU2", "L2", "T2",
+        "J1", "MM", "MSF", "MF", "M6", "S4", "M3",
+    ]
 
-    func fit(samples: [ChsSample]) async throws -> ChsFitResult {
+    func fit(samples: [ChsSample], basis: [String]) async throws -> ChsFitResult {
         try Task.checkCancellation()
         let start = ContinuousClock.now
         do {
             let result = try SlackwaterKit.fit(samples: samples.map {
                 HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
-            }, constituents: Self.basis)
+            }, constituents: basis)
             try Task.checkCancellation()
             let elapsed = start.duration(to: .now).components
             return ChsFitResult(

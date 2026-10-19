@@ -8,6 +8,7 @@
 // on-device, stored on the user's devices, and never publicly re-served.
 // Fitted models can be copied privately to the user's paired watch. No CHS data is bundled.
 import Foundation
+import SlackwaterKit
 import Synchronization
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
@@ -239,4 +240,37 @@ extension ChsModelStore {
 extension TideStationRecord {
     /// Fitted-on-device CHS station, vs a bundled NOAA harmonic station.
     var isChs: Bool { id.hasPrefix("chs-") }
+}
+
+/// A sampling grid CHS series are fetched and fitted on.
+struct ChsGrid {
+    let minutes: Int
+    var ms: Double { Double(minutes) * 60_000 }
+    var seconds: Double { Double(minutes) * 60 }
+    /// nil when IWLS doesn't serve the step, which fails the request.
+    var resolution: String? { Self.iwlsResolution(minutes) }
+
+    /// Tide ports follow the engine's shared recipe, `ChsTideFit`.
+    static let tide = ChsGrid(minutes: ChsTideFit.sampleMinutes)
+    /// Current gates and online windows keep the 15-minute grid the app has
+    /// always fetched them on, like `ChsFitter.currentBasis`, so a change to
+    /// the tide recipe can't move them. They move to the engine with
+    /// slackwater#431.
+    static let current = ChsGrid(minutes: 15)
+
+    /// `wlp` is a tide series; every other series IWLS serves the app is a current's.
+    static func of(_ code: String) -> ChsGrid { code == "wlp" ? tide : current }
+
+    /// IWLS's name for a step, or nil for a step it doesn't serve (it answers
+    /// those with a 400).
+    static func iwlsResolution(_ minutes: Int) -> String? {
+        switch minutes {
+        case 1: "ONE_MINUTE"
+        case 3: "THREE_MINUTES"
+        case 5: "FIVE_MINUTES"
+        case 15: "FIFTEEN_MINUTES"
+        case 60: "SIXTY_MINUTES"
+        default: nil
+        }
+    }
 }

@@ -3,10 +3,9 @@
 //
 // Constraints this client is built to:
 //   - no fetch inside JSCore — IWLS goes over URLSession here
-//   - series are requested on the engine recipe's grid, `ChsGrid` (IWLS is 1-min native)
+//   - series are requested on their `ChsGrid`: tides on the engine recipe's (IWLS is 1-min native)
 //   - 7-day request cap; queries by resolved Mongo id, never station code
 import Foundation
-import SlackwaterKit
 #if DEBUG
 import notify
 #endif
@@ -28,33 +27,6 @@ struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
 /// One request's worth of series: a 7-day slot on the absolute epoch grid.
 struct ChsChunk: Equatable { let start: Date; let end: Date }
 
-/// The sampling grid every CHS fit uses, from the engine's `ChsTideFit`.
-/// Current series share it until the engine carries a current recipe
-/// (slackwater#431).
-enum ChsGrid {
-    static let minutes = ChsTideFit.sampleMinutes
-    static let ms = Double(minutes) * 60_000
-    static let resolution: String = {
-        guard let name = iwlsResolution(minutes) else {
-            preconditionFailure("IWLS serves no \(minutes)-minute resolution")
-        }
-        return name
-    }()
-
-    /// IWLS's name for a step, or nil for a step it doesn't serve (it answers
-    /// those with a 400).
-    static func iwlsResolution(_ minutes: Int) -> String? {
-        switch minutes {
-        case 1: "ONE_MINUTE"
-        case 3: "THREE_MINUTES"
-        case 5: "FIVE_MINUTES"
-        case 15: "FIFTEEN_MINUTES"
-        case 60: "SIXTY_MINUTES"
-        default: nil
-        }
-    }
-}
-
 /// Fetched chunks, on disk, keyed by what identifies them and nothing else —
 /// so a job that retries mid-download resumes where it stopped instead of
 /// paying for the same bytes twice. Purged per station once its final fit lands
@@ -69,7 +41,8 @@ enum ChsChunkStore {
         // Every cached chunk so far was written on the 15-minute grid, so only
         // another grid needs its own name. Filtering can coarsen a cached
         // chunk, but nothing can refine one.
-        let grid = ChsGrid.minutes == 15 ? "" : "-\(ChsGrid.minutes)m"
+        let minutes = ChsGrid.of(code).minutes
+        let grid = minutes == 15 ? "" : "-\(minutes)m"
         return dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970))\(grid).json")
     }
 
@@ -180,7 +153,7 @@ final class IwlsFetcher {
             default: value = 3 + 1.5 * sin(phase) + 0.4 * sin(phase / 2)
             }
             out.append(ChsSample(t: date.timeIntervalSince1970 * 1000, v: value))
-            date = date.addingTimeInterval(900)
+            date = date.addingTimeInterval(ChsGrid.of(code).seconds)
         }
         return out
     }
@@ -367,7 +340,7 @@ final class IwlsFetcher {
     /// so this costs a request exactly once across retries and days.
     func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
         try await cached(code, stationID: stationID, chunk: chunk) {
-            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.ms) == 0 }
+            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.of(code).ms) == 0 }
         }
     }
 
@@ -375,7 +348,7 @@ final class IwlsFetcher {
     /// grid for chunks cached on disk at IWLS's native 1-min rate.
     func wlp(stationID: String, chunk: ChsChunk, cache: Bool = true) async throws -> [ChsSample] {
         try await cached("wlp", stationID: stationID, chunk: chunk, cache: cache) {
-            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.ms) == 0 }
+            $0.filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.tide.ms) == 0 }
         }
     }
 
@@ -409,10 +382,10 @@ final class IwlsFetcher {
         if Self.usesFixture {
             raw = Self.fixtureSamples(code, chunk)
         } else {
-            raw = try Self.decode(try await get(Self.dataPath(code, stationID, chunk)))
+            raw = try Self.decode(try await get(try Self.dataPath(code, stationID, chunk)))
         }
 #else
-        raw = try Self.decode(try await get(Self.dataPath(code, stationID, chunk)))
+        raw = try Self.decode(try await get(try Self.dataPath(code, stationID, chunk)))
 #endif
         let samples = transform(raw)
         // Only whole grid chunks are cached: the newest one runs to "now" and
@@ -425,11 +398,14 @@ final class IwlsFetcher {
 
     /// Samples at the fit's step: a fraction of the 1-minute default's bytes,
     /// with identical values at those stamps.
-    static func dataPath(_ code: String, _ stationID: String, _ chunk: ChsChunk) -> String {
+    static func dataPath(_ code: String, _ stationID: String, _ chunk: ChsChunk) throws -> String {
+        guard let resolution = ChsGrid.of(code).resolution else {
+            throw ChsError.permanent("IWLS serves no \(ChsGrid.of(code).minutes)-minute resolution")
+        }
         let iso = ISO8601DateFormatter()
         return "/stations/\(stationID)/data?time-series-code=\(code)" +
             "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))" +
-            "&resolution=\(ChsGrid.resolution)"
+            "&resolution=\(resolution)"
     }
 
     static func decode(_ data: Data) throws -> [ChsSample] {

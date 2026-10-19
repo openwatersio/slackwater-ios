@@ -101,7 +101,7 @@ func cachedGet(_ path: String, key: String) throws -> Data {
     fatalError("IWLS still failing after 6 attempts for \(path)")
 }
 
-// --- resolve by position (never name), nearest wlp station within 3 km ---
+// --- resolve by position (never name), nearest wcsp1 station within 3 km ---
 struct IwlsStation: Decodable {
     struct Series: Decodable { let code: String }
     let id: String, officialName: String, latitude: Double, longitude: Double
@@ -152,7 +152,7 @@ func fetchSeries(_ code: String, _ from: Date, _ to: Date) throws -> [(t: Double
     return out
 }
 
-// The JavaScript reference artifacts (shared by both modes).
+// The JavaScript reference artifacts (shared by current and file modes).
 let resources = URL(fileURLWithPath: #filePath) // tools/FitValidation/Sources/fit-validation/main.swift
     .deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
