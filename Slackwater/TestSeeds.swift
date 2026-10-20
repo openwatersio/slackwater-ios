@@ -34,6 +34,13 @@ import Foundation
     if CommandLine.arguments.contains("-resetComfortCurrent") {
         AppGroup.defaults.removeObject(forKey: AppGroup.slackWindowSpeedKey)
     }
+    // -comfortCurrent <kn> writes the setting, so a shot can match the
+    // Settings frame it sits beside.
+    if let at = CommandLine.arguments.firstIndex(of: "-comfortCurrent"),
+       CommandLine.arguments.indices.contains(at + 1),
+       let kn = Double(CommandLine.arguments[at + 1]) {
+        AppGroup.defaults.set(kn, forKey: AppGroup.slackWindowSpeedKey)
+    }
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
     }
