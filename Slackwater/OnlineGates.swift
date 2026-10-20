@@ -51,7 +51,21 @@ extension ChsFitService {
     /// so it is recoverable; key the span in too if that ever reads as a bug.
     nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
                                              from anchor: Date?) async throws -> ChsOnlineWindow {
-        try await MainActor.run { shared.onlineFetchTask(for: gate, from: anchor) }.value
+        try await fetchOnlineUpdate(for: gate, from: anchor ?? todayLocal(gate.tz)) { from in
+            try await shared.onlineFetchTask(for: gate, from: from).value
+        }
+    }
+
+    /// A date-specific fetch must also replace any today refresh it displaced.
+    static func fetchOnlineUpdate(for gate: ChsCurrentGateInfo, from anchor: Date,
+                                  fetch: (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
+        let fetched = try await fetch(anchor)
+        let today = todayLocal(gate.tz)
+        if anchor != today, !fetched.covers(anchor: today),
+           ChsModelStore.loadOnline(gate.id)?.block(covering: today) == nil {
+            _ = try? await fetch(today)
+        }
+        return fetched
     }
 
     /// The check-and-set, on the main actor so it is atomic: an existing handle

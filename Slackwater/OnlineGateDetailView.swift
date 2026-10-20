@@ -37,6 +37,7 @@ struct OnlineGateDetailView: View {
     /// The day a scrub settled against the strip's end on, while its block
     /// downloads. The week on screen stays put until it lands (`extend`).
     @State private var pendingAnchor: Date?
+    @State private var pendingFetchAnchor: Date?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -190,11 +191,11 @@ struct OnlineGateDetailView: View {
             }
             .onReceive(ChsFitService.shared.$onlineStates
                 .map { $0[gate.id] ?? .idle }.removeDuplicates()) { state in
-                    // The service's own retry re-checks only today's block, so a
-                    // pending week asks again when the backoff ends.
-                    let backedOff = if case .deferred = fetchState { state == .idle } else { false }
+                    // A completed fetch can cover today while leaving the week at the strip's edge uncovered.
+                    let resumePending = onlineGateShouldResumePendingFetch(
+                        from: fetchState, to: state, pendingFetchActive: pendingFetchAnchor != nil)
                     fetchState = state
-                    if backedOff { fetchPending() }
+                    if resumePending { fetchPending() }
                 }
             .onReceive(ChsFitService.shared.$onlineProgress
                 .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
@@ -278,8 +279,15 @@ struct OnlineGateDetailView: View {
     /// Twice at most: the first call joins any fetch already in flight (the
     /// picker's prefetch), which may be for a different block.
     private func fetchPending() {
-        guard let next = pendingAnchor, net.online else { return }
+        guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
+        if landIfCovered(next, fetched: window) { return }
+        pendingFetchAnchor = next
         Task { @MainActor in
+            defer {
+                pendingFetchAnchor = nil
+                // A different week gets its own budget; incomplete data must not restart this one.
+                if let pendingAnchor, pendingAnchor != next { fetchPending() }
+            }
             for _ in 0..<2 {
                 guard let fetched = try? await ChsFitService.fetchOnlineWindow(for: gate, from: next),
                       pendingAnchor == next else { return }
@@ -338,12 +346,14 @@ struct OnlineGateDetailView: View {
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("online-provenance")
-            Text(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))
-                .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
-            Button("Refresh") { fetchNow(from: todayLocal(tz)) }
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
-                .disabled(fetchState == .fetching || !net.online)
+            HStack(spacing: 16) {
+                DownloaderConnectionIndicator()
+                Spacer(minLength: 8)
+                OnlineDownloadStatus(gate: gate, window: window) {
+                    guard net.online, ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
+                    fetchNow(from: todayLocal(tz))
+                }
+            }
         }
     }
 
@@ -354,6 +364,7 @@ struct OnlineGateDetailView: View {
                      expectation: expectation, action: downloadAction,
                      identifier: "online-honesty-card", status: downloadStatus,
                      downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
+            guard net.online, ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
             fetchNow(from: anchor)
         }
     }
@@ -364,6 +375,9 @@ struct OnlineGateDetailView: View {
                      headline: String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation."),
                      action: downloadAction, identifier: "online-extending-card", status: downloadStatus,
                      downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
+            guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
+            if landIfCovered(next, fetched: window) { return }
+            guard ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
             fetchPending()
         }
         .padding(.horizontal, -16)
@@ -377,16 +391,16 @@ struct OnlineGateDetailView: View {
         switch downloadStatus {
         case .downloading: String(localized: "Downloading", comment: "Offline-prediction card title.")
         case .retrying: String(localized: "Waiting to retry", comment: "Offline-prediction card title.")
-        case .failed: String(localized: "Download failed", comment: "Offline-prediction card title.")
-        case .offline: String(localized: "Waiting for signal", comment: "Offline-prediction card title.")
-        case .expired: String(localized: "Offline download expired", comment: "Offline-prediction card title.")
+        case .failed: String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
+        case .offline: String(localized: "Waiting for signal", comment: "Prediction card title when the downloader is offline.")
+        case .expired: String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.")
         default: String(localized: "Download for offline use", comment: "Offline-prediction card title.")
         }
     }
 
     private var downloadAction: String {
         switch downloadStatus {
-        case .downloading: String(localized: "Downloading…", comment: "Offline-prediction action while downloading.")
+        case .downloading: String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
         case .retrying: String(localized: "Retry now", comment: "Offline-prediction action.")
         case .failed: String(localized: "Retry", comment: "Offline-prediction action.")
         case .expired: String(localized: "Download", comment: "Offline-prediction action.")
@@ -449,5 +463,15 @@ struct OnlineGateDetailView: View {
         timeline = TimelineData.build(onlinePoints: window.points, tz: tz,
                                       lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,
                                       threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+    }
+}
+
+func onlineGateShouldResumePendingFetch(from previous: ChsFitService.OnlineFetchState,
+                                       to next: ChsFitService.OnlineFetchState,
+                                       pendingFetchActive: Bool = false) -> Bool {
+    guard next == .idle, !pendingFetchActive else { return false }
+    switch previous {
+    case .fetching, .deferred: return true
+    case .idle, .failed: return false
     }
 }

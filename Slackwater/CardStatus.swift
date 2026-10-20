@@ -59,18 +59,17 @@ enum CardStatus: Equatable {
     var label: String {
         switch self {
         case .downloading: String(localized: "Downloading", comment: "Compact download status.")
-        case .queued: String(localized: "Queued", comment: "Compact download status.")
+        case .queued: String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
         case .retrying: String(localized: "Retrying", comment: "Compact download status.")
         case .notQueued: ""
         case .offline: String(localized: "Offline", comment: "Compact network status.")
-        case .expired: String(localized: "Expired", comment: "Compact offline-download status.")
-        case .notDownloaded: String(localized: "Not downloaded", comment: "Compact offline-download status.")
+        case .expired: String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.")
+        case .notDownloaded: String(localized: "Not downloaded", comment: "Predictions are not stored on this device.")
         case .failed: String(localized: "Failed", comment: "Compact download status.")
         }
     }
 
-    /// VoiceOver keeps the sentence the strip dropped — including when the
-    /// active queue states reduce to an icon (#93).
+    /// VoiceOver expands automatic download states that the strip reduces to icons.
     var accessibilityLabel: String {
         switch self {
         case .downloading: return String(localized: "Downloading — Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
@@ -78,7 +77,7 @@ enum CardStatus: Equatable {
         case .retrying: return String(localized: "Retrying — Slackwater tries again on its own. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
         case .notQueued: return String(localized: "Predictions are not downloaded.", comment: "VoiceOver download status.")
         case .offline: return String(localized: "Offline — needs a moment of signal. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
-        case .expired: return String(localized: "Expired — get back online to download current predictions.", comment: "VoiceOver download status.")
+        case .expired: return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.")
         case .notDownloaded: return String(localized: "Not downloaded — get back online to download predictions.", comment: "VoiceOver download status.")
         case .failed: return String(localized: "Station unavailable.", comment: "VoiceOver station status.")
         }
@@ -102,7 +101,7 @@ enum CardStatus: Equatable {
 /// source is irrelevant here; people only need to know how long the local
 /// copy remains useful.
 func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current) -> String {
-    guard end > now else { return String(localized: "Offline download expired", comment: "Offline-download expiry status.") }
+    guard end > now else { return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.") }
     let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
                                        to: calendar.startOfDay(for: end)).day ?? 0
     if days <= 0 { return String(localized: "Expires today", comment: "Offline-download expiry status.") }

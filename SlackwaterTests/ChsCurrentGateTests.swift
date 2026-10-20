@@ -7,6 +7,57 @@ import XCTest
 import SlackwaterKit
 
 final class ChsCurrentGateTests: XCTestCase {
+    func testPendingWeekResumesAfterManualUpdateCompletes() {
+        XCTAssertTrue(onlineGateShouldResumePendingFetch(from: .fetching, to: .idle),
+                      "Finishing a manual update must resume any still-uncovered pending week")
+        XCTAssertTrue(onlineGateShouldResumePendingFetch(from: .deferred(.distantFuture), to: .idle))
+        XCTAssertFalse(onlineGateShouldResumePendingFetch(from: .deferred(.distantFuture), to: .fetching),
+                       "A pending week must not preempt the manual update as it starts")
+        XCTAssertFalse(onlineGateShouldResumePendingFetch(from: .fetching, to: .deferred(.distantFuture)),
+                       "A failed fetch must respect the new retry delay")
+        XCTAssertFalse(onlineGateShouldResumePendingFetch(from: .idle, to: .idle))
+    }
+
+
+    func testPendingWeekCompletionDoesNotStartAnotherFetchCycle() {
+        XCTAssertFalse(onlineGateShouldResumePendingFetch(from: .fetching, to: .idle,
+                                                          pendingFetchActive: true),
+                       "A partial response must not give the pending week another two attempts")
+    }
+
+    @MainActor
+    func testManualFutureUpdateAlsoFetchesMissingTodayOnlyOnce() async throws {
+        let gate = ChsCurrentGateInfo(id: "chs-test-\(UUID().uuidString)", name: "Test", region: "Test",
+                                     aliases: [], latitude: 49, longitude: -123, timezone: "America/Vancouver",
+                                     tideReference: nil, fitDays: 0, provisionalSlackMinutes: nil, online: true)
+        let today = todayLocal(gate.tz)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = gate.tz
+        let future = calendar.date(byAdding: .day, value: 60, to: today)!
+        let span = Timeline.window(anchor: future)
+        let partial = onlineWindow([span.start.timeIntervalSince1970,
+                                    span.end.timeIntervalSince1970], [1, 2], id: gate.id)
+        var requests: [Date] = []
+        let result = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+            requests.append(anchor)
+            return partial
+        }
+        XCTAssertEqual(requests, [future, today],
+                       "A manual future update must replace the today request it removed from the queue")
+        XCTAssertEqual(result.start, partial.start, "The requested week remains the result for the detail")
+
+        let todaySpan = Timeline.window(anchor: today)
+        let cached = onlineWindow([todaySpan.start.timeIntervalSince1970,
+                                   todaySpan.end.timeIntervalSince1970], [1, 2], id: gate.id)
+        try ChsModelStore.saveOnline(cached)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id)) }
+        requests = []
+        _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+            requests.append(anchor)
+            return partial
+        }
+        XCTAssertEqual(requests, [future], "An existing today block must not be downloaded again")
+    }
 
     // MARK: - Bundled identity (chs-current-gates.json, generated from the registry)
 
@@ -275,7 +326,7 @@ final class ChsCurrentGateTests: XCTestCase {
                        "Expires in 1 day")
         XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: -1, to: now)!,
                                               now: now, calendar: cal),
-                       "Offline download expired")
+                       "Expired")
     }
 
     // MARK: - Merging (the 30-day fetch, unioned on save)

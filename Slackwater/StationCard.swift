@@ -15,8 +15,8 @@ func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -
             $0 <= 1
                 ? String(localized: "Next", comment: "First position in the download queue.")
                 : String(localized: "\(ordinal($0)) in line", comment: "Download queue position. The value is a locale-formatted ordinal.")
-        } ?? String(localized: "Queued", comment: "Compact download status.")
-    case .ready: return String(localized: "Queued", comment: "Compact download status.")
+        } ?? String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
+    case .ready: return String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
     case .failed: return String(localized: "Failed", comment: "Compact download status.")
     }
 }

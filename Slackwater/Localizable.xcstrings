@@ -6295,6 +6295,101 @@
         }
       }
     },
+    "Update now" : {
+      "comment" : "Fetch fresh predictions for a previously downloaded station. Available only while online.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opdater nu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jetzt aktualisieren"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar ahora"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Päivitä nyt"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser maintenant"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuashonraigh anois"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ùraich an-dràsta"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna ora"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今すぐ更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 업데이트"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oppdater nå"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nu bijwerken"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar agora"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar agora"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uppdatera nu"
+          }
+        }
+      }
+    },
     "When this gate runs hardest" : {
       "comment" : "Current sheet section: the months this gate sees its strongest water.",
       "localizations" : {
@@ -20734,7 +20829,7 @@
       }
     },
     "Download failed" : {
-      "comment" : "Offline-prediction card title.\nOffline-prediction status.\nStation download-card title.",
+      "comment" : "Prediction download failed; already downloaded predictions remain usable.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -21014,101 +21109,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hämtat från CHS (IWLS), sedan anpassat och beräknat på den här enheten. Dessa prognoser är inte publicerade av CHS. Flodströmmen sätter %lld°T."
-          }
-        }
-      }
-    },
-    "Downloaded predictions are ready offline. Downloads that expire show their remaining time below." : {
-      "comment" : "Offline-download completion summary.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hentede prognoser er klar offline. Hentninger, der udløber, viser den resterende tid nedenfor."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geladene Vorhersagen sind offline verfügbar. Bei zeitlich begrenzten Downloads wird unten die verbleibende Zeit angezeigt."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las predicciones descargadas están listas sin conexión. Las descargas que caducan muestran abajo el tiempo restante."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ladatut ennusteet ovat valmiina ilman verkkoyhteyttä. Vanhenevien latausten jäljellä oleva aika näkyy alla."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les prévisions téléchargées sont prêtes pour une utilisation hors ligne. Les téléchargements qui expirent affichent leur temps restant ci-dessous."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tá na tuartha íoslódáilte réidh as líne. Taispeántar thíos an t-am atá fágtha ag íoslódálacha a théann in éag."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tha na ro-innsean a chaidh a luchdadh a-nuas deiseil far loidhne. Chì thu gu h-ìosal an ùine a tha air fhàgail aig luchdaidhean a-nuas a dh'fhalbhas an ùine orra."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le previsioni scaricate sono pronte offline. I download con scadenza mostrano qui sotto il tempo rimasto."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ダウンロード済みの予測はオフラインで利用できます。有効期限のあるデータは、残り時間を下に表示します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드한 예측을 오프라인에서 사용할 수 있습니다. 만료되는 다운로드의 남은 시간은 아래에 표시됩니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nedlastede prognoser er klare for frakoblet bruk. Nedlastinger som utløper, viser gjenværende tid nedenfor."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gedownloade voorspellingen zijn offline beschikbaar. Voor downloads die verlopen staat de resterende tijd hieronder."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As previsões baixadas estão disponíveis offline. Os downloads com validade mostram abaixo o tempo restante."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As previsões descarregadas estão disponíveis sem ligação. As descargas com prazo de validade mostram abaixo o tempo restante."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hämtade prognoser är klara offline. Hämtningar som går ut visar återstående tid nedan."
           }
         }
       }
@@ -21690,7 +21690,7 @@
       }
     },
     "Downloading…" : {
-      "comment" : "Download status.\nOffline-prediction action while downloading.\nOffline-prediction status.\nStation download-card title.",
+      "comment" : "Prediction download in progress; also used for the action while downloading.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -23124,7 +23124,7 @@
       }
     },
     "Expired" : {
-      "comment" : "Compact offline-download status.",
+      "comment" : "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -23214,101 +23214,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utgånget"
-          }
-        }
-      }
-    },
-    "Expired — get back online to download current predictions." : {
-      "comment" : "VoiceOver download status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Udløbet — gå online igen for at hente aktuelle prognoser."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abgelaufen — verbinde dich wieder, um aktuelle Vorhersagen zu laden."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Caducada — vuelve a conectarte para descargar las predicciones de corrientes."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vanhentunut — yhdistä verkkoon ladataksesi ajantasaiset ennusteet."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expiré — reconnectez-vous pour télécharger les prévisions de courant."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Imithe in éag — téigh ar líne arís chun tuartha reatha a íoslódáil."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dh'fhalbh an ùine air — till air loidhne gus ro-innsean ùra a luchdadh a-nuas."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scaduto — torna online per scaricare le previsioni di corrente."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "期限切れ — 接続して最新の予測をダウンロードしてください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "만료됨 — 인터넷에 연결하여 최신 예측을 다운로드하세요."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utløpt — koble til igjen for å laste ned strømprognoser."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verlopen — ga weer online om actuele voorspellingen te downloaden."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expirado — conecte-se novamente para baixar previsões de correntes."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expirado — ligue-se à Internet novamente para descarregar previsões de correntes."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utgånget — anslut igen för att hämta aktuella prognoser."
           }
         }
       }
@@ -35153,7 +35058,7 @@
       }
     },
     "Not downloaded" : {
-      "comment" : "Compact offline-download status.\nOffline-prediction status.",
+      "comment" : "Predictions are not stored on this device.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -36192,101 +36097,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offline — behöver signal en stund. Kanadensiska prognoser hämtas en gång och fungerar sedan offline."
-          }
-        }
-      }
-    },
-    "Offline download expired" : {
-      "comment" : "Offline-download expiry status.\nOffline-prediction card title.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offlinehentning udløbet"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offline-Download abgelaufen"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descarga sin conexión caducada"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offline-lataus vanhentunut"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement hors ligne expiré"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Íoslódáil as líne imithe in éag"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dh'fhalbh an ùine air an luchdadh a-nuas far loidhne"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download offline scaduto"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オフラインデータの期限切れ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "오프라인 다운로드 만료"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Frakoblet nedlasting utløpt"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offline download verlopen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download offline expirado"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descarga para uso sem ligação expirada"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offlinehämtningen har gått ut"
           }
         }
       }
@@ -40713,7 +40523,7 @@
       }
     },
     "Queued" : {
-      "comment" : "Compact download status.",
+      "comment" : "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -41183,101 +40993,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Senaste"
-          }
-        }
-      }
-    },
-    "Refresh" : {
-      "comment" : "Slackwater interface text.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opdater"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktualisieren"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualizar"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Päivitä"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualiser"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Athnuaigh"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ath-nuadhaich"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiorna"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "새로 고침"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oppdater"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vernieuwen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atualizar"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atualizar"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uppdatera"
           }
         }
       }
@@ -55633,7 +55348,7 @@
       }
     },
     "Waiting for signal" : {
-      "comment" : "Download status while offline.\nOffline-prediction card title.\nStation download-card title while offline.",
+      "comment" : "Prediction card title when the downloader is offline.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -55723,291 +55438,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Väntar på signal"
-          }
-        }
-      }
-    },
-    "Waiting for signal. Areas already downloaded keep working offline." : {
-      "comment" : "Offline-map download status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Allerede hentede områder bliver ved med at virke offline."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wartet auf Verbindung. Bereits geladene Bereiche funktionieren weiterhin offline."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esperando señal. Las zonas ya descargadas siguen funcionando sin conexión."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Odotetaan yhteyttä. Jo ladatut alueet toimivat edelleen ilman verkkoyhteyttä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente de signal. Les zones déjà téléchargées continuent de fonctionner hors ligne."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ag fanacht le comhartha. Oibríonn limistéir atá íoslódáilte cheana as líne i gcónaí."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A' feitheamh ri siognail. Obraichidh na raointean a chaidh a luchdadh a-nuas far loidhne fhathast."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In attesa di segnale. Le aree già scaricate continuano a funzionare offline."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続待ち。ダウンロード済みのエリアはオフラインでも利用できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "연결 대기 중. 이미 다운로드된 영역은 오프라인에서도 계속 작동합니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Områder som allerede er lastet ned, fortsetter å virke frakoblet."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wachten op verbinding. Al gedownloade gebieden blijven offline werken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aguardando sinal. As áreas já baixadas continuam funcionando offline."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aguardar sinal. As áreas já descarregadas continuam a funcionar sem ligação."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Väntar på signal. Redan hämtade områden fortsätter fungera offline."
-          }
-        }
-      }
-    },
-    "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline." : {
-      "comment" : "Offline-download summary while offline.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Hentninger fortsætter, når du har forbindelse; alt, der allerede er tilgængeligt, virker offline."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wartet auf Verbindung. Downloads werden fortgesetzt, sobald du verbunden bist; alles bereits Verfügbare funktioniert weiterhin offline."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esperando señal. Las descargas se reanudan cuando te conectas; todo lo que ya está disponible sigue funcionando sin conexión."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Odotetaan yhteyttä. Lataukset jatkuvat, kun olet verkossa; jo käytettävissä olevat tiedot toimivat ilman verkkoyhteyttä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente de signal. Les téléchargements reprennent dès que vous êtes connecté ; tout ce qui est déjà disponible continue de fonctionner hors ligne."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ag fanacht le comhartha. Leanfaidh íoslódálacha ar aghaidh nuair a bheidh tú ceangailte; oibríonn aon rud atá ar fáil cheana as líne i gcónaí."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A' feitheamh ri siognail. Leanaidh na luchdaidhean a-nuas orra nuair a bhios ceangal agad; obraichidh rud sam bith a tha ri làimh mar-thà far loidhne."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In attesa di segnale. I download riprendono quando sei connesso; tutto ciò che è già disponibile continua a funzionare offline."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続待ち。接続するとダウンロードを再開します。利用可能なデータはオフラインでも使えます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "연결 대기 중. 연결되면 다운로드를 재개하며 이미 사용 가능한 자료는 오프라인에서도 계속 작동합니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Nedlastingene fortsetter når du er tilkoblet; alt som allerede er tilgjengelig, fortsetter å virke frakoblet."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wachten op verbinding. Downloads gaan verder zodra je verbinding hebt; alles wat al beschikbaar is blijft offline werken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aguardando sinal. Os downloads continuam quando houver conexão; tudo que já está disponível continua funcionando offline."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aguardar sinal. As descargas são retomadas quando houver ligação; tudo o que já está disponível continua a funcionar sem ligação."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Väntar på signal. Hämtningarna fortsätter när du är ansluten; allt som redan finns fungerar offline."
-          }
-        }
-      }
-    },
-    "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected." : {
-      "comment" : "Offline-map download status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Kortet henter verden, farvandet omkring dig og dine gemte stationer, så snart du har forbindelse."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wartet auf Verbindung. Die Karte lädt die Welt, die Gewässer in deiner Nähe und deine gespeicherten Stationen, sobald du verbunden bist."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esperando señal. El mapa descargará el mundo, el agua a tu alrededor y tus estaciones guardadas en cuanto te conectes."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Odotetaan yhteyttä. Kartta lataa koko maailman, lähivedet ja tallennetut asemat heti, kun olet verkossa."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente de signal. La carte télécharge le monde entier, les eaux autour de vous et vos stations enregistrées dès que vous êtes connecté."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ag fanacht le comhartha. Íoslódálfaidh an léarscáil an domhan, an t-uisce timpeall ort, agus do stáisiúin shábháilte a luaithe a bheidh tú ceangailte."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A' feitheamh ri siognail. Luchdaichidh am mapa a-nuas an saoghal, an t-uisge mun cuairt ort, agus na stèiseanan a shàbhail thu cho luath 's a bhios ceangal agad."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In attesa di segnale. La mappa scarica il mondo, le acque vicine e le stazioni salvate appena sei connesso."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続待ち。接続すると、世界地図、近くの水域、保存した観測所の地図をダウンロードします。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "연결 대기 중. 연결되면 전 세계, 주변 해역, 저장한 관측소의 지도를 다운로드합니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på signal. Kartet laster ned verden, farvannet rundt deg og de lagrede stasjonene dine så snart du er tilkoblet."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wachten op verbinding. De kaart downloadt de wereld, het water om je heen en je opgeslagen stations zodra je verbinding hebt."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aguardando sinal. O mapa baixa o mundo, as águas próximas e suas estações salvas assim que houver conexão."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aguardar sinal. O mapa descarrega o mundo, as águas próximas e as suas estações guardadas assim que houver ligação."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Väntar på signal. Kartan hämtar världen, vattnet omkring dig och dina sparade stationer så snart du är ansluten."
           }
         }
       }
@@ -59683,107 +59113,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Beräknad tid: %@"
-          }
-        }
-      }
-    },
-    "Downloaded predictions stay available offline. Open any other Canadian station to download it." : {
-      "comment" : "Canadian offline explanation below download choices; opening another station downloads its predictions.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hentede prognoser forbliver tilgængelige offline. Åbn en anden canadisk station for at hente den."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heruntergeladene Vorhersagen bleiben offline verfügbar. Öffne eine andere kanadische Station, um sie herunterzuladen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Downloaded predictions stay available offline. Open any other Canadian station to download it."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las predicciones descargadas siguen disponibles sin conexión. Abre cualquier otra estación de Canadá para descargarla."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ladatut ennusteet pysyvät käytettävissä offline-tilassa. Avaa jokin muu Kanadan asema ladataksesi sen ennusteet."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les prévisions téléchargées restent disponibles hors ligne. Ouvrez une autre station canadienne pour la télécharger."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fanann tuartha íoslódáilte ar fáil as líne. Oscail aon stáisiún Ceanadach eile chun é a íoslódáil."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bidh ro-innsean a chaidh a luchdadh a-nuas ri làimh far loidhne. Fosgail stèisean Canadach sam bith eile gus a luchdadh a-nuas."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le previsioni scaricate restano disponibili offline. Apri un’altra stazione canadese per scaricarla."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ダウンロードした予測はオフラインでも利用できます。他のカナダの観測所を開くと、その予測をダウンロードできます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드한 예측은 오프라인에서도 이용할 수 있습니다. 다른 캐나다 관측소를 열면 해당 예측이 다운로드됩니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nedlastede prognoser forblir tilgjengelige uten nett. Åpne en annen kanadisk stasjon for å laste den ned."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gedownloade voorspellingen blijven offline beschikbaar. Open een ander Canadees station om het te downloaden."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As previsões baixadas continuam disponíveis offline. Abra qualquer outra estação canadense para baixá-la."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As previsões descarregadas continuam disponíveis offline. Abra qualquer outra estação canadiana para a descarregar."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nedladdade prognoser förblir tillgängliga offline. Öppna en annan kanadensisk station för att ladda ned den."
           }
         }
       }
