@@ -58,5 +58,16 @@ final class WebsiteScreenshots: ShotWalk {
         assertCurrentDetailRendered(app)
         settleScrub(app, at: localizedClock("15:30"))
         save(app, "currents-victoria.png")
+
+        // The kayak page's comfort-current frame, beside a Settings frame at
+        // 1.4 kn, so its green windows are drawn at 1.4 kn too. Off Oak Bay,
+        // where paddlers cross to Discovery Island, and fast enough that the
+        // windows stand apart from the runs between them.
+        app = launchShots(["-comfortCurrent", "1.4"], scrubTo: "15:30")
+        openSearch(app, "discovery island")
+        pickSearchResult(app, app.staticTexts["Discovery Island, 3.0 nm NE of"].firstMatch)
+        assertCurrentDetailRendered(app)
+        settleScrub(app, at: localizedClock("15:30"))
+        save(app, "currents-comfort.png")
     }
 }
