@@ -240,3 +240,14 @@ extension TideStationRecord {
     /// Fitted-on-device CHS station, vs a bundled NOAA harmonic station.
     var isChs: Bool { id.hasPrefix("chs-") }
 }
+
+/// The grid every CHS series is fetched and fitted on: SlackwaterIWLS requests
+/// `FIFTEEN_MINUTES` and keeps only samples on it (`IwlsFetch.onGrid`). The
+/// engine's recipes name the same step (`ChsTideFit.sampleMinutes`,
+/// `ChsCurrentFit.sampleMinutes`), and `ChsGridTests` fails if any of them
+/// moves without the others.
+enum ChsGrid {
+    static let minutes = 15
+    static let ms = Double(minutes) * 60_000
+    static let seconds = Double(minutes) * 60
+}

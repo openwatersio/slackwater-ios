@@ -194,7 +194,7 @@ extension ChsOnlineWindow: CurrentPredicting {
                 while index < times.count - 1 && times[index] < time { index += 1 }
                 let span = times[index] - times[index - 1]
                 guard span > 0 else { return [] }
-                // CHS samples are 15 minutes apart; widget readings also land between them.
+                // CHS samples are `ChsGrid` apart; widget readings also land between them.
                 let fraction = (time - times[index - 1]) / span
                 let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
                 result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))

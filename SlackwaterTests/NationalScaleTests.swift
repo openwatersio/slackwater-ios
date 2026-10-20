@@ -307,8 +307,10 @@ import XCTest
     /// across the whole bundled tide set. Threshold sweep this shipped with
     /// (speed-weighted relative delta): 0.0003 → 2 wrong-signed trusted
     /// samples out of 5,700; 0.00033 → 0; shipped at 0.0004 for margin above
-    /// that empirical floor (7.4% fall back to the exact search, versus 15%
-    /// for the amplitude-only version of this same idea).
+    /// that empirical floor (then 7.4% fell back to the exact search, versus
+    /// 15% for the amplitude-only version of this same idea). The 1 cm floor
+    /// added with the engine's pair filter (`PIN_TIDE_TURN_FLOOR_M`) sends more
+    /// small-range stations to the exact search; coverage still clears 99%.
     ///
     /// Issue #15: one reference date leaves the ~27-day lunar declination
     /// cycle unsampled, and four probes 6h apart all share one alignment on

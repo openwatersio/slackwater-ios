@@ -5,15 +5,19 @@
 import Foundation
 import SlackwaterKit
 
-/// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
-/// half-period, so it always finds the next turn. Only the minority of
-/// stations flagged by the cheap check below pay for it.
-let PIN_TIDE_FALLBACK_WINDOW: TimeInterval = 13 * 3600
+/// The exact-search fallback's window is the card's own. Where the tide's
+/// turns are a few centimetres, SlackwaterKit's extremes can differ between
+/// windows (a sub-centimetre run longer than its search context filters
+/// differently, slackwater#436), so only the card's own search guarantees the
+/// pin and the card name the same next turn for the same instant. The engine
+/// searches 25h past each end anyway, so this costs little over a shorter
+/// window, and only the minority of stations flagged by the cheap check below
+/// pay for it.
+let PIN_TIDE_FALLBACK_WINDOW = TIDE_NEXT_TURN_REACH
 
-/// Exact direction via the same search `cardState(at:)` uses, just over a
-/// shorter (but still turn-guaranteeing) window. nil only if even that comes
-/// up empty — draw neutral rather than default "rising" the way the card
-/// does; a wrong colour is worse than an admitted grey.
+/// Exact direction via the same search `cardState(at:)` uses. nil only if it
+/// comes up empty — draw neutral rather than default "rising" the way the
+/// card does; a wrong colour is worse than an admitted grey.
 func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterval) -> Bool? {
     let next = record.engineStation.extremes(from: now, to: now.addingTimeInterval(window))
         .first { $0.time > now }
@@ -28,6 +32,13 @@ func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterv
 /// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment.
 let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
 let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
+/// SlackwaterKit drops any high and low closer than 1 cm, so the curve can dip
+/// against the next extreme it reports, but never by 1 cm. A diff under this
+/// floor may be one of those dips and falls back to the exact search. It binds
+/// wherever the relative floor admits less than 1 cm, which is any station
+/// whose speed-weighted range (A·ω) is under 25: an M2-equivalent amplitude
+/// under about 0.86 m, roughly half the bundle.
+let PIN_TIDE_TURN_FLOOR_M: Double = 0.01
 private let constituentSpeed: [String: Double] = [   // degrees/hour
     "M2": 28.9841, "S2": 30.0, "N2": 28.4397, "K2": 30.0821,
     "K1": 15.0411, "O1": 13.9430, "P1": 14.9589, "Q1": 13.3987,
@@ -42,18 +53,18 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 /// is 12:00 and 12:30) — which is what the sweep measured and trusts.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     // A subordinate has no cheap path: its curve is only defined by its
-    // extremes, so the exact search is the only search. 2,017 of them cost
-    // ~0.26 ms each here (debug), which is why the budget is per CAMERA and
-    // not per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
-    if record.isSubordinate { return tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
+    // extremes, so the exact search is the only search. Thousands of them at a
+    // fraction of a millisecond each is why the budget is per CAMERA and not
+    // per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
+    if record.isSubordinate { return fallback() }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
     guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it
     let pts = record.engineStation.heights(from: now, to: now.addingTimeInterval(PIN_TIDE_DIFF_DT),
                                            step: PIN_TIDE_DIFF_DT)
     guard pts.count >= 2 else { return fallback() }
     let delta = pts[1].height - pts[0].height
-    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD else { return fallback() }
+    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD, abs(delta) >= PIN_TIDE_TURN_FLOOR_M else { return fallback() }
     return delta > 0
 }
 
@@ -93,7 +104,7 @@ let PIN_GAUGE_BUCKETS = 8
 func tidePinState(_ record: TideStationRecord, at now: Date,
                   imperial: Bool, detailed: Bool, station override: (any TidePredicting)? = nil) -> PinState {
     let previewRising = override.flatMap { predictor in
-        predictor.extremes(from: now, to: now.addingTimeInterval(30 * 3600)).first.map { $0.kind == .high }
+        predictor.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).first { $0.time > now }.map { $0.kind == .high }
             ?? predictor.rates(from: now, to: now.addingTimeInterval(1), step: 1).first.map { $0.rate >= 0 }
     }
     guard let rising = previewRising ?? tidePinRisingHybrid(record, at: now) else {
@@ -105,13 +116,15 @@ func tidePinState(_ record: TideStationRecord, at now: Date,
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
     else { return PinState(state: state) }
     // The gauge: where the height sits between the surrounding extremes.
-    // ±15h brackets any station's cycle.
+    // ±15h brackets a turn either side almost everywhere; where it doesn't,
+    // or its turns disagree with the colour, the pin draws a dot.
     let gauge: Int? = {
         let extremes = station.extremes(from: now.addingTimeInterval(-15 * 3600),
                                         to: now.addingTimeInterval(15 * 3600))
         guard let prev = extremes.last(where: { $0.time <= now }),
-              let next = extremes.first(where: { $0.time > now }) else { return nil }
-        let lo = min(prev.height, next.height), hi = max(prev.height, next.height)
+              let next = extremes.first(where: { $0.time > now }),
+              let bounds = tideGaugeBounds(prev: prev, next: next, rising: rising) else { return nil }
+        let lo = bounds.lo, hi = bounds.hi
         guard hi - lo > 0.01 else { return nil }
         let f = min(1, max(0, (height - lo) / (hi - lo)))
         return Int((f * Double(PIN_GAUGE_BUCKETS)).rounded())

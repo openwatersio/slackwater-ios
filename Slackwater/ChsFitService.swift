@@ -5,6 +5,7 @@
 import Combine
 import Foundation
 import SlackwaterIWLS
+import SlackwaterKit
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
 /// stand-in: every IWLS request throws before the socket).
@@ -1010,9 +1011,9 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    /// 60 d @ 15 min ending yesterday — a validated fit window. Deliberately
+    /// The engine's validated tide window, ending yesterday. Deliberately
     /// not per-gate: per-gate windows are a currents-only concern.
-    nonisolated static let tideFitDays = 60.0
+    nonisolated static let tideFitDays = Double(ChsTideFit.days)
 
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
                                  fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
@@ -1038,7 +1039,7 @@ final class ChsFitService: ObservableObject {
             throw ChsError.permanent("\(info.name): IWLS served no wlp samples over \(Int(Self.tideFitDays)) d")
         }
         let start = plan.last?.start ?? end
-        let fit = try await fitter.fit(samples: samples)
+        let fit = try await fitter.fit(samples: samples, basis: ChsFitter.tideBasis)
         print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.1f", fit.rms * 100)) cm")
         return ChsModel(
             stationID: info.id, iwlsID: station.id, iwlsName: station.officialName,
@@ -1113,7 +1114,7 @@ final class ChsFitService: ObservableObject {
         guard !samples.isEmpty else {
             throw ChsError.permanent("\(gate.name): IWLS served no wcsp1/wcdp1 samples over \(Int(fitDays)) d")
         }
-        let fit = try await fitter.fit(samples: samples)
+        let fit = try await fitter.fit(samples: samples, basis: ChsFitter.currentBasis)
         print("CHS current fit \(gate.id) @ \(Int(fitDays)) d: \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
         return ChsModel(
             stationID: gate.id, iwlsID: station.id, iwlsName: station.officialName,

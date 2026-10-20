@@ -210,7 +210,7 @@ final class FillField: Sendable {
     /// `cardState`): `speeds(from:to:step:)` snapped to a 1s timeline and
     /// the first (only) sample taken. `offset` is the axis's Z0 mean-flow
     /// term (kn) — CurrentStation appends it as its own Z0 basis term, same
-    /// as FitValidation's main.swift:337.
+    /// as FitValidation's `runFit`.
     private func evaluate(_ constituents: [HarmonicConstituent], offset: Double, at date: Date) -> Double {
         let station = CurrentStation(constituents: constituents, floodDirection: 0, ebbDirection: 180, offset: offset)
         return station.speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed ?? 0

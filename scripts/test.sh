@@ -159,16 +159,16 @@ for sim in "${sims[@]}"; do
   fi
 done
 
-# testHybridDirectionHasFullCoverageAndMatchesBaseline sweeps all 2,776 bundled
-# stations x 20 times, each a 30-hour extremes search: 18 s, which is 86% of the
-# whole unit target's 21 s. It validates stations.json — it can only change when
-# the BUNDLE changes, never when app code does — so it rides the full plan with
-# the other data-shaped checks. -skip-testing rather than an env gate: the
-# TEST_RUNNER_ route below reaches the UI-test runner process only, never the
-# app process that hosts the unit bundle.
+# testHybridDirectionHasFullCoverageAndMatchesBaseline sweeps every bundled tide
+# station 20 times, most of the unit target's time, and every offline plan runs it: an
+# engine pin bump or a change to MapPinState.swift or TideStation.swift breaks
+# it as surely as a bundle change does, and the UI tests dwarf its seconds.
+# -skip-testing rather than an env gate: the TEST_RUNNER_ route below reaches
+# the UI-test runner process only, never the app process that hosts the unit
+# bundle.
 selection=()
 case $MODE in
-  fast) selection=(-skip-testing:SlackwaterUITests/LiveFetchTests -skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline) ;;
+  fast) selection=(-skip-testing:SlackwaterUITests/LiveFetchTests) ;;
   full) selection=(-skip-testing:SlackwaterUITests/LiveFetchTests) ;;
   unit) selection=(-only-testing:SlackwaterTests) ;;
   live) selection=(-only-testing:SlackwaterUITests/LiveFetchTests) ;;

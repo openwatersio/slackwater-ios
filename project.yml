@@ -39,10 +39,10 @@ packages:
     # Exact-commit pin: the stack is in prerelease (slackwater#338 stage 4),
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
     # at the deliberate 1.0.0 release. IWLS fetching uses the separate MIT
-    # SlackwaterIWLS product (slackwater#430). This consumer commit keeps
-    # SlackwaterKit identical to bd9f1b2; newer extrema filtering needs its own adoption.
+    # SlackwaterIWLS product (slackwater#430); the CHS tide fit recipe,
+    # ChsTideFit, requires slackwater#429.
     url: https://github.com/openwatersio/slackwater
-    revision: f3e13e8a3ad76c6bdbf0dcc1e3bcda95faa7ac10
+    revision: fada3b5c2b4572a101fe306d4930fde8005ec817
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

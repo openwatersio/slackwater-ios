@@ -118,7 +118,7 @@ final class IwlsFetcher {
             default: value = 3 + 1.5 * sin(phase) + 0.4 * sin(phase / 2)
             }
             out.append(ChsSample(t: date.timeIntervalSince1970 * 1000, v: value))
-            date = date.addingTimeInterval(900)
+            date = date.addingTimeInterval(ChsGrid.seconds)
         }
         return out
     }

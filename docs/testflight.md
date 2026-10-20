@@ -239,7 +239,7 @@ Two smaller pieces of the same story:
 
 | Mode | Devices | Contents | Wall clock |
 |---|---|---|---|
-| **Fast** (default) | iPhone 17 | offline unit and UI tests; skips the exhaustive national sweep | Re-measure after migration |
+| **Fast** (default) | iPhone 17 | offline unit and UI tests, including the national sweep | Re-measure after migration |
 | **Full** (`--full`) | iPhone 17 + iPad Pro 11-inch (M5) | offline unit and UI tests plus the national sweep | Re-measure after migration |
 | **Unit** (`--unit`) | one simulator | unit target, including the national sweep | Re-measure after migration |
 | **Live** (`--live`) | one simulator | `LiveFetchTests` compatibility smoke only | Network-dependent |
