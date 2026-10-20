@@ -93,19 +93,10 @@ struct TideDetailView: View {
         }
         return nextStop.map { commentaryContent($0, from: scrubTime) }
     }
-    /// A fast tide's tap goes to this run's fastest point — the flow arrow the
-    /// magnet already snaps to — so the pill then reads the peak rate. From
-    /// the peak itself, or a quiet tide, it goes to the next stop.
     private func scrubToCommentary() {
-        if fastTide, let tl = timeline,
-           let peak = tideFlowArrows(tl.tideRates)
-               .filter({ ($0.rate < 0) == (scrubRate < 0) })
-               .min(by: { abs($0.time.timeIntervalSince(scrubTime)) < abs($1.time.timeIntervalSince(scrubTime)) }),
-           abs(peak.time.timeIntervalSince(scrubTime)) > 1 {
-            scrubTime = peak.time
-        } else if let next = nextStop {
-            scrubTime = next.time
-        }
+        guard let timeline,
+              let target = tideCommentaryTarget(in: timeline, at: scrubTime, nextStop: nextStop?.time) else { return }
+        scrubTime = target
     }
 
     var body: some View {
@@ -516,6 +507,19 @@ func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
     return rate < 0
         ? String(localized: "Falling \(value) \(unit)/hr", comment: "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.")
         : String(localized: "Rising \(value) \(unit)/hr", comment: "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.")
+}
+
+func tideCommentaryTarget(in timeline: TimelineData, at time: Date, nextStop: Date?) -> Date? {
+    let rate = timeline.rateAt(time)
+    guard abs(rate) >= tideMovementRampAnchorsMHr[0],
+          let turn = firstCommentaryStop(timeline.tideExtremes, at: \.time,
+                                         after: time, drawn: timeline.drawnSpan) else { return nextStop }
+    // Stay within this run so a passed peak cannot send the next tap backward.
+    let peak = tideFlowArrows(timeline.tideRates).first {
+        ($0.rate < 0) == (rate < 0) && $0.time < turn.time
+            && commentaryCanName($0.time, after: time, drawn: timeline.drawnSpan)
+    }
+    return peak?.time ?? turn.time
 }
 
 #Preview {
