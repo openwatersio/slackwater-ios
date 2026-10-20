@@ -139,6 +139,16 @@ struct SettingsView: View {
                     WidgetSettingsContent()
 
                     section(String(localized: "About")) {
+                        Link(destination: URL(string: "https://slackwater.xyz/support/")!) {
+                            HStack {
+                                Text("Help").font(.headline).foregroundStyle(SN.leaf)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .frame(minHeight: 44)
+                        }
+                        .accessibilityIdentifier("settings-help")
+                        Divider()
                         if let onReplayTour {
                             Button {
                                 dismiss()
