@@ -152,11 +152,9 @@ final class SkyBackdropTests: XCTestCase {
                        CGPoint(x: 200, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 180, altitude: 30, latitude: 48, size: size),
                        CGPoint(x: 200, y: 160 - 30 * skyAltitudeScale))
-        // East on the RIGHT — mirrored from a sky chart. Time advances to
-        // the right on the strip, so the curve pans right to left under the
-        // fixed centerline and the bodies sweep with it. In either hemisphere.
+        // Facing the equator: east is left in the north and right in the south.
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: 48, size: size),
-                       CGPoint(x: 300, y: 160))
+                       CGPoint(x: 100, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: -48, size: size),
                        CGPoint(x: 300, y: 160))
 
@@ -165,9 +163,9 @@ final class SkyBackdropTests: XCTestCase {
         // Altitude keeps its fixed scale whatever the span.
         let span = HorizonSpan(riseAz: 120, setAz: 240)
         XCTAssertEqual(skyPoint(azimuth: 120, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
-                       CGPoint(x: 420, y: 160))
-        XCTAssertEqual(skyPoint(azimuth: 240, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
                        CGPoint(x: -20, y: 160))
+        XCTAssertEqual(skyPoint(azimuth: 240, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
+                       CGPoint(x: 420, y: 160))
         let noon = skyPoint(azimuth: 180, altitude: 30, latitude: 48, span: span, pad: 20, size: size)
         XCTAssertEqual(noon.x, 200, accuracy: 0.001)
         XCTAssertEqual(noon.y, 160 - 30 * skyAltitudeScale, accuracy: 0.001)
@@ -199,14 +197,14 @@ final class SkyBackdropTests: XCTestCase {
         let sun = try XCTUnwrap(rising.sun)
         let atRise = skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: 48.535,
                               span: rising.sunSpan, pad: sunDiscRadius, size: size)
-        XCTAssertEqual(atRise.x, 400 + sunDiscRadius, accuracy: 0.001)
+        XCTAssertEqual(atRise.x, -sunDiscRadius, accuracy: 0.001)
         XCTAssertGreaterThan(atRise.y, 320, "the upper limb is on the horizon, the centre below it")
 
         let setting = SkyState(time: set.time, latitude: 48.535, longitude: -123.01, days: days)
         let sunSet = try XCTUnwrap(setting.sun)
         let atSet = skyPoint(azimuth: sunSet.azDeg, altitude: sunSet.altDeg, latitude: 48.535,
                              span: setting.sunSpan, pad: sunDiscRadius, size: size)
-        XCTAssertEqual(atSet.x, -sunDiscRadius, accuracy: 0.001)
+        XCTAssertEqual(atSet.x, 400 + sunDiscRadius, accuracy: 0.001)
         XCTAssertNil(setting.moonSpan, "no moon chrome, no moon span")
     }
 
@@ -252,7 +250,8 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertGreaterThan(sin(south), 0, "lit from below (y runs down)")
 
         func gap(_ a: Double, _ b: Double) -> Double { abs(atan2(sin(a - b), cos(a - b))) }
-        for (time, site) in [("2026-10-15T02:00:00Z", victoria), ("2026-10-21T06:00:00Z", victoria),
+        for (time, site) in [("2026-10-15T02:00:00Z", victoria), ("2026-10-19T01:17:00Z", victoria),
+                             ("2026-10-21T06:00:00Z", victoria),
                              ("2026-10-28T12:00:00Z", victoria), ("2026-11-02T15:00:00Z", victoria),
                              ("2026-10-14T09:00:00Z", sydney), ("2026-10-21T12:00:00Z", sydney),
                              ("2026-11-02T19:00:00Z", sydney)] {
@@ -266,10 +265,8 @@ final class SkyBackdropTests: XCTestCase {
             let up = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
             let toSun = atan2(-up, right)
             XCTAssertLessThan(gap(try tilt(time, site), toSun), 2 * .pi / 180, time)
-            // The sky backdrop puts east on the right, so in the north it is the
-            // sky's mirror image, and the tilt is mirrored with it.
             let sky = SkyState(time: at, latitude: site.lat, longitude: site.lon)
-            XCTAssertLessThan(gap(sky.moonLightAngle, site.lat >= 0 ? .pi - toSun : toSun),
+            XCTAssertLessThan(gap(sky.moonLightAngle, toSun),
                               2 * .pi / 180, time)
         }
     }

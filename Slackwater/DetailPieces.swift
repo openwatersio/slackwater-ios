@@ -143,7 +143,8 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double,
         set = signed(span.setAz)
     }
     let pointsPerDegree = (size.width + 2 * pad) / CGFloat(set - rise)
-    return CGPoint(x: size.width + pad - CGFloat(signed(azimuth) - rise) * pointsPerDegree,
+    let travel = CGFloat(signed(azimuth) - rise) * pointsPerDegree
+    return CGPoint(x: latitude >= 0 ? travel - pad : size.width + pad - travel,
                    y: size.height - CGFloat(altitude) * skyAltitudeScale)
 }
 
@@ -210,10 +211,7 @@ struct SkyState {
             }
         } ?? []
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
-        // `skyPoint` puts east on the right in both hemispheres, which in the
-        // north is the sky's mirror image; the limb is mirrored with it so it
-        // still faces the sun drawn beside it.
-        moonLightAngle = observer.flatMap { moonTilt(at: time, observer: $0, mirrored: latitude >= 0) } ?? 0
+        moonLightAngle = observer.flatMap { moonTilt(at: time, observer: $0) } ?? 0
         illumination = try? moonIllumination(time)
         obscuration = observer.flatMap { try? solarObscuration(at: time, observer: $0) } ?? 0
         sunSpan = observer.flatMap { obs in
@@ -367,8 +365,7 @@ struct SkyBackdrop: View {
                     // `waxing: true` lights the +x limb; the rotation aims it.
                     // Keep the umbra screen-stable; its physical entry direction is #304-adjacent work.
                     MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
-                              umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
-                        .rotationEffect(.radians(toSun))
+                              umbra: sky.shadow, wash: sky.wash, orientation: toSun)
                         .position(point)
                         .opacity(glare)
                 }
@@ -406,12 +403,12 @@ func moonLitPath(fraction: Double, radius r: CGFloat) -> Path {
 /// Almanac's bright limb less the parallactic angle is the limb's angle from
 /// the zenith, counterclockwise as the observer faces the Moon. SwiftUI's y
 /// runs down and its rotation turns clockwise, so straight up is −90° and the
-/// angle subtracts. `mirrored` is for a frame drawn as the sky's mirror image.
+/// angle subtracts.
 /// Nil outside Almanac's supported years.
-func moonTilt(at time: Date, observer: Observer, mirrored: Bool = false) -> Double? {
+func moonTilt(at time: Date, observer: Observer) -> Double? {
     guard let o = try? moonOrientation(at: time, observer: observer) else { return nil }
     let fromZenith = (o.brightLimbAngleDeg - o.parallacticAngleDeg) * .pi / 180
-    return mirrored ? fromZenith - .pi / 2 : -.pi / 2 - fromZenith
+    return -.pi / 2 - fromZenith
 }
 
 /// The umbral shadow's offset for a disc of radius `r`: tangent at zero
@@ -561,13 +558,7 @@ func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> St
     }
 }
 
-/// The moon glyph: the lit region over a dark disc that stays
-/// semi-transparent to show the sky. Lit on the right while waxing, the
-/// northern convention, for the calendar glyphs. The sky backdrop and the Moon
-/// sheet's head pass `waxing: true` and rotate it by `moonTilt`.
-///
-/// `umbra` and `wash` add the eclipse on top of all that, and only on top:
-/// at zero the glyph is exactly what it draws for every other night.
+/// Observer orientation overrides the upright waxing/waning convention used by phase symbols.
 struct MoonGlyph: View {
     let fraction: Double
     let waxing: Bool
@@ -579,11 +570,9 @@ struct MoonGlyph: View {
     /// warms and dims, which for a penumbral eclipse is the ONLY mark there
     /// is: it has no umbral contact, so `umbra` stays 0 throughout.
     var wash: Double = 0
-    /// Rotation applied to the SHADOW alone. The sky dome rotates the whole
-    /// glyph to aim the lit limb at the sun; the umbra must not follow it,
-    /// because an eclipse happens at the anti-solar point. Zero everywhere
-    /// else, where nothing rotates the glyph at all.
+    /// Observer tilt is cancelled here so Earth's eclipse shadow stays screen-stable.
     var shadowTilt: Angle = .zero
+    var orientation: Double? = nil
 
     var body: some View {
         let r = size / 2 - 1
@@ -591,7 +580,7 @@ struct MoonGlyph: View {
             Circle().fill(SN.moonLimb.opacity(0.18))
             moonLitPath(fraction: fraction, radius: r).offsetBy(dx: r, dy: r)
                 .fill(SN.foam)
-                .scaleEffect(x: waxing ? 1 : -1)
+                .scaleEffect(x: orientation != nil || waxing ? 1 : -1)
             if wash > 0 || umbra > 0 {
                 // The eclipse sits OVER the lit region, not inside it: the
                 // penumbra dims whatever the phase left lit, and the umbra is a
@@ -606,13 +595,14 @@ struct MoonGlyph: View {
                             .offset(x: moonUmbraShift(coverage: umbra, radius: r))
                     }
                 }
-                .rotationEffect(shadowTilt)
+                .rotationEffect(shadowTilt - .radians(orientation ?? 0))
                 .clipShape(Circle())
             }
         }
         .frame(width: 2 * r, height: 2 * r)
         .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
         .frame(width: size, height: size)
+        .rotationEffect(.radians(orientation ?? 0))
         .accessibilityHidden(true)
     }
 }
@@ -899,16 +889,14 @@ struct Commentary: View {
     }
 }
 
-/// Between the strip and the schedule: the one number this station kind has
-/// to add beside the moon that drives it. `primary` is the caller's — a tide's
-/// swing ("Range"), a current's next maximum ("Next max"); a derived gate has
-/// no number at all and passes nil, leaving the moon on its own.
+/// Water summary above the paired Moon and Sun tiles.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
     /// The primary tile's sheet, where it has more to say than it can show —
     /// and the SF Symbol that marks it. Built by the caller: this view knows
     /// about moons, not about what makes one station's range worth explaining.
     var primaryDetail: (() -> AnyView)? = nil
+    var primaryOutlook: AnyView? = nil
     var primarySymbol: String? = nil
     var primaryValueColor: Color = .white
     /// The illumination the SKY already computed, rather than a second lookup
@@ -918,6 +906,8 @@ struct SummaryTiles: View {
     /// shadow is read at it. `moon` cannot supply this — it is a phase, not a
     /// moment.
     let at: Date
+    var sunDays: [TimelineDay] = []
+    var moonAngle: Double? = nil
     /// The eclipse underway at `at`, from the timeline: it renames the value
     /// line and shadows the glyph.
     var eclipse: WindowEclipse? = nil
@@ -931,6 +921,8 @@ struct SummaryTiles: View {
     /// Read HERE, inside the presenting hierarchy where the scaffold set it,
     /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
     @Environment(\.timeZone) private var tz
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var widePane = false
     @State private var apsides: (day: Date, perigee: Date?, apogee: Date?)?
 
     /// Non-nil only when the caller gave both somewhere to go and somewhere to
@@ -947,46 +939,65 @@ struct SummaryTiles: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        let singleRow = widePane && !dynamicTypeSize.isAccessibilitySize
+        let layout = singleRow
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            : AnyLayout(VStackLayout(spacing: 12))
+        layout {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail) {
-                    if let primarySymbol {
+                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail, fillsRow: singleRow, trailing: primaryOutlook) {
+                    if let primarySymbol, primaryOutlook == nil {
                         Image(systemName: primarySymbol).foregroundStyle(SN.foam.opacity(0.55))
                     }
                 } value: {
                     Text(primary.value).font(ReadoutType.hero.monospacedDigit())
                 }
+                .accessibilityIdentifier("tile-primary")
             }
-            // Almanac throws only outside 1950–2101; the tile drops rather
-            // than the row, so a primary reading still stands on its own.
-            if let moon {
-                let day = dayLocal(at, tz)
-                let dates = apsides?.day == day ? apsides : nil
-                ReadoutTile(label: String(localized: "Moon", comment: "Moon summary tile label."), caption: moonTideLabel(
-                    phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
-                    ?? String(localized: "\(Int((moon.fraction * 100).rounded()))% lit", comment: "Moon illumination percentage. The integer is a percentage."),
-                            accessibility: String(localized: "Moon", comment: "VoiceOver moon summary label."), detail: sheet) {
-                    if solarEclipse != nil {
-                        SolarEclipseGlyph(obscuration: solarObscuration, size: 14)
-                    } else {
-                        MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
-                                  umbra: eclipse?.shadow(at: at) ?? 0,
-                                  wash: eclipse?.wash(at: at) ?? 0)
+            let pairLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            pairLayout {
+                // Almanac throws only outside 1950–2101; the tile drops rather
+                // than the row, so a primary reading still stands on its own.
+                if let moon {
+                    let day = dayLocal(at, tz)
+                    let dates = apsides?.day == day ? apsides : nil
+                    ReadoutTile(label: String(localized: "Moon", comment: "Moon summary tile label."), caption: moonTideLabel(
+                        phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
+                        ?? String(localized: "\(Int((moon.fraction * 100).rounded()))% lit", comment: "Moon illumination percentage. The integer is a percentage."),
+                                accessibility: String(localized: "Moon", comment: "VoiceOver moon summary label."), detail: sheet, fillsRow: true) {
+                        if solarEclipse != nil {
+                            SolarEclipseGlyph(obscuration: solarObscuration, size: 14)
+                        } else {
+                            MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
+                                      umbra: eclipse?.shadow(at: at) ?? 0,
+                                      wash: eclipse?.wash(at: at) ?? 0, orientation: moonAngle)
+                        }
+                    } value: {
+                        // Words, not a number: "Waning Crescent" has to fit on one
+                        // line where "7.6 ft" does, so it sits well below the hero.
+                        Text(solarEclipse.map { solarEclipseTileText($0.kind) }
+                                ?? eclipse.map { eclipseTileText($0.kind) }
+                                ?? moonPhaseName(phase: moon.phase))
+                            .font(ReadoutType.tileText)
                     }
-                } value: {
-                    // Words, not a number: "Waning Crescent" has to fit on one
-                    // line where "7.6 ft" does, so it sits well below the hero.
-                    Text(solarEclipse.map { solarEclipseTileText($0.kind) }
-                            ?? eclipse.map { eclipseTileText($0.kind) }
-                            ?? moonPhaseName(phase: moon.phase))
-                        .font(ReadoutType.tileText)
+                    .accessibilityIdentifier("tile-moon")
+                    .tourAnchor(.moonCard)
+                    .id(TourStep.moonCard)
                 }
-                .accessibilityIdentifier("tile-moon")
-                .tourAnchor(.moonCard)
-                .id(TourStep.moonCard)
+                if let onJump, let latitude, let longitude, !sunDays.isEmpty {
+                    SunSummaryCard(days: sunDays, at: at, latitude: latitude,
+                                   longitude: longitude, onJump: onJump)
+                }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: Bool.self) { geometry in
+            geometry.size.width >= 700
+        } action: { widePane = $0 }
         .task(id: dayLocal(at, tz)) {
             guard moon != nil else { return }
             let day = dayLocal(at, tz)
@@ -1004,41 +1015,52 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     /// Spoken for the eyebrow row, glyph included; the tile then reads as one
     /// element, this, the value and the caption in order.
     let accessibility: String
-    /// A tile with somewhere to go: a chevron, a tap, and a sheet. The Moon
-    /// always has one; `Range` has one only at a station whose water is
-    /// seasonal rather than tidal, where the small number needs explaining.
-    /// `Next max` stays inert — it has nothing to say that it doesn't show.
+    /// Extra detail is disclosed with a chevron and a sheet.
     var detail: (() -> AnyView)? = nil
+    var fillsRow = false
+    var trailing: AnyView? = nil
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showDetail = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                MonoLabel(text: label, color: SN.foam.opacity(0.55))
-                if detail != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(SN.foam.opacity(0.4))
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+        layout {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    MonoLabel(text: label, color: SN.foam.opacity(0.55))
+                    if detail != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.4))
+                    }
+                    Spacer()
+                    HStack(spacing: 4) { glyph() }
+                        .font(.caption.weight(.semibold))
                 }
-                Spacer()
-                HStack(spacing: 4) { glyph() }
-                    .font(.caption.weight(.semibold))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibility)
+                ZStack(alignment: .leading) {
+                    Text(verbatim: "0").font(ReadoutType.hero).hidden()
+                    value()
+                }
+                .foregroundStyle(valueColor)
+                Text(caption)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(captionColor)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(accessibility)
-            ZStack(alignment: .leading) {
-                Text(verbatim: "0").font(ReadoutType.hero).hidden()
-                value()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing {
+                trailing.frame(maxWidth: .infinity)
+                    .frame(height: dynamicTypeSize.isAccessibilitySize ? 52 : nil)
             }
-            .foregroundStyle(valueColor)
-            Text(caption)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(captionColor)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: fillsRow ? .infinity : nil, alignment: .topLeading)
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)

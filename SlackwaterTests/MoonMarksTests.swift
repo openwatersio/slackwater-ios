@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. The Moon sheet's two drawings: the geometry behind the
 // orbit, and the pair of horizon marks that have to be told apart at a glance.
+import Almanac
 import SwiftUI
 import UIKit
 import XCTest
@@ -49,6 +50,29 @@ final class MoonMarksTests: XCTestCase {
             let v = Double(step) * .pi / 90
             XCTAssertGreaterThan(radius(v), radius(v - .pi / 90),
                                  "the radius fell while travelling to apogee at \(v)")
+        }
+    }
+
+    @MainActor
+    func testObserverOrientationOverridesTheUprightPhaseConvention() throws {
+        let left = try shot(MoonGlyph(fraction: 0.5, waxing: true, size: 44, orientation: .pi))
+        let same = try shot(MoonGlyph(fraction: 0.5, waxing: false, size: 44, orientation: .pi))
+        let upright = try shot(MoonGlyph(fraction: 0.5, waxing: true, size: 44))
+        XCTAssertLessThan(differingFraction(left, same), 0.001)
+        XCTAssertGreaterThan(differingFraction(left, upright), 0.1)
+    }
+
+    func testRiseAndSetUseTheirOwnPhaseAndOrientation() throws {
+        let at = ISO8601DateFormatter().date(from: "2026-10-19T01:17:00Z")!
+        let observer = try Observer(latitudeDeg: 48.4284, longitudeDeg: -123.3656)
+        let facts = try XCTUnwrap(moonFacts(at: at, observer: observer,
+                                          tz: TimeZone(identifier: "America/Vancouver")!))
+        for (time, appearance) in [(facts.rise, facts.riseAppearance), (facts.set, facts.setAppearance)] {
+            let time = try XCTUnwrap(time), appearance = try XCTUnwrap(appearance)
+            XCTAssertEqual(appearance.illumination.fraction, try moonIllumination(time).fraction, accuracy: 1e-10)
+            XCTAssertEqual(try XCTUnwrap(appearance.tilt),
+                           try XCTUnwrap(moonTilt(at: time, observer: observer)), accuracy: 1e-10)
+            XCTAssertNotEqual(appearance.illumination.fraction, facts.illumination.fraction)
         }
     }
 

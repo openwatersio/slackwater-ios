@@ -16,6 +16,7 @@ struct MoonHorizonMark: View {
     let fraction: Double
     let waxing: Bool
     let rising: Bool
+    var orientation: Double? = nil
     var width: CGFloat = 78
     var height: CGFloat = 44
 
@@ -36,7 +37,7 @@ struct MoonHorizonMark: View {
 
             // Masked at the horizon: the lower limb is already below it, which
             // is what "at moonrise" means and what a tangent circle would not say.
-            MoonGlyph(fraction: fraction, waxing: waxing, size: disc)
+            MoonGlyph(fraction: fraction, waxing: waxing, size: disc, orientation: orientation)
                 .position(x: width / 2, y: ground)
                 .mask(alignment: .top) { Rectangle().frame(height: ground) }
 

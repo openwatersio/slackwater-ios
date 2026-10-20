@@ -7,6 +7,17 @@
 import Almanac
 import SwiftUI
 
+struct MoonAppearance {
+    let illumination: MoonIllumination
+    let tilt: Double?
+
+    init?(at: Date, observer: Observer) {
+        guard let illumination = try? moonIllumination(at) else { return nil }
+        self.illumination = illumination
+        tilt = moonTilt(at: at, observer: observer)
+    }
+}
+
 struct MoonFacts {
     let illumination: MoonIllumination
     /// The head glyph's `moonTilt`: the moon as it stands in this sky at the
@@ -14,6 +25,8 @@ struct MoonFacts {
     let tilt: Double?
     let rise: Date?
     let set: Date?
+    let riseAppearance: MoonAppearance?
+    let setAppearance: MoonAppearance?
     let nextFull: Date?
     let nextNew: Date?
     /// Where the NEXT FULL and NEXT NEW rows scrub to: a night sky near the phase (#314).
@@ -112,11 +125,15 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
 
     let fullAt = phases.first { $0.phase == .full }?.time
     let newAt = phases.first { $0.phase == .new }?.time
+    let rise = events.first { $0.kind == .rise }?.time
+    let set = events.first { $0.kind == .set }?.time
     return MoonFacts(
         illumination: illumination,
         tilt: moonTilt(at: at, observer: observer),
-        rise: events.first { $0.kind == .rise }?.time,
-        set: events.first { $0.kind == .set }?.time,
+        rise: rise,
+        set: set,
+        riseAppearance: rise.flatMap { MoonAppearance(at: $0, observer: observer) },
+        setAppearance: set.flatMap { MoonAppearance(at: $0, observer: observer) },
         nextFull: fullAt,
         nextNew: newAt,
         fullNight: fullAt.map { phaseNight($0, observer: observer) },
@@ -264,15 +281,10 @@ struct MoonDetailSheet: View {
                 if solarEclipse != nil {
                     SolarEclipseGlyph(obscuration: solarObscuration, size: 54)
                 } else {
-                    // Tilted as it stands in the sky, the same way the sky
-                    // backdrop draws it; the umbra stays screen-stable there too.
-                    // The rows below are calendar glyphs and stay upright.
-                    let tilt = facts.tilt ?? 0
                     MoonGlyph(fraction: facts.illumination.fraction,
-                              waxing: facts.tilt == nil ? facts.illumination.waxing : true,
+                              waxing: facts.illumination.waxing,
                               size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
-                              wash: eclipse?.wash(at: at) ?? 0, shadowTilt: .radians(-tilt))
-                        .rotationEffect(.radians(tilt))
+                              wash: eclipse?.wash(at: at) ?? 0, orientation: facts.tilt)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -333,8 +345,10 @@ struct MoonDetailSheet: View {
             // each day, so it skips a calendar day roughly monthly, every
             // latitude included.
             if time != nil {
-                MoonHorizonMark(fraction: facts.illumination.fraction,
-                                waxing: facts.illumination.waxing, rising: rising)
+                let appearance = rising ? facts.riseAppearance : facts.setAppearance
+                MoonHorizonMark(fraction: appearance?.illumination.fraction ?? facts.illumination.fraction,
+                                waxing: appearance?.illumination.waxing ?? facts.illumination.waxing,
+                                rising: rising, orientation: appearance?.tilt)
             } else {
                 Color.clear.frame(width: 78, height: 44)
             }

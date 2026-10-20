@@ -44,19 +44,31 @@ struct SwingFigure: View {
     /// One scale for every bar: the biggest day fills the box and the rest are
     /// their true fraction of it. Auto-fitting each bar to itself is exactly
     /// the defect #97 found in the strip.
-    static func bars(_ standing: PeakStanding, tz: TimeZone, size: CGSize) -> [Bar] {
+    static func dailyPeaks(_ standing: PeakStanding, tz: TimeZone) -> [Peak] {
+        dailyPeaks(standing.all, tz: tz, window: standing.window)
+    }
+
+    static func dailyPeaks(_ peaks: [Peak], tz: TimeZone,
+                           window: (start: Date, end: Date)) -> [Peak] {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         var biggestOfDay: [Date: Peak] = [:]
-        for r in standing.all {
-            let day = cal.startOfDay(for: r.time)
-            guard day >= standing.window.start,
-                  let next = cal.date(byAdding: .day, value: 1, to: day), next <= standing.window.end
+        for peak in peaks {
+            let day = cal.startOfDay(for: peak.time)
+            guard day >= window.start,
+                  let next = cal.date(byAdding: .day, value: 1, to: day), next <= window.end
             else { continue }
-            if r.magnitude > (biggestOfDay[day]?.magnitude ?? -.infinity) { biggestOfDay[day] = r }
+            if peak.magnitude > (biggestOfDay[day]?.magnitude ?? -.infinity) { biggestOfDay[day] = peak }
         }
-        let days = biggestOfDay.keys.sorted()
-        guard let biggest = biggestOfDay.values.map(\.magnitude).max(), biggest > 0,
+        return biggestOfDay.keys.sorted().compactMap { biggestOfDay[$0] }
+    }
+
+    static func bars(_ standing: PeakStanding, tz: TimeZone, size: CGSize) -> [Bar] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let peaks = dailyPeaks(standing, tz: tz)
+        let days = peaks.map { cal.startOfDay(for: $0.time) }
+        guard let biggest = peaks.map(\.magnitude).max(), biggest > 0,
               days.count > 1 else { return [] }
         let selectedDay = cal.startOfDay(for: standing.selected.time)
         let nextDay = standing.nextBigger.map { cal.startOfDay(for: $0.time) }
@@ -64,7 +76,7 @@ struct SwingFigure: View {
         let step = size.width / CGFloat(days.count)
         return days.enumerated().map { i, day in
             Bar(x: step * (CGFloat(i) + 0.5),
-                height: size.height * CGFloat(biggestOfDay[day]!.magnitude / biggest),
+                height: size.height * CGFloat(peaks[i].magnitude / biggest),
                 isSelected: day == selectedDay,
                 isNextBigger: day == nextDay && day != selectedDay)
         }

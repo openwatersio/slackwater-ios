@@ -155,8 +155,11 @@ struct TideDetailView: View {
                                     }
                                     SummaryTiles(primary: range,
                                                  primaryDetail: rangeDetail(jump: jump),
+                                                 primaryOutlook: AnyView(RangeOutlook(timeline: tl,
+                                                     selected: nextExtreme?.time ?? scrubTime, at: scrubTime)),
                                                  primarySymbol: rangeSymbol,
-                                                 moon: sky.illumination, at: scrubTime,
+                                                 moon: sky.illumination, at: scrubTime, sunDays: tl.days,
+                                                 moonAngle: sky.moonLightAngle,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
                                                  solarObscuration: sky.obscuration,

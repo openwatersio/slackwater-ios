@@ -24,6 +24,41 @@ import SlackwaterKit
     /// turns over a fortnight. Measured on real Friday Harbor predictions the
     /// daily maximum runs 1.8 → 3.7 → 1.9 → 3.0 → 1.8 ft across the window,
     /// while the per-swing series shows no beat at all.
+    func testRangeOutlookShowsTheSelectedDayAndSixComingDays() throws {
+        let timeline = TimelineData.build(tide: station, current: nil, now: at,
+                                          anchor: dayLocal(at, station.tz))
+        let peaks = RangeOutlook.peaks(timeline, at: at)
+        XCTAssertEqual(peaks.count, 7)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let start = cal.startOfDay(for: at)
+        for (offset, peak) in peaks.enumerated() {
+            let day = cal.date(byAdding: .day, value: offset, to: start)!
+            XCTAssertEqual(cal.startOfDay(for: peak.time), day)
+            let biggest = PeakStanding.swings(timeline.tideExtremes)
+                .filter { cal.isDate($0.time, inSameDayAs: day) }
+                .map(\.magnitude).max()
+            XCTAssertEqual(peak.magnitude, try XCTUnwrap(biggest))
+        }
+    }
+
+    func testRangeOutlookFollowsDistantTimelineDatesAndDST() throws {
+        for text in ["2027-01-02T12:00:00Z", "2026-11-01T12:00:00Z"] {
+            let date = ISO8601DateFormatter().date(from: text)!
+            let timeline = TimelineData.build(tide: station, current: nil, now: at,
+                                              anchor: dayLocal(date, station.tz))
+            let peaks = RangeOutlook.peaks(timeline, at: date)
+            XCTAssertEqual(peaks.count, 7)
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = station.tz
+            let start = calendar.startOfDay(for: date)
+            for (offset, peak) in peaks.enumerated() {
+                XCTAssertEqual(calendar.startOfDay(for: peak.time),
+                               calendar.date(byAdding: .day, value: offset, to: start))
+            }
+        }
+    }
+
     func testOneBarPerDayNotPerSwing() {
         let s = standing()
         XCTAssertGreaterThan(s.all.count, 90, "a fortnight either side is ~99 swings")
