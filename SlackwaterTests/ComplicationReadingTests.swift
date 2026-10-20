@@ -46,18 +46,19 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertLessThan(lo, hi)
     }
 
-    /// At Kemi Ajos at 17:20 on the new engine, the last turn before now and
-    /// the card's next turn are both highs, because the engine's extremes
-    /// depend on the search window there (slackwater#436). A gauge between two
-    /// highs labels one of them the low, so the complication draws none, and
-    /// its word still follows the card. If #436 is fixed and the turns
-    /// alternate here, pick another instant for the gauge assertion.
-    func testNoGaugeBetweenTwoTurnsOfOneKindAndTheWordFollowsTheCard() throws {
+    /// At Kemi Ajos, a micro-tidal gauge, at 17:20 the last turn was a low an
+    /// hour earlier and the next is a high more than a day out. The
+    /// complication still draws its gauge between them, and its word follows
+    /// the card. Two turns of one kind draw none
+    /// (`testGaugeBoundsNeedALowAndAHighAgreeingWithTheDirection`).
+    func testAMicroTidalGaugeSpansAFarTurnAndTheWordFollowsTheCard() throws {
         let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == "ticon/kemi_ajos-100539-fin-fmi" })
         let now = Date(timeIntervalSince1970: 1_785_777_600)
         let station = WidgetStation.tide(record.engineStation, tz: utc, name: record.name)
         let r = try XCTUnwrap(ComplicationReading.build(station, now: now))
-        XCTAssertNil(r.gauge, "the two turns are both highs here (slackwater#436)")
+        let next = try XCTUnwrap(record.cardState(at: now).next)
+        XCTAssertGreaterThan(next.time.timeIntervalSince(now), 24 * 3600, "the next turn is more than a day out")
+        XCTAssertNotNil(r.gauge)
         XCTAssertEqual(r.word, record.cardState(at: now).rising ? "Rising" : "Falling")
     }
 

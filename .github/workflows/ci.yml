@@ -284,8 +284,7 @@ jobs:
       matrix:
         # Pull requests get the fast iPhone run. A push to main runs --full on
         # both devices instead: Nightly releases whatever main holds without
-        # re-running the suite, so this is where the iPad leg and the national
-        # sweep report.
+        # re-running the suite, so this is where the iPad leg reports.
         device: ${{ fromJSON(github.event_name == 'push' && '["iPhone 17", "iPad Pro 11-inch (M5)"]' || '["iPhone 17"]') }}
         shard:
           - name: offline

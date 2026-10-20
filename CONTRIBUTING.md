@@ -80,7 +80,7 @@ no npm install is needed for it.
 
 ```sh
 ./scripts/test.sh          # offline unit + UI tests, iPhone. Use while iterating.
-./scripts/test.sh --full   # offline, both reference simulators + exhaustive data test.
+./scripts/test.sh --full   # offline, both reference simulators.
 ./scripts/test.sh --unit   # unit target only, one simulator.
 ./scripts/test.sh --live   # live IWLS smoke only, one simulator.
 ```
