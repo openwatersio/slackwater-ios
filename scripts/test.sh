@@ -2,7 +2,7 @@
 # Run the test suite.
 #
 #   ./scripts/test.sh              fast run   — iPhone only; iterate with this
-#   ./scripts/test.sh --full       full run   — offline, both simulators + data sweep
+#   ./scripts/test.sh --full       full run   — offline, both simulators
 #   ./scripts/test.sh --unit       unit target only, one simulator
 #   ./scripts/test.sh --live       live IWLS smoke only, one simulator
 #   SHOT_DIR=/tmp/shots ./scripts/test.sh     where the UI tests save their screenshots

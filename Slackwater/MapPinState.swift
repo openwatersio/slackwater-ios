@@ -5,14 +5,12 @@
 import Foundation
 import SlackwaterKit
 
-/// The exact-search fallback's window is the card's own. Where the tide's
-/// turns are a few centimetres, SlackwaterKit's extremes can differ between
-/// windows (a sub-centimetre run longer than its search context filters
-/// differently, slackwater#436), so only the card's own search guarantees the
-/// pin and the card name the same next turn for the same instant. The engine
-/// searches 25h past each end anyway, so this costs little over a shorter
-/// window, and only the minority of stations flagged by the cheap check below
-/// pay for it.
+/// The exact-search fallback reaches as far as the card does. SlackwaterKit's
+/// extremes don't depend on the window (slackwater#436), so wherever the card
+/// finds a next turn the pin finds the same one; a shorter reach would leave
+/// a tide whose next turn is a day out, as at a micro-tidal gauge, without
+/// one. Only the minority of stations flagged by the cheap check below pay
+/// for it.
 let PIN_TIDE_FALLBACK_WINDOW = TIDE_NEXT_TURN_REACH
 
 /// Exact direction via the same search `cardState(at:)` uses. nil only if it

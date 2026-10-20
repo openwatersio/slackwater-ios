@@ -40,9 +40,11 @@ packages:
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
     # at the deliberate 1.0.0 release. IWLS fetching uses the separate MIT
     # SlackwaterIWLS product (slackwater#430); the CHS tide fit recipe,
-    # ChsTideFit, requires slackwater#429.
+    # ChsTideFit, requires slackwater#429. The widget and Siri windows need
+    # extremes that hold still as the window moves (slackwater#436, fixed in
+    # slackwater#448) and a turn on UTC midnight kept (slackwater#449).
     url: https://github.com/openwatersio/slackwater
-    revision: fada3b5c2b4572a101fe306d4930fde8005ec817
+    revision: 0b010a4b4d1e903acd742388092c6a341a65fe7b
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

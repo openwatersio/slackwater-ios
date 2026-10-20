@@ -112,8 +112,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     case (.tideExtreme(let high, let ofDay), .tide(let s, let tz, _)):
         var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
         // A day's rank needs the whole station day, 23 to 25 hours long, so that query runs
-        // midnight to midnight. The plain query stays as asked: the engine's heights shift in
-        // the eighth decimal with the range.
+        // midnight to midnight. The plain query stays as asked.
         let span = ofDay == true
             ? cal.startOfDay(for: from)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: to)) ?? to)
             : from...to
