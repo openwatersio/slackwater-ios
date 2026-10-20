@@ -3,6 +3,7 @@
 // rules iOS adds: promotion is sticky against a later re-sort, and opening a
 // failed station re-queues it.
 import XCTest
+import Combine
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
@@ -12,6 +13,75 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: false, online: false))
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: true, online: false))
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true))
+    }
+
+    @MainActor
+    func testManualOnlineUpdateResetsRetryBackoff() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<3 {
+            service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: t0)
+        }
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: t0)
+        XCTAssertEqual(service.onlineState(gate.id, at: t0),
+                       .deferred(t0.addingTimeInterval(ChsQueue.backoff(attempts: 1))))
+    }
+
+    @MainActor
+    func testManualOnlineUpdateCancelsThePreviousRetryTimer() async throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        let dueNow = Date.now.addingTimeInterval(-ChsQueue.backoff(attempts: 1))
+        service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: dueNow)
+        let retry = service.onlineStates[gate.id]
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        try await Task.sleep(for: .milliseconds(1200))
+        XCTAssertEqual(service.onlineStates[gate.id], retry,
+                       "preparation must cancel the timer even before a new fetch begins")
+        service.beginOnlineFetch(gate)
+        XCTAssertFalse(service.prepareOnlineUpdate(gate), "an active fetch must not be reset")
+        XCTAssertEqual(service.onlineState(gate.id), .fetching,
+                       "the old timer must not reset an in-flight manual update to idle")
+    }
+
+    @MainActor
+    func testPreparingManualUpdateDoesNotReleaseAPendingWeekRetry() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        service.noteOnlineFailure(gate.id, error: "offline", permanent: false)
+        var states: [ChsFitService.OnlineFetchState] = []
+        let subscription = service.$onlineStates.sink { values in
+            if let state = values[gate.id] { states.append(state) }
+        }
+        defer { subscription.cancel() }
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        service.beginOnlineFetch(gate)
+        XCTAssertFalse(states.contains(.idle),
+                       "An idle transition releases the detail's pending-week retry before the manual fetch starts")
+        XCTAssertEqual(states.last, .fetching)
+    }
+
+    @MainActor
+    func testEveryOnlineFetchCancelsThePreviousRetryTimer() async throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        let dueNow = Date.now.addingTimeInterval(-ChsQueue.backoff(attempts: 1))
+        service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: dueNow)
+        service.beginOnlineFetch(gate)
+        try await Task.sleep(for: .milliseconds(1200))
+        XCTAssertEqual(service.onlineState(gate.id), .fetching,
+                       "A retry through any caller must cancel the old timer before it starts fetching")
     }
 
     @MainActor

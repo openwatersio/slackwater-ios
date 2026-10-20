@@ -158,11 +158,11 @@ struct ChsWaitingView: View {
 
     private var title: String {
         switch status {
-        case .downloading: String(localized: "Downloading…", comment: "Station download-card title.")
+        case .downloading: String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
         case .queued: String(localized: "Waiting", comment: "Station download-card title.")
         case .retrying: String(localized: "Retrying", comment: "Station download-card title.")
-        case .offline: String(localized: "Waiting for signal", comment: "Station download-card title while offline.")
-        case .failed: String(localized: "Download failed", comment: "Station download-card title.")
+        case .offline: String(localized: "Waiting for signal", comment: "Prediction card title when the downloader is offline.")
+        case .failed: String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
         default: status.label
         }
     }

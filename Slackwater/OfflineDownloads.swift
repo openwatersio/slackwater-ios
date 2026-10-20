@@ -45,11 +45,11 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
                at now: Date = appNow()) -> String {
     switch job.status {
     case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
-    case .failed: return String(localized: "Download failed", comment: "Prediction download status; already downloaded predictions remain usable.")
+    case .failed: return String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
     case .downloading:
-        return String(localized: "Downloading…", comment: "Download status.")
+        return String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
     case .pending:
-        guard online else { return String(localized: "Queued", comment: "Download status.") }
+        guard online else { return String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.") }
         if let due = job.retryAfter, due > now {
             let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
             return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
@@ -183,7 +183,7 @@ struct DownloaderConnectionIndicator: View {
             : "antenna.radiowaves.left.and.right.slash")
             .foregroundStyle(SN.foam.opacity(0.75))
             .accessibilityLabel("Downloads")
-            .accessibilityValue(net.online ? String(localized: "Online") : String(localized: "Offline"))
+            .accessibilityValue(net.online ? String(localized: "Online", comment: "VoiceOver network status.") : String(localized: "Offline", comment: "Compact network status."))
             .accessibilityIdentifier("downloader-connection")
     }
 }
@@ -191,23 +191,34 @@ struct DownloaderConnectionIndicator: View {
 struct OnlineDownloadStatus: View {
     let gate: ChsCurrentGateInfo
     let window: ChsOnlineWindow?
+    let update: () -> Void
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
     private var validity: String {
-        guard let window else { return String(localized: "Not downloaded") }
+        guard let window else { return String(localized: "Not downloaded", comment: "Predictions are not stored on this device.") }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = gate.tz
         return onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
     }
 
-    private var retryStatus: String? {
+    private var activity: String? {
         switch service.onlineState(gate.id) {
-        case .failed: return String(localized: "Download failed")
+        case .fetching: return net.online ? String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.") : String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
+        case .failed: return String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
         case .deferred(let due):
+            guard net.online else { return String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.") }
             let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
             return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
-        default: return nil
+        case .idle: return service.onlinePosition(gate.id) == nil ? nil : String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
+        }
+    }
+
+    private var activityTint: Color {
+        switch service.onlineState(gate.id) {
+        case .failed: SN.amber
+        case .fetching where net.online: SN.leaf
+        default: SN.foam.opacity(0.62)
         }
     }
 
@@ -215,28 +226,29 @@ struct OnlineDownloadStatus: View {
         VStack(alignment: .trailing, spacing: 5) {
             Text(validity)
                 .foregroundStyle(SN.foam.opacity(0.62))
+            if let activity {
+                Text(activity)
+                    .foregroundStyle(activityTint)
+            }
             if net.online {
-                switch service.onlineState(gate.id) {
-                case .fetching:
-                    Text("Downloading…").foregroundStyle(SN.leaf)
+                if service.onlineState(gate.id) == .fetching {
                     StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
                         .frame(width: 100)
-                default:
-                    if let retryStatus {
-                        Text(retryStatus).foregroundStyle(SN.amber)
-                    }
-                    if service.onlinePosition(gate.id) != nil {
-                        Text("Queued").foregroundStyle(SN.foam.opacity(0.62))
-                    } else {
-                        Text("Update now")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(SN.leaf)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                            .onTapGesture { service.fetchOnline(gate) }
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("download-update-\(gate.id)")
-                    }
+                } else {
+                    Text(window == nil ? String(localized: "Download", comment: "Offline-prediction action.") : String(localized: "Update now", comment: "Fetch fresh predictions for a previously downloaded station. Available only while online."))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(SN.leaf)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: update)
+                        .focusable()
+                        .onKeyPress(keys: [.return, .space]) { _ in
+                            update()
+                            return .handled
+                        }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { update() }
+                        .accessibilityIdentifier("download-update-\(gate.id)")
                 }
             }
         }
@@ -246,6 +258,7 @@ struct OnlineDownloadStatus: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("download-status-\(gate.id)")
     }
+
 }
 
 // MARK: - The manager
@@ -271,7 +284,6 @@ struct OfflineManagerView: View {
     }
 }
 
-/// The manager proper — also pushed from Settings, hence no chrome of its own.
 struct OfflineManagerList: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
@@ -422,11 +434,13 @@ struct OfflineManagerList: View {
                 ProgressView(value: Double(readyCount), total: Double(downloads.count))
                     .tint(failedCount > 0 ? SN.amber : SN.leaf)
             }
-            Text(summaryLine)
-                .font(.footnote)
-                .lineSpacing(3)
-                .foregroundStyle(SN.foam.opacity(0.62))
-                .fixedSize(horizontal: false, vertical: true)
+            if !summaryLine.isEmpty {
+                Text(summaryLine)
+                    .font(.footnote)
+                    .lineSpacing(3)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if net.online, deferredCount > 0 {
                 Button { service.retryNow() } label: {
                     Text("Retry now")
@@ -489,13 +503,13 @@ struct OfflineManagerList: View {
         if state.total == 0 {
             base = net.online
                 ? String(localized: "Preparing the map for offline use…", comment: "Offline-map download status.")
-                : String(localized: "Queued", comment: "Download status.")
+                : String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
         } else if state.failed > 0 {
             base = String(localized: "Some map areas haven't finished. They resume on their own when you're connected.", comment: "Offline-map download failure status.")
         } else if state.downloading {
             base = net.online
                 ? String(localized: "Downloading map areas — the world, the water around you, and your saved stations.", comment: "Offline-map download status.")
-                : String(localized: "Queued", comment: "Download status.")
+                : String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.")
         } else {
             base = String(localized: "The map works offline here: the world, the water around you, and your saved stations.", comment: "Offline-map availability summary.")
         }
@@ -518,12 +532,7 @@ struct OfflineManagerList: View {
             return [String(localized: "No Canadian predictions to download here — you're outside the range where they'd be useful. Stations near you work offline already.", comment: "Offline-download summary outside Canadian coverage."), onDemandLine]
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        if readyCount == downloads.count {
-            return [String(localized: "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.", comment: "Offline-download completion summary."), onDemandLine]
-                .filter { !$0.isEmpty }.joined(separator: " ")
-        }
-        let base = String(localized: "Downloaded predictions stay available offline. Open any other Canadian station to download it.", comment: "Canadian offline explanation below download choices; opening another station downloads its predictions.")
-        return [base, onDemandLine].filter { !$0.isEmpty }.joined(separator: " ")
+        return onDemandLine
     }
 
     private var onDemandLine: String {
@@ -626,7 +635,9 @@ struct OfflineManagerList: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
-            OnlineDownloadStatus(gate: gate, window: onlineWindow(gate))
+            OnlineDownloadStatus(gate: gate, window: onlineWindow(gate)) {
+                service.fetchOnline(gate)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

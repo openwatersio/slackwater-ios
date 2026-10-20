@@ -326,7 +326,6 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         let service = try repoSource("Slackwater/ChsFitService.swift")
         XCTAssertTrue(manager.contains("case .online(let gate): onlineRow(gate)"))
         XCTAssertTrue(service.contains("private func observeConnectivity()"))
-        XCTAssertTrue(detail.contains("Button(\"Refresh\")"))
         XCTAssertFalse(detail.contains("No offline prediction here"))
     }
 

@@ -645,16 +645,25 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    func fetchOnline(_ gate: ChsCurrentGateInfo) {
-        guard Connectivity.shared.online, onlineState(gate.id) != .fetching else { return }
+    /// Idle releases pending-week retries, so preserve the state until the new fetch starts.
+    func prepareOnlineUpdate(_ gate: ChsCurrentGateInfo) -> Bool {
+        guard onlineState(gate.id) != .fetching else { return false }
         onlineDesired[gate.id] = gate
         onlineRetryTimers[gate.id]?.cancel()
-        onlineStates[gate.id] = .idle
+        onlineRetryTimers[gate.id] = nil
+        onlinePending.removeAll { $0.id == gate.id }
         onlineAttempts[gate.id] = 0
+        return true
+    }
+
+    func fetchOnline(_ gate: ChsCurrentGateInfo) {
+        guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
         Task { try? await Self.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz)) }
     }
 
     func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
+        onlineRetryTimers[gate.id]?.cancel()
+        onlineRetryTimers[gate.id] = nil
         onlineDesired[gate.id] = gate
         onlineProgress[gate.id] = 0
         onlineStates[gate.id] = .fetching

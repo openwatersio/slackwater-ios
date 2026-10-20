@@ -269,7 +269,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(row.appears(within: 10))
-        XCTAssert(row.label.contains("Waiting for signal"))
+        XCTAssert(row.label.contains("Queued"))
         XCTAssertFalse(row.label.contains("Fast answer"))
     }
 }
