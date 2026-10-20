@@ -232,7 +232,7 @@ The motion is an affordance: it teaches that the graph moves beneath a fixed rea
 
 The opening is one-shot. An initial selection within two seconds of `now - 2 hours` is the ordinary opening; any other initial selection, such as a linked moment or a picked week, is centred directly without the opening. A drag cancels the opening when panning starts, a tap when it is recognized at finger lift, and a press above the day row on a host with alerts (§6.5.1) when it is recognized after its half second; a touch-down alone does not. A host request (§8) cancels it too and moves to its own target. A drag continues from where the strip was grabbed, and a tap or press then acts as in §6.5. A press on the day row does nothing and leaves the opening running.
 
-With Reduce Motion enabled, skip the opening motion and land directly on now. The watch place page opens directly on now with no opening motion.
+With Reduce Motion enabled, skip the opening motion and land directly on now. If publishing that selection must wait until layout completes, intervening view updates and resizes preserve the pending destination; a newer request or drag takes priority. The watch place page opens directly on now with no opening motion.
 
 ### 6.3 Direct manipulation and momentum
 

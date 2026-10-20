@@ -104,6 +104,54 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
         XCTAssertEqual(scrub, shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2))
     }
 
+    func testInstantOpeningSurvivesUpdatesBeforeItsSelectionPublishes() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        for resized in [false, true] {
+            let sel = Selection(now.addingTimeInterval(-7200))
+            let m = mountedStrip(data, sel, now: now)
+            defer { m.window.isHidden = true }
+            if resized {
+                m.sv.frame.size.width = 504
+                m.co.layoutDidRun(m.sv)
+            }
+            m.strip(0).updateUIView(m.sv, coordinator: m.co)
+            XCTAssertEqual(sel.time, now.addingTimeInterval(-7200), "layout and view updates defer the binding write")
+            try await settle(m.co)
+            XCTAssertEqual(sel.time, now, "an intervening update must not cancel the opening's deferred selection")
+            XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(now),
+                           0, accuracy: 100, "the opening stays centered on now through a resize")
+        }
+    }
+
+    func testAnExplicitRequestSupersedesAnUnpublishedInstantOpening() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(now.addingTimeInterval(-7200))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        let requested = now.addingTimeInterval(9 * 3600)
+        sel.time = requested
+        m.strip(1).updateUIView(m.sv, coordinator: m.co)
+        try await settle(m.co)
+        XCTAssertEqual(sel.time, requested, "the deferred opening must not overwrite a newer request")
+        XCTAssertEqual(data.time(atX: m.sv.contentOffset.x + m.sv.bounds.width / 2).timeIntervalSince(requested),
+                       0, accuracy: 100)
+    }
+
+    func testADragSupersedesAnUnpublishedInstantOpening() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let sel = Selection(now.addingTimeInterval(-7200))
+        let m = mountedStrip(data, sel, now: now)
+        defer { m.window.isHidden = true }
+        m.co.scrollViewWillBeginDragging(m.sv)
+        m.sv.contentOffset.x += Timeline.pph * 3
+        try await settle(m.co)
+        XCTAssertEqual(sel.time.timeIntervalSince(now), 10800, accuracy: 100,
+                       "the deferred opening must not overwrite the first drag")
+    }
+
     func testPixelRoundedCenterStaysWithinHalfAPointOfTheReadout() {
         let now = Date(timeIntervalSince1970: 1788868800)
         let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
