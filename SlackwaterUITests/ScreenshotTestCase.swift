@@ -295,7 +295,8 @@ import notify
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
             .press(forDuration: 0.05, thenDragTo:
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
-                withVelocity: .default, thenHoldForDuration: 0)
+                // Hosted runners can collapse a fast drag into a pan with no movement.
+                withVelocity: .slow, thenHoldForDuration: 0)
         XCTAssertFalse(app.descendants(matching: .any)["alert-sheet"].exists, "scrubbing opened the alert sheet")
     }
 

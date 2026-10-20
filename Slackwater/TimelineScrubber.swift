@@ -226,11 +226,12 @@ struct TimelineScrubber: UIViewRepresentable {
             return
         }
         // A window rebuilt under a quiet strip can leave the offset off the selection.
-        let desired = data.x(scrubTime) - sv.bounds.width / 2
+        let selected = co.deferredSelection ?? scrubTime
+        let desired = data.x(selected) - sv.bounds.width / 2
         if abs(desired - sv.contentOffset.x) > 1, !sv.isDragging, !sv.isDecelerating,
            !co.magneting, !co.nudging {
             ScrubTrace.record("resync desired=\(desired)", sv)
-            co.move(sv, to: scrubTime, ride: false)
+            co.move(sv, to: selected, ride: false)
         }
     }
 
@@ -251,6 +252,8 @@ struct TimelineScrubber: UIViewRepresentable {
         var dragSettling = false
         /// Counts every interruption, so a deferred write can tell it was overtaken.
         var moves = 0
+        /// Layout and view updates must honor a selection waiting to reach SwiftUI.
+        var deferredSelection: Date?
         private(set) weak var tapRecognizer: UITapGestureRecognizer?
         /// Present only while the host has something to alert on (`onLongPress`).
         private(set) var pressRecognizer: UILongPressGestureRecognizer?
@@ -383,7 +386,7 @@ struct TimelineScrubber: UIViewRepresentable {
                 cancelMagnet()
             }
             reanchoring = true
-            sv.contentOffset = CGPoint(x: parent.data.x(parent.scrubTime) - width / 2, y: 0)
+            sv.contentOffset = CGPoint(x: parent.data.x(deferredSelection ?? parent.scrubTime) - width / 2, y: 0)
             reanchoring = false
         }
 
@@ -441,8 +444,10 @@ struct TimelineScrubber: UIViewRepresentable {
         /// A deferred write must not land over a move or drag that came after it.
         func selectLater(_ t: Date) {
             let generation = moves
+            deferredSelection = t
             Task { @MainActor [weak self] in
-                guard let self, self.moves == generation else { return }
+                guard let self, self.moves == generation, self.deferredSelection == t else { return }
+                self.deferredSelection = nil
                 self.select(t)
             }
         }
@@ -458,6 +463,7 @@ struct TimelineScrubber: UIViewRepresentable {
         /// The newest request wins, so whatever the strip was doing stops first.
         func halt(_ sv: UIScrollView) {
             moves += 1
+            deferredSelection = nil
             stopIntro()
             cancelMagnet()
             pendingTarget = nil
@@ -647,6 +653,7 @@ struct TimelineScrubber: UIViewRepresentable {
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
             ScrubTrace.record("pan-began", sv)
             moves += 1
+            deferredSelection = nil
             stopIntro()
             cancelMagnet()
             dragSettling = true

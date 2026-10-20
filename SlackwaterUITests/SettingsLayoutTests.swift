@@ -2,6 +2,17 @@
 import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
+    private func dismissPremium(_ app: XCUIApplication) -> Bool {
+        let done = app.buttons["premium-done"]
+        for _ in 0..<3 {
+            if done.exists { done.tap() }
+            // The presenting page remains in the iPad hierarchy while the sheet is open.
+            if done.disappears(within: 5) { return true }
+        }
+        XCTFail("the Premium sheet did not dismiss after Done")
+        return false
+    }
+
     func testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage() {
         let app = launch("-seedGate", "-locDenied", "-resetFavorites")
         openSettings(app)
@@ -23,7 +34,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             save(app, rowID + ".png")
             requirement.tap()
             XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
-            app.buttons["premium-done"].tap()
+            guard dismissPremium(app) else { return }
             XCTAssert(app.navigationBars[page].appears(within: 5))
             app.navigationBars.buttons.firstMatch.tap()
         }
@@ -41,7 +52,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["premium-preview-calendar"].exists)
         XCTAssert(app.otherElements["premium-preview-alert"].exists)
         save(app, "premium-visuals-bottom.png")
-        app.buttons["premium-done"].tap()
+        guard dismissPremium(app) else { return }
         XCTAssert(app.navigationBars["Settings"].appears(within: 5))
         let about = app.buttons["settings-about-row"]
         scrollTo(about, in: app)
@@ -271,7 +282,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["You have Premium — thank you."].exists)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "supporter-sheet.png")
-        app.buttons["premium-done"].tap()
+        guard dismissPremium(app) else { return }
         openSettings(app)
         let settingsSupport = app.buttons["settings-premium-cta"]
         scrollTo(settingsSupport, in: app)
@@ -295,7 +306,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.descendants(matching: .any)["Privacy Policy"].firstMatch.exists)
         XCTAssert(app.descendants(matching: .any)["Terms of Use"].firstMatch.exists)
         save(app, "support-sheet.png")
-        app.buttons["premium-done"].tap()
+        guard dismissPremium(app) else { return }
         XCTAssert(support.appears(within: 5))
         XCTAssertFalse(app.navigationBars["Settings"].exists)
     }
