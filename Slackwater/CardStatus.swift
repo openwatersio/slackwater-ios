@@ -78,7 +78,7 @@ enum CardStatus: Equatable {
         case .retrying: return String(localized: "Retrying — Slackwater tries again on its own. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
         case .notQueued: return String(localized: "Predictions are not downloaded.", comment: "VoiceOver download status.")
         case .offline: return String(localized: "Offline — needs a moment of signal. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
-        case .expired: return String(localized: "Expired — get back online to download current predictions.", comment: "VoiceOver download status.")
+        case .expired: return String(localized: "Expired — open Slackwater with internet access to refresh predictions automatically.", comment: "VoiceOver download status. Refresh requires opening the app with an internet connection.")
         case .notDownloaded: return String(localized: "Not downloaded — get back online to download predictions.", comment: "VoiceOver download status.")
         case .failed: return String(localized: "Station unavailable.", comment: "VoiceOver station status.")
         }
@@ -96,6 +96,10 @@ enum CardStatus: Equatable {
         case .queued, .retrying, .notQueued, .offline, .expired, .notDownloaded: SN.foam.opacity(0.85)
         }
     }
+}
+
+var onlineDownloadRefreshExplanation: String {
+    String(localized: "Selected downloads with expiry dates refresh automatically as needed when you open Slackwater with internet access.", comment: "Explanation beside offline-download expiry. Automatic refresh needs the app open and an internet connection; it does not happen on every launch.")
 }
 
 /// Calendar-day copy for cached official predictions. The station's data

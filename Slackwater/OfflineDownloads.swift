@@ -349,6 +349,13 @@ struct OfflineManagerList: View {
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
+            if !onlineGates.isEmpty {
+                Text(onlineDownloadRefreshExplanation)
+                    .font(.footnote)
+                    .lineSpacing(3)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if deferredCount > 0 {
                 Button { service.retryNow() } label: {
                     Text("Retry now")

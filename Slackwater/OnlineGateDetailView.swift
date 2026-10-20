@@ -340,10 +340,14 @@ struct OnlineGateDetailView: View {
                 .accessibilityIdentifier("online-provenance")
             Text(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
+            Text(onlineDownloadRefreshExplanation)
+                .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
+                .multilineTextAlignment(.center)
             Button("Refresh") { fetchNow(from: todayLocal(tz)) }
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
                 .disabled(fetchState == .fetching || !net.online)
+                .accessibilityHint("Download fresh predictions before going offline.")
         }
     }
 
@@ -408,6 +412,7 @@ struct OnlineGateDetailView: View {
         if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
             let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
             lines.append(String(localized: "\(validity).", comment: "Offline-prediction validity sentence. The value is a localized expiry phrase."))
+            lines.append(onlineDownloadRefreshExplanation)
         }
         if case .deferred = fetchState {
             lines.append(String(localized: "Slackwater will try again automatically.", comment: "Offline-prediction retry explanation."))
