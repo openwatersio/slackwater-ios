@@ -338,16 +338,11 @@ struct OnlineGateDetailView: View {
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("online-provenance")
-            Text(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))
-                .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
-            Text(onlineDownloadRefreshExplanation)
-                .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
-                .multilineTextAlignment(.center)
-            Button("Refresh") { fetchNow(from: todayLocal(tz)) }
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
-                .disabled(fetchState == .fetching || !net.online)
-                .accessibilityHint("Download fresh predictions before going offline.")
+            HStack(spacing: 16) {
+                DownloaderConnectionIndicator()
+                Spacer(minLength: 8)
+                OnlineDownloadStatus(gate: gate, window: window)
+            }
         }
     }
 
@@ -383,7 +378,7 @@ struct OnlineGateDetailView: View {
         case .retrying: String(localized: "Waiting to retry", comment: "Offline-prediction card title.")
         case .failed: String(localized: "Download failed", comment: "Offline-prediction card title.")
         case .offline: String(localized: "Waiting for signal", comment: "Offline-prediction card title.")
-        case .expired: String(localized: "Offline download expired", comment: "Offline-prediction card title.")
+        case .expired: String(localized: "Expired", comment: "Offline-prediction card title.")
         default: String(localized: "Download for offline use", comment: "Offline-prediction card title.")
         }
     }
@@ -412,7 +407,6 @@ struct OnlineGateDetailView: View {
         if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
             let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
             lines.append(String(localized: "\(validity).", comment: "Offline-prediction validity sentence. The value is a localized expiry phrase."))
-            lines.append(onlineDownloadRefreshExplanation)
         }
         if case .deferred = fetchState {
             lines.append(String(localized: "Slackwater will try again automatically.", comment: "Offline-prediction retry explanation."))

@@ -49,7 +49,7 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
     case .downloading:
         return String(localized: "Downloading…", comment: "Download status.")
     case .pending:
-        guard online else { return String(localized: "Waiting for signal", comment: "Download status while offline.") }
+        guard online else { return String(localized: "Queued", comment: "Download status.") }
         if let due = job.retryAfter, due > now {
             let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
             return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
@@ -174,6 +174,80 @@ struct OfflineStatusButton: View {
     }
 }
 
+struct DownloaderConnectionIndicator: View {
+    @ObservedObject private var net = Connectivity.shared
+
+    var body: some View {
+        Image(systemName: net.online
+            ? "antenna.radiowaves.left.and.right"
+            : "antenna.radiowaves.left.and.right.slash")
+            .foregroundStyle(SN.foam.opacity(0.75))
+            .accessibilityLabel("Downloads")
+            .accessibilityValue(net.online ? String(localized: "Online") : String(localized: "Offline"))
+            .accessibilityIdentifier("downloader-connection")
+    }
+}
+
+struct OnlineDownloadStatus: View {
+    let gate: ChsCurrentGateInfo
+    let window: ChsOnlineWindow?
+    @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
+
+    private var validity: String {
+        guard let window else { return String(localized: "Not downloaded") }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = gate.tz
+        return onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
+    }
+
+    private var retryStatus: String? {
+        switch service.onlineState(gate.id) {
+        case .failed: return String(localized: "Download failed")
+        case .deferred(let due):
+            let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
+            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 5) {
+            Text(validity)
+                .foregroundStyle(SN.foam.opacity(0.62))
+            if net.online {
+                switch service.onlineState(gate.id) {
+                case .fetching:
+                    Text("Downloading…").foregroundStyle(SN.leaf)
+                    StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
+                        .frame(width: 100)
+                default:
+                    if let retryStatus {
+                        Text(retryStatus).foregroundStyle(SN.amber)
+                    }
+                    if service.onlinePosition(gate.id) != nil {
+                        Text("Queued").foregroundStyle(SN.foam.opacity(0.62))
+                    } else {
+                        Text("Update now")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(SN.leaf)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                            .onTapGesture { service.fetchOnline(gate) }
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityIdentifier("download-update-\(gate.id)")
+                    }
+                }
+            }
+        }
+        .font(.footnote)
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("download-status-\(gate.id)")
+    }
+}
+
 // MARK: - The manager
 
 /// Sheet presentation (from the indicator): the list plus its own Done.
@@ -266,6 +340,10 @@ struct OfflineManagerList: View {
         }
         .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { DownloaderConnectionIndicator() }
+                .sharedBackgroundVisibility(.hidden)
+        }
     }
 
     // MARK: Tiers
@@ -349,14 +427,7 @@ struct OfflineManagerList: View {
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
-            if !onlineGates.isEmpty {
-                Text(onlineDownloadRefreshExplanation)
-                    .font(.footnote)
-                    .lineSpacing(3)
-                    .foregroundStyle(SN.foam.opacity(0.62))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if deferredCount > 0 {
+            if net.online, deferredCount > 0 {
                 Button { service.retryNow() } label: {
                     Text("Retry now")
                         .font(.subheadline.weight(.semibold))
@@ -418,13 +489,13 @@ struct OfflineManagerList: View {
         if state.total == 0 {
             base = net.online
                 ? String(localized: "Preparing the map for offline use…", comment: "Offline-map download status.")
-                : String(localized: "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected.", comment: "Offline-map download status.")
+                : String(localized: "Queued", comment: "Download status.")
         } else if state.failed > 0 {
             base = String(localized: "Some map areas haven't finished. They resume on their own when you're connected.", comment: "Offline-map download failure status.")
         } else if state.downloading {
             base = net.online
                 ? String(localized: "Downloading map areas — the world, the water around you, and your saved stations.", comment: "Offline-map download status.")
-                : String(localized: "Waiting for signal. Areas already downloaded keep working offline.", comment: "Offline-map download status.")
+                : String(localized: "Queued", comment: "Download status.")
         } else {
             base = String(localized: "The map works offline here: the world, the water around you, and your saved stations.", comment: "Offline-map availability summary.")
         }
@@ -449,10 +520,6 @@ struct OfflineManagerList: View {
         }
         if readyCount == downloads.count {
             return [String(localized: "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.", comment: "Offline-download completion summary."), onDemandLine]
-                .filter { !$0.isEmpty }.joined(separator: " ")
-        }
-        if !net.online {
-            return [String(localized: "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.", comment: "Offline-download summary while offline."), onDemandLine]
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
         let base = String(localized: "Downloaded predictions stay available offline. Open any other Canadian station to download it.", comment: "Canadian offline explanation below download choices; opening another station downloads its predictions.")
@@ -533,24 +600,6 @@ struct OfflineManagerList: View {
         return downloadSortRank(value.state, remainingDays: value.days)
     }
 
-    private func onlineStatus(_ gate: ChsCurrentGateInfo) -> String {
-        switch service.onlineState(gate.id) {
-        case .fetching: return String(localized: "Downloading…", comment: "Offline-prediction status.")
-        case .deferred(let due):
-            let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
-            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
-        case .failed: return String(localized: "Download failed", comment: "Offline-prediction status.")
-        case .idle:
-            if let position = service.onlinePosition(gate.id) {
-                return position <= 1
-                    ? String(localized: "Waiting · next", comment: "Offline-prediction queue status.")
-                    : String(localized: "Waiting · \(ordinal(position)) in line", comment: "Offline-prediction queue status. The value is a locale-formatted ordinal.")
-            }
-        }
-        guard let window = onlineWindow(gate) else { return String(localized: "Not downloaded", comment: "Offline-prediction status.") }
-        return onlineDownloadValidity(end: window.offlineValidUntil, calendar: gateCalendar(gate))
-    }
-
     private func gateCalendar(_ gate: ChsCurrentGateInfo) -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = gate.tz
@@ -569,34 +618,21 @@ struct OfflineManagerList: View {
                     .foregroundStyle(SN.foam.opacity(0.55))
                     .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(onlineStatus(gate))
-                    .font(.footnote)
-                    .foregroundStyle({
-                        switch service.onlineState(gate.id) {
-                        case .failed: return SN.amber
-                        case .deferred: return SN.foam.opacity(0.5)
-                        default: return SN.leaf
-                        }
-                    }())
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-                if service.onlineState(gate.id) == .fetching {
-                    StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
-                        .frame(width: 100)
-                }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                dismiss()
+                openChsRoute(.currentGate(gate))
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            OnlineDownloadStatus(gate: gate, window: onlineWindow(gate))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            dismiss()
-            openChsRoute(.currentGate(gate))
-        }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("download-row-\(gate.id)")
     }
 

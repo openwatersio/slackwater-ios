@@ -326,9 +326,9 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |
 | Canadian current | "Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets N°T." |
 | Derived gate | "Slackwater estimates <gate> slack times from high and low water at <port>, using a cruising rule of thumb. CHS does not publish current predictions for this pass." |
-| Online gate | "CHS-published predictions downloaded <date>; available through <date>. Not computed on this device." then its validity and a Refresh button |
+| Online gate | "CHS-published predictions downloaded <date>; available through <date>. Not computed on this device." then its download status and connection symbol |
 
-The online gate's validity reads "Available offline for N more days", "Expires in N days" within three days, "Expires today", or "Offline download expired". Each state is followed by "Selected downloads with expiry dates refresh automatically as needed when you open Slackwater with internet access." Refresh fetches from today and is disabled while fetching or offline; its VoiceOver hint explains that it downloads fresh predictions before going offline. The expired status also tells VoiceOver users to open Slackwater with internet access to refresh automatically.
+The online gate's validity reads "Available offline for N more days", "Expires in N days" within three days, "Expires today", or "Expired". The footer reuses the Downloads row's expiry and Update now control for this station. The same online/offline connection symbol appears here and in Downloads. Update now fetches predictions from today while online; during a download the control shows progress, and offline it shows only the expiry. Selected predictions refresh automatically when they need updating and the app has a connection.
 
 ### 10.2 Report a problem
 
@@ -393,7 +393,7 @@ An online gate whose downloaded windows do not cover the week shows this card in
 | Failed | "Download failed" | "Retry" |
 | Offline | "Waiting for signal" | "Connect to download" |
 
-The text is the gate's own note on why it has no on-device model. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity and automatic-refresh explanation when there is one, and "Slackwater will try again automatically." while a retry is pending.
+The text is the gate's own note on why it has no on-device model. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity when there is one, and "Slackwater will try again automatically." while a retry is pending.
 
 A download covers 30 days from the anchor's week, and downloaded windows are kept for 60 days. The page fetches on its own when it opens online without coverage and when the connection returns.
 

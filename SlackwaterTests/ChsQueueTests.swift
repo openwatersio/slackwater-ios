@@ -129,6 +129,7 @@ final class ChsQueueTests: XCTestCase {
     func testRowStatusSaysWhatIsHappening() {
         var q = ChsQueue([job("a", 48.4, -123.3)])
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Waiting")
+        XCTAssertEqual(rowStatus(q.job("a")!, online: false, at: t0), "Queued")
 
         q.set("a", .downloading)
         q.setProgress("a", done: 12, total: 31)

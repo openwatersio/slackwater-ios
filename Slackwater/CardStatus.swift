@@ -78,7 +78,7 @@ enum CardStatus: Equatable {
         case .retrying: return String(localized: "Retrying — Slackwater tries again on its own. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
         case .notQueued: return String(localized: "Predictions are not downloaded.", comment: "VoiceOver download status.")
         case .offline: return String(localized: "Offline — needs a moment of signal. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
-        case .expired: return String(localized: "Expired — open Slackwater with internet access to refresh predictions automatically.", comment: "VoiceOver download status. Refresh requires opening the app with an internet connection.")
+        case .expired: return String(localized: "Expired", comment: "VoiceOver download status.")
         case .notDownloaded: return String(localized: "Not downloaded — get back online to download predictions.", comment: "VoiceOver download status.")
         case .failed: return String(localized: "Station unavailable.", comment: "VoiceOver station status.")
         }
@@ -98,15 +98,11 @@ enum CardStatus: Equatable {
     }
 }
 
-var onlineDownloadRefreshExplanation: String {
-    String(localized: "Selected downloads with expiry dates refresh automatically as needed when you open Slackwater with internet access.", comment: "Explanation beside offline-download expiry. Automatic refresh needs the app open and an internet connection; it does not happen on every launch.")
-}
-
 /// Calendar-day copy for cached official predictions. The station's data
 /// source is irrelevant here; people only need to know how long the local
 /// copy remains useful.
 func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current) -> String {
-    guard end > now else { return String(localized: "Offline download expired", comment: "Offline-download expiry status.") }
+    guard end > now else { return String(localized: "Expired", comment: "Offline-download expiry status.") }
     let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
                                        to: calendar.startOfDay(for: end)).day ?? 0
     if days <= 0 { return String(localized: "Expires today", comment: "Offline-download expiry status.") }

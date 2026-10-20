@@ -275,7 +275,7 @@ final class ChsCurrentGateTests: XCTestCase {
                        "Expires in 1 day")
         XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: -1, to: now)!,
                                               now: now, calendar: cal),
-                       "Offline download expired")
+                       "Expired")
     }
 
     // MARK: - Merging (the 30-day fetch, unioned on save)
