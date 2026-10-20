@@ -143,8 +143,7 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double,
         set = signed(span.setAz)
     }
     let pointsPerDegree = (size.width + 2 * pad) / CGFloat(set - rise)
-    let travel = CGFloat(signed(azimuth) - rise) * pointsPerDegree
-    return CGPoint(x: latitude >= 0 ? travel - pad : size.width + pad - travel,
+    return CGPoint(x: size.width + pad - CGFloat(signed(azimuth) - rise) * pointsPerDegree,
                    y: size.height - CGFloat(altitude) * skyAltitudeScale)
 }
 
@@ -171,8 +170,14 @@ struct SkyState {
     let moon: AltAz?
     let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
-    /// The sky glyph's rotation toward the sun, in this backdrop's frame (`moonTilt`).
+    /// The glyph's rotation toward the sun as the moon is seen (`moonTilt`),
+    /// for the summary tile.
     let moonLightAngle: Double
+    /// The same rotation in the backdrop's frame. `skyPoint` puts east on the
+    /// right in both hemispheres, which in the north is the sky's mirror
+    /// image; the limb is mirrored with it so it still faces the sun drawn
+    /// beside it.
+    var backdropMoonLightAngle: Double { latitude >= 0 ? .pi - moonLightAngle : moonLightAngle }
     /// Every catalog star Almanac could place, with where it stands: built
     /// once per scrub frame here so the twinkle redraws don't recompute it.
     let stars: [(star: Star, at: AltAz)]
@@ -331,7 +336,7 @@ struct SkyBackdrop: View {
                         return len > 0 ? CGPoint(x: sun.x + dx / len * d, y: sun.y + dy / len * d)
                                        : CGPoint(x: sun.x + d, y: sun.y)
                     } ?? truePoint
-                    let toSun = sky.moonLightAngle
+                    let toSun = sky.backdropMoonLightAngle
                     let glare = moonGlareOpacity(
                         distance: sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity,
                         obscuration: sky.obscuration)

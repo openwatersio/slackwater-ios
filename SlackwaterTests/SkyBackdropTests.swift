@@ -152,9 +152,11 @@ final class SkyBackdropTests: XCTestCase {
                        CGPoint(x: 200, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 180, altitude: 30, latitude: 48, size: size),
                        CGPoint(x: 200, y: 160 - 30 * skyAltitudeScale))
-        // Facing the equator: east is left in the north and right in the south.
+        // East on the RIGHT — mirrored from a sky chart. Time advances to
+        // the right on the strip, so the curve pans right to left under the
+        // fixed centerline and the bodies sweep with it. In either hemisphere.
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: 48, size: size),
-                       CGPoint(x: 100, y: 160))
+                       CGPoint(x: 300, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: -48, size: size),
                        CGPoint(x: 300, y: 160))
 
@@ -163,9 +165,9 @@ final class SkyBackdropTests: XCTestCase {
         // Altitude keeps its fixed scale whatever the span.
         let span = HorizonSpan(riseAz: 120, setAz: 240)
         XCTAssertEqual(skyPoint(azimuth: 120, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
-                       CGPoint(x: -20, y: 160))
-        XCTAssertEqual(skyPoint(azimuth: 240, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
                        CGPoint(x: 420, y: 160))
+        XCTAssertEqual(skyPoint(azimuth: 240, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
+                       CGPoint(x: -20, y: 160))
         let noon = skyPoint(azimuth: 180, altitude: 30, latitude: 48, span: span, pad: 20, size: size)
         XCTAssertEqual(noon.x, 200, accuracy: 0.001)
         XCTAssertEqual(noon.y, 160 - 30 * skyAltitudeScale, accuracy: 0.001)
@@ -197,14 +199,14 @@ final class SkyBackdropTests: XCTestCase {
         let sun = try XCTUnwrap(rising.sun)
         let atRise = skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: 48.535,
                               span: rising.sunSpan, pad: sunDiscRadius, size: size)
-        XCTAssertEqual(atRise.x, -sunDiscRadius, accuracy: 0.001)
+        XCTAssertEqual(atRise.x, 400 + sunDiscRadius, accuracy: 0.001)
         XCTAssertGreaterThan(atRise.y, 320, "the upper limb is on the horizon, the centre below it")
 
         let setting = SkyState(time: set.time, latitude: 48.535, longitude: -123.01, days: days)
         let sunSet = try XCTUnwrap(setting.sun)
         let atSet = skyPoint(azimuth: sunSet.azDeg, altitude: sunSet.altDeg, latitude: 48.535,
                              span: setting.sunSpan, pad: sunDiscRadius, size: size)
-        XCTAssertEqual(atSet.x, 400 + sunDiscRadius, accuracy: 0.001)
+        XCTAssertEqual(atSet.x, -sunDiscRadius, accuracy: 0.001)
         XCTAssertNil(setting.moonSpan, "no moon chrome, no moon span")
     }
 
@@ -265,9 +267,25 @@ final class SkyBackdropTests: XCTestCase {
             let up = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
             let toSun = atan2(-up, right)
             XCTAssertLessThan(gap(try tilt(time, site), toSun), 2 * .pi / 180, time)
+            // The tiles and the Moon sheet draw the moon as seen.
             let sky = SkyState(time: at, latitude: site.lat, longitude: site.lon)
-            XCTAssertLessThan(gap(sky.moonLightAngle, toSun),
-                              2 * .pi / 180, time)
+            XCTAssertLessThan(gap(sky.moonLightAngle, toSun), 2 * .pi / 180, time)
+            // The backdrop's limb faces the sun as `skyPoint` draws it: a step
+            // from the moon toward the sun lands on the side the limb points.
+            // The frame stretches azimuth and altitude unequally, so only the
+            // signs carry over.
+            let size = CGSize(width: 400, height: 160), step = 0.5
+            let norm = hypot(right, up)
+            let here = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg, latitude: site.lat, size: size)
+            let there = skyPoint(azimuth: moon.azDeg + step * right / norm / cos(moonAlt),
+                                 altitude: moon.altDeg + step * up / norm, latitude: site.lat, size: size)
+            let limb = sky.backdropMoonLightAngle
+            if abs(right) > 0.1 * norm {
+                XCTAssertEqual(cos(limb) > 0, there.x > here.x, "\(time): limb faces the drawn sun across")
+            }
+            if abs(up) > 0.1 * norm {
+                XCTAssertEqual(sin(limb) > 0, there.y > here.y, "\(time): limb faces the drawn sun vertically")
+            }
         }
     }
 
