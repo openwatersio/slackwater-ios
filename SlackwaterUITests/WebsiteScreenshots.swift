@@ -70,6 +70,18 @@ final class WebsiteScreenshots: ShotWalk {
         settleScrub(app, at: localizedClock("15:30"))
         save(app, "currents-comfort.png")
 
+        // The boating page's pass frame: Deception Pass with the comfort
+        // current at 2 knots, a cruising sailboat's limit rather than a
+        // paddler's, so the green windows are the ones a boat would use.
+        // 3pm sits inside the window around the 3:06pm turn; at 1pm the sun
+        // is drawn over the reading.
+        app = launchShots(["-comfortCurrent", "2.0"], scrubTo: "15:00")
+        openSearch(app, "deception")
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
+        assertCurrentDetailRendered(app)
+        settleScrub(app, at: localizedClock("15:00"))
+        save(app, "currents-boat.png")
+
         // The tide-pool page: a fortnight's-lowest low in daylight, which the
         // walk's September day doesn't have — its lower low is at 11:35pm.
         // Friday Harbor's Sunday 6 June 2027 low at 12:31pm is the lowest of
@@ -88,13 +100,21 @@ final class WebsiteScreenshots: ShotWalk {
         // The sheet opens at half height on the swing chart; the fact this
         // page quotes sits under the station's ends. Raise the sheet, then
         // scroll until the fact is on screen.
-        app.navigationBars["Range"].swipeUp()
+        // Drags at fixed screen points, not swipes on elements: a swipe
+        // lands on an element's centre, and the ends figure's centre starts
+        // below the half-height sheet, so a swipe on it scrolls nothing.
+        let screen = app.windows.firstMatch
+        func drag(from: CGFloat, to: CGFloat) {
+            screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.1,
+                       thenDragTo: screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)))
+        }
+        let title = app.navigationBars["Range"].frame
+        drag(from: (title.midY) / screen.frame.height, to: 0.08)
         let fact = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] 'lowest low of the fortnight'")).firstMatch
-        for _ in 0..<4 where !(fact.exists && fact.isHittable) {
-            app.descendants(matching: .any)["range-section-ends"].exists
-                ? app.descendants(matching: .any)["range-section-ends"].swipeUp(velocity: .slow)
-                : swings.swipeUp(velocity: .slow)
+        for _ in 0..<6 where !(fact.exists && fact.isHittable) {
+            drag(from: 0.75, to: 0.45)
         }
         XCTAssert(fact.exists && fact.isHittable, "the Range sheet does not call this the fortnight's lowest low")
         _ = settled { app.staticTexts.count }
