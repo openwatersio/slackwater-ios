@@ -329,13 +329,11 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Favorites"].exists)
         XCTAssert(app.staticTexts["Near Me"].exists)
 
-        // Swipe open the Recents row: red destructive Remove. Recents is the
-        // last group, so scroll to the ROW — and to the row rather than the
-        // group label, because the swipe has to land on the row itself and not
-        // on the FAB pinned over the bottom of the list (see `scrollTo`).
-        let parkRow = app.staticTexts["Deception Pass State Park"].firstMatch
+        // The title can clear the floating controls while the cell's swipe target remains behind them.
+        let parkRow = listContainer(app).cells.containing(
+            .staticText, identifier: "Deception Pass State Park").firstMatch
         scrollTo(parkRow, in: app)
-        listContainer(app).cells.containing(.staticText, identifier: parkRow.label).firstMatch.swipeLeft()
+        parkRow.swipeLeft()
         XCTAssert(app.buttons["Remove"].appears(within: 5),
                   "trailing swipe did not reveal the Recents remove action")
         app.buttons["Remove"].firstMatch.tap()
