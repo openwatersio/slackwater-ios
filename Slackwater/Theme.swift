@@ -56,6 +56,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
+    @State private var showingSchedule = false
+    @State private var restoreSchedule = false
+    @State private var restoredFold = false
     /// Bumped with every selection the page sets, so the strip moves for it.
     @State private var moveRequests = 0
     /// The moment a long press parked (§7.1). Cleared the moment the strip moves off it.
@@ -108,6 +111,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         if let timeline {
                             scrubCard(timeline)
                             scheduleCard(timeline)
+                                .id("detail-schedule")
+                                .task(id: restoreSchedule) {
+                                    guard restoreSchedule else { return }
+                                    // The scroll target must finish mounting before a restored page can reach it.
+                                    await Task.yield()
+                                    guard !Task.isCancelled, restoreSchedule else { return }
+                                    scrollProxy.scrollTo("detail-schedule", anchor: .top)
+                                    restoreSchedule = false
+                                }
+                                .onGeometryChange(for: Bool.self) {
+                                    let frame = $0.frame(in: .scrollView(axis: .vertical))
+                                    return frame.minY < (geo.size.height + geo.safeAreaInsets.top) / 2 && frame.maxY > 0
+                                } action: { showingSchedule = $0 }
                                 .padding(.top, 14)
                         } else if anchor != .distantPast, canPickDate {
                         // #67 item 2: no timeline means the caller is showing its
@@ -146,6 +162,12 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 .ignoresSafeArea(edges: .horizontal)
             }
             .ignoresSafeArea(edges: [.top, .horizontal])
+            .onScrollPhaseChange { _, phase in
+                if phase == .tracking || phase == .interacting { restoreSchedule = false }
+            }
+            .onChange(of: timeline == nil) { _, empty in
+                if empty { showingSchedule = false }
+            }
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
                 // A dedicated GeometryReader, not the outer `geo`: `geo` sits
                 // inside the safe area, but this ScrollView ignores the top
@@ -165,6 +187,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
             .environment(\.stripTrailingBleed, geo.safeAreaInsets.trailing)
             .environment(\.stripStationID, favoriteId)
+            .environment(\.stripFoldPage, anchor == .distantPast ? nil
+                : FoldHandoff.Page(anchor: anchor, showingSchedule: showingSchedule || restoreSchedule))
             .environment(\.stripMoveRequests, moveRequests)
             .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
@@ -183,7 +207,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // A shared link's moment (#187): on appear, and again if another
             // link lands while this detail is already up — a second link to the
             // open station re-pushes the same value, so nothing else re-appears.
-            .onAppear(perform: applyLinkedInstant)
+            .onAppear {
+                if !restoredFold {
+                    restoredFold = true
+                    if let fold = FoldHandoff.takePage(favoriteId), let page = fold.page {
+                        anchor = page.anchor
+                        scrubTime = fold.live ? appNow() : fold.time
+                        restoreSchedule = page.showingSchedule
+                        onPicked(page.anchor)
+                    }
+                }
+                applyLinkedInstant()
+            }
             .onChange(of: LinkedInstant.shared.pending) { _, _ in applyLinkedInstant() }
             // A waiting page or an unavailable station has no curve, no sky,
             // no moon tile and no scrubber — nothing to teach — so the tour
@@ -200,6 +235,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
+                    restoreSchedule = false
                     // Park the centerline on the picked week when it isn't already
                     // there. The strip does NOT self-correct: `data.x(_:)` and
                     // `data.time(atX:)` are exact inverses, so the programmatic
@@ -277,6 +313,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// `linkedAnchor`'s — the picker's rule inverted, so a jump to later today
     /// doesn't re-key the schedule off today.
     private func jump(to t: Date) {
+        restoreSchedule = false
         moveRequests += 1
         scrubTime = t
         if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
@@ -475,10 +512,18 @@ private struct StripStationIDKey: EnvironmentKey {
     static let defaultValue: String? = nil
 }
 
+private struct StripFoldPageKey: EnvironmentKey {
+    static let defaultValue: FoldHandoff.Page? = nil
+}
+
 extension EnvironmentValues {
     var stripStationID: String? {
         get { self[StripStationIDKey.self] }
         set { self[StripStationIDKey.self] = newValue }
+    }
+    var stripFoldPage: FoldHandoff.Page? {
+        get { self[StripFoldPageKey.self] }
+        set { self[StripFoldPageKey.self] = newValue }
     }
     /// The scaffold's count of selections it set: the strip moves only when asked.
     var stripMoveRequests: Int {

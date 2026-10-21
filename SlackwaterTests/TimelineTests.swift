@@ -28,6 +28,29 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
     return (tz, days)
 }
 
+@MainActor private final class FoldPageTestSource: ObservableObject {
+    @Published var timeline: TimelineData?
+    init(_ timeline: TimelineData?) { self.timeline = timeline }
+}
+
+private struct FoldPageTestHarness: View {
+    @ObservedObject var source: FoldPageTestSource
+    let tz: TimeZone
+    @Binding var scrubTime: Date
+    @Binding var anchor: Date
+    let onPicked: (Date) -> Void
+
+    var body: some View {
+        ScrubDetailScaffold(name: "Fold test", region: "", favoriteId: "fold-page", tz: tz,
+                            timeline: source.timeline, entries: { _ in [] },
+                            scrubTime: $scrubTime, anchor: $anchor, onPicked: onPicked,
+                            above: { EmptyView() },
+                            card: { _ in Color.clear.frame(height: 1200) },
+                            links: { _, _ in EmptyView() },
+                            bottom: { Color.clear.frame(height: 1200) })
+    }
+}
+
 @MainActor final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
@@ -317,14 +340,18 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
                                         scrubTime: Binding(get: { scrub }, set: {
                                             scrub = $0
                                             if $0 == moment { landed.fulfill() }
-                                        }), stationID: "fh")
+                                        }), stationID: "fh",
+                                        foldPage: .init(anchor: data.anchor, showingSchedule: true))
             let co = TimelineScrubber.Coordinator(strip)
             defer { co.stopIntro() }
             let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
             sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
             sv.delegate = co
-            FoldHandoff.slot = .init(stationID: "fh", time: moment, live: false, closing: closing,
-                                     at: CACurrentMediaTime())
+            scrub = moment
+            co.hingeDidChange(closed: closing, fullyOpen: false, angle: 0.5)
+            XCTAssertEqual(FoldHandoff.peek("fh")?.page?.anchor, data.anchor)
+            XCTAssertEqual(FoldHandoff.peek("fh")?.page?.showingSchedule, true)
+            scrub = Timeline.introStart(for: now)
             co.centerIfNeeded(sv, animated: true)
             let centered = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
             XCTAssertEqual(centered.timeIntervalSince(moment), closing ? 0 : Timeline.hingeLead, accuracy: 300)
@@ -333,6 +360,114 @@ func lateSunsetDays() throws -> (tz: TimeZone, days: [TimelineDay]) {
                 co.hingeDidChange(closed: false, fullyOpen: true, angle: .pi)
             }
             await fulfillment(of: [landed], timeout: 3)
+        }
+    }
+
+    func testFoldPageSurvivesTheStripTakingItsMomentBeforeAppear() async {
+        defer { FoldHandoff.slot = nil; FoldHandoff.pageSlot = nil }
+        let week = Date(timeIntervalSince1970: 1790665200)
+        let moment = week.addingTimeInterval(4 * 3600)
+        var anchor = Date.distantPast
+        var scrub = Date.distantPast
+        let picked = expectation(description: "restore the captured page")
+        FoldHandoff.slot = .init(stationID: "fold-page", time: moment, live: false, closing: true,
+                                 at: CACurrentMediaTime(), page: .init(anchor: week, showingSchedule: false))
+        let page = ScrubDetailScaffold(name: "Fold test", region: "", favoriteId: "fold-page", tz: friday.tz,
+                                       timeline: nil, entries: { _ in [] },
+                                       scrubTime: Binding(get: { scrub }, set: { scrub = $0 }),
+                                       anchor: Binding(get: { anchor }, set: { anchor = $0 }),
+                                       onPicked: { _ in picked.fulfill() },
+                                       above: { EmptyView() }, card: { _ in EmptyView() },
+                                       links: { _, _ in EmptyView() }, bottom: { EmptyView() })
+        _ = FoldHandoff.take("fold-page", at: CACurrentMediaTime())
+        let host = UIHostingController(rootView: page)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.layoutIfNeeded()
+        await fulfillment(of: [picked], timeout: 2)
+        XCTAssertEqual(anchor, week)
+        XCTAssertEqual(scrub, moment)
+    }
+
+    func testFoldPageAndMomentCanBeTakenInEitherOrder() {
+        defer { FoldHandoff.slot = nil; FoldHandoff.pageSlot = nil }
+        let week = Date(timeIntervalSince1970: 1790665200)
+        for pageFirst in [true, false] {
+            FoldHandoff.slot = .init(stationID: "fold-page", time: week, live: false, closing: true,
+                                     at: 100, page: .init(anchor: week, showingSchedule: true))
+            let page: FoldHandoff.Moment?
+            let moment: FoldHandoff.Moment?
+            if pageFirst {
+                page = FoldHandoff.takePage("fold-page", at: 100.5)
+                moment = FoldHandoff.take("fold-page", at: 100.6)
+            } else {
+                moment = FoldHandoff.take("fold-page", at: 100.5)
+                XCTAssertNil(FoldHandoff.takePage("another", at: 100.6))
+                page = FoldHandoff.takePage("fold-page", at: 100.7)
+            }
+            XCTAssertEqual(page?.page?.anchor, week)
+            XCTAssertEqual(page?.page?.showingSchedule, true)
+            XCTAssertEqual(moment?.time, week)
+            XCTAssertNil(FoldHandoff.takePage("fold-page", at: 100.8), "a page is consumed once")
+        }
+        FoldHandoff.slot = .init(stationID: "fold-page", time: week, live: false, closing: true,
+                                 at: 100, page: .init(anchor: week, showingSchedule: true))
+        _ = FoldHandoff.take("fold-page", at: 100.5)
+        XCTAssertNil(FoldHandoff.takePage("fold-page", at: 103), "an expired page is a different visit")
+    }
+
+    func testAFoldRestoresTheChosenWeekAndSchedule() async throws {
+        defer { FoldHandoff.slot = nil; FoldHandoff.pageSlot = nil }
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let week = Date(timeIntervalSince1970: 1790665200)
+        let moment = week.addingTimeInterval(60 * 3600)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: week)
+        for (delayed, showingSchedule, live) in [(true, true, false), (false, true, true), (false, false, false)] {
+            var anchor = Date.distantPast
+            var scrub = Timeline.introStart(for: now)
+            let picked = expectation(description: "load the restored week")
+            FoldHandoff.slot = .init(stationID: "fold-page", time: moment, live: live, closing: true,
+                                     at: CACurrentMediaTime(),
+                                     page: .init(anchor: week, showingSchedule: showingSchedule))
+            let source = FoldPageTestSource(delayed ? nil : data)
+            let host = UIHostingController(rootView: FoldPageTestHarness(
+                source: source, tz: friday.tz,
+                scrubTime: Binding(get: { scrub }, set: { scrub = $0 }),
+                anchor: Binding(get: { anchor }, set: { anchor = $0 }),
+                onPicked: { XCTAssertEqual($0, week); picked.fulfill() }))
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            defer { window.isHidden = true }
+            host.view.layoutIfNeeded()
+            await fulfillment(of: [picked], timeout: 2)
+            XCTAssertEqual(anchor, week, "keep the chosen week's start, not the selected moment's day")
+            if live { XCTAssertEqual(scrub.timeIntervalSince(appNow()), 0, accuracy: 2) }
+            else { XCTAssertEqual(scrub, moment) }
+            _ = FoldHandoff.take("fold-page", at: CACurrentMediaTime())
+            if delayed {
+                source.timeline = data
+                host.view.layoutIfNeeded()
+            }
+            func scrollView(in view: UIView) -> UIScrollView? {
+                if let scroll = view as? UIScrollView { return scroll }
+                return view.subviews.compactMap { scrollView(in: $0) }.first
+            }
+            for frame in 0..<100 {
+                host.view.setNeedsLayout()
+                host.view.layoutIfNeeded()
+                if let scroll = scrollView(in: host.view), scroll.contentOffset.y > 1000 { break }
+                if !showingSchedule, frame >= 5 { break }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            let scroll = try XCTUnwrap(scrollView(in: host.view))
+            if showingSchedule {
+                XCTAssertGreaterThan(scroll.contentOffset.y, 1000, "the schedule stays in view; delayed: \(delayed), live: \(live); size \(scroll.contentSize), bounds \(scroll.bounds)")
+            } else {
+                XCTAssertEqual(scroll.contentOffset.y, 0, accuracy: 1, "the chart stays in view")
+            }
         }
     }
 
