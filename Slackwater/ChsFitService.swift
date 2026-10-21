@@ -357,7 +357,7 @@ final class ChsFitService: ObservableObject {
             // `-online.json` decodes as no model and keeps its chunks, and a
             // chunk cache is re-fetchable by definition.
             if let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
-                ChsChunkStore.purge(model.iwlsID, includingEmpty: true)
+                IwlsFetcher.chunkCache.purge(model.iwlsID, includingEmpty: true)
             }
             try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
         }
@@ -992,7 +992,7 @@ final class ChsFitService: ObservableObject {
             self.queue.set(job.id, .ready)
             self.modelRevision += 1
         }
-        ChsChunkStore.purge(model.iwlsID)
+        IwlsFetcher.chunkCache.purge(model.iwlsID)
     }
 
     #if os(watchOS)
@@ -1203,7 +1203,7 @@ extension ChsModelStore {
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadTierKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         try? FileManager.default.removeItem(at: dir)
-        try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+        IwlsFetcher.chunkCache.reset()
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
     }
 }

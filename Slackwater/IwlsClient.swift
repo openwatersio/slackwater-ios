@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. App-owned IWLS caches and UI-test fixtures.
+// Slackwater — GPL v3. IWLS cache configuration and UI-test fixtures.
 // Fetching rules and HTTP behavior live in the MIT SlackwaterIWLS module.
 import Foundation
 #if DEBUG
@@ -14,116 +14,12 @@ typealias ChsSample = SlackwaterIWLS.ChsSample
 typealias ChsChunk = SlackwaterIWLS.ChsChunk
 typealias IwlsPacer = SlackwaterIWLS.IwlsPacer
 
-/// Fetched chunks, on disk, keyed by what identifies them and nothing else —
-/// so a job that retries mid-download resumes where it stopped instead of
-/// paying for the same bytes twice. Positive samples are purged once the final fit
-/// lands; empty weeks retain their short retry lifetime in a separate directory.
-enum ChsChunkStore {
-    // Migration writes during a read, so cache transitions share a reentrant lock.
-    private static let lock = NSRecursiveLock()
-    static let dir: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("ChsChunks", isDirectory: true)
-    }()
-
-    static func legacyURL(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> URL {
-        dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970)).json")
-    }
-
-    static func url(_ stationID: String, _ code: String, _ chunk: ChsChunk,
-                    grid: IwlsSampleGrid = .fifteenMinutes) -> URL {
-        dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970))-\(grid.sampleMinutes)m.json")
-    }
-
-    static func emptyURL(_ stationID: String, _ code: String, _ chunk: ChsChunk,
-                         grid: IwlsSampleGrid = .fifteenMinutes) -> URL {
-        dir.appendingPathComponent("Empty", isDirectory: true)
-            .appendingPathComponent(url(stationID, code, chunk, grid: grid).lastPathComponent)
-    }
-
-    static func load(_ stationID: String, _ code: String, _ chunk: ChsChunk,
-                     grid: IwlsSampleGrid = .fifteenMinutes, now: Date = .now) -> [ChsSample]? {
-        lock.lock()
-        defer { lock.unlock() }
-        if let samples = readEntry(url(stationID, code, chunk, grid: grid), chunk: chunk, grid: grid, now: now) {
-            return samples
-        }
-        // An older build can write fresh samples during rollback. Reconcile those before a negative hit.
-        if grid == .fifteenMinutes,
-           let data = try? Data(contentsOf: legacyURL(stationID, code, chunk)),
-           let raw = try? JSONDecoder().decode([ChsSample].self, from: data) {
-            let samples = IwlsFetch.onGrid(raw, grid: grid)
-            if chunk.canCache(samples, grid: grid) {
-                // save removes the legacy file only after its replacement was written successfully.
-                save(samples, stationID, code, chunk, grid: grid, fetchedAt: now)
-                return samples
-            }
-        }
-        return readEntry(emptyURL(stationID, code, chunk, grid: grid), chunk: chunk, grid: grid, now: now)
-    }
-
-    private static func readEntry(_ file: URL, chunk: ChsChunk, grid: IwlsSampleGrid, now: Date) -> [ChsSample]? {
-        guard let data = try? Data(contentsOf: file) else { return nil }
-        if let entry = try? JSONDecoder().decode(IwlsChunkCacheEntry.self, from: data),
-           entry.isReusable(for: chunk, grid: grid, now: now) { return entry.samples }
-        try? FileManager.default.removeItem(at: file)
-        return nil
-    }
-
-    static func save(_ samples: [ChsSample], _ stationID: String, _ code: String, _ chunk: ChsChunk,
-                     grid: IwlsSampleGrid = .fifteenMinutes, fetchedAt: Date = .now) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let entry = IwlsChunkCacheEntry(chunk: chunk, samples: samples, grid: grid, fetchedAt: fetchedAt) else { return }
-        // A later empty response cannot invalidate complete immutable samples already on disk.
-        if samples.isEmpty, let positive = load(stationID, code, chunk, grid: grid, now: fetchedAt), !positive.isEmpty { return }
-        let positive = url(stationID, code, chunk, grid: grid)
-        let negative = emptyURL(stationID, code, chunk, grid: grid)
-        let file = samples.isEmpty ? negative : positive
-        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        var marked = dir
-        var exclude = URLResourceValues()
-        exclude.isExcludedFromBackup = true
-        try? marked.setResourceValues(exclude)
-        do {
-            try JSONEncoder().encode(entry).write(to: file, options: .atomic)
-            try? FileManager.default.removeItem(at: samples.isEmpty ? positive : negative)
-            try? FileManager.default.removeItem(at: legacyURL(stationID, code, chunk))
-        } catch { return }
-    }
-
-    // Keep recent empty responses through a successful fit so retrying cannot immediately re-query them.
-    static func purge(_ stationID: String, includingEmpty: Bool = false, now: Date = .now) {
-        lock.lock()
-        defer { lock.unlock() }
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        for f in files where f.hasPrefix(stationID + "-") {
-            try? FileManager.default.removeItem(at: dir.appendingPathComponent(f))
-        }
-        let emptyDir = dir.appendingPathComponent("Empty", isDirectory: true)
-        let emptyFiles = (try? FileManager.default.contentsOfDirectory(at: emptyDir, includingPropertiesForKeys: nil)) ?? []
-        for file in emptyFiles where file.lastPathComponent.hasPrefix(stationID + "-") {
-            if includingEmpty { try? FileManager.default.removeItem(at: file); continue }
-            guard let data = try? Data(contentsOf: file),
-                  let entry = try? JSONDecoder().decode(IwlsChunkCacheEntry.self, from: data),
-                  let grid = try? IwlsSampleGrid(sampleMinutes: entry.sampleMinutes) else {
-                try? FileManager.default.removeItem(at: file)
-                continue
-            }
-            let chunk = ChsChunk(start: Date(timeIntervalSince1970: entry.startMs / 1000),
-                                 end: Date(timeIntervalSince1970: entry.endMs / 1000))
-            if !entry.isReusable(for: chunk, grid: grid, now: now) {
-                try? FileManager.default.removeItem(at: file)
-            }
-        }
-    }
-}
-
 final class IwlsFetcher {
     private let killSwitch: Bool
-    private let client = IwlsClient { seconds in
-        await MainActor.run { ChsFitService.shared.observeRequest(seconds: seconds) }
-    }
+    static let chunkCache = IwlsChunkCache(directory: FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("ChsChunks", isDirectory: true))
+    private let client: IwlsClient
     private var fixtureRequests: [String: Int] = [:]
 
 #if DEBUG
@@ -194,10 +90,15 @@ final class IwlsFetcher {
 
     init(killSwitch: Bool = networkKillSwitch) {
         self.killSwitch = killSwitch
+        client = IwlsClient(chunkCache: Self.chunkCache, beforeRequest: {
+            guard !killSwitch else { throw ChsError.networkDisabled }
+        }) { seconds in
+            await MainActor.run { ChsFitService.shared.observeRequest(seconds: seconds) }
+        }
     }
 
     // The station list changes rarely and is expensive to download repeatedly.
-    static let stationListCache = ChsChunkStore.dir.deletingLastPathComponent()
+    static let stationListCache = chunkCache.directory.deletingLastPathComponent()
         .appendingPathComponent("IwlsStations.json")
 
     func stationList() async throws -> [IwlsStation] {
@@ -286,24 +187,18 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if cache, let hit = ChsChunkStore.load(stationID, code, chunk, grid: grid),
-           cacheEmpty || !hit.isEmpty { return hit }
-        let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
-            raw = Self.fixtureSamples(code, chunk, grid: grid)
-        } else {
-            guard !killSwitch else { throw ChsError.networkDisabled }
-            raw = try await client.series(code, stationID: stationID, chunk: chunk, grid: grid)
+            if cache {
+                return try await Self.chunkCache.samples(code, stationID: stationID, chunk: chunk,
+                                                        grid: grid, cacheEmpty: cacheEmpty) {
+                    Self.fixtureSamples(code, chunk, grid: grid)
+                }
+            }
+            return Self.fixtureSamples(code, chunk, grid: grid)
         }
-#else
-        guard !killSwitch else { throw ChsError.networkDisabled }
-        raw = try await client.series(code, stationID: stationID, chunk: chunk, grid: grid)
 #endif
-        let samples = IwlsFetch.onGrid(raw, grid: grid)
-        if cache && (cacheEmpty || !samples.isEmpty) {
-            ChsChunkStore.save(samples, stationID, code, chunk, grid: grid)
-        }
-        return samples
+        return try await client.series(code, stationID: stationID, chunk: chunk, grid: grid,
+                                       cache: cache, cacheEmpty: cacheEmpty)
     }
 }

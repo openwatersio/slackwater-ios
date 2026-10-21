@@ -6,7 +6,9 @@ import SlackwaterIWLS
 final class ChsGridTests: XCTestCase {
     func testTheRecipesDriveRequestResolutionAndFiltering() throws {
         let chunk = ChsChunk(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 86_400))
-        for code in IwlsFetch.fitSeries {
+        let requiredSeries = ["wlp", "wcsp1", "wcdp1"]
+        XCTAssertEqual(Set(IwlsFetch.fitSeries), Set(requiredSeries))
+        for code in requiredSeries {
             let minutes = code == "wlp" ? ChsTideFit.sampleMinutes : ChsCurrentFit.sampleMinutes
             let grid = try IwlsFetcher.grid(for: code)
             XCTAssertEqual(grid.sampleMinutes, minutes)

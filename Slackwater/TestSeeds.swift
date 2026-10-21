@@ -104,7 +104,7 @@ import Foundation
 private func seedTideModel(stationID: String) {
     guard ChsStationInfo.all.contains(where: { $0.id == stationID }) else { return }
     try? FileManager.default.removeItem(at: ChsModelStore.dir)
-    try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+    IwlsFetcher.chunkCache.reset()
     let now = appNow()
     let model = ChsModel(
         stationID: stationID, iwlsID: "seeded", iwlsName: "\(stationID) (seeded)",
@@ -121,7 +121,7 @@ private func seedTideModel(stationID: String) {
 private func seedCurrentModel(stationID: String, provisional: Bool) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
     try? FileManager.default.removeItem(at: ChsModelStore.dir)
-    try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+    IwlsFetcher.chunkCache.reset()
     let now = appNow()
     let days = provisional ? ChsCurrentGateInfo.provisionalDays : gate.fitDays
     let model = ChsModel(
