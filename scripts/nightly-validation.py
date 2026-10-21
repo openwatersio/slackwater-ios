@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require full main CI validation of the immutable nightly candidate."""
+"""Select and validate an immutable nightly candidate with full main CI."""
 import json
 import os
 import subprocess
@@ -20,6 +20,34 @@ def validate(sha, repository):
     if (run["head_sha"] != sha or run["head_branch"] != "main" or run["event"] != "push"
             or run["status"] != "completed" or run["conclusion"] != "success"):
         raise ValueError("latest main CI run is not successful and complete for this commit")
+    validate_jobs(run, repository)
+    print(f"Full main CI validated {sha} (run {run['id']}, attempt {run['run_attempt']}).")
+
+
+def select(anchor, repository):
+    ancestors = set(subprocess.check_output(["git", "rev-list", anchor], text=True).splitlines())
+    pages = api(f"repos/{repository}/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=100")
+    runs = sorted((run for page in pages for run in page["workflow_runs"]), key=lambda run: run["id"], reverse=True)
+    seen = set()
+    for run in runs:
+        sha = run["head_sha"]
+        if run["head_branch"] != "main" or run["event"] != "push" or sha not in ancestors or sha in seen:
+            continue
+        # An older success must not override a newer failed or pending run for the same SHA.
+        seen.add(sha)
+        if run["status"] != "completed" or run["conclusion"] != "success":
+            continue
+        try:
+            validate_jobs(run, repository)
+        except ValueError as error:
+            print(f"Skipping CI run {run['id']} ({sha}): {error}", file=sys.stderr)
+            continue
+        print(f"Selected {sha} from full main CI run {run['id']} (attempt {run['run_attempt']}).", file=sys.stderr)
+        return sha
+    raise ValueError("no completed successful main CI run with full app validation in the trigger history")
+
+
+def validate_jobs(run, repository):
     # Retain earlier successful jobs when only failed jobs were rerun.
     pages = api(f"repos/{repository}/actions/runs/{run['id']}/jobs?filter=all&per_page=100")
     jobs = [job for page in pages for job in page["jobs"]]
@@ -38,18 +66,22 @@ def validate(sha, repository):
     missing = required - successful
     if missing:
         raise ValueError("missing successful app validation: " + ", ".join(sorted(missing)))
-    print(f"Full main CI validated {sha} (run {run['id']}, attempt {run['run_attempt']}).")
 
 
 BLOCKED = 3
 
 
 if __name__ == "__main__":
+    selecting = sys.argv[1] == "--select"
+    sha = sys.argv[2] if selecting else sys.argv[1]
     try:
-        validate(sys.argv[1], os.environ["GITHUB_REPOSITORY"])
+        if selecting:
+            print(select(sha, os.environ["GITHUB_REPOSITORY"]))
+        else:
+            validate(sha, os.environ["GITHUB_REPOSITORY"])
     except ValueError as error:
         # A refusal releases nothing and is no release defect; main's CI run shows why.
-        print(f"::warning::Nightly blocked for {sys.argv[1]}: {error}")
+        print(f"::warning::Nightly blocked for {sha}: {error}", file=sys.stderr if selecting else sys.stdout)
         sys.exit(BLOCKED)
     except (KeyError, subprocess.CalledProcessError) as error:
-        sys.exit(f"Nightly could not validate {sys.argv[1]}: {error}")
+        sys.exit(f"Nightly could not validate {sha}: {error}")
