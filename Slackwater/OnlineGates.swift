@@ -114,9 +114,9 @@ extension ChsFitService {
         await MainActor.run { shared.setOnlineProgress(gate.id, done: 1, total: total) }
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []
         for (index, chunk) in plan.enumerated() {
-            speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
+            speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk, cacheEmpty: false)
             await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 2, total: total) }
-            dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
+            dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk, cacheEmpty: false)
             await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 3, total: total) }
         }
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)

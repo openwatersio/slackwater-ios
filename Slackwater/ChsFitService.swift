@@ -357,7 +357,7 @@ final class ChsFitService: ObservableObject {
             // `-online.json` decodes as no model and keeps its chunks, and a
             // chunk cache is re-fetchable by definition.
             if let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
-                ChsChunkStore.purge(model.iwlsID)
+                ChsChunkStore.purge(model.iwlsID, includingEmpty: true)
             }
             try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
         }

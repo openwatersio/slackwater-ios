@@ -83,16 +83,95 @@ final class ChsChunkCacheTests: XCTestCase {
         }
     }
 
-    func testNewNegativeEntryReplacesLegacyAndPositiveSamples() throws {
+    func testAnEmptyResponseCannotReplaceACompleteCachedWeek() throws {
         let id = station()
         defer { cleanup(id) }
         ChsChunkStore.save(samples, id, "wlp", chunk, fetchedAt: now)
+        ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+        XCTAssertEqual(ChsChunkStore.load(id, "wlp", chunk, now: now), samples)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.emptyURL(id, "wlp", chunk).path))
+    }
+
+    func testAnEmptyResponsePreservesCompleteLegacySamples() throws {
+        let id = station()
+        defer { cleanup(id) }
+        try FileManager.default.createDirectory(at: ChsChunkStore.dir, withIntermediateDirectories: true)
         try JSONEncoder().encode(samples).write(to: ChsChunkStore.legacyURL(id, "wlp", chunk))
         ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+        XCTAssertEqual(ChsChunkStore.load(id, "wlp", chunk, now: now), samples)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.emptyURL(id, "wlp", chunk).path))
+    }
+
+    func testConcurrentReadsAndSavesNeverLoseAnExistingWeek() {
+        let id = station()
+        let chunk = chunk
+        let samples = samples
+        let now = now
+        defer { cleanup(id) }
+        ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+        DispatchQueue.concurrentPerform(iterations: 400) { index in
+            if index % 3 == 0 {
+                ChsChunkStore.save(samples, id, "wlp", chunk, fetchedAt: now)
+            } else if index % 3 == 1 {
+                ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+            } else {
+                XCTAssertNotNil(ChsChunkStore.load(id, "wlp", chunk, now: now))
+            }
+        }
+    }
+
+    func testFailedMigrationPreservesLegacySamplesForOfflineResume() throws {
+        let id = station()
+        defer { cleanup(id) }
+        try FileManager.default.createDirectory(at: ChsChunkStore.url(id, "wlp", chunk), withIntermediateDirectories: true)
+        let legacy = ChsChunkStore.legacyURL(id, "wlp", chunk)
+        try JSONEncoder().encode(samples).write(to: legacy)
+        XCTAssertEqual(ChsChunkStore.load(id, "wlp", chunk, now: now), samples)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
+    }
+
+    func testRollbackSamplesSupersedeAnEarlierNegativeEntry() throws {
+        let id = station()
+        defer { cleanup(id) }
+        ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+        try JSONEncoder().encode(samples).write(to: ChsChunkStore.legacyURL(id, "wlp", chunk))
+        XCTAssertEqual(ChsChunkStore.load(id, "wlp", chunk, now: now), samples)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.emptyURL(id, "wlp", chunk).path))
+    }
+
+    func testOnlineRetriesBypassEmptyWeeksButReusePositiveWeeks() async throws {
+        let id = station()
+        defer {
+            ChsChunkStore.purge(id, includingEmpty: true)
+        }
+        let fetcher = IwlsFetcher(killSwitch: true)
+        ChsChunkStore.save([], id, "wcsp1", chunk)
+        do {
+            _ = try await fetcher.series("wcsp1", stationID: id, chunk: chunk, cacheEmpty: false)
+            XCTFail("an online retry must reach the network after an empty week")
+        } catch ChsError.networkDisabled {} catch { XCTFail("unexpected error: \(error)") }
+        ChsChunkStore.save(samples, id, "wcsp1", chunk)
+        let hit = try await fetcher.series("wcsp1", stationID: id, chunk: chunk, cacheEmpty: false)
+        XCTAssertEqual(hit, samples)
+    }
+
+    func testPurgeExpiresEmptyWeeksAndOrphanPurgeRemovesFreshOnes() {
+        let id = station()
+        let other = station()
+        defer {
+            ChsChunkStore.purge(id, includingEmpty: true)
+            ChsChunkStore.purge(other, includingEmpty: true)
+        }
+        let older = ChsChunk(start: chunk.start.addingTimeInterval(-604800), end: chunk.start)
+        ChsChunkStore.save([], id, "wlp", older, fetchedAt: now.addingTimeInterval(-86400))
+        ChsChunkStore.save([], id, "wlp", chunk, fetchedAt: now)
+        ChsChunkStore.save([], other, "wlp", chunk, fetchedAt: now)
+        ChsChunkStore.purge(id, now: now)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.emptyURL(id, "wlp", older).path))
         XCTAssertEqual(ChsChunkStore.load(id, "wlp", chunk, now: now), [])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.url(id, "wlp", chunk).path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsChunkStore.legacyURL(id, "wlp", chunk).path))
-        XCTAssertNil(ChsChunkStore.load(id, "wlp", chunk, now: now.addingTimeInterval(86400)))
+        ChsChunkStore.purge(id, includingEmpty: true, now: now)
+        XCTAssertNil(ChsChunkStore.load(id, "wlp", chunk, now: now))
+        XCTAssertEqual(ChsChunkStore.load(other, "wlp", chunk, now: now), [])
     }
 
     func testGridAndWindowAreValidatedEvenUnderTheWrongFilename() throws {

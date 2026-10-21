@@ -22,6 +22,18 @@ final class ChsGridTests: XCTestCase {
         XCTAssertEqual(ChsGrid.tideSeconds, Double(ChsTideFit.sampleMinutes) * 60)
     }
 
+    func testFitValidationUsesTheAppPackageRevision() throws {
+        let revisions = try repoSource("project.yml").components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.hasPrefix("revision: ") }
+        XCTAssertEqual(revisions.count, 1)
+        let revision = String(try XCTUnwrap(revisions.first).dropFirst("revision: ".count))
+        XCTAssertTrue(try repoSource("tools/FitValidation/Package.swift").contains("revision: \"\(revision)\""))
+        let resolved = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(repoSource("tools/FitValidation/Package.resolved").utf8)) as? [String: Any])
+        let pins = try XCTUnwrap(resolved["pins"] as? [[String: Any]])
+        let slackwater = try XCTUnwrap(pins.first { $0["identity"] as? String == "slackwater" })
+        XCTAssertEqual((slackwater["state"] as? [String: Any])?["revision"] as? String, revision)
+    }
+
     /// Current gates keep the basis their bar was measured on. When an engine
     /// bump changes the tide recipe, this fails, so the change is a decision:
     /// update `currentBasis` with a current revalidation, or keep the split.

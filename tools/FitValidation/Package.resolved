@@ -5,7 +5,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/openwatersio/slackwater",
       "state" : {
-        "revision" : "0b010a4b4d1e903acd742388092c6a341a65fe7b"
+        "revision" : "661f3afb082e84a45e0b27c5c55ac99ad78268dc"
       }
     }
   ],
