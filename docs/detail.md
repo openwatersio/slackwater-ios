@@ -536,7 +536,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/StationLinkTests.swift`, `SlackwaterTests/ReportProblemTests.swift`, `SlackwaterTests/SeasonalWaterTests.swift`, `SlackwaterTests/EclipseTests.swift`, `SlackwaterTests/DetailLeadTests.swift` |
 | End-to-end checks | `SlackwaterUITests/DetailAndScrubTests.swift`, `SlackwaterUITests/ListAndFavoritesTests.swift`, `SlackwaterUITests/MapSearchAndNavigationTests.swift`, `SlackwaterUITests/OfflineCoverageTests.swift`, `SlackwaterUITests/OfflineTransitionTests.swift` |
 
-The watch's place page (`SlackwaterWatch/PlaceDetail.swift`) shows a reading card, the Crown-driven strip, and a sheet with the rest of the selected day's events and the favorite toggle. It has no week schedule, tiles, picker, provenance, or share.
+The watch's place page (`SlackwaterWatch/PlaceDetail.swift`) shows a reading card, the Crown-driven strip, and a sheet with the rest of the selected day's events, "Predictions — not for navigation", and the favorite toggle. The disclaimer is in the sheet, below the fold as the phone's footer is, because the page has no row for it: on a 40mm watch the strip's hours already sit under the bottom bar. It has no week schedule, tiles, picker, provenance, or share.
 
 ## 21. Maintaining this specification
 

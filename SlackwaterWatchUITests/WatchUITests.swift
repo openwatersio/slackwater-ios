@@ -78,6 +78,16 @@ import XCTest
         XCTAssertTrue(app.buttons["add-place-row"].exists || app.buttons["place-row"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    func testDetailSaysNotForNavigation() {
+        openFirstPlace()
+        app.buttons["reading-card"].tap()
+        let line = app.staticTexts["not-for-navigation"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5), app.debugDescription)
+        scrollIntoView(line)
+        XCTAssertTrue(line.isHittable, "the disclaimer is off screen: \(line.frame)")
+        snapshot("watch-not-for-navigation")
+    }
+
     func testCardOpensTheSheet() {
         openFirstPlace()
         let card = app.buttons["reading-card"]
@@ -89,9 +99,7 @@ import XCTest
     func testDetailOffersHandoffToPhone() {
         openFirstPlace()
         app.buttons["reading-card"].tap()
-        let phone = app.buttons["open-on-phone"]
-        XCTAssertTrue(phone.waitForExistence(timeout: 5), app.debugDescription)
-        scrollIntoView(phone)
+        let phone = openOnPhoneInSheet()
         snapshot("watch-phone-action")
         phone.tap()
         XCTAssertTrue(app.staticTexts["To continue, open the app switcher on your iPhone and tap Slackwater."].waitForExistence(timeout: 5))
@@ -205,11 +213,19 @@ import XCTest
         app.launch()
         openFirstPlace()
         app.buttons["reading-card"].tap()
-        let phone = app.buttons["open-on-phone"]
-        XCTAssertTrue(phone.waitForExistence(timeout: 5), app.debugDescription)
+        let phone = openOnPhoneInSheet()
         XCTAssertTrue(phone.label.contains(label), phone.label)
-        scrollIntoView(phone)
         snapshot("watch-phone-action-\(language)")
+    }
+
+    /// The sheet's list builds a row only once it scrolls into view, and on a
+    /// 40mm watch Open on iPhone starts below the fold.
+    private func openOnPhoneInSheet() -> XCUIElement {
+        XCTAssertTrue(app.buttons["close-sheet"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        let phone = app.buttons["open-on-phone"]
+        scrollIntoView(phone)
+        XCTAssertTrue(phone.waitForExistence(timeout: 5), app.debugDescription)
+        return phone
     }
 
     private func scrollIntoView(_ element: XCUIElement) {

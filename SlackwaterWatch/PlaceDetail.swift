@@ -246,6 +246,15 @@ struct PlaceDetail: View {
                 ForEach(ScrubReading.todaysEvents(after: scrubTime, in: tl, imperial: imperial,
                                                   speedUnit: speedUnit), id: \.self) { Text(verbatim: $0).monospacedDigit() }
             }
+            // The phone's detail footer line (#669). It lives here, below the
+            // fold as on the phone, because the page has no row to spare: on
+            // a 40mm watch the strip's hours already sit under the bottom bar.
+            MonoLabel(text: String(localized: "Predictions — not for navigation", comment: "Safety disclaimer above station provenance."),
+                      color: SN.foam.opacity(0.62), tracking: 1.4)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+                .accessibilityIdentifier("not-for-navigation")
             Button {
                 favorites.toggle(item.id)
             } label: {
