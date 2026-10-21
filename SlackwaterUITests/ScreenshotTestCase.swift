@@ -746,12 +746,18 @@ class ShotWalk: ScreenshotTestCase {
                       "generator — run scripts/screenshots.sh")
     }
 
-    func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
+    /// `epoch` and `instant` move one frame off the walk's day, for a
+    /// moment the pinned day doesn't have; `instant` is a full ISO 8601
+    /// time and takes the place of `time`.
+    func launchShots(_ extra: [String] = [], scrubTo time: String? = nil,
+                     epoch: String? = nil, instant: String? = nil) -> XCUIApplication {
         var args = ["-seedGate", "-seedTour", "-resetRecents", "-noCloudSync",
                     "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
-                    "-nowEpoch", shotEpoch] + fix + extra
-        if let time {
+                    "-nowEpoch", epoch ?? shotEpoch] + fix + extra
+        if let instant {
+            args += ["-scrubInstant", instant]
+        } else if let time {
             args += ["-scrubInstant", String(format: "%04d-%02d-%02dT%@:00%@",
                                              day.year!, day.month!, day.day!, time, shotZone)]
         }
