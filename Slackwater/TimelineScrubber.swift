@@ -1077,7 +1077,7 @@ struct TimelineScrubStrip: View {
     }
 }
 
-// Native state travels with CI's screenshot artifacts when the Malibu test opts in (#613).
+// Opt-in native traces travel with CI's screenshot artifacts to diagnose gesture failures.
 @MainActor private enum ScrubTrace {
     #if DEBUG && targetEnvironment(simulator)
     static let path: URL? = {
