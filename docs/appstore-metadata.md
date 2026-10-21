@@ -258,7 +258,6 @@ Review notes for Premium Lifetime:
   /tmp/slackwater-mac-screenshot-checks
   ```
 - [ ] Station counts re-derived and rounded down, in every localization.
-- [ ] A native speaker has read the Spanish (Mexico) and French (Canada) copy.
 - [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Both Premium products have complete metadata. Attach any first in-app purchase to the version in App Store Connect and submit there; `asc.mjs submit` refuses a submission holding purchases.
 - [ ] Description ends with the Terms of Use and Privacy Policy links, and the Privacy Policy URL field is `https://slackwater.xyz/privacy/`.
