@@ -99,6 +99,17 @@ func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
 struct HorizonSpan: Equatable {
     let riseAz: Double
     let setAz: Double
+    /// Whether the arc crosses the meridian south of the zenith. The frame
+    /// faces that side, so the arc runs through mid-frame wherever it
+    /// culminates: in the tropics the sun and moon also pass on the poleward
+    /// side, and measured from the other meridian their arc would wrap
+    /// through the frame's edges and never come on screen.
+    var facesSouth = true
+    /// Whether the body stays up through its lower culmination, as the moon
+    /// does for days at a time at high latitudes. Such an arc runs round the
+    /// whole horizon, through both of the frame's edges, so `skyBodyPoint`
+    /// lets it leave the frame instead of holding it at an edge.
+    var circumpolar = false
 }
 
 /// The sky as a window whose side edges are the horizon. A body's own
@@ -113,13 +124,14 @@ struct HorizonSpan: Equatable {
 /// runs left → right, so as time advances the curve pans right → left under
 /// the fixed centerline and a body sweeps with the curve it drives.
 /// (openwaters.io/sky keeps the chart convention; this page's frame is the
-/// timeline, not a compass.)
+/// timeline, not a compass.) Facing south, that is the sky's mirror image;
+/// facing north (`HorizonSpan.facesSouth`) it is the sky as seen.
 ///
 /// `pad` is the body's disc radius: at the horizon the disc has just cleared
 /// the edge, and its glow spills in from off screen as it rises. A wider pad
 /// would cost daylight — the sun covers about 36pt an hour here, so padding
 /// by the glow instead had it leaving an hour before sunset under a blue
-/// sky. With no span the window is the whole 360°.
+/// sky. With no span the window is the whole 360°, facing the equator.
 let skyAltitudeScale: CGFloat = 3   // points per degree of altitude
 /// How far the horizon sits inside the plot box, so the curve's peaks rise in
 /// front of the lowest stars. Small: a body 5° up is back above the box, and
@@ -131,11 +143,11 @@ let skyHorizonOverlap: CGFloat = 16
 func starHazeOpacity(altitude: Double) -> Double { max(0, min(1, (altitude + 10) / 50)) }
 func skyPoint(azimuth: Double, altitude: Double, latitude: Double,
               span: HorizonSpan? = nil, pad: CGFloat = 0, size: CGSize) -> CGPoint {
-    let center = latitude >= 0 ? 180.0 : 0.0
+    let facesSouth = span?.facesSouth ?? (latitude >= 0)
     // Degrees from the meridian, negative toward the rising side.
     func signed(_ az: Double) -> Double {
-        let s = (az - center + 540).truncatingRemainder(dividingBy: 360) - 180
-        return latitude >= 0 ? s : -s
+        let s = (az - (facesSouth ? 180 : 0) + 540).truncatingRemainder(dividingBy: 360) - 180
+        return facesSouth ? s : -s
     }
     var rise = -180.0, set = 180.0
     if let span, signed(span.riseAz) < signed(span.setAz) {
@@ -145,6 +157,27 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double,
     let pointsPerDegree = (size.width + 2 * pad) / CGFloat(set - rise)
     return CGPoint(x: size.width + pad - CGFloat(signed(azimuth) - rise) * pointsPerDegree,
                    y: size.height - CGFloat(altitude) * skyAltitudeScale)
+}
+
+/// Where the sun or moon draws: `skyPoint`, held in frame once the body is
+/// up. A body climbing steeply, as it does most days in the tropics, gains
+/// altitude faster than azimuth and would sit just past the edge for hours;
+/// one crossing poleward of the zenith swings wider than its own rise and
+/// set. The hold eases in over the first 10° of altitude, from `pad` outside
+/// the edge to twice `pad` inside it, so the body still clears the edge as it
+/// rises and sets, and from 10° up it is whole with a radius of sky between
+/// it and the bezel: flush against the edge, a disc reads as clipped. Never
+/// for the stars: they run off the frame.
+func skyBodyPoint(azimuth: Double, altitude: Double, latitude: Double, span: HorizonSpan?,
+                  pad: CGFloat, size: CGSize) -> CGPoint {
+    var point = skyPoint(azimuth: azimuth, altitude: altitude, latitude: latitude,
+                         span: span, pad: pad, size: size)
+    // Without a span the frame is the whole sky, and its edges are not the
+    // horizon; a circumpolar arc crosses them while it is up.
+    guard let span, !span.circumpolar, altitude > 0 else { return point }
+    let inset = pad * (3 * CGFloat(min(altitude / 10, 1)) - 1)
+    point.x = min(max(point.x, inset), size.width - inset)
+    return point
 }
 
 /// A fixed star: J2000 right ascension and declination in degrees, and
@@ -173,11 +206,35 @@ struct SkyState {
     /// The glyph's rotation toward the sun as the moon is seen (`moonTilt`),
     /// for the summary tile.
     let moonLightAngle: Double
-    /// The same rotation in the backdrop's frame. `skyPoint` puts east on the
-    /// right in both hemispheres, which in the north is the sky's mirror
-    /// image; the limb is mirrored with it so it still faces the sun drawn
-    /// beside it.
-    var backdropMoonLightAngle: Double { latitude >= 0 ? .pi - moonLightAngle : moonLightAngle }
+    /// The same rotation in the backdrop's frame, given how far right of the
+    /// moon the sun is drawn (`sunDrawnOffset`, negative to its left). `skyPoint` puts east on the right whichever
+    /// way the frame faces, which facing south is the sky's mirror image; the
+    /// limb is mirrored with it so it still faces the sun drawn beside it.
+    /// In the tropics the sun's frame can face the other way, and then the
+    /// two are not one picture: while the sun is up, the limb keeps its
+    /// upward or downward lean and turns to the side the sun is drawn on,
+    /// through vertical as the drawn sun passes over or under the moon (the
+    /// lean across is scaled down within 40pt) so it never snaps to its mirror
+    /// image. Once the sun has set there is no drawn sun to face, and its
+    /// off-screen x wraps round at midnight. On the horizon the two rules
+    /// agree, since both frames put the sun's rising side on the right.
+    func backdropMoonLightAngle(sunDrawnOffset: CGFloat?) -> Double {
+        let moonFacesSouth = moonSpan?.facesSouth ?? (latitude >= 0)
+        let sunFacesSouth = sunSpan?.facesSouth ?? (latitude >= 0)
+        if moonFacesSouth != sunFacesSouth, let sunDrawnOffset, let sun, sun.altDeg > 0 {
+            let across = abs(cos(moonLightAngle)) * Double(min(max(sunDrawnOffset / 40, -1), 1))
+            return atan2(sin(moonLightAngle), across)
+        }
+        return moonFacesSouth ? .pi - moonLightAngle : moonLightAngle
+    }
+    /// The stars' frame: the sun's span, always facing the equator. Facing
+    /// the sun's own way, the whole field would flip to its mirror image at
+    /// midnight on the nights the sun's crossing changes sides; stars are
+    /// only out while the sun is down, so they lose nothing by not sharing
+    /// its frame.
+    var starSpan: HorizonSpan? {
+        sunSpan.map { HorizonSpan(riseAz: $0.riseAz, setAz: $0.setAz, facesSouth: latitude >= 0) }
+    }
     /// Every catalog star Almanac could place, with where it stands: built
     /// once per scrub frame here so the twinkle redraws don't recompute it.
     let stars: [(star: Star, at: AltAz)]
@@ -221,16 +278,19 @@ struct SkyState {
         obscuration = observer.flatMap { try? solarObscuration(at: time, observer: $0) } ?? 0
         sunSpan = observer.flatMap { obs in
             Self.span(rises: days.compactMap(\.sunrise), sets: days.compactMap(\.sunset),
-                      at: time) { try sunAltAz($0, observer: obs) }
+                      at: time, latitude: latitude, altAz: { try sunAltAz($0, observer: obs) },
+                      declination: { try sunPosition($0).decDeg })
         }
         moonSpan = observer.flatMap { obs in
             Self.span(rises: days.compactMap(\.moonrise), sets: days.compactMap(\.moonset),
-                      at: time) { try moonAltAz($0, observer: obs) }
+                      at: time, latitude: latitude, altAz: { try moonAltAz($0, observer: obs) },
+                      declination: { try moonPosition($0).decDeg })
         }
     }
 
-    private static func span(rises: [Date], sets: [Date], at time: Date,
-                             altAz: (Date) throws -> AltAz) -> HorizonSpan? {
+    static func span(rises: [Date], sets: [Date], at time: Date, latitude: Double,
+                     altAz: (Date) throws -> AltAz,
+                     declination: (Date) throws -> Double) -> HorizonSpan? {
         let arcs = sets.compactMap { set -> (rise: Date, set: Date)? in
             guard let rise = rises.last(where: { $0 < set }) else { return nil }
             return (rise, set)
@@ -241,8 +301,21 @@ struct SkyState {
         // Switch arcs below the horizon, so the visible disc and halo never jump at a crossing.
         guard let arc = arcs.min(by: { distance($0) < distance($1) }),
               let riseAz = try? altAz(arc.rise).azDeg,
-              let setAz = try? altAz(arc.set).azDeg else { return nil }
-        return HorizonSpan(riseAz: riseAz, setAz: setAz)
+              let setAz = try? altAz(arc.set).azDeg,
+              let dec = try? declination(arc.rise.addingTimeInterval(arc.set.timeIntervalSince(arc.rise) / 2))
+        else { return nil }
+        // A body culminates south of the zenith when its declination is south
+        // of the latitude. Read halfway through the arc: the moon's moves a
+        // few tenths of a degree an hour, so only a pass within about that of
+        // the zenith could be read on the wrong side. The body's azimuth there
+        // says nothing for an arc days long, which is halfway through its
+        // lower culmination as often as its upper.
+        // Up through its lower culmination when it is within the colatitude
+        // of the pole; an arc a day or more long can only have been.
+        let poleward = latitude >= 0 ? dec : -dec
+        return HorizonSpan(riseAz: riseAz, setAz: setAz, facesSouth: dec < latitude,
+                           circumpolar: poleward > 90 - abs(latitude)
+                               || arc.set.timeIntervalSince(arc.rise) >= 86_400)
     }
 
     /// Fraction of the moon's diameter in the umbra right now, 0 when clear.
@@ -285,16 +358,16 @@ struct SkyBackdrop: View {
                     TimelineView(.animation(minimumInterval: 0.125,
                                             paused: opacity == 0 || reduceMotion)) { timeline in
                         let seconds = timeline.date.timeIntervalSinceReferenceDate
-                        // The stars share the sun's frame (`skyPoint` with
-                        // its span), so the field slides with the bodies as
-                        // the scrubber moves. Off-frame and set stars cost
-                        // nothing: the canvas clips them.
+                        // The stars take the sun's span (`starSpan`), so the
+                        // field slides with the bodies as the scrubber moves.
+                        // Off-frame and set stars cost nothing: the canvas
+                        // clips them.
                         Canvas { context, _ in
                             for (i, placed) in sky.stars.enumerated() {
                                 let haze = starHazeOpacity(altitude: placed.at.altDeg)
                                 guard haze > 0 else { continue }
                                 let point = skyPoint(azimuth: placed.at.azDeg, altitude: placed.at.altDeg,
-                                                     latitude: sky.latitude, span: sky.sunSpan, size: size)
+                                                     latitude: sky.latitude, span: sky.starSpan, size: size)
                                 let radius = max(0.5, 1.6 - 0.3 * CGFloat(placed.star.mag))
                                 let twinkle = starTwinkle(index: i, seconds: seconds,
                                                           reduceMotion: reduceMotion)
@@ -310,8 +383,8 @@ struct SkyBackdrop: View {
                 }
                 // Below the horizon a body is past an edge; the clip hides it.
                 let sunPoint = sky.sun.map {
-                    skyPoint(azimuth: $0.azDeg, altitude: $0.altDeg, latitude: sky.latitude,
-                             span: sky.sunSpan, pad: sunDiscRadius, size: size)
+                    skyBodyPoint(azimuth: $0.azDeg, altitude: $0.altDeg, latitude: sky.latitude,
+                                 span: sky.sunSpan, pad: sunDiscRadius, size: size)
                 }
                 if let point = sunPoint {
                     Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
@@ -321,9 +394,9 @@ struct SkyBackdrop: View {
                 }
                 if let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
-                    let truePoint = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
-                                             latitude: sky.latitude, span: sky.moonSpan,
-                                             pad: moonGlyphSize / 2, size: size)
+                    let truePoint = skyBodyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
+                                                 latitude: sky.latitude, span: sky.moonSpan,
+                                                 pad: moonGlyphSize / 2, size: size)
                     // The symbols are many times the true half-degree, so the
                     // real separation is under a point and any partial would
                     // read as total. In an eclipse the moon sits off the sun by
@@ -336,7 +409,7 @@ struct SkyBackdrop: View {
                         return len > 0 ? CGPoint(x: sun.x + dx / len * d, y: sun.y + dy / len * d)
                                        : CGPoint(x: sun.x + d, y: sun.y)
                     } ?? truePoint
-                    let toSun = sky.backdropMoonLightAngle
+                    let toSun = sky.backdropMoonLightAngle(sunDrawnOffset: sunPoint.map { $0.x - point.x })
                     let glare = moonGlareOpacity(
                         distance: sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity,
                         obscuration: sky.obscuration)

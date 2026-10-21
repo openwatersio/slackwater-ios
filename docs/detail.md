@@ -174,7 +174,7 @@ There is deliberately **no section measured against the station's own ends**, as
 
 ### 6.6 Moon (every kind)
 
-- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant and place. The bright limb uses Almanac's observer orientation, matching the Moon sheet instead of an upright calendar-phase convention. The sky backdrop mirrors it in the northern hemisphere (scrubber §14).
+- **Glyph:** the Moon's lit shape, or the eclipse, at the selected instant and place. The bright limb uses Almanac's observer orientation, matching the Moon sheet instead of an upright calendar-phase convention. The sky backdrop mirrors it wherever its moon frame faces south (scrubber §14).
 - **Value:** an eclipse in progress ("Solar Eclipse", "Total Eclipse", "Partial Eclipse", "Penumbral Eclipse"), otherwise the phase: "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous", "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent". New and full span 1.7 days either side; the quarters span 1.4.
 - **Caption:** the tide the Moon is driving: "Perigean spring tide", "Apogean spring tide", "Perigean neap tide", "Apogean neap tide", "Perigean tide", "Apogean tide", "Spring tide", or "Neap tide". Perigee and apogee count within 2 days. When none applies, "<N>% lit".
 - **Absent** outside the years the astronomy library supports (1950–2101 today).
