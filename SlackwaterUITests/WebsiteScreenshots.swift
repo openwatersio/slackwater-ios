@@ -69,5 +69,35 @@ final class WebsiteScreenshots: ShotWalk {
         assertCurrentDetailRendered(app)
         settleScrub(app, at: localizedClock("15:30"))
         save(app, "currents-comfort.png")
+
+        // The tide-pool page: a fortnight's-lowest low in daylight, which the
+        // walk's September day doesn't have — its lower low is at 11:35pm.
+        // Friday Harbor's Sunday 6 June 2027 low at 12:31pm is the lowest of
+        // that spring's daytime run. The detail at the low, then the Range
+        // sheet that names it.
+        app = launchShots(epoch: "1812300060", instant: "2027-06-06T12:31:00-07:00")
+        openFridayHarbor(app)
+        settleScrub(app, at: localizedClock("12:31"))
+        save(app, "tides-lowest.png")
+        let range = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] 'Range,'")).firstMatch
+        XCTAssert(range.appears(within: 10), "no Range tile on the tide detail")
+        range.tap()
+        XCTAssert(app.navigationBars["Range"].appears(within: 5), "the Range sheet did not open")
+        let swings = app.descendants(matching: .any)["range-section-swings"]
+        XCTAssert(swings.appears(within: 10))
+        // The sheet opens at half height on the swing chart; the fact this
+        // page quotes sits under the station's ends. Raise the sheet, then
+        // scroll until the fact is on screen.
+        app.navigationBars["Range"].swipeUp()
+        let fact = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS[c] 'lowest low of the fortnight'")).firstMatch
+        for _ in 0..<4 where !(fact.exists && fact.isHittable) {
+            app.descendants(matching: .any)["range-section-ends"].exists
+                ? app.descendants(matching: .any)["range-section-ends"].swipeUp(velocity: .slow)
+                : swings.swipeUp(velocity: .slow)
+        }
+        XCTAssert(fact.exists && fact.isHittable, "the Range sheet does not call this the fortnight's lowest low")
+        _ = settled { app.staticTexts.count }
+        save(app, "tides-lowest-range.png")
     }
 }
