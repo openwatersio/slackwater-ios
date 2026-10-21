@@ -44,7 +44,7 @@ packages:
     # extremes that hold still as the window moves (slackwater#436, fixed in
     # slackwater#448) and a turn on UTC midnight kept (slackwater#449).
     url: https://github.com/openwatersio/slackwater
-    revision: 0b010a4b4d1e903acd742388092c6a341a65fe7b
+    revision: 661f3afb082e84a45e0b27c5c55ac99ad78268dc
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

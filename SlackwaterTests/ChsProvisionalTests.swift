@@ -120,8 +120,8 @@ final class ChsProvisionalTests: XCTestCase {
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
         defer { ChsChunkStore.purge("backup-station") }
 
-        let start = Date(timeIntervalSince1970: 1_784_000_000)
-        ChsChunkStore.save([ChsSample(t: start.timeIntervalSince1970 * 1000, v: 1)],
+        let start = Date(timeIntervalSince1970: 604800)
+        ChsChunkStore.save([ChsSample(t: 604800000, v: 1), ChsSample(t: 1209600000, v: 2)],
                            "backup-station", "wlp",
                            ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400)))
 
@@ -132,17 +132,20 @@ final class ChsProvisionalTests: XCTestCase {
 
     /// Cached current data may be denser; the fit must keep a uniform time grid.
     func testCachedChunksResumeWithoutRefetching() async throws {
-        let start = Date(timeIntervalSince1970: 1_784_000_000)
+        let start = Date(timeIntervalSince1970: 604800)
         let chunk = ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400))
         let missing = ChsChunk(start: start.addingTimeInterval(-7 * 86_400), end: start)
         defer { ChsChunkStore.purge("test-station") }
 
         let grid = (start.timeIntervalSince1970 / ChsGrid.seconds).rounded(.up) * ChsGrid.ms
-        ChsChunkStore.save([ChsSample(t: grid, v: 2), ChsSample(t: grid + 60_000, v: 3)],
-                           "test-station", "wcsp1", chunk)
+        let samples = [ChsSample(t: grid, v: 2), ChsSample(t: chunk.end.timeIntervalSince1970 * 1000, v: 3)]
+        // Simulate a complete dense array from a build before cache envelopes.
+        try FileManager.default.createDirectory(at: ChsChunkStore.dir, withIntermediateDirectories: true)
+        try JSONEncoder().encode(samples + [ChsSample(t: grid + 60_000, v: 4)])
+            .write(to: ChsChunkStore.legacyURL("test-station", "wcsp1", chunk))
         let offline = IwlsFetcher(killSwitch: true)
         let resumed = try await offline.series("wcsp1", stationID: "test-station", chunk: chunk)
-        XCTAssertEqual(resumed, [ChsSample(t: grid, v: 2)], "cached current samples must use the fit grid")
+        XCTAssertEqual(resumed, samples, "cached current samples must use the fit grid")
 
         do {
             _ = try await offline.series("wcsp1", stationID: "test-station", chunk: missing)
@@ -150,7 +153,7 @@ final class ChsProvisionalTests: XCTestCase {
         } catch ChsError.networkDisabled {}
 
         // An empty week an older build stored must refetch, not stand in for data.
-        ChsChunkStore.save([], "test-station", "wlp", chunk)
+        try JSONEncoder().encode([ChsSample]()).write(to: ChsChunkStore.legacyURL("test-station", "wlp", chunk))
         do {
             _ = try await offline.wlp(stationID: "test-station", chunk: chunk)
             XCTFail("a cached empty week must still need the network")

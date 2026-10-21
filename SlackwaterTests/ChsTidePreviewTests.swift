@@ -74,10 +74,10 @@ final class ChsTidePreviewTests: XCTestCase {
         XCTAssertNil(ChsModelStore.loadTidePreview(id))
     }
 
-    func testPreviewRequestBypassesAnIncompleteFitChunk() async throws {
+    func testPreviewRequestBypassesACachedFitChunk() async throws {
         let id = "preview-test-\(UUID().uuidString)"
-        let chunk = ChsChunk(start: start, end: start.addingTimeInterval(7 * 86400))
-        let samples = [ChsSample(t: start.timeIntervalSince1970 * 1000, v: 1)]
+        let chunk = ChsChunk(start: .init(timeIntervalSince1970: 604800), end: .init(timeIntervalSince1970: 1209600))
+        let samples = [ChsSample(t: 604800000, v: 1), ChsSample(t: 1209600000, v: 2)]
         ChsChunkStore.save(samples, id, "wlp", chunk)
         defer { ChsChunkStore.purge(id) }
         let fetcher = IwlsFetcher(killSwitch: true)
@@ -85,7 +85,7 @@ final class ChsTidePreviewTests: XCTestCase {
         XCTAssertEqual(cached, samples)
         do {
             _ = try await fetcher.wlp(stationID: id, chunk: chunk, cache: false)
-            XCTFail("A preview must request fresh samples instead of accepting the incomplete fit chunk")
+            XCTFail("A preview must request fresh samples instead of accepting the cached fit chunk")
         } catch ChsError.networkDisabled {}
     }
 
