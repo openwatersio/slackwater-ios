@@ -34,6 +34,12 @@ struct TideDetailView: View {
     @State private var viewportPts: CGFloat = 0
     /// Bumped when a preview clamp moves the selection, so the strip moves for it.
     @State private var clampRequests = 0
+    /// The Range bars' week: the local midnight `RangeOutlook.week` moves.
+    @State private var outlookWeek: Date?
+    /// The opening slide, Now, and a picked date ride the strip through days
+    /// on the way to a week already chosen for them; the bars ignore the ride
+    /// until the scrub next rests.
+    @State private var outlookHeld = true
 
     private var timeline: TimelineData? { store?.timeline ?? previewTimeline }
     private var activePreview: ChsTidePreview? { store == nil ? preview ?? displayedPreview : nil }
@@ -114,6 +120,7 @@ struct TideDetailView: View {
                                     anchor = todayLocal(tz)
                                     clamp(into: coverage)
                                 } else { store?.jump(to: scrubTime, anchor: picked) }
+                                holdOutlook(anchor)
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             alertOffer: activePreview == nil ? tideAlertOffer(
@@ -147,7 +154,7 @@ struct TideDetailView: View {
                                     SummaryTiles(primary: range,
                                                  primaryDetail: rangeDetail(jump: jump),
                                                  primaryOutlook: AnyView(RangeOutlook(timeline: tl,
-                                                     selected: nextExtreme?.time ?? scrubTime, at: scrubTime)),
+                                                     week: outlookWeek ?? dayLocal(scrubTime, tz), at: scrubTime)),
                                                  primarySymbol: rangeSymbol,
                                                  moon: sky.illumination, at: scrubTime, sunDays: tl.days,
                                                  moonAngle: sky.moonLightAngle,
@@ -172,6 +179,8 @@ struct TideDetailView: View {
             .onAppear {
                 let linked = anchor != .distantPast
                 if anchor == .distantPast { anchor = todayLocal(tz) }
+                // Not the scrub's day: the opening slide starts two hours back, which after midnight is yesterday.
+                if outlookWeek == nil { outlookWeek = linked ? dayLocal(scrubTime, tz) : todayLocal(tz) }
                 if preview == nil, store == nil {
                     let s = TimelineWindowStore(source: .tide(record))
                     s.start(anchor: anchor, now: live, focus: linked ? scrubTime : FoldHandoff.pending(record.id))
@@ -219,6 +228,7 @@ struct TideDetailView: View {
                 await standings.loadYear(record: record, around: live)
             }
             .onChange(of: scrubTime) { _, t in
+                if !outlookHeld { outlookWeek = RangeOutlook.week(from: outlookWeek, scrub: t, tz: tz) }
                 if let coverage = activePreview?.coverage {
                     clamp(into: coverage)
                 } else { store?.focus(t, viewportPts: viewportPts) }
@@ -241,8 +251,12 @@ struct TideDetailView: View {
             // three weeks ago would be a lie. A cancelled sleep is a scrub
             // still in motion, same rest rule as the chrome row's.
             .task(id: scrubTime) {
-                guard activePreview == nil else { return }
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+                if outlookHeld {
+                    outlookHeld = false
+                    outlookWeek = RangeOutlook.week(from: outlookWeek, scrub: scrubTime, tz: tz)
+                }
+                guard activePreview == nil else { return }
                 // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
                 if let tl = timeline,
                    let next = Timeline.reanchor(settledAt: scrubTime, anchor: tl.anchor, tz: tz) {
@@ -450,10 +464,16 @@ struct TideDetailView: View {
         // and lands unanimated past it — the scrubber decides by distance;
         // the store only guarantees now's chunks exist.
         anchor = todayLocal(tz)
+        holdOutlook(anchor)
         store?.jump(to: live, anchor: anchor)
         if let coverage = activePreview?.coverage {
             scrubTime = min(max(live, coverage.lowerBound), coverage.upperBound)
         } else { scrubTime = live }
+    }
+
+    private func holdOutlook(_ week: Date) {
+        outlookWeek = week
+        outlookHeld = true
     }
 }
 
