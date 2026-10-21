@@ -24,19 +24,19 @@ import SlackwaterKit
     /// turns over a fortnight. Measured on real Friday Harbor predictions the
     /// daily maximum runs 1.8 → 3.7 → 1.9 → 3.0 → 1.8 ft across the window,
     /// while the per-swing series shows no beat at all.
-    func testRangeOutlookShowsTheSelectedDayAndSixComingDays() throws {
-        let timeline = TimelineData.build(tide: station, current: nil, now: at,
-                                          anchor: dayLocal(at, station.tz))
-        let peaks = RangeOutlook.peaks(timeline, at: at)
-        XCTAssertEqual(peaks.count, 7)
+    func testRangeOutlookShowsSevenDaysFromItsWeek() throws {
+        let week = dayLocal(at, station.tz)
+        let timeline = TimelineData.build(tide: station, current: nil, now: at, anchor: week)
+        let days = RangeOutlook.days(timeline, week: week)
+        XCTAssertEqual(days.count, 7)
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = station.tz
-        let start = cal.startOfDay(for: at)
-        for (offset, peak) in peaks.enumerated() {
-            let day = cal.date(byAdding: .day, value: offset, to: start)!
-            XCTAssertEqual(cal.startOfDay(for: peak.time), day)
+        for (offset, day) in days.enumerated() {
+            XCTAssertEqual(day.start, cal.date(byAdding: .day, value: offset, to: week))
+            let peak = try XCTUnwrap(day.peak)
+            XCTAssertEqual(cal.startOfDay(for: peak.time), day.start)
             let biggest = PeakStanding.swings(timeline.tideExtremes)
-                .filter { cal.isDate($0.time, inSameDayAs: day) }
+                .filter { cal.isDate($0.time, inSameDayAs: day.start) }
                 .map(\.magnitude).max()
             XCTAssertEqual(peak.magnitude, try XCTUnwrap(biggest))
         }
@@ -44,19 +44,92 @@ import SlackwaterKit
 
     func testRangeOutlookFollowsDistantTimelineDatesAndDST() throws {
         for text in ["2027-01-02T12:00:00Z", "2026-11-01T12:00:00Z"] {
-            let date = ISO8601DateFormatter().date(from: text)!
-            let timeline = TimelineData.build(tide: station, current: nil, now: at,
-                                              anchor: dayLocal(date, station.tz))
-            let peaks = RangeOutlook.peaks(timeline, at: date)
-            XCTAssertEqual(peaks.count, 7)
+            let week = dayLocal(ISO8601DateFormatter().date(from: text)!, station.tz)
+            let timeline = TimelineData.build(tide: station, current: nil, now: at, anchor: week)
+            let days = RangeOutlook.days(timeline, week: week)
+            XCTAssertEqual(days.count, 7)
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = station.tz
-            let start = calendar.startOfDay(for: date)
-            for (offset, peak) in peaks.enumerated() {
-                XCTAssertEqual(calendar.startOfDay(for: peak.time),
-                               calendar.date(byAdding: .day, value: offset, to: start))
+            for (offset, day) in days.enumerated() {
+                XCTAssertEqual(day.start, calendar.date(byAdding: .day, value: offset, to: week))
+                XCTAssertEqual(calendar.startOfDay(for: try XCTUnwrap(day.peak).time), day.start)
             }
         }
+    }
+
+    /// A day the loaded timeline does not yet hold keeps its slot empty, so
+    /// the bars either side of it stay where they stood.
+    func testRangeOutlookKeepsAnUnloadedDaysSlot() throws {
+        let anchor = dayLocal(at, station.tz)
+        let timeline = TimelineData.build(tide: station, current: nil, now: at, anchor: anchor)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let week = try XCTUnwrap(cal.date(byAdding: .day, value: 5, to: anchor))
+        let days = RangeOutlook.days(timeline, week: week)
+        XCTAssertEqual(days.count, 7)
+        XCTAssertNotNil(days.first?.peak)
+        XCTAssertNil(days.last?.peak, "the timeline ends before the week does")
+    }
+
+    private func noon(_ offset: Int, from week: Date) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        return noonLocal(cal.date(byAdding: .day, value: offset, to: week)!, station.tz)
+    }
+
+    private func day(_ offset: Int, from week: Date) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        return cal.date(byAdding: .day, value: offset, to: week)!
+    }
+
+    /// The bars stand still while the scrub walks the week's first five days;
+    /// only the highlight moves.
+    func testTheWeekHoldsThroughItsFirstFiveDays() {
+        let week = dayLocal(at, station.tz)
+        for offset in 0..<5 {
+            XCTAssertEqual(RangeOutlook.week(from: week, scrub: noon(offset, from: week), tz: station.tz),
+                           week, "day \(offset + 1)")
+        }
+    }
+
+    /// The sixth day leaves one day of outlook, so a new week starts there.
+    func testTheSixthDayStartsANewWeek() {
+        let week = dayLocal(at, station.tz)
+        for offset in [5, 6, 9, 30] {
+            let next = RangeOutlook.week(from: week, scrub: noon(offset, from: week), tz: station.tz)
+            XCTAssertEqual(next, day(offset, from: week))
+            XCTAssertEqual(RangeOutlook.week(from: next, scrub: noon(offset, from: week), tz: station.tz),
+                           next, "a new week holds where it started")
+        }
+    }
+
+    /// Scrubbing back past the week lands on the new week's fifth day, so the
+    /// way back walks five days before the bars move again, as the way forward does.
+    func testScrubbingBehindTheWeekLandsOnItsFifthDay() {
+        let week = dayLocal(at, station.tz)
+        for offset in [-1, -3, -20] {
+            let next = RangeOutlook.week(from: week, scrub: noon(offset, from: week), tz: station.tz)
+            XCTAssertEqual(next, day(offset - 4, from: week))
+            XCTAssertEqual(RangeOutlook.week(from: next, scrub: noon(offset, from: week), tz: station.tz),
+                           next, "a new week holds where it started")
+        }
+    }
+
+    func testWithNoWeekTheScrubsDayStartsOne() {
+        let scrub = noon(3, from: dayLocal(at, station.tz))
+        XCTAssertEqual(RangeOutlook.week(from: nil, scrub: scrub, tz: station.tz), dayLocal(scrub, station.tz))
+    }
+
+    /// Across the November fall-back, five 86,400-second days from the week's
+    /// midnight is 23:00 on its fifth day, an hour short of the sixth.
+    func testTheSixthDayIsACalendarDayAcrossDST() {
+        let week = dayLocal(ISO8601DateFormatter().date(from: "2026-10-29T19:00:00Z")!, station.tz)
+        let lateOnTheFifthDay = day(5, from: week).addingTimeInterval(-30 * 60)
+        XCTAssertEqual(RangeOutlook.week(from: week, scrub: lateOnTheFifthDay, tz: station.tz), week)
+        XCTAssertEqual(RangeOutlook.week(from: week, scrub: day(5, from: week).addingTimeInterval(30 * 60),
+                                         tz: station.tz),
+                       day(5, from: week))
     }
 
     func testOneBarPerDayNotPerSwing() {
