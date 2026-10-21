@@ -174,7 +174,7 @@ final class IwlsFixtureTests: XCTestCase {
     func testRealFitterPredictsHeldOutVictoriaSamples() async throws {
         let fixture = try recording()
         let victoria = try XCTUnwrap(fixture.stations.first { $0.key == "victoria" })
-        let all = try samples(victoria, "wlp").filter { $0.t.truncatingRemainder(dividingBy: ChsGrid.ms) == 0 }
+        let all = IwlsFetch.onGrid(try samples(victoria, "wlp"), grid: try IwlsFetcher.grid(for: "wlp"))
         let split = all.count * 5 / 6
         let fit = try await ChsFitter().fit(samples: Array(all[..<split]), basis: ChsFitter.tideBasis)
         try assertGolden(fit, "victoria")
@@ -188,7 +188,7 @@ final class IwlsFixtureTests: XCTestCase {
         let heldStart = try XCTUnwrap(held.first)
         let heldEnd = try XCTUnwrap(held.last)
         let predicted = engine.heights(from: Date(timeIntervalSince1970: heldStart.t / 1000),
-                                       to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: 900)
+                                       to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: ChsGrid.tideSeconds)
         let byTime = Dictionary(predicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.height) },
                                 uniquingKeysWith: { first, _ in first })
         let errors = held.compactMap { sample in byTime[sample.t].map { $0 - sample.v } }
@@ -200,7 +200,7 @@ final class IwlsFixtureTests: XCTestCase {
             HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
         }, offset: legacy.offset)
         let legacyPredicted = legacyEngine.heights(from: Date(timeIntervalSince1970: heldStart.t / 1000),
-                                                   to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: 900)
+                                                   to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: ChsGrid.tideSeconds)
         let legacyByTime = Dictionary(legacyPredicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.height) },
                                       uniquingKeysWith: { first, _ in first })
         let legacyErrors = held.compactMap { sample in legacyByTime[sample.t].map { $0 - sample.v } }
