@@ -78,8 +78,8 @@ final class ChsTidePreviewTests: XCTestCase {
         let id = "preview-test-\(UUID().uuidString)"
         let chunk = ChsChunk(start: .init(timeIntervalSince1970: 604800), end: .init(timeIntervalSince1970: 1209600))
         let samples = [ChsSample(t: 604800000, v: 1), ChsSample(t: 1209600000, v: 2)]
-        ChsChunkStore.save(samples, id, "wlp", chunk)
-        defer { ChsChunkStore.purge(id) }
+        _ = try await IwlsFetcher.chunkCache.samples("wlp", stationID: id, chunk: chunk) { samples }
+        defer { IwlsFetcher.chunkCache.purge(id) }
         let fetcher = IwlsFetcher(killSwitch: true)
         let cached = try await fetcher.wlp(stationID: id, chunk: chunk)
         XCTAssertEqual(cached, samples)

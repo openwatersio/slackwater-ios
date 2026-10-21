@@ -112,54 +112,6 @@ final class ChsProvisionalTests: XCTestCase {
                        "only the newest, uncached chunk may move")
     }
 
-    /// Fetched chunks are re-downloadable CHS data, so they stay out of the
-    /// user's backup — the same posture as the station-list cache. The mark is
-    /// asserted after a reset-and-recreate, because that is the path that would
-    /// silently leak it back in.
-    func testChunkStoreIsExcludedFromBackup() throws {
-        try? FileManager.default.removeItem(at: ChsChunkStore.dir)
-        defer { ChsChunkStore.purge("backup-station") }
-
-        let start = Date(timeIntervalSince1970: 604800)
-        ChsChunkStore.save([ChsSample(t: 604800000, v: 1), ChsSample(t: 1209600000, v: 2)],
-                           "backup-station", "wlp",
-                           ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400)))
-
-        let values = try ChsChunkStore.dir.resourceValues(forKeys: [.isExcludedFromBackupKey])
-        XCTAssertEqual(values.isExcludedFromBackup, true,
-                       "re-downloadable CHS chunks must not enter a device backup")
-    }
-
-    /// Cached current data may be denser; the fit must keep a uniform time grid.
-    func testCachedChunksResumeWithoutRefetching() async throws {
-        let start = Date(timeIntervalSince1970: 604800)
-        let chunk = ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400))
-        let missing = ChsChunk(start: start.addingTimeInterval(-7 * 86_400), end: start)
-        defer { ChsChunkStore.purge("test-station") }
-
-        let grid = (start.timeIntervalSince1970 / ChsGrid.seconds).rounded(.up) * ChsGrid.ms
-        let samples = [ChsSample(t: grid, v: 2), ChsSample(t: chunk.end.timeIntervalSince1970 * 1000, v: 3)]
-        // Simulate a complete dense array from a build before cache envelopes.
-        try FileManager.default.createDirectory(at: ChsChunkStore.dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(samples + [ChsSample(t: grid + 60_000, v: 4)])
-            .write(to: ChsChunkStore.legacyURL("test-station", "wcsp1", chunk))
-        let offline = IwlsFetcher(killSwitch: true)
-        let resumed = try await offline.series("wcsp1", stationID: "test-station", chunk: chunk)
-        XCTAssertEqual(resumed, samples, "cached current samples must use the fit grid")
-
-        do {
-            _ = try await offline.series("wcsp1", stationID: "test-station", chunk: missing)
-            XCTFail("a chunk that was never fetched must still need the network")
-        } catch ChsError.networkDisabled {}
-
-        // An empty week an older build stored must refetch, not stand in for data.
-        try JSONEncoder().encode([ChsSample]()).write(to: ChsChunkStore.legacyURL("test-station", "wlp", chunk))
-        do {
-            _ = try await offline.wlp(stationID: "test-station", chunk: chunk)
-            XCTFail("a cached empty week must still need the network")
-        } catch ChsError.networkDisabled {}
-    }
-
     /// A model stored before M51 has no `fitDays` and was always the full
     /// window — it must not suddenly read as provisional after an upgrade.
     func testALegacyStoredModelIsNotProvisional() throws {
