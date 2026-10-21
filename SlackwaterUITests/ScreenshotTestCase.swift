@@ -254,13 +254,12 @@ import notify
         return app
     }
 
-    /// Reach the target in its own scroll container: on iPad the sidebar
-    /// remains mounted behind Settings and beside the detail. Only the
-    /// station list needs the 80pt bottom clearance for its floating buttons.
+    /// Use the target's container because the iPad sidebar stays mounted beside other scroll views.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var container = listContainer(app)
         let reachable = {
             var bounds = container.frame.intersection(app.windows.firstMatch.frame)
+            // Reserve a bottom margin for floating controls; this does not measure their safe-area-adjusted frames.
             if container.identifier == "station-list" { bounds.size.height -= 80 }
             return el.exists && !el.frame.isEmpty && bounds.contains(el.frame) && el.isHittable
         }
