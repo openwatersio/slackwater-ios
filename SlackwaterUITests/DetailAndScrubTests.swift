@@ -222,7 +222,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// date under the day is the one that names a DAY rather than a moment, so
     /// it opens the picker instead.
     func testTappingTheStripScrubsAndTheDateOpensThePicker() throws {
-        let app = launch("-seedGate")
+        let app = launch("-seedGate", "-scrubTrace", "\(shotDir)/strip-tap-\(UUID().uuidString).log")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 10), "timeline strip missing")
@@ -234,7 +234,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let opening = scrubClock(app)
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)).tap()
         settleScrub(app)  // the tap rides an animated scroll to the stop
-        XCTAssertNotEqual(scrubClock(app), opening,
+        let afterTap = scrubClock(app)
+        if afterTap == opening {
+            save(app, "strip-tap-frozen.png")
+            XCTContext.runActivity(named: "Strip-tap UI hierarchy") { activity in
+                let attachment = XCTAttachment(string: app.debugDescription)
+                attachment.lifetime = .keepAlways
+                activity.add(attachment)
+            }
+        }
+        XCTAssertNotEqual(afterTap, opening,
                           "a tap on the strip left the centerline on \(opening)")
         save(app, "strip-tap-scrubbed.png")
 
