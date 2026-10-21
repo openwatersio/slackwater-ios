@@ -128,7 +128,7 @@ In the Spanish keywords, `alta` and `baja` pair with `marea` for the everyday "m
 
 Re-answer this section whenever a new host appears in the app. `grep -rhoE "https://[a-z0-9.-]+" --include="*.swift" Slackwater/` lists every one.
 
-- **Privacy manifests.** `Slackwater/`, `SlackwaterWidgets/` and `SlackwaterWatch/PrivacyInfo.xcprivacy` declare no tracking, no collected data, and the required-reason APIs each target uses: `UserDefaults` (`CA92.1`, and `1C8F.1` for the App Group) and file modification dates (`C617.1`). Every target compiles `ChsCurrentGate.swift`, which reads a file's modification date, so the files are identical. `SlackwaterWatchWidgets` compiles the same files and has no manifest yet (#668). Re-check them when a target starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api); App Store Connect reports a gap by email (ITMS-91053), not in the upload log.
+- **Privacy manifests.** `Slackwater/`, `SlackwaterWidgets/`, `SlackwaterWatch/` and `SlackwaterWatchWidgets/PrivacyInfo.xcprivacy` declare no tracking, no collected data, and the required-reason APIs each target uses: `UserDefaults` (`CA92.1`, and `1C8F.1` for the App Group) and file modification dates (`C617.1`). Every target compiles `ChsCurrentGate.swift`, which reads a file's modification date, so the files are identical. A new target needs its own copy: each bundle is checked on its own. Re-check them when a target starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api); App Store Connect reports a gap by email (ITMS-91053), not in the upload log.
 
 ## Accessibility Nutrition Labels
 
