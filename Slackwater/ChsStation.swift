@@ -8,6 +8,7 @@
 // on-device, stored on the user's devices, and never publicly re-served.
 // Fitted models can be copied privately to the user's paired watch. No CHS data is bundled.
 import Foundation
+import SlackwaterKit
 import Synchronization
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
@@ -241,13 +242,10 @@ extension TideStationRecord {
     var isChs: Bool { id.hasPrefix("chs-") }
 }
 
-/// The grid every CHS series is fetched and fitted on: SlackwaterIWLS requests
-/// `FIFTEEN_MINUTES` and keeps only samples on it (`IwlsFetch.onGrid`). The
-/// engine's recipes name the same step (`ChsTideFit.sampleMinutes`,
-/// `ChsCurrentFit.sampleMinutes`), and `ChsGridTests` fails if any of them
-/// moves without the others.
+/// Presentation cadence follows each engine recipe independently of the request grid.
 enum ChsGrid {
-    static let minutes = 15
+    static let minutes = ChsCurrentFit.sampleMinutes
     static let ms = Double(minutes) * 60_000
     static let seconds = Double(minutes) * 60
+    static let tideSeconds = Double(ChsTideFit.sampleMinutes) * 60
 }

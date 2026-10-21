@@ -4,29 +4,22 @@ import SlackwaterIWLS
 @testable import Slackwater
 
 final class ChsGridTests: XCTestCase {
-    /// SlackwaterIWLS fetches on a fixed grid while the engine's recipes name
-    /// theirs. When an engine bump moves either recipe, this fails until the
-    /// shared client follows, instead of the app fitting a recipe it never
-    /// fetched (slackwater#444).
-    func testTheRecipesNameTheGridTheSharedClientFetches() throws {
-        XCTAssertEqual(ChsTideFit.sampleMinutes, ChsGrid.minutes)
-        XCTAssertEqual(ChsCurrentFit.sampleMinutes, ChsGrid.minutes)
-        // Every whole minute across two steps: a filter on any other step
-        // keeps a different set.
-        let samples = stride(from: 0.0, through: 2 * ChsGrid.ms, by: 60_000).map { ChsSample(t: $0, v: 1) }
-        XCTAssertEqual(IwlsFetch.onGrid(samples).map(\.t), [0, ChsGrid.ms, 2 * ChsGrid.ms])
-        // And it asks IWLS for that step, not one it then thins, for every
-        // series the app fetches.
-        XCTAssertEqual(IwlsFetch.fitSeries, ["wlp", "wcsp1", "wcdp1"])
+    func testTheRecipesDriveRequestResolutionAndFiltering() throws {
         let chunk = ChsChunk(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 86_400))
         for code in IwlsFetch.fitSeries {
-            let url = try IwlsFetch.dataURL(code, stationID: "id", chunk: chunk)
+            let minutes = code == "wlp" ? ChsTideFit.sampleMinutes : ChsCurrentFit.sampleMinutes
+            let grid = try IwlsFetcher.grid(for: code)
+            XCTAssertEqual(grid.sampleMinutes, minutes)
+            let step = Double(minutes) * 60_000
+            let samples = stride(from: 0.0, through: 2 * step, by: 60_000).map { ChsSample(t: $0, v: 1) }
+            XCTAssertEqual(IwlsFetch.onGrid(samples, grid: grid).map(\.t), [0, step, 2 * step])
+            let url = try IwlsFetch.dataURL(code, stationID: "id", chunk: chunk, grid: grid)
             let resolution = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first { $0.name == "resolution" }?.value
-            XCTAssertEqual(resolution, "FIFTEEN_MINUTES", code)
+            XCTAssertEqual(resolution, grid.resolution, code)
         }
-        XCTAssertEqual(ChsGrid.minutes, 15, "update the resolution name above with the grid")
-        XCTAssertEqual(ChsOnlineWindow.sampleInterval, ChsGrid.seconds)
+        XCTAssertEqual(ChsOnlineWindow.sampleInterval, Double(ChsCurrentFit.sampleMinutes) * 60)
+        XCTAssertEqual(ChsGrid.tideSeconds, Double(ChsTideFit.sampleMinutes) * 60)
     }
 
     /// Current gates keep the basis their bar was measured on. When an engine

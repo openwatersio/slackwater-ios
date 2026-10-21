@@ -26,7 +26,7 @@ Both halves of that sentence constrain more work than people expect.
 
 | Series | What | Used for |
 |---|---|---|
-| `wlp` | water-level predictions, 1-minute native | tide ports — preview samples and full-model fitting on the 15-minute grid SlackwaterIWLS fetches (`ChsGrid`) |
+| `wlp` | water-level predictions, 1-minute native | tide ports — preview samples and full-model fitting on the `ChsTideFit.sampleMinutes` grid SlackwaterIWLS fetches |
 | `wcsp1` | current speed predictions | current gates |
 | `wcdp1` | current direction predictions | current gates — projected onto the flood axis |
 | `wcp1-events` | CHS's own published slack/max events | **validation only**, never shipped |
@@ -34,7 +34,9 @@ Both halves of that sentence constrain more work than people expect.
 
 The phone and watch use the MIT `SlackwaterIWLS` module for station resolution, chunk planning, HTTP pacing and retries, and sample decoding. The shared [IWLS fetching contract](https://github.com/openwatersio/slackwater/blob/main/docs/iwls-fetch.md) and its synthetic fixtures define compatibility across clients. `IwlsFetcher` keeps the app's cache storage, network kill switch, and UI-test fixtures; `ChsFitService` owns queueing, progress, and model persistence.
 
-Stations are resolved by position: the nearest IWLS station serving the required series within 3 km of the registry position. Fits end at the station's local midnight and fetch newest-first chunks on an absolute seven-day epoch grid. Cached and fetched samples use the same 15-minute filter; duplicate timestamps between chunks retain their fit weight.
+Stations are resolved by position: the nearest IWLS station serving the required series within 3 km of the registry position. Fits end at the station's local midnight and fetch newest-first chunks on an absolute seven-day epoch grid. The app passes `ChsTideFit.sampleMinutes` for `wlp` and `ChsCurrentFit.sampleMinutes` for current series to the client's resolution and grid filter; duplicate timestamps between chunks retain their fit weight.
+
+Chunk-cache identities include the sample step. Complete epoch weeks with both exact endpoints are retained indefinitely; a nonempty response missing either endpoint is fetched again. Successfully decoded empty weeks are remembered for 24 elapsed hours, including after a successful fit purges its positive chunks, then retried. Shared cache entries record Unix-millisecond endpoints and receipt time and validate their identity on every read. Legacy raw arrays are reusable only for 15-minute requests after filtering and endpoint validation; legacy empty arrays are misses. Resetting downloaded data clears both positive and empty entries.
 
 All of these are point series at a gauge. None is a field.
 
