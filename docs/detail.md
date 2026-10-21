@@ -53,6 +53,8 @@ Opening any page in this table except the unavailable page records the station i
 
 Detail pages scroll vertically, with the system navigation bar hidden; the header (§5) supplies its own Back. An edge swipe also goes back.
 
+Folding or unfolding an iPhone Duo keeps the chosen schedule week. If the schedule reaches the upper half of the viewport, the rebuilt page scrolls to the schedule after its data loads. A glimpse of the schedule below the chart leaves the chart in view. Scrolling or choosing another date cancels a pending restoration. The exact vertical offset within the schedule is not preserved across the two layouts; positions below the schedule return to the chart.
+
 Sections, top to bottom:
 
 | # | Section | Tide | Current | Derived gate | Online gate |

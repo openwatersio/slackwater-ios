@@ -21,11 +21,15 @@ import UIKit
     UIAccessibility.isReduceMotionEnabled || uiTestQuiet
 }
 
-/// The moment a detail's strip was on when the iPhone Duo's hinge moved.
+/// The detail's selected moment, week, and schedule position when the iPhone Duo's hinge moved.
 /// Folding swaps the phone stack for the split view (or back) and SwiftUI
 /// rebuilds the detail with it, so the strip that comes back would open on
 /// now. One slot: a phone shows one detail.
 @MainActor enum FoldHandoff {
+    struct Page: Sendable {
+        let anchor: Date
+        let showingSchedule: Bool
+    }
     struct Moment {
         let stationID: String
         let time: Date
@@ -34,22 +38,45 @@ import UIKit
         /// Last seen closed: the cover screen takes over, with no opening to follow.
         let closing: Bool
         let at: TimeInterval
+        var page: Page? = nil
+
+        @MainActor func isFresh(for stationID: String, at now: TimeInterval = CACurrentMediaTime()) -> Bool {
+            self.stationID == stationID && now - at <= FoldHandoff.freshFor
+        }
     }
     static var slot: Moment?
+    // The strip and scaffold can mount in either order, so taking the moment must leave the page available.
+    static var pageSlot: Moment?
     /// The rebuild lands well within this of the hinge update before it; anything older is a different visit.
     static let freshFor: TimeInterval = 2
+
+    static func peek(_ stationID: String, at now: TimeInterval = CACurrentMediaTime()) -> Moment? {
+        guard let m = slot, m.isFresh(for: stationID, at: now) else { return nil }
+        return m
+    }
 
     /// The moment a rebuilt detail builds its first data around, so the strip's
     /// `take` finds it loaded. Does not consume the slot. Nil on now: the
     /// ordinary build already covers it.
     static func pending(_ stationID: String, at now: TimeInterval = CACurrentMediaTime()) -> Date? {
-        guard let m = slot, m.stationID == stationID, now - m.at <= freshFor, !m.live else { return nil }
+        guard let m = peek(stationID, at: now), !m.live else { return nil }
         return m.time
     }
 
     static func take(_ stationID: String, at now: TimeInterval) -> Moment? {
         defer { slot = nil }
-        guard let m = slot, m.stationID == stationID, now - m.at <= freshFor else { return nil }
+        guard let m = peek(stationID, at: now) else { return nil }
+        if m.page != nil { pageSlot = m }
+        return m
+    }
+
+    static func takePage(_ stationID: String, at now: TimeInterval = CACurrentMediaTime()) -> Moment? {
+        defer {
+            if slot?.stationID == stationID { slot?.page = nil }
+            if pageSlot?.stationID == stationID { pageSlot = nil }
+        }
+        if let m = peek(stationID, at: now), m.page != nil { return m }
+        guard let m = pageSlot, m.isFresh(for: stationID, at: now) else { return nil }
         return m
     }
 }
@@ -83,6 +110,7 @@ struct TimelineScrubber: UIViewRepresentable {
     /// The detail's station. Nil on a list card, which neither follows the
     /// Duo's hinge nor hands its moment across a fold.
     var stationID: String? = nil
+    var foldPage: FoldHandoff.Page? = nil
     /// The resting pills' frames in the strip's viewport; empty while they are hidden and inert.
     var restingPills: [CGRect] = []
 
@@ -601,7 +629,7 @@ struct TimelineScrubber: UIViewRepresentable {
             FoldHandoff.slot = .init(stationID: id,
                                      time: hingeFollow?.moment ?? parent.scrubTime,
                                      live: hingeFollow?.live ?? !scrubbedAway(parent.scrubTime, from: parent.now),
-                                     closing: closed, at: t)
+                                     closing: closed, at: t, page: parent.foldPage)
         }
 
         private func startHingeFollow(_ sv: UIScrollView, moment: Date, live: Bool) {
@@ -858,6 +886,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.openWeekPicker) private var openWeekPicker
     @Environment(\.stripTrailingBleed) private var trailingBleed
     @Environment(\.stripStationID) private var stationID
+    @Environment(\.stripFoldPage) private var foldPage
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.stripPressed) private var stripPressed
@@ -878,6 +907,7 @@ struct TimelineScrubStrip: View {
                          onPickDate: openWeekPicker, onLongPress: stripPressed,
                          onAlertAction: stripAlertAction,
                          stationID: stationID,
+                         foldPage: foldPage,
                          restingPills: restingPills)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the

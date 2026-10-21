@@ -314,7 +314,7 @@ When nothing is moving and no request is waiting, but the offset and the selecti
 
 When the viewport width changes—rotation, split screen, or browser resize—recompute the offset so the existing `selectedTime` remains under the new centreline. Cancel momentum or a magnetic settle if needed. The resize must not change `selectedTime`, replay the opening, or briefly publish the wrong centre value.
 
-On a foldable whose posture change rebuilds the page (iPhone Duo), the rebuilt strip returns to the selected moment, or to refreshed now if it was home. The rebuilt detail builds its first data around that moment (for an online current, it hangs the fixed window from the moment's day when the moment lies outside today's), so a moment far from now is loaded when the strip lands. While the hinge opens, the strip starts up to six hours past that moment and scrubs back to it in step with the hinge, landing exactly on it at flat or when the hinge rests for 0.25 s. Closing to the cover screen, or Reduce Motion, lands directly. Until the hinge moves past the angle the rebuilt strip first saw, the follow waits 1 s for it before landing; the follow eases toward the hinge and snaps once it is within a minute of the moment.
+On a foldable whose posture change rebuilds the page (iPhone Duo), the rebuilt strip returns to the selected moment, or to refreshed now if it was home. The detail keeps the chosen schedule anchor and loads data around that moment, so a moment far from now is loaded when the strip lands. A schedule that was in view stays in view after the rebuild (detail §4). While the hinge opens, the strip starts up to six hours past that moment and scrubs back to it in step with the hinge, landing exactly on it at flat or when the hinge rests for 0.25 s. Closing to the cover screen, or Reduce Motion, lands directly. Until the hinge moves past the angle the rebuilt strip first saw, the follow waits 1 s for it before landing; the follow eases toward the hinge and snaps once it is within a minute of the moment.
 
 ## 9. Fixed lead reading
 
@@ -796,7 +796,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 35. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
 36. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
 37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and greatest eclipse is the eclipse's only magnetic target; its other contacts are not.
-38. **Fold:** Unfolding after scrubbing lands on the folded instant, including one weeks from now; folding while home lands on refreshed now.
+38. **Fold:** Unfolding after scrubbing lands on the folded instant, including one weeks from now; folding while home lands on refreshed now. Both directions keep the chosen schedule week. A schedule in the upper half of the viewport returns to view after its data loads; a glimpse at the bottom leaves the chart in view. Scrolling while data loads cancels the pending schedule restoration.
 
 ## 18. Known iOS deviations from the intended contract
 
@@ -813,7 +813,7 @@ The living implementation is split by responsibility:
 | Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, schedule list | `Slackwater/TimelineStrip.swift` |
 | Scroll host, opening, taps, press and hold, accessibility actions, resize and fold follow, magnet settle, fixed overlay, commentary and Now pill row, rescale glide | `Slackwater/TimelineScrubber.swift` |
 | Continuous chunks, merging, scroll gate, scale governor | `Slackwater/TimelineChunks.swift` |
-| Detail scaffold: date picker, alert line wiring, shared-link jump, week bar | `Slackwater/Theme.swift` |
+| Detail scaffold: date picker, alert line wiring, shared-link jump, week bar, fold restoration | `Slackwater/Theme.swift` |
 | Lead card, commentary pill and stop walk, lead clock, sky state and backdrop | `Slackwater/DetailPieces.swift` |
 | Colour tokens, curve style, station-local clock formatting | `Slackwater/Palette.swift` |
 | Shared current lead and direct commentary walk | `Slackwater/CurrentLead.swift` |
