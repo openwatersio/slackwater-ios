@@ -2,7 +2,7 @@
 // station it belongs to.
 //
 // App-level state read directly by the views that need it, the way
-// `LinkedInstant` is (GateView.swift) — deliberately NOT a parameter, because
+// `LinkedInstant` is — deliberately NOT a parameter, because
 // a parameter on `TimelineScrubStrip` fans out to four detail views.
 import CoreLocation
 import SwiftUI
@@ -42,10 +42,14 @@ let seenTourKey = "slackwater.seenTour"
         armed = !UserDefaults.standard.bool(forKey: seenTourKey)
     }
 
+    /// Set by `handOff(to:)`: the only station that may claim the armed tour.
+    private var reservedFor: String?
+
     /// A detail with a real timeline claims the armed tour.
     func begin(on station: String, starsAvailable: Bool, moonAvailable: Bool) {
-        guard armed else { return }
+        guard armed, reservedFor.map({ $0 == station }) ?? true else { return }
         armed = false
+        reservedFor = nil
         self.station = station
         self.starsAvailable = starsAvailable
         self.moonAvailable = moonAvailable
@@ -63,6 +67,19 @@ let seenTourKey = "slackwater.seenTour"
         step = nil
         station = nil
         armed = true
+        reservedFor = nil
+    }
+
+    /// A link replaced the first-run tour's station: re-arm the tour for the
+    /// linked station alone. Reserved, because the detail being replaced is
+    /// still mounted, and a timeline revision landing there would otherwise
+    /// claim the tour back and then finish it on its way out.
+    func handOff(to station: String) {
+        guard armed || step != nil, self.station != station else { return }
+        step = nil
+        self.station = nil
+        armed = true
+        reservedFor = station
     }
 
     func advance() {
@@ -141,9 +158,9 @@ func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
 
 // MARK: - Which station the tour teaches on
 
-/// Friday Harbor — the station the gate already showed as its example
-/// (GateView.swift), so the card someone just looked at is the one they now
-/// learn to read.
+/// Friday Harbor: a first launch opens it before the location prompt has
+/// been answered, so with no fix this is where everyone first learns to read
+/// a station.
 let tourFallbackStationID = "noaa/9449880"
 
 /// Past this there is no "local water" claim worth making, and the fallback

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Getting around: the first-run gate, the search FAB,
+// Slackwater — GPL v3. Getting around: the first launch, the search FAB,
 // the pin map, the split layout, and the ways in and out of a detail.
 //
 // One of the weight-balanced screenshot classes — see ScreenshotTestCase.swift
@@ -10,7 +10,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // Current stations sit in the list beside the tide ports; walk into
     // Deception Pass and scrub the signed velocity curve.
     func testM2Currents() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         // wait (briefly) for a reading — screenshot only; an undownloaded list shows none
         _ = app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
@@ -29,40 +29,30 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         save(app, "m2-current-scrubbed.png")
     }
 
-    // First-run gate — the search bypass lands in the search experience, and
-    // the choice sticks across relaunch without reopening search.
-    // (The Use-My-Location path needs the system permission dialog; exercised
-    // manually via simctl privacy.)
-    func testM4Gate() throws {
+    // First launch: the list asks for location on its first appear, and the
+    // tour opens Friday Harbor over it, since there is no fix to pick a nearer
+    // station from. `-locUndetermined` turns the ask into a no-op, so the real
+    // system prompt is not part of this (scripts/first-run.sh and the
+    // Slackwater First Run scheme show it); everything around it is.
+    func testM4FirstLaunchTeachesOnFridayHarbor() throws {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-resetGate"])
+        app.launchArguments = testArguments(["-resetLocationAsk", "-resetTour", "-resetRecents",
+                                             "-locUndetermined"])
+            .filter { $0 != "-seedTour" }
         app.launch()
 
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
-        XCTAssertFalse(app.staticTexts["Find the water near you"].exists)
-        XCTAssert(app.staticTexts["Real example station"].exists)
-        XCTAssert(app.staticTexts["Friday Harbor"].exists)
-        XCTAssert(app.descendants(matching: .any)["25-hour curve"].firstMatch.appears(within: 5))
-        XCTAssert(app.staticTexts["Tide and Current predictions nearby."].exists)
-        XCTAssert(app.staticTexts["Keeps working offline."].exists)
-        XCTAssert(app.staticTexts["Your location stays on this device."].exists)
-        XCTAssert(app.buttons["Find tides near me"].exists)
-        save(app, "m4-gate.png")
-        app.buttons["Search for a place"].tap()
-        let field = app.textFields.firstMatch
-        XCTAssert(field.appears(within: 5), "gate bypass did not open search")
-        XCTAssert(waitFor(field, "hasKeyboardFocus == true"),
-                  "the gate's search field did not take keyboard focus")
-        type("friday", into: field)  // works only if the field auto-focused
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5))
-        closeSearch(app)
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15),
+                  "a first launch did not open the tour")
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists,
+                  "with no fix the tour should teach on Friday Harbor")
+        save(app, "m4-first-launch.png")
 
-        app.terminate()
-        app.launchArguments = testArguments([])
-        app.launch()
+        app.buttons["tour-skip"].tap()
+        goBack(app)
         XCTAssert(stationList(app).appears(within: 10))
-        XCTAssertFalse(app.textFields.firstMatch.exists,
-                       "search must not reopen on relaunch — the handoff is one-shot")
+        XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5),
+                  "the list lost its way back to the location prompt")
+        XCTAssert(app.staticTexts["Find tides near me"].exists)
     }
 
     // Pin map — opens from the floating button, land + pins render, and a
@@ -80,7 +70,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             (48.48500061035156, -123.08300018310547, "Kanaka Bay"),                // NOAA tide → square
         ] {
             // Pin coordinates below use this fixed Salish camera.
-            let app = launch("-seedGate", "-resetRecents", "-locDenied",
+            let app = launch("-resetRecents", "-locDenied",
                              "-mapCenter", "48.35,-123.05")
             app.buttons["Map"].tap()
             let map = app.otherElements["map-canvas"].firstMatch
@@ -116,7 +106,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Inline, not `launch(...)`: that helper waits for the station list,
         // and `-openMap` opens the map instead.
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate", "-openMap", "-locDenied",
+        app.launchArguments = testArguments(["-openMap", "-locDenied",
                                              "-mapCenter", "43.558,-5.698", "-mapZoom", "11"])
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
@@ -179,7 +169,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // A gate detail shows no tide — the port's numbers live on the port's own
     // detail, one tap through the quiet link.
     func testM4TideAtPortLink() throws {
-        let app = launch("-seedGate")
+        let app = launch()
 
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
@@ -239,7 +229,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             throw XCTSkip("iPad-only layout test")
         }
         XCUIDevice.shared.orientation = .landscapeLeft
-        let app = launch("-seedGate")
+        let app = launch()
         // The pane opens on the first row, not the placeholder — the
         // placeholder is only reachable by clearing the pane (map toggle).
         XCTAssert(app.otherElements["detail-header"].appears(within: 10),
@@ -280,7 +270,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // the map FAB toggles the surface in place and flips to the list icon (no
     // header, no close chrome); over the map the left FAB becomes My Location.
     func testM45SearchFabAndMapToggle() throws {
-        let app = launch("-seedGate")
+        let app = launch()
 
         // No top search bar on the list; both FABs present.
         XCTAssertFalse(app.textFields.firstMatch.exists, "top search bar must be gone")
@@ -346,7 +336,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // below can tap it: a finger-sized box at the exact center of a
         // station-scale zoom holds one pin. Same convention as
         // testM48MapPinToUnfittedDetail.
-        let app = launch("-seedGate", "-fixLat", "48.5453", "-fixLon", "-123.0125",
+        let app = launch("-fixLat", "48.5453", "-fixLon", "-123.0125",
                          "-mapZoom", "11")
 
         // Leg 1 — detail reached from a list row.
@@ -382,7 +372,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // holds several dots, so "the nearest dot to the tap" is not reliably
         // the one this test means. The fix is the fix — the discovery map opens
         // on it — plus a station-scale zoom.
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "48.3067", "-fixLon", "-123.5367", "-mapZoom", "11")
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
@@ -416,7 +406,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         guard UIDevice.current.userInterfaceIdiom == .phone else {
             throw XCTSkip("iPhone-only: regular width is a split, with nothing to pop")
         }
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
+        let app = launch("-chsResetModels", "-networkKillSwitch")
 
         // (a) tide detail — and first, the gesture that must NOT pop.
         openFridayHarbor(app)
@@ -469,7 +459,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             throw XCTSkip("regular-width behaviour")
         }
         XCUIDevice.shared.orientation = .landscapeLeft
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-fixLat", "48.4235", "-fixLon", "-123.3705")
         XCTAssert(app.otherElements["detail-header"].appears(within: 10),
                   "the detail pane did not open a station on launch")
         XCTAssertFalse(app.staticTexts["Pick a station"].exists,
@@ -495,7 +485,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // immediately before this, which leaves the anchor 4,500 km east with no
         // BC or WA port inside the truncated set. The fast plan skips that test,
         // so only the full run would go red.
-        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents",
+        let app = launch("-networkKillSwitch", "-resetRecents",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // "port" matches several hundred stations nationally.
@@ -528,7 +518,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         for (orientation, shot) in [(UIDeviceOrientation.portrait, "search-grid-ipad-portrait.png"),
                                     (.landscapeLeft, "search-grid-ipad-landscape.png")] {
             XCUIDevice.shared.orientation = orientation
-            let app = launch("-seedGate", "-resetRecents")
+            let app = launch("-resetRecents")
             openSearch(app, "port")
             XCTAssert(app.descendants(matching: .any)["search-truncated"].firstMatch.appears(within: 5))
             let frames = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Port'"))
@@ -552,7 +542,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Alaska, offline, with everything the bundle knows on it. The camera
         // is stated rather than pinched into place — five synthesised pinches
         // land somewhere no assertion can name.
-        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2",
+        app.launchArguments = testArguments(["-openMap", "-mapZoom", "3.2",
                                              "-mapCenter", "48.35,-123.05"])
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch

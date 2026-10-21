@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. UI-test seed hooks: the -seed*/-resetGate launch
+// Slackwater — GPL v3. UI-test seed hooks: the -seed*/-reset* launch
 // arguments SlackwaterApp.init honours, and the synthetic state they write.
 import Foundation
 
@@ -6,17 +6,18 @@ import Foundation
 /// The launch-argument hooks a UI test drives the app with, applied once from
 /// `SlackwaterApp.init` before anything reads the state they write.
 @MainActor func applySeedHooksIfRequested() {
-    // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
-    // gate; -seedGate skips it (arguments-domain values would mask the
-    // in-app write, so tests set persisted state explicitly instead).
-    if CommandLine.arguments.contains("-resetGate") {
-        UserDefaults.standard.removeObject(forKey: seenGateKey)
+    // UI-test hooks, like -chsResetModels: -resetLocationAsk makes the list
+    // ask for location on appear, as a first run does; -seedLocationAsk
+    // marks it already asked (arguments-domain values would mask the in-app
+    // write, so tests set persisted state explicitly instead).
+    if CommandLine.arguments.contains("-resetLocationAsk") {
+        UserDefaults.standard.removeObject(forKey: locationAskedKey)
     }
-    if CommandLine.arguments.contains("-seedGate") {
-        UserDefaults.standard.set(true, forKey: seenGateKey)
+    if CommandLine.arguments.contains("-seedLocationAsk") {
+        UserDefaults.standard.set(true, forKey: locationAskedKey)
     }
-    // Same shape as -resetGate/-seedGate: a UI test forces or suppresses the
-    // first-run tour by writing the persisted flag, because an
+    // Same shape as -resetLocationAsk/-seedLocationAsk: a UI test forces or
+    // suppresses the first-run tour by writing the persisted flag, because an
     // arguments-domain value would mask the in-app write.
     if CommandLine.arguments.contains("-resetTour") {
         UserDefaults.standard.removeObject(forKey: seenTourKey)

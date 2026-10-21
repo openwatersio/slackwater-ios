@@ -14,7 +14,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage() {
-        let app = launch("-seedGate", "-locDenied", "-resetFavorites")
+        let app = launch("-locDenied", "-resetFavorites")
         openSettings(app)
         save(app, "settings-premium-top.png")
         for (rowID, page) in [("settings-alerts-row", "Alerts"),
@@ -61,7 +61,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
 
     func testHeightDefaultsUseRegionAndPreserveAnExplicitChoice() {
         for (region, selected) in [("US", "Feet"), ("FR", "Meters")] {
-            let app = launch("-seedGate", "-locDenied", "-resetUnits",
+            let app = launch("-locDenied", "-resetUnits",
                              "-AppleLanguages", "(en)", "-AppleLocale", "en_\(region)")
             openSettings(app)
             XCTAssertTrue(app.segmentedControls.buttons[selected].isSelected)
@@ -70,17 +70,17 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             if region == "FR" { app.segmentedControls.buttons["Feet"].tap() }
             app.terminate()
         }
-        let app = launch(["-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_FI"],
+        let app = launch(["-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_FI"],
                          resetSettings: false)
         openSettings(app)
         XCTAssertTrue(app.segmentedControls.buttons["Feet"].isSelected)
         app.terminate()
-        let clean = launch("-seedGate", "-locDenied", "-resetUnits")
+        let clean = launch("-locDenied", "-resetUnits")
         clean.terminate()
     }
 
     func testLaunchResetsPersistedPreferences() {
-        let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        let app = launch("-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
         openSettings(app)
         let preview = app.descendants(matching: .any)["slack-window-preview"].firstMatch
         XCTAssert(preview.appears(within: 5))
@@ -94,7 +94,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
         app.terminate()
 
-        let relaunched = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        let relaunched = launch("-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
         openSettings(relaunched)
         XCTAssertTrue(relaunched.segmentedControls.buttons["Feet"].isSelected)
         XCTAssertTrue(relaunched.segmentedControls.buttons["Knots"].isSelected)
@@ -104,7 +104,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testSlackWindowPreviewChangesWithComfortCurrent() {
-        let app = launch("-seedGate", "-locDenied")
+        let app = launch("-locDenied")
         openSettings(app)
         save(app, "slack-window-settings-before.png")
         let preview = app.descendants(matching: .any)["slack-window-preview"].firstMatch
@@ -175,7 +175,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testMacSettingsShowsDesktopWidgets() {
-        let app = launch("-seedGate", "-locDenied", "-settingsPlatform", "mac")
+        let app = launch("-locDenied", "-settingsPlatform", "mac")
         openSettings(app)
         XCTAssert(app.staticTexts["Desktop — free"].exists)
         XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
@@ -191,7 +191,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             ("fr-CA", "Réglages", "Bureau — gratuit", "Soutenez le développement de Slackwater."),
             ("es-ES", "Ajustes", "Escritorio — gratis", "Apoya el desarrollo de Slackwater.")
         ] {
-            let app = launch("-seedGate", "-locDenied", "-settingsPlatform", "mac",
+            let app = launch("-locDenied", "-settingsPlatform", "mac",
                              "-AppleLanguages", "(\(language))", "-AppleLocale", language)
             let settings = app.buttons[settingsTitle].firstMatch
             scrollTo(settings, in: app)
@@ -206,7 +206,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testTVSettingsOmitsWidgetInstructions() {
-        let app = launch("-seedGate", "-locDenied", "-settingsPlatform", "tv")
+        let app = launch("-locDenied", "-settingsPlatform", "tv")
         openSettings(app)
         XCTAssertFalse(app.staticTexts["Desktop — free"].exists)
         XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
@@ -218,7 +218,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String, previewTitle: String? = nil, calendarSummary: String? = nil) {
-        let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
+        let app = launch("-locDenied", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
         // Use the gear's identifier-independent location in translated runs.
         if language == "en" {
             openSettings(app)
@@ -272,7 +272,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testPremiumSupporterSeesTheirStatusInTheFooterAndSheet() {
-        let app = launch("-seedGate", "-locDenied", "-seedPremium")
+        let app = launch("-locDenied", "-seedPremium")
         let support = app.buttons["support-slackwater"]
         scrollTo(support, in: app)
         XCTAssertTrue(support.label.contains("Slackwater supporter"))
@@ -291,7 +291,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testSupportSheetOpensAndClosesFromTheFooter() {
-        let app = launch("-seedGate", "-locDenied")
+        let app = launch("-locDenied")
         let support = app.buttons["support-slackwater"]
         scrollTo(support, in: app)
         XCTAssertTrue(support.label.contains("Support Slackwater"))

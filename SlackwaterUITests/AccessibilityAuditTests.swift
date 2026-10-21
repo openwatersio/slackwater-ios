@@ -84,18 +84,18 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
         // state labels are the card children the note above defers to #438, and they fail
         // the hit-region audit. Every audit here resets them: on iPad the list column stays
         // beside the detail, so the detail audits walk that card too.
-        let app = launch("-seedGate", "-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
         try audit(app, "station list")
     }
 
     func testTideDetailPassesTheAudit() throws {
-        let app = launch("-seedGate", "-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openFridayHarbor(app)
         try audit(app, "tide detail")
     }
 
     func testCurrentDetailPassesTheAudit() throws {
-        let app = launch("-seedGate", "-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 5))

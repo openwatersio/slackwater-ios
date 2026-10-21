@@ -29,7 +29,7 @@ Deleting the app from a simulator does not give you a first launch: the simulato
 
 An erased simulator is signed out of iCloud, so it starts with no favorites. Each of these is worth its own run: answering the location prompt both ways, Location Services switched off in Settings, and Features ▸ Location ▸ None.
 
-For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
+For quick iteration on the first launch itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the launch location ask, the tour, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
 
 ## Running the watch app
 
@@ -51,7 +51,7 @@ The `iPhone Duo` simulator (iOS 27.1 and later) boots folded, on its cover scree
 
 `xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens the dedicated Support Slackwater sheet) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
 
-Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-seedGate", "-locDenied"])` (`-seedGate` skips the first-run gate), open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the [worktree test lock](#local-test-runs). Delete the file and run `xcodegen generate` again before committing.
+Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-locDenied"])`, open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the [worktree test lock](#local-test-runs). Delete the file and run `xcodegen generate` again before committing.
 
 ## User-facing copy
 

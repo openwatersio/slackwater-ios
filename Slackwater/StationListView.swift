@@ -64,6 +64,10 @@ struct StationListView: View {
     /// re-open the same tour station forever. Settings' replay bypasses this
     /// latch entirely — it opens the station directly, not through here.
     @State private var hasOpenedTourStation = false
+    /// A link opened a station. Set before the first appear, it keeps the
+    /// tour push from replacing the station the user asked for.
+    @State private var hasOpenedLink = false
+    @AppStorage(locationAskedKey) private var locationAsked = false
     /// One-shot like `mapFocus`: the locate remount lands at `locateZoom`
     /// instead of the discovery camera; cleared by the same `.onAppear`.
     @State private var locateFocus = false
@@ -242,28 +246,22 @@ struct StationListView: View {
         // Search covers everything — list, map, and (regular) the detail pane.
         .overlay { if searching { searchOverlay } }
         .onAppear {
-            // Captured before the branches below consume and clear both —
-            // a search bypass or a deep link must win the tour push, since
-            // that user asked for something specific.
-            let hadSearchHandoff = gateSearchHandoff
-            let hadDeepLink = pendingDeepLink != nil
             loc.refreshIfAuthorized()
-            if gateSearchHandoff {
-                gateSearchHandoff = false
-                openSearch()
-            }
-            if let url = pendingDeepLink {
-                pendingDeepLink = nil
-                handleDeepLink(url)
-            }
-            // First run on the location path: the gate has resolved (a fix or
-            // a denial) and nothing else has claimed the tour, so bring the
-            // user to a detail that can teach. A bundled station needs no
-            // download, so this works offline and with location denied.
-            if TourCoach.shared.armed, !hasOpenedTourStation, !hadSearchHandoff, !hadDeepLink,
+            // First run: bring the user to a detail that can teach, before
+            // anything else claims the tour. With no fix yet this is Friday
+            // Harbor, and the location prompt below lands over it. A bundled
+            // station needs no download, so this works offline and with
+            // location denied.
+            if TourCoach.shared.armed, !hasOpenedTourStation, !hasOpenedLink,
                let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] {
                 hasOpenedTourStation = true
                 open(item)
+            }
+            // The one launch ask. After this, `askCard` is the way back to
+            // the prompt for an app iOS has reset to undecided.
+            if !locationAsked {
+                locationAsked = true
+                loc.request()
             }
         }
         // First connected launch: the auto-fit set around where this list is
@@ -633,15 +631,15 @@ struct StationListView: View {
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
     /// both routes: locked accessory widgets → premium (the Support Slackwater sheet), home widgets
     /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
-    /// rather than inline because RootView's pre-gate handoff replays the URL
-    /// through it on first appear.
+    /// rather than inline because user activities and alert taps route
+    /// through it too.
     private func handleDeepLink(_ url: URL) {
         // A universal link arrives here too, not through a separate callback.
         if let link = stationLink(from: url) {
             // A slug this build doesn't know — an older build, or a station
             // that has since left the bundle — opens nothing. It can never open
             // something else: a slug is allocated once and never reused.
-            if let item = stationItem(for: link) { open(item, at: link.instant) }
+            if let item = stationItem(for: link) { openLinked(item, at: link.instant) }
             return
         }
         guard url.scheme == "slackwater" else { return }
@@ -653,7 +651,7 @@ struct StationListView: View {
         case "station":
             let id = stationID(from: url)
             if let item = StationItem.byId[id] {
-                open(item)
+                openLinked(item)
             } else if StationTombstone.byId[id] != nil {
                 path = NavigationPath()
                 showMap = false
@@ -666,6 +664,17 @@ struct StationListView: View {
             }
         default: break
         }
+    }
+
+    /// A link that cold-launches a first run races `.onAppear`'s tour push,
+    /// and SwiftUI does not order the two. Either way the linked station
+    /// wins: landing first, it stops the push; landing second, it replaces
+    /// the pushed station, and the tour moves to the station the user
+    /// actually asked for.
+    private func openLinked(_ item: StationItem, at instant: Date? = nil) {
+        hasOpenedLink = true
+        if hasOpenedTourStation { TourCoach.shared.handOff(to: item.id) }
+        open(item, at: instant)
     }
 
     /// Show a station picked anywhere (row tap in regular, map pin tap in
@@ -785,8 +794,8 @@ struct StationListView: View {
             }
 
         // My Location slot: the hero tile, its locating state, the amber
-        // denied card, or — past the gate, with the choice never made — the ask
-        // card. Keep the slot mounted while Core Location finds a fix.
+        // denied card, or — the choice never made — the ask card. Keep the
+        // slot mounted while Core Location finds a fix.
         Group {
             if let fix, !heroItems.isEmpty {
                 MyLocationTile(items: heroItems, fix: fix, imperial: imperial,
@@ -794,7 +803,9 @@ struct StationListView: View {
                     itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
                 }
                     .transition(.opacity)
-            } else if loc.authorized {
+            } else if loc.authorized || loc.locating {
+                // `locating` covers the launch ask: the system prompt is up
+                // over this list, so the slot says it is finding a location.
                 MyLocationLoadingTile(locating: loc.locating, fallback: fallbackLocationText)
                     .transition(.opacity)
             } else if loc.denied {
@@ -803,14 +814,11 @@ struct StationListView: View {
                     unavailableCard
                 }
             } else {
-                // .notDetermined past the gate. Two ways in, and NEITHER is a
-                // first run: the gate's "or search" bypass sets seenGate
-                // without ever asking, and iOS's "Ask Next Time Or When I
-                // Share" (or an expired "Allow Once") resets an answered app
-                // back to undecided. seenGate is one-way, so the gate — the
-                // only caller of `request()` — never comes back, and this slot
-                // used to render nothing at all: the whole My Location group
-                // silently vanished with no prompt and no explanation.
+                // .notDetermined with no ask in flight. Not a first run, which
+                // asks on appear: iOS's "Ask Next Time Or When I Share" (or an
+                // expired "Allow Once") resets an answered app back to
+                // undecided, and launch asks only once (`locationAsked`), so
+                // this card is the way back to the prompt.
                 VStack(alignment: .leading, spacing: 4) {
                     sectionLabel(String(localized: "My Location", comment: "Current-location section heading."))
                     askCard
@@ -1315,7 +1323,7 @@ struct StationListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            // Same fix as the gate button: content sizes the pill, `minHeight`
+            // Content sizes the pill, `minHeight`
             // keeps the 48pt look at default sizes. A fixed `.frame(height: 48)`
             // left the field's text hanging out of its own capsule at
             // accessibility sizes. `TextField` fails the way an `Image` does,

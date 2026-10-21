@@ -4,7 +4,10 @@ import Foundation
 import CoreLocation
 import WidgetKit
 
-let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
+/// Set when the list first asks for location, so launch raises the system
+/// prompt once and never again. It keeps the retired first-run gate's key:
+/// anyone who got past that gate has already had their one ask.
+let locationAskedKey = "slackwater.seenGate"
 
 @MainActor final class LocationService: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     static let shared = LocationService()
@@ -70,7 +73,7 @@ let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
             && (status == .denied || status == .restricted))
     }
 
-    /// The gate's location action: ask, or refresh if already authorized.
+    /// Ask, or refresh if already authorized.
     func request() {
         guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
                 && !Self.testUndetermined else { return }

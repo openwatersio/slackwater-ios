@@ -35,7 +35,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     }
 
     func testTheLineRestsUnderATideStripAndOpensTheSheet() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
 
         XCTAssert(line(app).appears(within: 5))
@@ -50,7 +50,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     }
 
     func testALongPressNamesTheMomentOnTheLineUntilTheStripMoves() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         pressStrip(app)
@@ -65,7 +65,7 @@ final class AlertLineUITests: ScreenshotTestCase {
 
     /// A current detail's press reaches the line with a current-flavoured offer, never a tide one.
     func testALongPressOnACurrentStripOffersACurrentAlert() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(line(app).appears(within: 5))
@@ -78,7 +78,7 @@ final class AlertLineUITests: ScreenshotTestCase {
 
     func testAFreeUsersSaveOpensTheTierSheet() {
         // Review Focus 5.
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         line(app).tap()
@@ -91,7 +91,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     }
 
     func testSavingTurnsTheLineToSet() {
-        let app = launch("-seedGate", "-resetAlerts", "-seedPremium")
+        let app = launch("-resetAlerts", "-seedPremium")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         XCTAssertEqual(line(app).label, "Set an alert")
@@ -117,7 +117,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// Review Focus 4 of the sentence plan: without the model — every hosted runner — the sheet
     /// is the one the press path uses, and nothing waits on a field that is not there.
     func testTheSheetWorksWithoutTheField() throws {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         line(app).tap()
@@ -132,7 +132,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// The sun row sits under Remind me (§7.2): a picker, Any time by default, below the
     /// medium detent's fold on a phone.
     func testTheSunRowStartsOnAnyTime() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         line(app).tap()
@@ -147,7 +147,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// Only where the model runs: a typed sentence lands on the summary and the repeat row, and
     /// the free Save still upsells.
     func testASentenceLandsOnTheSummary() throws {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
         line(app).tap()
@@ -185,7 +185,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// runners have dropped strip swipes with no sheet involved (#613, #664); the native trace
     /// says whether the pan ever began.
     func testTheStripIsStillScrubbableAfterTheSheetCloses() {
-        let app = launch("-seedGate", "-resetAlerts",
+        let app = launch("-resetAlerts",
                          "-scrubTrace", "\(shotDir)/sheet-scrub-\(UUID().uuidString).log")
         openFridayHarbor(app)
         XCTAssert(line(app).appears(within: 5))
@@ -211,7 +211,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// continuous-vs-discrete gesture exclusivity already keeps the tap from firing once the
     /// press has begun) — kept anyway as a direct assertion of the documented invariant.
     func testAPressDoesNotAlsoFireATapScrub() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5))
@@ -225,7 +225,7 @@ final class AlertLineUITests: ScreenshotTestCase {
 
     /// An ordinary tap must still scrub after the press recognizer is added beside it.
     func testAnOrdinaryTapStillScrubsAfterThePressGestureIsAdded() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5))
@@ -243,7 +243,7 @@ final class AlertLineUITests: ScreenshotTestCase {
     /// draws — or the nearest label under a raw coordinate can be a sunrise/sunset instead
     /// (DetailAndScrubTests's own day-row test sets up the same way).
     func testATapOnTheDayRowStillOpensTheWeekPicker() {
-        let app = launch("-seedGate", "-resetAlerts")
+        let app = launch("-resetAlerts")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5))

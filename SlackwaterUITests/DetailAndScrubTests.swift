@@ -11,7 +11,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad layout") }
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
-        let app = launch("-seedGate", "-locDenied")
+        let app = launch("-locDenied")
         openFridayHarbor(app)
         let sun = app.buttons["sun-card-details"].firstMatch
         scrollTo(sun, in: app)
@@ -28,7 +28,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     func testScheduleSunDetails() throws {
-        let app = launch("-seedGate", "-locDenied")
+        let app = launch("-locDenied")
         openFridayHarbor(app)
         let row = app.buttons["sun-card-details"].firstMatch
         scrollTo(row, in: app)
@@ -122,7 +122,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // somewhere else entirely.
         // Hosted runners have dropped this walk's scrub (#664); the native trace says
         // whether the drag's hit test reached the strip and whether its pan began.
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705",
+        let app = launch("-fixLat", "48.4235", "-fixLon", "-123.3705",
                          "-scrubTrace", "\(shotDir)/m1-scrub-\(UUID().uuidString).log")
 
         // Units live in Settings only (no list pill): start this walk in feet.
@@ -199,7 +199,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// hide.
     func testTideReadoutShowsHeightAndRange() throws {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate"])
+        app.launchArguments = testArguments([])
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
 
@@ -222,7 +222,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// date under the day is the one that names a DAY rather than a moment, so
     /// it opens the picker instead.
     func testTappingTheStripScrubsAndTheDateOpensThePicker() throws {
-        let app = launch("-seedGate", "-scrubTrace", "\(shotDir)/strip-tap-\(UUID().uuidString).log")
+        let app = launch("-scrubTrace", "\(shotDir)/strip-tap-\(UUID().uuidString).log")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 10), "timeline strip missing")
@@ -294,7 +294,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// #170: provenance stays out of the primary tide-reading flow until the
     /// sailor asks for it, then exposes the support/debugging facts in place.
     func testStationDetailsAreCollapsedUntilOpened() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
 
         let details = app.buttons["Station details"].firstMatch
@@ -313,7 +313,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// Every detail closes on Nearby: the shared filter narrows its rows, a
     /// row pushes that station, and a tap off the pins opens the full map.
     func testNearbyFiltersOpensAStationAndOpensTheMap() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
 
         let nearby = app.descendants(matching: .any)["nearby"].firstMatch
@@ -361,7 +361,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// Saturday, so its 31st is on the sixth row.
     func testPickerReachesTheSixthWeek() throws {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate"])
+        app.launchArguments = testArguments([])
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
 
@@ -392,7 +392,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// already waits for the same element to read `before`.
     func testPickingADateMovesTheWindow() throws {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate"])
+        app.launchArguments = testArguments([])
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
 
@@ -452,7 +452,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     // The detail header carries the title, the day header carries the sun
     // times, and the summary tile names the moon phase.
     func testM41DetailHeaderSunMoon() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),
                   "header missing from tide detail")
@@ -486,7 +486,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     func testM42DayHeaderSpansTheSchedule() {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
 
         let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
@@ -513,7 +513,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
     // The fixed centerline stays put while the multi-day strip pans underneath.
     func testM42ContinuousScrubAcrossMidnight() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
@@ -588,7 +588,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     // the settle recomputes everything, the dot floats off the curve. The read
     // lands mid-deceleration, before any settle.
     func testM43FirstScrubDotRidesCurve() throws {
-        let app = launch("-seedGate", "-scrubTrace", "\(shotDir)/first-scrub-\(UUID().uuidString).log")
+        let app = launch("-scrubTrace", "\(shotDir)/first-scrub-\(UUID().uuidString).log")
         openFridayHarbor(app)
 
         // First frame after appearance — no scrub, no settle yet.
@@ -626,7 +626,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let device = XCUIDevice.shared
         device.orientation = .portrait
         defer { device.orientation = .portrait }
-        let app = launch("-seedGate", "-scrubInstant", "2026-09-09T09:54:00-07:00")
+        let app = launch("-scrubInstant", "2026-09-09T09:54:00-07:00")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "timeline strip missing")
@@ -674,7 +674,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// worst-case limb (M2 − S2 − N2) stays well over it, any day of the
     /// lunar month.
     func testFastTideCommentaryNamesTheRate() throws {
-        let app = launch("-seedGate", "-networkKillSwitch")
+        let app = launch("-networkKillSwitch")
         openSearch(app, "eastport")
         pickSearchResult(app, app.staticTexts["Eastport"].firstMatch)
         let strip = app.otherElements["timeline-strip"].firstMatch
@@ -727,7 +727,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// scrubs the strip there, so the lead's time moves and the pill returns
     /// naming the stop after that one.
     func testCommentaryTapScrubsToTheStopItNames() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 10))
@@ -760,7 +760,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// on the side now is, so scrubbing back puts it on the right, arrow
     /// pointing that way — and it must still bring the strip home.
     func testReturnToNowFromHistory() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5))
@@ -785,7 +785,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// strip, not in the header's top row, so the star and the back button
     /// never move when it comes and goes.
     func testNowPillSitsLeftWhenScrubbedForward() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5))
 
@@ -839,7 +839,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// placement only — tapping raises the system share sheet, which is
     /// another process.
     func testShareSitsInboardOfTheStar() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         let share = app.buttons["detail-share"].firstMatch
         let star = app.buttons["detail-favorite"].firstMatch
@@ -856,7 +856,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// eclipse rows are destinations — tapping one moves the window to it.
     func testMoonOrientationAcrossTheDetailAndSheet() throws {
         let app = XCUIApplication()
-        var arguments = testArguments(["-seedGate", "-locDenied"])
+        var arguments = testArguments(["-locDenied"])
         let now = try XCTUnwrap(arguments.firstIndex(of: "-nowEpoch"))
         let at = ISO8601DateFormatter().date(from: "2026-10-19T01:17:00Z")!
         arguments[now + 1] = String(at.timeIntervalSince1970)
@@ -874,7 +874,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     func testTheMoonTileOpensItsSheetAndTheEclipseRowJumps() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
         XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
@@ -939,7 +939,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// stores separately, so both are opened.
     func testAMomentWeeksAwayLandsOnItsClockAndDay() throws {
         for (query, name) in [("friday", "Friday Harbor"), ("deception", "Deception Pass (Narrows)")] {
-            let app = launch("-seedGate", "-scrubInstant", "2026-09-28T13:00:00-07:00")
+            let app = launch("-scrubInstant", "2026-09-28T13:00:00-07:00")
             openSearch(app, query)
             pickSearchResult(app, app.staticTexts[name].firstMatch)
             XCTAssert(leadReading(app).appears(within: 10), "no lead reading on \(name)")
@@ -961,7 +961,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// at the open menu: what it guards is that the three subjects a support
     /// mail can carry are all still offered.
     func testReportAProblemOffersItsThreeSubjects() throws {
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-fixLat", "48.4235", "-fixLon", "-123.3705")
         openFridayHarbor(app)
         let report = app.descendants(matching: .any)["detail-report"].firstMatch
         scrollTo(report, in: app)

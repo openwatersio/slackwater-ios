@@ -23,7 +23,7 @@ import WidgetKit
     var skipNextRecordID: String?
 
     private init() {
-        // UI-test hook, like -resetGate: a clean no-recents first run.
+        // UI-test hook, like -resetLocationAsk: a clean no-recents first run.
         if CommandLine.arguments.contains("-resetRecents") {
             AppGroup.defaults.removeObject(forKey: Self.key)
         }

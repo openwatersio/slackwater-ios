@@ -7,7 +7,7 @@ final class TourUITests: ScreenshotTestCase {
         let app = XCUIApplication()
         // ScreenshotTestCase seeds -seedTour by default so every other UI
         // test suppresses the tour; strip it here so it actually fires.
-        app.launchArguments = testArguments(["-seedGate", "-resetTour", "-locAuthorizedNoFix"])
+        app.launchArguments = testArguments(["-resetTour", "-locAuthorizedNoFix"])
             .filter { $0 != "-seedTour" }
         app.launch()
 
@@ -28,7 +28,7 @@ final class TourUITests: ScreenshotTestCase {
 
         // One-way: the flag survives a relaunch.
         app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-locAuthorizedNoFix"])
+        app.launchArguments = testArguments(["-locAuthorizedNoFix"])
             .filter { $0 != "-seedTour" }
         app.launch()
         XCTAssertFalse(app.otherElements["tour-mark"].firstMatch.appears(within: 5),
@@ -40,7 +40,7 @@ final class TourUITests: ScreenshotTestCase {
     // this regresses the tour still "works" and silently stops teaching.
     func testARealSwipeAdvancesTheStarsMark() {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate", "-resetTour", "-locAuthorizedNoFix"])
+        app.launchArguments = testArguments(["-resetTour", "-locAuthorizedNoFix"])
             .filter { $0 != "-seedTour" }
         app.launch()
 
@@ -57,7 +57,7 @@ final class TourUITests: ScreenshotTestCase {
 
     func testSkipEndsItFromTheFirstMark() {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate", "-resetTour", "-locAuthorizedNoFix"])
+        app.launchArguments = testArguments(["-resetTour", "-locAuthorizedNoFix"])
             .filter { $0 != "-seedTour" }
         app.launch()
 

@@ -438,8 +438,9 @@ schemes:
     test:
       config: Debug
       targets: [SlackwaterWatchUITests]
-  # First-run state on every launch, for iterating on the gate. Location stays
-  # real, so the permission prompt needs a device erased by scripts/first-run.sh.
+  # First-run state on every launch, for iterating on the first launch.
+  # Location stays real, so the permission prompt needs a device erased by
+  # scripts/first-run.sh.
   Slackwater First Run:
     build:
       targets:
@@ -448,7 +449,8 @@ schemes:
       config: Debug
       storeKitConfiguration: Slackwater.storekit
       commandLineArguments:
-        "-resetGate": true
+        "-resetLocationAsk": true
+        "-resetTour": true
         "-resetRecents": true
         "-resetFavorites": true   # also keeps the run off iCloud (FavoritesCloud.store)
         "-chsResetModels": true
