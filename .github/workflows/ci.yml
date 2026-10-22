@@ -339,6 +339,10 @@ jobs:
       # ready against ~10 s for every later test. So launch the app once here,
       # with the suite's no-network flags, then uninstall it so the tests
       # start from an empty container as they did on a fresh clone.
+      # -seedLocationAsk and -seedTour as `testArguments` passes them: this is
+      # a first launch, which otherwise raises the real location prompt. The
+      # prompt outlives the uninstall, and the first test to tap anything has
+      # XCUITest answer "Don't Allow", leaving the device denied for the shard.
       # ponytail: fixed 45 s settle; poll for the app going idle if it proves short.
       - run: |
           udid=$(xcrun simctl list devices available | grep -F "$DEVICE (" | tail -1 \
@@ -346,7 +350,8 @@ jobs:
           [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
-          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch
+          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch \
+            -seedLocationAsk -seedTour
           sleep 45
           xcrun simctl terminate "$udid" io.openwaters.slackwater || true
           xcrun simctl uninstall "$udid" io.openwaters.slackwater
