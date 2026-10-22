@@ -930,11 +930,23 @@ struct TimelineCanvas: View {
     /// came before it — so thinning a tile's slice in isolation would let one
     /// tile keep a label its neighbour drops, and a label would blink as it
     /// crossed a seam. Only the drawing is per-tile.
-    private func axisTimes(_ ctx: GraphicsContext, _ times: [Date], _ t0: Date, _ t1: Date) {
-        for t in thinnedAxisTimes(times, x: data.x, minGap: 64) where t >= t0 && t <= t1 {
-            ctx.draw(Text(chartTime(t, data.tz))
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(0.7 * fade(t))),
+    ///
+    /// `tint` colours a time by what happens at it — a tide's high or low —
+    /// and sets it larger but light, so the colour carries it without the
+    /// weight pulling the eye; untinted times stay quiet foam.
+    private func axisTimes(_ ctx: GraphicsContext, _ times: [Date], _ t0: Date, _ t1: Date,
+                           tint: ((Date) -> Color)? = nil) {
+        // A time is centred on its moment, so one just off the tile still
+        // prints half a label into it: widen by the thinning gap, which no
+        // label is wider than, or the seam clips it.
+        let minGap: CGFloat = 64
+        let x0 = data.x(t0) - minGap, x1 = data.x(t1) + minGap
+        for t in thinnedAxisTimes(times, x: data.x, minGap: minGap) where data.x(t) >= x0 && data.x(t) <= x1 {
+            let font: Font = tint == nil
+                ? .system(size: 12, weight: .medium).monospacedDigit()
+                : .system(size: 14, weight: .regular).monospacedDigit()
+            let color = tint.map { $0(t).opacity(fade(t)) } ?? SN.foam.opacity(0.7 * fade(t))
+            ctx.draw(Text(chartTime(t, data.tz)).font(font).foregroundStyle(color),
                      at: CGPoint(x: data.x(t), y: geo.timeY), anchor: .center)
         }
     }
@@ -1063,7 +1075,9 @@ struct TimelineCanvas: View {
                                    glyph: .toBar(high: high), tint: tint, ink: SN.foam.opacity(f),
                                    valueFontSize: CurveStyle.stripValueFontSize)
         }
-        axisTimes(ctx, data.tideExtremes.map(\.time).filter(data.clearsLabelEdges), t0, t1)
+        let highs = Set(data.tideExtremes.filter { $0.kind == .high }.map(\.time))
+        axisTimes(ctx, data.tideExtremes.map(\.time).filter(data.clearsLabelEdges), t0, t1,
+                  tint: { highs.contains($0) ? SN.graphHigh : SN.graphLow })
 
         if now >= t0, now <= t1 {
             drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.tideY(data.heightAt(now))))
