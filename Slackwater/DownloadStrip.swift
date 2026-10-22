@@ -22,11 +22,18 @@ struct DownloadStrip: View {
             // capture that creates the cohort never fired and nothing ever
             // downloaded. A zero-height row is a view; EmptyView is a hole.
             Color.clear.frame(height: 0)
-        case let .working(done, total, progress):
+        case let .working(done, total, progress), let .waiting(done, total, progress):
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Downloading")
+                        // The same words and rule as the Live Activity
+                        // (`DownloadCount.waitingToRetry`). The tap opens the
+                        // manager, which offers "Retry now" while online.
+                        if case .waiting = state {
+                            Text(String(localized: "Waiting to retry…", comment: "Background download activity while waiting to retry."))
+                        } else {
+                            Text("Downloading")
+                        }
                         Spacer()
                         Text("\(done) of \(total)").monospacedDigit()
                     }

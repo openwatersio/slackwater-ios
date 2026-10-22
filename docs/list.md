@@ -249,8 +249,12 @@ Results use the station card (§6) without a distance and without swipe actions,
 Canadian predictions download to the device in tiers: the stations in view, then those within 25 km, then those within 150 km. The download strip reports that work at the top of the list.
 
 - **Working:** "Downloading" with "N of M" and a progress bar. Tapping opens the Downloads sheet.
+- **Waiting:** "Waiting to retry…" over the same count and bar, when a download is sitting out a retry backoff and nothing else is downloading or due. The background download's Live Activity says the same thing on the same condition.
+
 - **Offering the next tier:** "Download N more?" opens the Downloads sheet when tapped. A decline button ("Not now") dismisses the offer for the session, and an accept button ("Download N more") adds the next tier directly.
 - **Neither:** the strip takes no space.
+
+"N of M" counts fitted Canadian stations and the online currents being downloaded, and the Live Activity, the Downloads row in the footer, and the Downloads sheet's counter all show the same count. An online current downloading on its own also shows the strip.
 
 The footer is a rounded card with three rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), "Settings", and "Support Slackwater" ("Slackwater supporter ❇" when Premium is active), each at least 48 units tall. The support row opens a dedicated sheet with Premium benefits, purchase options, and restore. Settings orders units and the comfort-current control first, followed by Alerts and Calendar marked with sparkles, a Premium section with lock-screen widget previews and a support button, free widget previews, and a final group containing Help, the station tour, and About. Help opens `https://slackwater.xyz/support/`. About names licensing, acknowledgements, and privacy in its subtitle. The purchase sheet illustrates its benefits with the actual lock-screen widget views and example calendar events and alerts; purchase and restore controls stay in that sheet. Below the card are "Slackwater" and "by Open Waters". The Help link in Settings has a minimum 44-point tap target.
 

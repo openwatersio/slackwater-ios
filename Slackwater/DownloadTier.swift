@@ -111,19 +111,84 @@ struct DownloadCohort {
 enum DownloadStripState: Equatable {
     case absent
     case working(done: Int, total: Int, progress: Double)
+    /// The same count while nothing downloads and something sits out a retry
+    /// backoff, which can last 15 minutes. A bare bar would read as a hang.
+    case waiting(done: Int, total: Int, progress: Double)
     /// `count` is the offer. A count and never a duration: locking the device
     /// stops the work, so any promise of a finish would be false in a pocket.
     case asking(count: Int)
 }
 
+/// Online current gates download predictions, not a fit, so they have no
+/// queue job and the queue's counts never include them.
+struct OnlineDownloads: Equatable {
+    var ready = 0
+    var total = 0
+    var requestsCompleted = 0.0
+    var requestsRemaining = 0.0
+    /// Keeps the background task alive. Offline, a gate with nothing covering
+    /// today counts: the task waits for signal rather than ending.
+    var active = false
+    /// A fetch is running, queued, or waiting out a retry, the same states that
+    /// keep a fitted job `.pending`. The strip shows this, not `active`, so a
+    /// gate merely waiting for signal doesn't hide the offer.
+    var inFlight = false
+    /// A gate is fetching, or queued to fetch next.
+    var moving = false
+    /// A gate with nothing covering today is sitting out a retry backoff.
+    var deferred = false
+}
+
+/// The one station count every iOS download surface shows. The list strip
+/// once counted the queue alone while the Live Activity added online gates,
+/// so the two disagreed on both numbers at once. The watch never fetches
+/// online gates, so its queue-only count is already this one.
+struct DownloadCount: Equatable {
+    let ready: Int
+    let total: Int
+    /// Request units, the same scale `BGContinuedProcessingTask.progress` uses.
+    let completed: Double
+    let requests: Double
+    let active: Bool
+    /// Something is sitting out a retry backoff and nothing else is
+    /// downloading or due, so the count is stalled. While anything else can
+    /// run it is not, and the count is the better thing to show. "Due"
+    /// matters as much as "downloading": a run fetches the station list
+    /// before it claims a job, and the gap between jobs is not a stall. The strip and the Live Activity
+    /// both say "Waiting to retry…" on this, and only on this.
+    ///
+    /// The copy names no cause, because this cannot tell which. A deferral
+    /// follows every transient failure (offline, 5xx, station list
+    /// unavailable), and the IWLS 429 wait (`IwlsFetch.retryDelay`) happens
+    /// with the job still downloading, so it never lands here.
+    let waitingToRetry: Bool
+    var complete: Bool { total > 0 && ready == total }
+
+    init(queue: ChsQueue, online: OnlineDownloads) {
+        let progress = queue.requestProgress
+        ready = queue.ready + online.ready
+        total = queue.total + online.total
+        completed = progress.completed + online.requestsCompleted
+        requests = progress.total + online.requestsCompleted + online.requestsRemaining
+        active = queue.active || online.active
+        let now = appNow()
+        let moving = online.moving || queue.jobs.contains {
+            $0.status == .downloading || $0.status == .pending && ($0.retryAfter ?? .distantPast) <= now
+        }
+        waitingToRetry = !moving && (online.deferred || queue.deferred(at: now) > 0)
+    }
+}
+
 /// Pure mapping from download state to what the list shows. Free function
 /// rather than a view model so it can be tested without a view or a service.
-func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadTier,
-                        declined: Bool, remaining: Int) -> DownloadStripState {
-    if queue.active {
-        let requests = queue.requestProgress
-        let progress = requests.total > 0 ? requests.completed / requests.total * 10 : 0
-        return .working(done: queue.ready, total: queue.total, progress: progress)
+func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, online: OnlineDownloads = OnlineDownloads(),
+                        tier: DownloadTier, declined: Bool, remaining: Int) -> DownloadStripState {
+    let count = DownloadCount(queue: queue, online: online)
+    if queue.active || online.inFlight {
+        let progress = count.requests > 0 ? count.completed / count.requests * 10 : 0
+        return count.waitingToRetry
+            ? .waiting(done: count.ready, total: count.total, progress: progress)
+            : .working(done: count.ready, total: count.total, progress: progress)
     }
     guard !cohort.ids.isEmpty else { return .absent }
     guard tier.next != nil, !declined, remaining > 0 else { return .absent }

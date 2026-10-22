@@ -769,7 +769,7 @@ struct StationListView: View {
         // precisely so this modifier has somewhere to live (DownloadStrip).
         DownloadStrip(
             state: downloadStripState(cohort: chs.cohort, queue: chs.queue,
-                                      tier: chs.tier, declined: chs.declinedNearby,
+                                      online: chs.onlineDownloads, tier: chs.tier, declined: chs.declinedNearby,
                                       remaining: chs.remainingBeyondCohort),
             onOpen: { showDownloads = true },
             onAccept: {

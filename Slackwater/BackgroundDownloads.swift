@@ -90,10 +90,11 @@ enum BackgroundDownloads {
             return
         }
 
+        let count = DownloadCount(queue: queue, online: online)
         let request = BGContinuedProcessingTaskRequest(
             identifier: id,
             title: String(localized: "Downloading", comment: "Compact download status."),
-            subtitle: String(localized: "\(queue.ready + online.ready) of \(queue.total + online.total)", comment: "Completed and total station downloads."))
+            subtitle: String(localized: "\(count.ready) of \(count.total)", comment: "Completed and total station downloads."))
         request.strategy = .queue
         do {
             try BGTaskScheduler.shared.submit(request)
@@ -178,29 +179,16 @@ enum BackgroundDownloads {
                 let service = ChsFitService.shared
                 service.resumeForBackground()
                 while !Task.isCancelled {
-                    let online = service.onlineDownloads
-                    guard service.queue.active || online.active else { break }
-                    let progress = service.queue.requestProgress
-                    task.progress.totalUnitCount = Int64((progress.total + online.requestsCompleted + online.requestsRemaining).rounded())
-                    task.progress.completedUnitCount = Int64((progress.completed + online.requestsCompleted).rounded())
-                    // A deferred job is sitting out `ChsQueue.backoff`, which
-                    // reads as a stall with no explanation — up to 15 minutes,
-                    // on an API that kills tasks showing no progress first.
-                    //
-                    // The copy names no cause, because this cannot tell which.
-                    // `deferRetry` fires for every transient failure — offline,
-                    // 5xx, station list unavailable — and the rate limit it was
-                    // written for is the one case it does NOT catch: IWLS's 429
-                    // wait happens inside `IwlsClient.get`, with the job still
-                    // `.downloading`. "Waiting to retry" is true of all of them.
-                    let waitingToRetry = service.queue.deferred() > 0 || service.onlineStates.values.contains {
-                        if case .deferred = $0 { return true }
-                        return false
-                    }
+                    let count = DownloadCount(queue: service.queue, online: service.onlineDownloads)
+                    guard count.active else { break }
+                    task.progress.totalUnitCount = Int64(count.requests.rounded())
+                    task.progress.completedUnitCount = Int64(count.completed.rounded())
+                    // A stall with no explanation lasts up to 15 minutes, on an
+                    // API that kills tasks showing no progress first.
                     task.updateTitle(String(localized: "Downloading", comment: "Compact download status."),
-                                     subtitle: waitingToRetry
+                                     subtitle: count.waitingToRetry
                                         ? String(localized: "Waiting to retry…", comment: "Background download activity while waiting to retry.")
-                                        : String(localized: "Stations ready: \(service.queue.ready + online.ready) of \(service.queue.total + online.total)", comment: "Background download activity. Values are ready and total station counts."))
+                                        : String(localized: "Stations ready: \(count.ready) of \(count.total)", comment: "Background download activity. Values are ready and total station counts."))
                     try? await Task.sleep(for: .seconds(2))
                 }
                 task.setTaskCompleted(success: !Task.isCancelled)
