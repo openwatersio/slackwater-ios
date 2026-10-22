@@ -43407,25 +43407,25 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angiv højden igen: dette sted måles nu fra et andet kortdatum."
+            "value" : "Angiv højden igen: dette sted måles nu fra en anden søkortreference."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Höhe neu festlegen: Dieser Ort wird jetzt von einem anderen Kartennull aus gemessen."
+            "value" : "Höhe neu festlegen: Dieser Ort wird jetzt von einem anderen Seekartennull aus gemessen."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a fijar la altura: este lugar se mide ahora desde otro datum de carta."
+            "value" : "Vuelve a fijar la altura: este lugar se mide ahora desde otro cero hidrográfico."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseta korkeus uudelleen: tämän paikan korkeudet mitataan nyt eri karttanollasta."
+            "value" : "Aseta korkeus uudelleen: tämän paikan korkeudet mitataan nyt eri merikartan vertailutasosta."
           }
         },
         "fr-CA" : {
@@ -43437,13 +43437,13 @@
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Socraigh an airde arís: tomhaistear an áit seo anois ó dhatam cairte eile."
+            "value" : "Socraigh an airde arís: tomhaistear an áit seo anois ó thagra cairte eile."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suidhich an àirde a-rithist: thathar a’ tomhas an àite seo a-nis o dhatum cairt eile."
+            "value" : "Suidhich an àirde a-rithist: thathar a’ tomhas an àite seo a-nis o bhun-ìre cairte eile."
           }
         },
         "it" : {
@@ -43467,31 +43467,31 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angi høyden på nytt: dette stedet måles nå fra et annet kartnull."
+            "value" : "Angi høyden på nytt: dette stedet måles nå fra et annet sjøkartnull."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stel de hoogte opnieuw in: deze plek wordt nu gemeten vanaf een ander kaartnulpunt."
+            "value" : "Stel de hoogte opnieuw in: deze plek wordt nu gemeten vanaf een andere kaartnul."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defina a altura de novo: este local agora é medido a partir de outro datum de carta."
+            "value" : "Defina a altura de novo: este local agora é medido a partir de outro nível de redução."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defina a altura de novo: este local é agora medido a partir de outro datum de carta."
+            "value" : "Defina a altura de novo: este local é agora medido a partir de outro zero hidrográfico."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ange höjden igen: den här platsen mäts nu från ett annat sjökortsnollplan."
+            "value" : "Ange höjden igen: den här platsen mäts nu från en annan sjökortsreferensnivå."
           }
         }
       }
@@ -46590,7 +46590,7 @@
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Slackwater n’offre plus cette station, elle ne fournit donc plus de relevés."
+            "value" : "Slackwater n’offre plus cette station et n’a donc aucun relevé à afficher."
           }
         },
         "ga" : {
@@ -46685,7 +46685,7 @@
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Slackwater n’offre plus cette station, elle ne fournit donc plus de relevés. Balayez pour la supprimer."
+            "value" : "Slackwater n’offre plus cette station et n’a donc aucun relevé à afficher. Balayez pour la supprimer."
           }
         },
         "ga" : {
