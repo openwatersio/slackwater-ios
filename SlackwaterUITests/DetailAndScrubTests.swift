@@ -376,7 +376,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         stepMonth(app, "Previous Month")
         save(app, "week-picker-six-weeks.png")
         tapDay(app.collectionViews.buttons.matching(
-            NSPredicate(format: "label == %@", "Monday, August 31")).firstMatch)
+            NSPredicate(format: "label CONTAINS[c] %@", "Monday, August 31")).firstMatch)
         let show = app.descendants(matching: .any)["week-picker-done"].firstMatch
         XCTAssert(show.appears(within: 5), "a tap on the sixth week closed the picker")
         show.tap()
