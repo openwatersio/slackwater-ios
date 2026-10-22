@@ -37,10 +37,6 @@ func downloadSortRank(_ state: ManagedDownloadState, remainingDays: Int?) -> Int
     }
 }
 
-func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
-    state == .available || state == .permanent
-}
-
 func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
                at now: Date = appNow()) -> String {
     switch job.status {
@@ -91,10 +87,9 @@ struct OfflineStatusButton: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
-    private var state: OfflineIndicatorState {
-        let queue = service.queue
-        if net.online, queue.active, !networkKillSwitch {
-            return .downloading(ready: queue.ready, total: queue.total)
+    private func state(_ count: DownloadCount) -> OfflineIndicatorState {
+        if net.online, count.active, !networkKillSwitch {
+            return .downloading(ready: count.ready, total: count.total)
         }
         return net.online ? .online : .offline
     }
@@ -107,6 +102,11 @@ struct OfflineStatusButton: View {
     }
 
     var body: some View {
+        // Once per render: every read of the online summary stats each gate's
+        // window on disk, and the state below is read five times.
+        let count = DownloadCount(queue: service.queue, online: service.onlineDownloads)
+        let state = state(count)
+        let tint = tint(state, count)
         Button(action: onOpen) {
             HStack(spacing: 12) {
                 ZStack {
@@ -117,7 +117,7 @@ struct OfflineStatusButton: View {
                             .rotationEffect(.degrees(-90))
                             .frame(width: 28, height: 28)
                     }
-                    Image(systemName: icon)
+                    Image(systemName: icon(state))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(tint)
                 }
@@ -139,11 +139,11 @@ struct OfflineStatusButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Offline downloads")
-        .accessibilityValue(spoken)
+        .accessibilityValue(spoken(state, count))
         .accessibilityIdentifier("offline-status")
     }
 
-    private var icon: String {
+    private func icon(_ state: OfflineIndicatorState) -> String {
         switch state {
         case .downloading: "arrow.down"
         case .online: "antenna.radiowaves.left.and.right"
@@ -153,23 +153,23 @@ struct OfflineStatusButton: View {
 
     /// Amber only when the state actually needs attention: stalled downloads,
     /// or no signal with stations still missing. Everything else is calm.
-    private var tint: Color {
+    private func tint(_ state: OfflineIndicatorState, _ count: DownloadCount) -> Color {
         switch state {
         case .downloading: hasPermanentFailure ? SN.amber : SN.leaf
         case .online: hasPermanentFailure ? SN.amber : SN.foam.opacity(0.8)
-        case .offline: service.queue.complete ? SN.leaf : SN.amber
+        case .offline: count.complete ? SN.leaf : SN.amber
         }
     }
 
-    private var spoken: String {
+    private func spoken(_ state: OfflineIndicatorState, _ count: DownloadCount) -> String {
         switch state {
         case .downloading(let ready, let total): String(localized: "Downloading, \(ready) of \(total) ready", comment: "VoiceOver download summary. Values are ready and total station counts.")
-        case .online: service.queue.complete
+        case .online: count.complete
             ? String(localized: "Online, all stations downloaded", comment: "VoiceOver network and download summary.")
             : String(localized: "Online", comment: "VoiceOver network status.")
-        case .offline: service.queue.complete
+        case .offline: count.complete
             ? String(localized: "Offline, all stations downloaded", comment: "VoiceOver network and download summary.")
-            : String(localized: "Offline, \(service.queue.total - service.queue.ready) still to download", comment: "VoiceOver network and download summary. The integer is a station count; vary by plural.")
+            : String(localized: "Offline, \(count.total - count.ready) still to download", comment: "VoiceOver network and download summary. The integer is a station count; vary by plural.")
         }
     }
 }
@@ -294,17 +294,17 @@ struct OfflineManagerList: View {
     // scales with type, the slot scales with it so it can't overflow the row.
 
     private var queue: ChsQueue { service.queue }
-    /// The online (fit-reject) gates that belong in this manager: the ones a
-    /// fix would prefetch, plus any already on disk.
+    /// The online (fit-reject) gates that belong in this manager: every gate
+    /// the service is fetching (the summary counts exactly those, so each
+    /// needs a row), the ones a fix would prefetch, plus any already on disk.
     ///
     /// Bounded by the same radius as the prefetch itself (#205), because a row
     /// here is a promise the app can keep. `autoPrefetchGates` refuses a gate
     /// beyond `autoFitRadiusKm`, and all nine online gates are Salish or BC
     /// coast — so listing them from, say, Massachusetts adds nine rows that
-    /// can never become ready and a denominator the progress bar can never
-    /// reach. The radius, not `autoPrefetchGates` itself: that caps at
-    /// `autoFitGates`, and a Victoria fix has more online gates in reach than
-    /// the prefetch budget spends. In range and un-fetched is a legitimate
+    /// can never become ready. The radius, not `autoPrefetchGates` itself:
+    /// that caps at `autoFitGates`, and a Victoria fix has more online gates
+    /// in reach than the prefetch budget spends. In range and un-fetched is a legitimate
     /// row — it says "Not downloaded" and a tap fetches it.
     ///
     /// The on-disk half keeps a gate the user opened by hand and then sailed
@@ -315,7 +315,7 @@ struct OfflineManagerList: View {
         let anchor = LocationService.shared.rankingAnchor
         return ChsCurrentGateInfo.all.filter {
             guard $0.isOnline else { return false }
-            if service.allCurrentsSelected { return true }
+            if service.isFetchingOnline($0.id) { return true }
             let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
             return km <= ChsFitService.autoFitRadiusKm || onlineWindow($0) != nil
         }
@@ -429,9 +429,19 @@ struct OfflineManagerList: View {
             // set they are "0 of 0 ready" over an empty track, which reads as a
             // stalled download rather than as nothing to do (#205) — the
             // sentence below carries the whole state on its own.
-            if !downloads.isEmpty {
-                MonoLabel(text: String(localized: "\(readyCount) of \(downloads.count) ready", comment: "Offline-download progress. Values are ready and total station counts."))
-                ProgressView(value: Double(readyCount), total: Double(downloads.count))
+            //
+            // The counter is the download set, the same count the list strip and
+            // the Live Activity show. The rows can outnumber it: an in-range gate
+            // nothing is fetching is an offer ("Not downloaded"), and a window
+            // kept on disk from an earlier session is a holding, not a download.
+            // A row can also read "Download failed" while counted ready: its
+            // refresh failed, but the predictions it holds still cover today.
+            // Rows of offers alone are still "nothing to do", so the guard is
+            // the count, not the rows.
+            let count = DownloadCount(queue: queue, online: service.onlineDownloads)
+            if count.total > 0 {
+                MonoLabel(text: String(localized: "\(count.ready) of \(count.total) ready", comment: "Offline-download progress. Values are ready and total station counts."))
+                ProgressView(value: Double(count.ready), total: Double(count.total))
                     .tint(failedCount > 0 ? SN.amber : SN.leaf)
             }
             if !summaryLine.isEmpty {
@@ -541,7 +551,6 @@ struct OfflineManagerList: View {
         return String(localized: "\(rest) more Canadian stations are searchable everywhere — open one and it downloads.", comment: "Offline-download catalog note. The integer is a station count; vary by plural.")
     }
 
-    private var readyCount: Int { downloads.filter { downloadIsReady(managedState($0).state) }.count }
     private var failedCount: Int {
         queue.failed + onlineGates.count {
             if case .failed = service.onlineState($0.id) { return true }

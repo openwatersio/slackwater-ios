@@ -214,6 +214,78 @@ final class DownloadTierTests: XCTestCase {
                        .absent)
     }
 
+    func testStripCountsOnlineGatesLikeTheLiveActivity() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("b", 48.44, -123.38))
+        let online = OnlineDownloads(ready: 6, total: 6, requestsCompleted: 6, requestsRemaining: 0)
+        let requests = queue.requestProgress
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, online: online, tier: .nearby,
+                                          declined: false, remaining: 14),
+                       .working(done: 7, total: 8, progress: (requests.completed + 6) / (requests.total + 6) * 10),
+                       "the strip and the Live Activity must show the same numbers")
+    }
+
+    func testStripWorksForOnlineOnlyDownloads() {
+        let (cohort, queue) = settledQueue()
+        let online = OnlineDownloads(ready: 0, total: 2, requestsCompleted: 0, requestsRemaining: 4,
+                                     active: true, inFlight: true)
+        guard case let .working(done, total, _) = downloadStripState(
+            cohort: cohort, queue: queue, online: online, tier: .everything, declined: false, remaining: 0)
+        else { return XCTFail("an online fetch in flight is a download, so the strip shows it") }
+        XCTAssertEqual(done, 1)
+        XCTAssertEqual(total, 3)
+    }
+
+    func testStripSaysWaitingWhenOnlyARetryRemains() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("b", 48.44, -123.38))
+        queue.deferRetry("b", error: "HTTP 503")
+        guard case let .waiting(done, total, _) = downloadStripState(
+            cohort: cohort, queue: queue, tier: .nearby, declined: false, remaining: 14)
+        else { return XCTFail("a backoff with nothing downloading is a stall, and the strip must say why") }
+        XCTAssertEqual(done, 1)
+        XCTAssertEqual(total, 2)
+
+        let deferredGate = OnlineDownloads(total: 1, requestsRemaining: 2, active: true, inFlight: true, deferred: true)
+        guard case .waiting = downloadStripState(
+            cohort: cohort, queue: settled, online: deferredGate, tier: .nearby, declined: false, remaining: 14)
+        else { return XCTFail("an online gate's backoff stalls the count the same way") }
+    }
+
+    func testStripKeepsCountingWhileARetryWaitsBehindOtherWork() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("b", 48.44, -123.38))
+        queue.add(job("c", 48.45, -123.39))
+        queue.deferRetry("b", error: "HTTP 503")
+        guard case .working = downloadStripState(
+            cohort: cohort, queue: queue, tier: .nearby, declined: false, remaining: 14)
+        else { return XCTFail("a job due next is not a stall, even before the run claims it") }
+        queue.set("c", .downloading)
+        guard case .working = downloadStripState(
+            cohort: cohort, queue: queue, tier: .nearby, declined: false, remaining: 14)
+        else { return XCTFail("while anything downloads the count is moving, so it is the thing to show") }
+
+        let fetching = OnlineDownloads(total: 1, requestsRemaining: 2, active: true, inFlight: true, moving: true)
+        var waiting = settled
+        waiting.add(job("b", 48.44, -123.38))
+        waiting.deferRetry("b", error: "HTTP 503")
+        XCTAssertFalse(DownloadCount(queue: waiting, online: fetching).waitingToRetry,
+                       "an online fetch in progress is also movement")
+    }
+
+    func testOfflineOnlineGatesDoNotHideTheOffer() {
+        let (cohort, queue) = settledQueue()
+        let waiting = OnlineDownloads(ready: 0, total: 4, requestsCompleted: 0, requestsRemaining: 8,
+                                      active: true, inFlight: false)
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, online: waiting, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .asking(count: 14),
+                       "gates waiting for signal keep the background task alive, but nothing is downloading")
+    }
+
     func testWorkingCounterOnlyIncludesDownloadableStations() {
         var cohort = DownloadCohort()
         _ = cohort.capture(ids: ["chs-a", "noaa-b"], heroID: "chs-a")

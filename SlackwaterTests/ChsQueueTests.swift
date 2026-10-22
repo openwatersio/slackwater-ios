@@ -12,7 +12,9 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: true, covered: false, online: true))
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: false, online: false))
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: true, online: false))
-        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true))
+        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: false, online: true))
+        XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true),
+                       "the retry skips a gate covering today, so its backoff ends in no fetch")
     }
 
     @MainActor
@@ -82,6 +84,31 @@ final class ChsQueueTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(1200))
         XCTAssertEqual(service.onlineState(gate.id), .fetching,
                        "A retry through any caller must cancel the old timer before it starts fetching")
+    }
+
+    @MainActor
+    func testAnExpiredWindowNobodyFetchesIsOutsideTheCount() throws {
+        let service = ChsFitService.shared
+        try XCTSkipIf(service.allCurrentsSelected, "every online gate is fetched when all currents are selected")
+        service.resetOnlineStateForTesting()
+        let unwritten = ChsCurrentGateInfo.all.filter { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil }
+        try XCTSkipIf(unwritten.count < 2, "needs two online gates with nothing on disk")
+        let (fetched, stale) = (unwritten[0], unwritten[1])
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(stale.id))
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = stale.tz
+        let span = Timeline.window(anchor: calendar.date(byAdding: .day, value: -60, to: todayLocal(stale.tz))!)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: stale.id, iwlsName: stale.name, timezone: stale.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        service.beginOnlineFetch(fetched)
+        let count = service.onlineDownloads
+        XCTAssertEqual(count.total, 1, "a window nothing will refresh would hold the count short of done for good")
+        XCTAssertEqual(count.ready, 0)
     }
 
     @MainActor
@@ -190,10 +217,6 @@ final class ChsQueueTests: XCTestCase {
         }.map(\.element.0),
         ["downloading", "queued", "expired", "not-downloaded", "failed", "expiring",
          "valid-5", "valid-20", "permanent"])
-        XCTAssert(downloadIsReady(.permanent))
-        XCTAssert(downloadIsReady(.available))
-        XCTAssertFalse(downloadIsReady(.expired))
-        XCTAssertFalse(downloadIsReady(.failed))
     }
 
     func testRowStatusSaysWhatIsHappening() {

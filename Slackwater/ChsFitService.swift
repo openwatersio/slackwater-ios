@@ -99,7 +99,9 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
-    private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
+    /// Published because the download count's total reads it: a gate desired
+    /// while offline joins the total without any fetch state changing.
+    @Published private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
 
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
@@ -136,7 +138,10 @@ final class ChsFitService: ObservableObject {
     private var onlinePending: [ChsCurrentGateInfo] = []
     private var onlinePreferred: [String] = []
     private var onlineOrigin: (lat: Double, lon: Double)?
-    private var onlineRunning = false
+    /// Published because the strip reads it through `onlineDownloads`: the
+    /// last fetch's state change publishes before this clears, and nothing
+    /// else would tell the strip the prefetch has finished.
+    @Published private var onlineRunning = false
 
     /// How far out the queue is currently allowed to walk, and the stations
     /// the list was rendering when the question was last framed.
@@ -470,32 +475,50 @@ final class ChsFitService: ObservableObject {
                                      end: span.end).count * 2 + 1)
     }
 
-    var onlineDownloads: (ready: Int, total: Int, requestsCompleted: Double,
-                          requestsRemaining: Double, active: Bool) {
-        let gates = allCurrentsSelected ? ChsCurrentGateInfo.all.filter(\.isOnline)
-            : Array(onlineDesired.values)
-        return onlineDownloadSummary(gates)
+    /// The online half of the download set: only gates the service fetches.
+    /// A window left on disk by a gate nobody fetches any more would sit in
+    /// the total after it expires, and the count could never finish.
+    var onlineDownloads: OnlineDownloads {
+        onlineDownloadSummary(ChsCurrentGateInfo.all.filter { $0.isOnline && isFetchingOnline($0.id) })
+    }
+
+    /// The Downloads screen lists every gate this answers yes for, so its
+    /// counter never counts a station it has no row for.
+    func isFetchingOnline(_ id: String) -> Bool {
+        allCurrentsSelected || onlineDesired[id] != nil
     }
 
     nonisolated static func onlineDownloadIsActive(_ state: OnlineFetchState, queued: Bool,
                                                    covered: Bool, online: Bool) -> Bool {
         switch state {
-        case .fetching, .deferred: true
+        case .fetching: true
+        // The retry timer re-enters `prefetchOnlineGates`, which skips a gate
+        // already covering today. A covered gate's backoff (a failed "Update
+        // now", or a later week's fetch) ends in no fetch, so nothing waits on it.
+        case .deferred: !covered
         case .failed: false
         case .idle: !covered && (queued || !online)
         }
     }
 
-    private func onlineDownloadSummary(_ gates: [ChsCurrentGateInfo])
-        -> (ready: Int, total: Int, requestsCompleted: Double, requestsRemaining: Double, active: Bool) {
-        var ready = 0, completed = 0.0, remaining = 0.0, active = false
+    private func onlineDownloadSummary(_ gates: [ChsCurrentGateInfo]) -> OnlineDownloads {
+        var ready = 0, completed = 0.0, remaining = 0.0, active = false, inFlight = false
+        var moving = false, deferred = false
         for gate in gates {
             let requests = onlineRequestCount(gate)
             let state = onlineStates[gate.id] ?? .idle
             let covered = ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil
-            active = active || Self.onlineDownloadIsActive(state,
-                queued: onlineRunning || onlinePending.contains { $0.id == gate.id },
+            let queued = onlineRunning || onlinePending.contains { $0.id == gate.id }
+            active = active || Self.onlineDownloadIsActive(state, queued: queued,
                 covered: covered, online: Connectivity.shared.online)
+            inFlight = inFlight || Self.onlineDownloadIsActive(state, queued: queued,
+                covered: covered, online: true)
+            if case .deferred = state {
+                deferred = deferred || !covered
+            } else {
+                moving = moving || Self.onlineDownloadIsActive(state, queued: queued,
+                    covered: covered, online: true)
+            }
             if covered, state != .fetching {
                 ready += 1
                 completed += requests
@@ -505,7 +528,9 @@ final class ChsFitService: ObservableObject {
             completed += requests * progress / 10
             remaining += requests * (1 - progress / 10)
         }
-        return (ready, gates.count, completed, remaining, active)
+        return OnlineDownloads(ready: ready, total: gates.count, requestsCompleted: completed,
+                               requestsRemaining: remaining, active: active, inFlight: inFlight,
+                               moving: moving, deferred: deferred)
     }
 
     /// Re-assert the UI-test hooks over jobs added by a later location fix.
@@ -697,7 +722,9 @@ final class ChsFitService: ObservableObject {
         // The watch detail requires harmonics; online gates have no fitted model.
         return
 #else
-        for gate in gates { onlineDesired[gate.id] = gate }
+        // Guarded: every fix re-enters here with the same gates, and a
+        // published write that changes nothing still redraws the list.
+        for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
         guard Connectivity.shared.online, !networkKillSwitch else { return }
         var due: [ChsCurrentGateInfo] = []
         for gate in gates where onlineState(gate.id) == .idle {
