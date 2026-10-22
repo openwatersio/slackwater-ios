@@ -15,7 +15,7 @@ final class MaxSheetTests: ScreenshotTestCase {
     /// §6.5. Deception Pass is a harmonic reference with its own constituents,
     /// so it has a fortnight to rank against.
     func testTheNextMaxTileOpensASheetWithBothSections() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openSearch(app, "deception pass (n")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10), "current detail did not render")
@@ -38,7 +38,7 @@ final class MaxSheetTests: ScreenshotTestCase {
     /// §6.2. The caption's time is the half a reader acts on, so it survives
     /// whether the maximum marks or not.
     func testTheCaptionAlwaysCarriesATime() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openSearch(app, "deception pass (n")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10))

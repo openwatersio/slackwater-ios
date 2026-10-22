@@ -2,9 +2,10 @@
 // app's surfaces and save screenshots. They double as the smoke check that
 // every interaction actually responds.
 //
-// The app opens on the first-run gate, then the list — tests seed or reset that
-// state explicitly (-seedGate / -resetGate) because a UserDefaults value passed
-// as a launch argument would mask in-app writes.
+// The app opens on the list, which asks for location on its first appear —
+// tests seed or reset that state explicitly (-seedLocationAsk /
+// -resetLocationAsk) because a UserDefaults value passed as a launch argument
+// would mask in-app writes.
 //
 // The suite is split across several classes because XCTest distributes parallel
 // work per CLASS, not per test: with `parallelizable` set on this target in
@@ -43,6 +44,9 @@ import notify
         // the next test's lists.
         // -seedTour: arm() now fires on every launch, so without this every
         // detail-opening test would grow an unexpected coach mark.
+        // -seedLocationAsk: the list asks for location on its first appear,
+        // and a test without a location flag would otherwise raise the real
+        // system prompt. A test of that first appear passes -resetLocationAsk.
         // -uiTestQuiet: no animations, so the app has none to finish and
         // XCUITest's wait for them cannot spend its 60 s timeout before every
         // event and every query (#556, SlackwaterApp.swift). The screenshot
@@ -51,6 +55,7 @@ import notify
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
                              "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
+        if !args.contains("-resetLocationAsk") { result.append("-seedLocationAsk") }
         // Opt out only when a relaunch is asserting persisted preferences.
         if resetSettings { result += ["-resetUnits", "-resetComfortCurrent"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
@@ -314,7 +319,7 @@ import notify
     }
 
     /// The standard preamble: launch with `args`, wait for the list. Tests
-    /// whose first screen is not the list (the FTUE gate, -openMap) and
+    /// whose first screen is not the list (the first-run tour, -openMap) and
     /// mid-test relaunches on an existing app stay inline.
     func launch(_ args: String...) -> XCUIApplication {
         launch(args)
@@ -751,7 +756,7 @@ class ShotWalk: ScreenshotTestCase {
     /// time and takes the place of `time`.
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil,
                      epoch: String? = nil, instant: String? = nil) -> XCUIApplication {
-        var args = ["-seedGate", "-seedTour", "-resetRecents", "-noCloudSync",
+        var args = ["-seedLocationAsk", "-seedTour", "-resetRecents", "-noCloudSync",
                     "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", epoch ?? shotEpoch] + fix + extra

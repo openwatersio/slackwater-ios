@@ -8,7 +8,7 @@ import XCTest
 
 final class ListAndFavoritesTests: ScreenshotTestCase {
     func testEmptySearchShowsAnAnswerAndKeepsFiltersAvailable() {
-        let app = launch("-seedGate", "-locDenied")
+        let app = launch("-locDenied")
         openSearch(app, "zzzzzzzz")
         XCTAssert(app.staticTexts["No matches"].appears(within: 5))
         XCTAssert(app.buttons["Show tides"].exists)
@@ -17,13 +17,13 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     func testMissingLocationNamesTheFallbackAnchor() {
-        let app = launch("-seedGate", "-resetRecents", "-locDenied")
+        let app = launch("-resetRecents", "-locDenied")
         XCTAssert(app.staticTexts["Showing places near Chesapeake Bay"].appears(within: 5))
         save(app, "list-location-fallback.png")
     }
 
     func testMissingLocationNamesTheLastOpenedPlace() {
-        let app = launch("-seedGate", "-resetRecents", "-locDenied")
+        let app = launch("-resetRecents", "-locDenied")
         openFridayHarbor(app)
         goBack(app)
         let origin = app.staticTexts["Showing places near Friday Harbor"].firstMatch
@@ -33,7 +33,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     func testApproximateLocationDoesNotPresentPreciseCoordinates() {
-        let app = launch("-seedGate", "-resetRecents", "-locApproximate",
+        let app = launch("-resetRecents", "-locApproximate",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         XCTAssert(app.staticTexts["Approximate location"].appears(within: 5))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '°N'")).firstMatch.exists)
@@ -49,7 +49,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // launch args enforce that — not the goodwill of every earlier test
         // on the simulator (a leaked favorite pushed RECENTS past the iPad
         // sidebar's bounded scroll, 2026-08-08).
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         XCTAssert(app.staticTexts["My Location"].appears(within: 10))
         XCTAssert(app.staticTexts["Near Me"].exists)
@@ -109,7 +109,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Victoria fix: the hero is the CHS port "Victoria" (nearest, tide)
         // over "Tillicum Bridge" (the nearest current inside the nearby
         // radius) — NationalScaleTests pins that this fix gets both series.
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         XCTAssert(app.staticTexts["My Location"].appears(within: 10))
         let hero = listContainer(app).staticTexts["Victoria"].firstMatch
@@ -127,7 +127,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     // Location denied — the amber card sits in the My Location slot, above
     // The example area is labeled honestly when location is denied.
     func testM41DeniedSlot() throws {
-        let app = launch("-seedGate", "-resetRecents", "-locDenied")
+        let app = launch("-resetRecents", "-locDenied")
         XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
         XCTAssert(app.images["Location unavailable"].exists)
         XCTAssert(app.staticTexts["Go to Settings"].exists)
@@ -137,9 +137,9 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Greenbury Point, 1.6 nm east of"].firstMatch.exists)
     }
 
-    /// Past the gate with the choice never made — the "or search" bypass, or
-    /// iOS "Ask Next Time Or When I Share" resetting an answered app. That
-    /// state used to render an empty slot and never prompt.
+    /// Location undecided after the launch ask — iOS "Ask Next Time Or When I
+    /// Share" resetting an answered app. That state used to render an empty
+    /// slot and never prompt.
     ///
     /// `-locUndetermined` rather than simply omitting the location flags: the
     /// no-flag version reads the simulator's OWN authorization, which is
@@ -147,7 +147,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// clean simulator and failed on CI, whose device carries an `Authorization`
     /// key from an earlier answer.
     func testM41UndeterminedSlotOffersTheAsk() throws {
-        let app = launch("-seedGate", "-resetRecents", "-locUndetermined")
+        let app = launch("-resetRecents", "-locUndetermined")
         XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
         XCTAssert(app.images["Location"].exists)
         XCTAssert(app.staticTexts["Find tides near me"].exists)
@@ -157,7 +157,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     func testM41AuthorizedLocationKeepsItsSlotWhileWaitingForAFix() throws {
-        let app = launch("-seedGate", "-resetRecents", "-locAuthorizedNoFix")
+        let app = launch("-resetRecents", "-locAuthorizedNoFix")
         XCTAssert(app.staticTexts["My Location"].appears(within: 5))
         XCTAssert(app.staticTexts["Finding your location…"].exists)
         XCTAssert(app.staticTexts["Chesapeake Bay"].exists)
@@ -173,7 +173,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     func testFavoritePendingChsGateFromDetail() throws {
         // Fit only Victoria, so Dodd Narrows deterministically stays the
         // pending ⚠️ waiting page.
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-chsResetModels", "-chsFitOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
@@ -227,7 +227,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// comment, the 2026-08-08 fresh-install bug) on an online gate
     /// specifically, never fitted, never queued.
     func testOnlineGateUnfetchedShowsHonestyCard() throws {
-        let app = launch("-chsResetModels", "-seedGate", "-networkKillSwitch",
+        let app = launch("-chsResetModels", "-networkKillSwitch",
                          "-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
@@ -301,7 +301,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     // repeat in Recents, and the swipe actions manage the groups.
     func testM43FavoritesAndSwipeActions() throws {
         // Deterministic Victoria fix; clean favorites/recents.
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // Star Friday Harbor from its detail (upper-right, back's mirror).
@@ -373,7 +373,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     // favorites walk above, which then needs no scroll back up to Settings.
     func testM43SpeedUnitRewritesTheCurrentReadout() throws {
         // Deterministic Victoria fix; clean favorites/recents.
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // Speed units: switch to km/h in Settings, the current detail follows.
@@ -403,7 +403,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCUIDevice.shared.orientation = .portrait
         // The fix is put ON the Bournedale gauge: standing at the station is
         // the deterministic way to put a collided name at the top of the list.
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+        let app = launch("-resetRecents", "-resetFavorites",
                          "-fixLat", "41.77", "-fixLon", "-70.5617")  // Cape Cod Canal, Bournedale
         XCTAssert(app.staticTexts["Near Me"].appears(within: 10))
 
@@ -501,7 +501,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
             throw XCTSkip("iPad-only split-layout swap")
         }
         XCUIDevice.shared.orientation = .landscapeLeft
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = launch("-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "discovery island")
         pickSearchResult(app, app.staticTexts["Discovery Island, 3.0 nm NE of"].firstMatch)
@@ -526,7 +526,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     func testM53DoesNotShowNoCurrentCoverageNoticeAtPortsmouth() throws {
-        let app = launch("-seedGate", "-resetRecents", "-fixLat", "50.80", "-fixLon", "-1.11")
+        let app = launch("-resetRecents", "-fixLat", "50.80", "-fixLon", "-1.11")
 
         let notice = app.staticTexts["Current predictions not available here"].firstMatch
         XCTAssertFalse(notice.appears(within: 2),
@@ -538,11 +538,11 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// A favorite whose station left with no tombstone: the card cannot name
     /// it, and must not claim a withdrawal that only CHS tombstones record.
     func testRemovedFavoriteWithoutATombstoneMakesNoClaim() throws {
-        let app = launch("-seedGate", "-resetRecents",
+        let app = launch("-resetRecents",
                          "-seedFavorites", "ticon/departed-fixture",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         defer {
-            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
+            app.launchArguments = testArguments(["-resetFavorites"])
             app.launch()
         }
 
@@ -562,14 +562,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// neighbour: the card's TITLE has to be the station's real name, which is
     /// the only thing the tombstone file exists to supply.
     func testRemovedFavoriteKeepsItsRowAndOffersAReplacement() throws {
-        let app = launch("-seedGate", "-resetRecents",
+        let app = launch("-resetRecents",
                          "-seedFavorites", "chs-north-galiano",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         defer {
-            // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
-            // lazy singleton, so a relaunch that stops at the first-run gate
-            // never touches it and the reset never happens.
-            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
+            // Leave the simulator as found.
+            app.launchArguments = testArguments(["-resetFavorites"])
             app.launch()
         }
 
@@ -620,14 +618,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// The other exit: there is no Recents to re-file a removed station to, so
     /// its swipe action is true deletion — and it has to actually be reachable.
     func testRemovedFavoriteCanBeRemovedOutright() throws {
-        let app = launch("-seedGate", "-resetRecents",
+        let app = launch("-resetRecents",
                          "-seedFavorites", "chs-north-galiano",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         defer {
-            // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
-            // lazy singleton, so a relaunch that stops at the first-run gate
-            // never touches it and the reset never happens.
-            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
+            // Leave the simulator as found.
+            app.launchArguments = testArguments(["-resetFavorites"])
             app.launch()
         }
 

@@ -23,7 +23,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         save(app, "tide-preview.png")
 
         app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launchArguments = testArguments(["-nowOffsetDays", "1"])
         app.launch()
         openSearch(app, "victoria")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
@@ -32,7 +32,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
 
         app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", UUID().uuidString,
+        app.launchArguments = testArguments(["-chsFitOnly", "chs-victoria", "-chsFixture", UUID().uuidString,
                                             "-chsFixtureScenario", "tide-preview-fail"])
         app.launch()
         openSearch(app, "victoria")
@@ -43,7 +43,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
 
         app.terminate()
         let resumeToken = UUID().uuidString
-        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", resumeToken,
+        app.launchArguments = testArguments(["-chsFitOnly", "chs-victoria", "-chsFixture", resumeToken,
                                             "-chsFixtureScenario", "hold-first"])
         app.launch()
         openSearch(app, "victoria")
@@ -63,7 +63,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     private func fixture(_ scenario: String = "terminal", _ ids: String,
                          fix: (String, String)? = nil) -> (XCUIApplication, String) {
         let token = UUID().uuidString
-        var args = ["-seedGate", "-chsResetModels", "-chsFitOnly", ids,
+        var args = ["-chsResetModels", "-chsFitOnly", ids,
                     "-chsFixture", token, "-chsFixtureScenario", scenario]
         if let fix { args += ["-fixLat", fix.0, "-fixLon", fix.1] }
         return (launch(args), token)
@@ -84,7 +84,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         )).firstMatch.appears(within: 30), "final tide model never replaced the downloaded preview")
 
         app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launchArguments = testArguments(["-nowOffsetDays", "1"])
         app.launch()
         openSearch(app, "victoria")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
@@ -157,7 +157,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists)
 
         app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launchArguments = testArguments(["-nowOffsetDays", "1"])
         app.launch()
         openSearch(app, "dodd")
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
@@ -255,7 +255,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testSeededFinalCurrentModelRendersOffline() {
-        let app = launch("-seedGate", "-seedCurrentModel", "chs-dodd-narrows")
+        let app = launch("-seedCurrentModel", "chs-dodd-narrows")
         openSearch(app, "dodd")
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         assertCurrentDetailRendered(app)
@@ -264,7 +264,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testSeededProvisionalModelAppearsInManager() {
-        let app = launch("-seedGate", "-seedCurrentModel", "chs-dodd-narrows",
+        let app = launch("-seedCurrentModel", "chs-dodd-narrows",
                          "-seedCurrentProvisional", "-fixLat", "49.1344", "-fixLon", "-123.8171")
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch

@@ -11,7 +11,7 @@ final class DownloadStatusTests: ScreenshotTestCase {
 
     func testChangingDatesDuringAnUpdateLoadsTheSelectedWeek() {
         let token = UUID().uuidString
-        let app = launch(["-seedGate", "-chsResetModels", "-networkKillSwitch",
+        let app = launch(["-chsResetModels", "-networkKillSwitch",
                           "-seedOnlineWindow", "chs-sechelt-rapids",
                           "-chsFixture", token, "-chsFixtureScenario", "hold-first",
                           "-fixLat", "48.4235", "-fixLon", "-123.3705"])
@@ -48,7 +48,7 @@ final class DownloadStatusTests: ScreenshotTestCase {
 
     func testQueuedDownloadCanUpdateEarly() {
         let token = UUID().uuidString
-        let app = launch(["-seedGate", "-chsResetModels",
+        let app = launch(["-chsResetModels",
                           "-seedOnlineWindow", "chs-sechelt-rapids",
                           "-chsFixture", token, "-chsFixtureScenario", "hold-first",
                           "-fixLat", "49.738", "-fixLon", "-123.900"])
@@ -75,7 +75,7 @@ final class DownloadStatusTests: ScreenshotTestCase {
     }
 
     private func checkDownloadStatus(online: Bool) {
-        var args = ["-seedGate", "-chsResetModels", "-networkKillSwitch",
+        var args = ["-chsResetModels", "-networkKillSwitch",
                     "-seedOnlineWindow", "chs-sechelt-rapids",
                     "-fixLat", "48.4235", "-fixLon", "-123.3705"]
         if online { args += ["-connectivityOnline", "-chsFixture", "download-status"] }

@@ -6,7 +6,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         try skipUnlessLive()
         let app = XCUIApplication()
         app.launchArguments = testArguments([
-            "-seedGate", "-chsResetModels", "-chsFitOnly", "chs-victoria",
+            "-chsResetModels", "-chsFitOnly", "chs-victoria",
             "-fixLat", "48.4235", "-fixLon", "-123.3705"
         ], live: true) + ["-nowEpoch", String(Date().timeIntervalSince1970)]
         app.launch()
@@ -24,7 +24,7 @@ final class LiveFetchTests: ScreenshotTestCase {
 
     func testLiveCurrentFit() throws {
         try skipUnlessLive()
-        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-active-pass",
+        let app = launchLive("-chsResetModels", "-chsFitOnly", "chs-active-pass",
                              "-fixLat", "48.8604", "-fixLon", "-123.3128")
         openSearch(app, "active pass")
         let fitted = app.scrollViews.firstMatch.staticTexts.matching(NSPredicate(
@@ -39,7 +39,7 @@ final class LiveFetchTests: ScreenshotTestCase {
     /// may need dropping from the online set — a human call.
     func testLiveOnlineGateFetch() throws {
         try skipUnlessLive()
-        let app = launchLive("-seedGate", "-chsResetModels")
+        let app = launchLive("-chsResetModels")
         openSearch(app, "skookumchuck")
         pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
         let provenance = app.staticTexts["online-provenance"].firstMatch

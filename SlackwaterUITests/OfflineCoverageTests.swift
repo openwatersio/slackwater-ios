@@ -11,7 +11,7 @@ import XCTest
 
 final class OfflineCoverageTests: ScreenshotTestCase {
     func testCanadianDownloadChecklistAddsWork() {
-        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+        let app = launch("-resetFavorites", "-chsResetModels",
                          "-networkKillSwitch", "-chsFitOnly",
                          "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
@@ -49,7 +49,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
     func testCanadianDownloadChoicesFitTranslations() {
         for (language, locale) in [("fr-CA", "fr_CA"), ("de", "de_DE")] {
-            let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+            let app = launch("-resetFavorites", "-chsResetModels",
                              "-networkKillSwitch", "-fixLat", "48.4235", "-fixLon", "-123.3705",
                              "-AppleLanguages", "(\(language))", "-AppleLocale", locale)
             let indicator = app.buttons["offline-status"].firstMatch
@@ -66,7 +66,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     }
 
     func testDownloadOfferOpensExplanation() {
-        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels",
+        let app = launch("-resetFavorites", "-chsResetModels",
                          "-networkKillSwitch", "-chsFitOnly", "chs-victoria,chs-race-passage",
                          "-chsFailOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
@@ -88,7 +88,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // queue is built from the ranking anchor. Without an explicit fix the
         // anchor is whatever station the previous test opened, which decides
         // whether Victoria is in the download set at all.
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
         // The visible card is an icon and two words (#93), but the action that
         // makes progress possible still has to reach VoiceOver.
@@ -110,7 +110,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
     // The seeded reference renders Malibu's shape-only path without live IWLS.
     func testM46MalibuDerivedGateSeededOffline() throws {
-        let app = launch("-seedGate", "-networkKillSwitch",
+        let app = launch("-networkKillSwitch",
                          "-scrubTrace", "\(shotDir)/malibu-scrub-\(UUID().uuidString).log",
                          "-seedTideModel", "chs-point-atkinson")
 
@@ -176,7 +176,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// to be visible, or a sailor cannot tell whether the map is ready before
     /// leaving signal.
     func testChartPackCardShowsStateAndOffersRefresh() throws {
-        let app = launch("-seedGate", "-connectivityOnline",
+        let app = launch("-connectivityOnline",
                          "-fixLat", "48.406", "-fixLon", "-122.643")
         openDownloads(app)
         // The state line is the card: a VStack identifier does not surface as
@@ -191,7 +191,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     }
 
     func testDownloadsRowOpensDetail() throws {
-        let app = launch("-seedGate", "-chsResetModels",
+        let app = launch("-chsResetModels",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
         openDownloads(app)
@@ -228,7 +228,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// the very deferral this test seeds. It failed on every iPad run for a
     /// week reading "Waiting · next" where it wanted "Retrying in".
     func testTappingADeferredRowOpensTheStation() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-chsResetModels", "-networkKillSwitch",
                          "-connectivityOnline", "-chsDeferOnly", "chs-selkirk-water",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
@@ -249,7 +249,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else {
             throw XCTSkip("iPad Downloads sheet clipping")
         }
-        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-resetFavorites", "-chsResetModels", "-networkKillSwitch",
                          "-connectivityOnline", "-chsDeferOnly", "chs-selkirk-water",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openDownloads(app)
@@ -272,7 +272,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     }
 
     func testRetryNowAppearsWhileSomethingIsDeferred() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-chsResetModels", "-networkKillSwitch",
                          "-connectivityOnline", "-chsDeferOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
@@ -299,7 +299,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     func testFarFromCanadaDownloadsNothing() throws {
         // Favorites intentionally download regardless of distance; earlier
         // tests can leave a Canadian favorite on this simulator.
-        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
+        let app = launch("-resetFavorites", "-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "42.3601", "-fixLon", "-71.0589")  // Boston
 
         openDownloads(app)
@@ -318,7 +318,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// same screen as Friday Harbor.
     func testM53UsEastCoastStationRendersACurve() throws {
         // Airplane mode: whatever renders here is bundled, not fetched.
-        let app = launch("-seedGate", "-networkKillSwitch")
+        let app = launch("-networkKillSwitch")
 
         openSearch(app, "boston")
         pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
@@ -346,7 +346,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// A Canadian station outside the auto-fit set stays visible and searchable.
     /// Held offline so the card explains why no download is available.
     func testM53CanadianStationOnDemand() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
+        let app = launch("-chsResetModels", "-networkKillSwitch")
 
         openSearch(app, "halifax")
         let halifax = app.staticTexts["Halifax"].firstMatch
@@ -401,7 +401,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // real window for this same gate. Passing by test ordering is not
         // passing. (The reset runs first — the seed hook touches
         // ChsFitService.shared before seeding, precisely for this.)
-        let app = launch("-seedGate", "-chsResetModels",
+        let app = launch("-chsResetModels",
                          "-seedOnlineWindow", "chs-sechelt-rapids",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
@@ -450,7 +450,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// back to a week the app holds (#67 item 2), so the navigation back button
     /// is not the only way off this screen.
     func testOnlineGatePagedBeyondItsWindowOffline() throws {
-        let app = launch("-seedGate", "-chsResetModels",
+        let app = launch("-chsResetModels",
                          "-seedOnlineWindow", "chs-sechelt-rapids",
                          "-networkKillSwitch",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
@@ -518,7 +518,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// which this test's very first strip assertion catches; and paging into
     /// the far block must render from disk, which is the multi-block payoff.
     func testOnlineGatePagesBetweenSeededBlocksOffline() throws {
-        let app = launch("-seedGate", "-chsResetModels",
+        let app = launch("-chsResetModels",
                          "-seedOnlineWindow", "chs-sechelt-rapids",
                          "-seedOnlineFarWindow", "chs-sechelt-rapids",
                          "-networkKillSwitch",

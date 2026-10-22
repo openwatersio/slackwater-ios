@@ -14,7 +14,7 @@ final class RangeSheetTests: ScreenshotTestCase {
     /// bounds, so all three sections apply; before this feature its Range tile
     /// was inert.
     func testTheRangeTileOpensASheetWithAllThreeSections() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         // The nested eyebrow is also named Range. Target the actionable tile,
         // which appears only once its sheet is available.
@@ -45,7 +45,7 @@ final class RangeSheetTests: ScreenshotTestCase {
     /// Portland is a station that HAS the annual constituent. Gating the year
     /// on Sa/Ssa hid a stronger signal than it showed.
     func testAStationWithoutBoundsKeepsEverythingButTheAbsoluteSection() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         // Chignik rather than the nearer Winterport: Winterport also has a
         // current station on the Penobscot, and the bare name matches that row
         // first, opening a page with a Next max tile and no Range tile at all.
@@ -73,7 +73,7 @@ final class RangeSheetTests: ScreenshotTestCase {
     /// caption that names the next bigger swing moves the scrubber to it and
     /// closes the sheet — the same contract the Moon sheet's facts keep.
     func testTappingTheNextBiggerSwingMovesTheScrubber() throws {
-        let app = launch("-seedGate")
+        let app = launch()
         openFridayHarbor(app)
         let lead = leadReading(app)
         XCTAssert(lead.appears(within: 10), "no lead reading")

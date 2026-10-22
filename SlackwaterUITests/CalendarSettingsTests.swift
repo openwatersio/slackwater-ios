@@ -23,7 +23,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     private let settle: TimeInterval = 60
 
     func testTheCalendarSectionListsSavedStations() {
-        let app = launch("-seedGate", "-seedFavorites", "\(tide),\(current)")
+        let app = launch("-seedFavorites", "\(tide),\(current)")
         openCalendarSettings(app)
 
         XCTAssert(app.switches["calendar-station-\(tide)"].appears(within: 5))
@@ -31,14 +31,14 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     }
 
     func testAStationWithNoSavedStationsExplainsItself() {
-        let app = launch("-seedGate", "-resetFavorites")
+        let app = launch("-resetFavorites")
         openCalendarSettings(app)
 
         XCTAssert(app.staticTexts["calendar-empty"].appears(within: 5))
     }
 
     func testAFreeUsersToggleOpensTheTierSheet() {
-        let app = launch("-seedGate", "-resetCalendars", "-seedFavorites", "\(tide),\(current)")
+        let app = launch("-resetCalendars", "-seedFavorites", "\(tide),\(current)")
         openCalendarSettings(app)
         let tideSwitch = app.switches["calendar-station-\(tide)"]
         tideSwitch.tap()
@@ -74,7 +74,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     /// user reading the cost first). Dismissing leaves the toggle exactly where it was;
     /// confirming turns it off.
     func testTurningAStationOffAsksFirst() {
-        let app = launch("-seedGate", "-seedPremium", "-resetCalendars", "-seedFavorites", tide)
+        let app = launch("-seedPremium", "-resetCalendars", "-seedFavorites", tide)
         openCalendarSettings(app)
         let toggle = app.switches["calendar-station-\(tide)"]
         toggle.tap()

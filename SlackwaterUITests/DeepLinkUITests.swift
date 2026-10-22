@@ -1,9 +1,9 @@
 // Slackwater — GPL v3. The widget deep link's RECEIVING half (#167).
 // DeepLinkTests proves the URL a widget emits round-trips through
 // `url.pathComponents`; nothing proved the app ACTS on it. The handler sits on
-// a view (`StationListView`), not on the scene, so whether it fires at all
-// depends on what is on screen when the URL lands — which is why the first-run
-// gate gets its own case here.
+// a view (`StationListView`), not on the scene, and on a first run it races
+// that view's own tour push — which is why the first run gets its own case
+// here.
 //
 // Scope is the receiving half on purpose: driving a real home-screen widget
 // means automating the widget gallery, and the emit side is already covered by
@@ -14,6 +14,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
     /// "noaa/9449880" percent-encoded exactly as `deepLink(forStationID:)`
     /// encodes it — the "/"-bearing shape, which is every id but CHS.
     private let fridayHarbor = URL(string: "slackwater://station/noaa%2F9449880")!
+    private let seattle = URL(string: "slackwater://station/noaa%2F9447130")!
     private let removedStation = URL(string: "slackwater://station/chs-north-galiano")!
 
     /// `system.open` routes through SpringBoard, which asks before handing a
@@ -33,10 +34,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(args)
         app.launch()
-        let firstScreen = args.contains("-resetGate")
-            ? app.staticTexts["Tide and Current predictions nearby."].firstMatch
-            : stationList(app)
-        XCTAssert(firstScreen.appears(within: 10),
+        XCTAssert(stationList(app).appears(within: 10),
                   "app did not finish launching before the deep link")
         app.terminate()
         return app
@@ -50,24 +48,38 @@ final class DeepLinkUITests: ScreenshotTestCase {
                   "\(message) — landed on a detail, but not this station's")
     }
 
-    /// The reported case: a user past the first-run gate taps a home widget.
+    /// The reported case: a returning user taps a home widget.
     func testDeepLinkColdOpensTheStationDetail() {
-        let app = primeThenTerminate("-seedGate")
+        let app = primeThenTerminate()
         openDeepLink(fridayHarbor)
         assertStationDetail(app, "widget deep link opened the list, not the station detail")
     }
 
-    /// A widget can be added from the gallery before the app is ever opened, so
-    /// the URL can arrive while `RootView` is still showing `GateView` — and
-    /// `.onOpenURL` lives inside `StationListView`, which does not exist yet.
-    func testDeepLinkColdOpensTheStationDetailBeforeTheGateIsAnswered() {
-        let app = primeThenTerminate("-resetGate")
-        openDeepLink(fridayHarbor)
-        assertStationDetail(app, "deep link was dropped on the first-run gate")
+    /// A first run cold-launched by a link: the list's first appear pushes
+    /// the tour station, and SwiftUI does not order that against the link.
+    /// The prime launch begins the tour on Friday Harbor and is killed before
+    /// it finishes, so the cold launch arms it again. Whichever lands second,
+    /// the user ends on the linked station, with the tour there.
+    func testFirstRunDeepLinkWinsOverTheTourStation() {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-resetTour", "-locDenied"])
+            .filter { $0 != "-seedTour" }
+        app.launch()
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15),
+                  "the prime launch did not begin the tour")
+        app.terminate()
+
+        openDeepLink(seattle)
+        XCTAssert(app.wait(for: .runningForeground, timeout: 20),
+                  "the deep link did not launch the app")
+        XCTAssert(app.staticTexts["Seattle"].firstMatch.appears(within: 20),
+                  "the tour station replaced the linked one")
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15),
+                  "the tour did not follow the link to its station")
     }
 
     func testDeepLinkToRemovedStationShowsItsExplanation() {
-        let app = primeThenTerminate("-seedGate", "-resetFavorites", "-resetRecents")
+        let app = primeThenTerminate("-resetFavorites", "-resetRecents")
         openDeepLink(removedStation)
 
         XCTAssert(app.wait(for: .runningForeground, timeout: 20),
@@ -80,7 +92,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
 
     func testDeepLinkToRemovedStationClosesSearch() {
         let app = XCUIApplication()
-        app.launchArguments = testArguments(["-seedGate", "-resetFavorites", "-resetRecents"])
+        app.launchArguments = testArguments(["-resetFavorites", "-resetRecents"])
         app.launch()
         openSearch(app, "Friday")
 

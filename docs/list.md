@@ -20,7 +20,7 @@ The list contract covers:
 6. the download strip and footer; and
 7. navigation from a card, a deep link, or first run into a detail.
 
-The map is a separate surface reached from the list. This document covers only the handoff between the two (§10). The first-run gate and the coach-mark tour are separate surfaces; §11 covers what they hand to the list.
+The map is a separate surface reached from the list. This document covers only the handoff between the two (§10). The coach-mark tour is a separate surface; §11 covers how first run reaches it from the list.
 
 ## 2. Product idea
 
@@ -65,7 +65,7 @@ The slot shows exactly one of four states. It cross-fades (0.25 s ease on iOS) w
 | State | Slot content | Near Me heading and count |
 |---|---|---|
 | Authorized, with a fix | My Location tile and one or two hero cards | "Near Me", 4 cards |
-| Authorized, no fix yet | My Location tile with a spinner and "Finding your location…", at least 96 units tall | 5 cards |
+| Authorized, no fix yet; or the launch prompt is up | My Location tile with a spinner and "Finding your location…", at least 96 units tall | 5 cards |
 | Denied or restricted | My Location heading and attention-amber card: title "Location unavailable", action "Go to Settings" opening the app's system settings | 5 cards |
 | Not determined | My Location heading and go-green card: title "Location unavailable", action "Find tides near me" raising the system prompt | 5 cards |
 
@@ -284,7 +284,7 @@ Opening a Canadian station moves its download to the front of the queue. At regu
 
 An alert notification opens through the same path.
 
-A link to a station that is no longer published resets navigation, closes search, and shows the Station unavailable section at the top of the list. A link to an id the app has never known does nothing. A link that arrives before the first-run gate is answered marks the gate seen and opens once the list first appears.
+A link to a station that is no longer published resets navigation, closes search, and shows the Station unavailable section at the top of the list. A link to an id the app has never known does nothing. On a first run, a link wins over the tour's station whichever arrives first, and the tour moves to the linked station (§11).
 
 Neither the unavailable section nor the removed-station card says *why* the station is gone, and that is deliberate. The app cannot tell a decommissioned gauge from a renumbered one from a publisher's outage, and a guess printed as a reason is worse than no reason. Do not add an explanation back.
 
@@ -316,9 +316,9 @@ The map's preview panel uses the station card (§6) without a distance; tapping 
 
 ## 11. First run
 
-The first-run gate offers "Find tides near me", which asks for location, and "Search for a place", which opens the list straight into search. Either answer, including a denial, closes the gate for good.
+The app opens straight to the list. There is no gate screen. The list's first appearance asks for location once, and never again on a later launch; the Not determined card (§4) is the way back to the prompt after that.
 
-After the gate, if the coach-mark tour has not been seen and no search handoff or deep link is pending, the list's first appearance opens the nearest bundled NOAA tide station within 150 km of the anchor, or Friday Harbor (`noaa/9449880`) when none is that close. The tour draws on that detail, not on the list.
+If the coach-mark tour has not been seen and no deep link has opened a station, that same first appearance opens the nearest bundled NOAA tide station within 150 km of the anchor, or Friday Harbor (`noaa/9449880`) when none is that close. On a true first launch there is no fix yet, so it is Friday Harbor, with the system location prompt over it. The tour draws on that detail, not on the list. While the prompt is up, the My Location slot shows its locating state; once a fix arrives, the list re-ranks around it.
 
 ## 12. Accessibility
 
@@ -367,7 +367,7 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 ### Location
 
 5. **Denied:** My Location shows the amber card and names the last-opened place used for distances; "Go to Settings" opens the app's settings, and Near Me shows 5 cards ranked from that place.
-6. **Not determined:** The slot shows the green card; "Find tides near me" raises the system prompt.
+6. **Not determined:** With no ask in flight, the slot shows the green card; "Find tides near me" raises the system prompt.
 7. **Authorized, no fix:** The slot shows "Finding your location…" and Near Me shows 5 cards.
 8. **First launch, no fix:** My Location says "Showing places near Chesapeake Bay"; Near Me keeps that proper-name heading in every language and ranks from Annapolis.
 9. **Second hero:** A fix within 20 km of both a tide and a current station shows both as heroes; tapping one opens only that one.
