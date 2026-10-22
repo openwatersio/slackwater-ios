@@ -98,6 +98,16 @@ import notify
         return XCTWaiter().wait(for: [met], timeout: scaled(timeout)) == .completed
     }
 
+    /// Polls `condition` on this machine's clock, for a state no one element's predicate can express.
+    func eventually(within timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date.now.addingTimeInterval(scaled(timeout))
+        while !condition() {
+            guard Date.now < deadline else { return false }
+            usleep(250_000)
+        }
+        return true
+    }
+
     func openSearch(_ app: XCUIApplication, _ text: String) {
         let fab = app.buttons["Search"].firstMatch
         XCTAssert(fab.appears(within: 10), "search FAB did not appear")
@@ -260,33 +270,62 @@ import notify
     }
 
     /// Use the target's container because the iPad sidebar stays mounted beside other scroll views.
+    ///
+    /// Locates the target through `snapshot()`, which comes back empty for an
+    /// element that has left the tree, where a property read fails the test
+    /// outright, as it does for a row re-sorted out of a lazy stack (#786).
+    /// `isHittable` is the one live read, taken only once the snapshot puts
+    /// the target in view. The container is read through its properties: a
+    /// snapshot would copy its whole subtree on every check.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var container = listContainer(app)
         let reachable = {
+            guard let target = try? el.snapshot(), !target.frame.isEmpty, container.exists else { return false }
             var bounds = container.frame.intersection(app.windows.firstMatch.frame)
             // Reserve a bottom margin for floating controls; this does not measure their safe-area-adjusted frames.
             if container.identifier == "station-list" { bounds.size.height -= 80 }
-            return el.exists && !el.frame.isEmpty && bounds.contains(el.frame) && el.isHittable
+            return bounds.contains(target.frame) && el.isHittable
         }
+        var inReach = false, pinned = false
         for attempt in 0...10 {
-            if el.exists {
-                let identifier = el.identifier.isEmpty ? el.label : el.identifier
-                container = [app.tables, app.collectionViews, app.scrollViews]
-                    .lazy.map { $0.containing(el.elementType, identifier: identifier).firstMatch }
-                    .first { $0.exists } ?? container
+            let target = try? el.snapshot()
+            if !pinned, let target, let found = scrollContainer(holding: target, in: app) {
+                (container, pinned) = found
             }
-            if reachable() { break }
+            if reachable() {
+                _ = settled { (try? el.snapshot())?.frame }
+                inReach = reachable()
+                if inReach { break }
+            }
             if attempt < 10 {
+                if !container.exists { container = listContainer(app) }
                 // A swipe can carry a short row past the sheet's top edge.
-                if el.exists, !el.frame.isEmpty, el.frame.minY < container.frame.minY {
+                if let target, !target.frame.isEmpty, target.frame.minY < container.frame.minY {
                     container.swipeDown(velocity: .slow)
                 } else {
                     container.swipeUp(velocity: .slow)
                 }
             }
         }
-        settleLayout(el)
-        XCTAssert(reachable(), "could not scroll element within reach: target \(el.exists ? "\(el.identifier) \(el.frame)" : "missing"), container \(container.identifier) \(container.frame)")
+        if inReach { return }
+        _ = settled { (try? el.snapshot())?.frame }
+        let found = (try? el.snapshot()).map { "\($0.identifier) \($0.frame)" } ?? "missing"
+        let box = container.exists ? "\(container.identifier) \(container.frame)" : "missing"
+        XCTAssert(reachable(), "could not scroll element within reach: target \(found), container \(box)")
+    }
+
+    /// The scroll view around `target`, queried by its own identifier when it
+    /// has one (`pinned`): a `containing` query stops resolving once the target leaves.
+    private func scrollContainer(holding target: any XCUIElementSnapshot,
+                                 in app: XCUIApplication) -> (XCUIElement, pinned: Bool)? {
+        let identifier = target.identifier.isEmpty ? target.label : target.identifier
+        for query in [app.tables, app.collectionViews, app.scrollViews] {
+            let match = query.containing(target.elementType, identifier: identifier).firstMatch
+            guard match.exists else { continue }
+            let name = match.identifier
+            return name.isEmpty ? (match, false) : (query.matching(identifier: name).firstMatch, true)
+        }
+        return nil
     }
 
     /// Pan the timeline strip under its fixed centerline (drag left = later).
