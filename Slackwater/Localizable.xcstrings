@@ -43407,19 +43407,19 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angiv højden igen: dette sted måles nu fra en anden søkortreference."
+            "value" : "Angiv højden igen: højderne her måles nu fra en anden søkortreference."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Höhe neu festlegen: Dieser Ort wird jetzt von einem anderen Seekartennull aus gemessen."
+            "value" : "Höhe neu festlegen: Die Höhen an diesem Ort beziehen sich jetzt auf ein anderes Seekartennull."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a fijar la altura: este lugar se mide ahora desde otro cero hidrográfico."
+            "value" : "Vuelve a fijar la altura: las alturas de este lugar se miden ahora desde otro cero hidrográfico."
           }
         },
         "fi" : {
@@ -43431,67 +43431,67 @@
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réglez de nouveau la hauteur : cet endroit est maintenant mesuré à partir d’un autre zéro des cartes."
+            "value" : "Réglez de nouveau la hauteur : les hauteurs à cet endroit sont maintenant mesurées à partir d’un autre zéro des cartes."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Socraigh an airde arís: tomhaistear an áit seo anois ó thagra cairte eile."
+            "value" : "Socraigh an airde arís: tomhaistear na hairdí anseo anois ó thagra cairte eile."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suidhich an àirde a-rithist: thathar a’ tomhas an àite seo a-nis o bhun-ìre cairte eile."
+            "value" : "Suidhich an àirde a-rithist: thathar a’ tomhas nan àirdean an seo a-nis o bhun-ìre cairte eile."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imposta di nuovo l’altezza: questo luogo ora si misura da un altro zero idrografico."
+            "value" : "Imposta di nuovo l’altezza: le altezze in questo luogo si misurano ora rispetto a un altro zero idrografico."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "高さを設定し直してください。この場所は別の海図基準面から測るようになりました。"
+            "value" : "高さを設定し直してください。この場所では、潮位の基準となる海図基準面が変わりました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "높이를 다시 설정하세요. 이 장소는 이제 다른 해도 기준면에서 측정합니다."
+            "value" : "높이를 다시 설정하세요. 이 장소의 조위는 이제 다른 해도 기준면을 기준으로 표시됩니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angi høyden på nytt: dette stedet måles nå fra et annet sjøkartnull."
+            "value" : "Angi høyden på nytt: høydene på dette stedet måles nå fra et annet sjøkartnull."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stel de hoogte opnieuw in: deze plek wordt nu gemeten vanaf een andere kaartnul."
+            "value" : "Stel de hoogte opnieuw in: de hoogten op deze plek worden nu gemeten vanaf een andere kaartnul."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defina a altura de novo: este local agora é medido a partir de outro nível de redução."
+            "value" : "Defina a altura de novo: as alturas neste local agora são medidas a partir de outro nível de redução."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defina a altura de novo: este local é agora medido a partir de outro zero hidrográfico."
+            "value" : "Defina a altura de novo: as alturas neste local são agora medidas a partir de outro zero hidrográfico."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ange höjden igen: den här platsen mäts nu från en annan sjökortsreferensnivå."
+            "value" : "Ange höjden igen: höjderna på den här platsen mäts nu från en annan sjökortsreferensnivå."
           }
         }
       }
