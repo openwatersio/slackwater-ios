@@ -536,17 +536,20 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // date directly instead of a grid index: leading-blank/spillover
         // cells shift what a fixed `boundBy` index means across month
         // layouts. Add calendar days so DST does not shift the target date.
-        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45,
-                                                           to: Self.fixtureDate)!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Vancouver")!  // Sechelt Rapids
+        let target = calendar.date(byAdding: .day, value: 45, to: Self.fixtureDate)!
         let targetLabelFormatter = DateFormatter()
         targetLabelFormatter.dateFormat = "EEEE, MMMM d"   // observed cell label shape:
                                                             // "Sunday, October 11" (no year)
+        targetLabelFormatter.timeZone = calendar.timeZone
         let targetLabel = targetLabelFormatter.string(from: target)
 
         app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
+        // CONTAINS, not ==: on the real date the target falls on, the cell reads "Today, …".
         let targetCell = app.collectionViews.buttons.matching(
-            NSPredicate(format: "label == %@", targetLabel)).firstMatch
+            NSPredicate(format: "label CONTAINS[c] %@", targetLabel)).firstMatch
         // `.exists` is a no-wait snapshot; taken right after `.tap()` it races
         // the graphical calendar's month-transition animation and can read
         // false on a month the target is already in — the loop then taps past

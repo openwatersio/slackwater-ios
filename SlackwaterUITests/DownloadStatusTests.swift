@@ -109,10 +109,17 @@ final class DownloadStatusTests: ScreenshotTestCase {
             row.buttons["download-update-chs-sechelt-rapids"].tap()
             XCTAssert(app.descendants(matching: .any)["downloads-manager"].firstMatch.exists,
                       "Updating a download must leave Downloads open")
-            scrollTo(row, in: app)
-            XCTAssert(row.staticTexts.matching(NSPredicate(
-                format: "label BEGINSWITH 'Available offline for'")).firstMatch.appears(within: 10),
-                      "Update now must replace the expired download with fresh coverage")
+            // Under -networkKillSwitch nothing else can land, so the fresh row sorts
+            // last in the lazy list, which draws it only once scrolled to.
+            let fresh = row.staticTexts.matching(NSPredicate(
+                format: "label BEGINSWITH 'Available offline for'")).firstMatch
+            let list = app.scrollViews["downloads-manager"]
+            XCTAssert(eventually(within: 10) {
+                if fresh.exists { return true }
+                list.swipeUp(velocity: .slow)
+                return false
+            }, "Update now must replace the expired download with fresh coverage")
+            scrollTo(fresh, in: app)
         }
     }
 }
