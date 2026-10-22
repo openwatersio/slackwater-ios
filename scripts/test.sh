@@ -192,7 +192,7 @@ diagnostics=never
 # gets the lot.
 #
 # SLACKWATER_SKIP is what makes the split safe to leave alone: the last shard
-# names no tests of its own, it skips the other three, so a class added later
+# names no tests of its own, it skips the other four, so a class added later
 # runs there rather than running nowhere and reporting green.
 [[ -n "${SLACKWATER_ONLY:-}" ]] && for t in "${(@s/,/)SLACKWATER_ONLY}"; do selection+=("-only-testing:$t"); done
 [[ -n "${SLACKWATER_SKIP:-}" ]] && for t in "${(@s/,/)SLACKWATER_SKIP}"; do selection+=("-skip-testing:$t"); done
