@@ -45509,7 +45509,7 @@
       }
     },
     "Slack ends" : {
-      "comment" : "Widget label above a live slack-window countdown.",
+      "comment" : "Widget countdown label and Siri detail prefix before the observed local closing time of a slack window.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -49991,406 +49991,382 @@
         }
       }
     },
-    "The next high tide at %@ is %@, at %@ %@." : {
-      "comment" : "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.",
+    "The next high tide at %@ is in about %@." : {
+      "comment" : "Spoken Siri answer. Values are place name and a localized duration such as 6 hours.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Næste højvande ved %@ er %@, på %@ %@."
+            "value" : "Næste højvande ved %@ er om cirka %@."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das nächste Hochwasser bei %1$@ ist %2$@, mit %3$@ %4$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The next high tide at %1$@ is %2$@, at %3$@ %4$@."
+            "value" : "Das nächste Hochwasser bei %@ ist in etwa %@."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La próxima pleamar en %1$@ es el %2$@, a las %3$@, con %4$@."
+            "value" : "La próxima pleamar en %@ es dentro de aproximadamente %@."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseman %@ seuraava ylävesi on %@, korkeus %@ %@."
+            "value" : "Seuraava nousuvesi paikassa %@: odotusaikaa noin %@."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prochaine marée haute à %1$@ est prévue %2$@ et atteindra %3$@ %4$@."
+            "value" : "La prochaine marée haute à %@ est dans environ %@."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beidh an chéad lán mara eile ag %1$@ %2$@, airde %3$@ %4$@."
+            "value" : "Beidh an chéad lán mara eile ag %@ i gceann thart ar %@."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bidh an ath mhuir-làn aig %1$@ %2$@, aig %3$@ %4$@."
+            "value" : "Bidh an ath làn-mara aig %@ ann an timcheall air %@."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prossima alta marea a %1$@ è %2$@, con un’altezza di %3$@ %4$@."
+            "value" : "La prossima alta marea a %@ è tra circa %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@の次の満潮は%2$@で、潮位は%3$@ %4$@です。"
+            "value" : "%@の次の満潮は約%@後です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@의 다음 만조는 %@이며 높이는 %@ %@입니다."
+            "value" : "%@의 다음 만조는 약 %@ 후입니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neste høyvann ved %1$@ er %2$@, kl. %3$@ %4$@."
+            "value" : "Neste høyvann ved %@ er om omtrent %@."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Het volgende hoogwater bij %1$@ is %2$@, met een hoogte van %3$@ %4$@."
+            "value" : "Het volgende hoogwater bij %@ is over ongeveer %@."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima preamar em %1$@ é %2$@, às %3$@ %4$@."
+            "value" : "A próxima preamar em %@ será daqui a cerca de %@."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima preia-mar em %1$@ é %2$@, com uma altura de %3$@ %4$@."
+            "value" : "A próxima preia-mar em %@ é daqui a cerca de %@."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nästa högvatten vid %@ är %@, på %@ %@."
+            "value" : "Nästa högvatten vid %@ är om ungefär %@."
           }
         }
       }
     },
-    "The next low tide at %@ is %@, at %@ %@." : {
-      "comment" : "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.",
+    "The next low tide at %@ is in about %@." : {
+      "comment" : "Spoken Siri answer. Values are place name and a localized duration such as 25 minutes.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Næste lavvande ved %@ er %@, på %@ %@."
+            "value" : "Næste lavvande ved %@ er om cirka %@."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das nächste Niedrigwasser bei %1$@ ist %2$@, mit %3$@ %4$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The next low tide at %1$@ is %2$@, at %3$@ %4$@."
+            "value" : "Das nächste Niedrigwasser bei %@ ist in etwa %@."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La próxima bajamar en %1$@ es el %2$@, a las %3$@, con %4$@."
+            "value" : "La próxima bajamar en %@ es dentro de aproximadamente %@."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseman %@ seuraava alavesi on %@, korkeus %@ %@."
+            "value" : "Seuraava laskuvesi paikassa %@: odotusaikaa noin %@."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prochaine marée basse à %1$@ est prévue %2$@ et atteindra %3$@ %4$@."
+            "value" : "La prochaine marée basse à %@ est dans environ %@."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beidh an chéad lag trá eile ag %1$@ %2$@, airde %3$@ %4$@."
+            "value" : "Beidh an chéad trá mhara eile ag %@ i gceann thart ar %@."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bidh an ath mhuir-tràigh aig %1$@ %2$@, aig %3$@ %4$@."
+            "value" : "Bidh an ath thràigh aig %@ ann an timcheall air %@."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prossima bassa marea a %1$@ è %2$@, con un’altezza di %3$@ %4$@."
+            "value" : "La prossima bassa marea a %@ è tra circa %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@の次の干潮は%2$@で、潮位は%3$@ %4$@です。"
+            "value" : "%@の次の干潮は約%@後です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@의 다음 간조는 %@이며 높이는 %@ %@입니다."
+            "value" : "%@의 다음 간조는 약 %@ 후입니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neste lavvann ved %1$@ er %2$@, kl. %3$@ %4$@."
+            "value" : "Neste lavvann ved %@ er om omtrent %@."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Het volgende laagwater bij %1$@ is %2$@, met een hoogte van %3$@ %4$@."
+            "value" : "Het volgende laagwater bij %@ is over ongeveer %@."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima baixa-mar em %1$@ é %2$@, às %3$@ %4$@."
+            "value" : "A próxima baixa-mar em %@ será daqui a cerca de %@."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima baixa-mar em %1$@ é %2$@, com uma altura de %3$@ %4$@."
+            "value" : "A próxima baixa-mar em %@ é daqui a cerca de %@."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nästa lågvatten vid %@ är %@, på %@ %@."
+            "value" : "Nästa lågvatten vid %@ är om ungefär %@."
           }
         }
       }
     },
-    "The next slack window at %@ is from %@ to %@ and is open now." : {
-      "comment" : "Spoken Siri slack-window answer. Values are station name and localized start and end times.",
+    "The slack window at %@ is open now, with about %@ remaining." : {
+      "comment" : "Spoken Siri answer for an open current window. Values are place name and localized time remaining.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Næste strømstille periode ved %@ er fra %@ til %@ og er åben nu."
+            "value" : "Den strømstille periode ved %@ er i gang, med cirka %@ tilbage."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das nächste Stauwasserfenster bei %1$@ ist von %2$@ bis %3$@ und ist jetzt offen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The next slack window at %1$@ is from %2$@ to %3$@ and is open now."
+            "value" : "Das Stauwasserfenster bei %@ ist gerade offen. Es bleiben etwa %@."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La próxima ventana de estoa en %1$@ va de %2$@ a %3$@ y está abierta ahora."
+            "value" : "La ventana de estoa en %@ está abierta, con aproximadamente %@ por delante."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseman %@ seuraava heikon virtauksen jakso on %@–%@ ja on käynnissä nyt."
+            "value" : "Heikon virtauksen jakso paikassa %@ on käynnissä. Aikaa on jäljellä noin %@."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prochaine fenêtre d’étale à %1$@ s’étend de %2$@ à %3$@ et est ouverte maintenant."
+            "value" : "La fenêtre d’étale à %@ est ouverte. Il reste environ %@."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tá an chéad tréimhse fáfaill eile ag %1$@ ó %2$@ go %3$@ agus tá sí ar siúl anois."
+            "value" : "Tá an tréimhse fáfaill ag %@ oscailte anois, agus thart ar %@ fágtha."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tha an ath thràth marbh-shruth aig %1$@ o %2$@ gu %3$@ agus tha e fosgailte an-dràsta."
+            "value" : "Tha an tràth marbh-shruth aig %@ fosgailte an-dràsta, le timcheall air %@ air fhàgail."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prossima finestra di stanca a %1$@ va dalle %2$@ alle %3$@ ed è già aperta."
+            "value" : "La finestra di stanca a %@ è aperta. Restano circa %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@の次の潮止まり時間帯は%2$@から%3$@までで、現在その時間帯です。"
+            "value" : "%@は現在、潮止まり時間帯です。残り約%@です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@의 다음 정조 시간대는 %@부터 %@까지이며 현재 진행 중입니다."
+            "value" : "%@의 정조 시간대는 현재 진행 중이며, 약 %@ 남았습니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neste strømstillevindu ved %1$@ er fra %2$@ til %3$@ og er åpent nå."
+            "value" : "Strømstillevinduet ved %@ er åpent nå, med omtrent %@ igjen."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Het volgende kenteringsvenster bij %1$@ is van %2$@ tot %3$@ en is nu open."
+            "value" : "Het kenteringsvenster bij %@ is nu open, met nog ongeveer %@ te gaan."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima janela de estofo em %1$@ vai de %2$@ a %3$@ e já está aberta."
+            "value" : "A janela de estofo em %@ está aberta. Restam cerca de %@."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O próximo período de estofo em %1$@ vai de %2$@ a %3$@ e já está aberto."
+            "value" : "O período de estofo em %@ está em curso. Faltam cerca de %@ para terminar."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nästa strömstilla period vid %@ är från %@ till %@ och pågår nu."
+            "value" : "Den strömstilla perioden vid %@ pågår nu, med ungefär %@ kvar."
           }
         }
       }
     },
-    "The next slack window at %@ is from %@ to %@, and starts %@." : {
-      "comment" : "Spoken Siri slack-window answer. Values are station name, localized start and end times, and a relative start time.",
+    "The next slack window at %@ starts in about %@ and lasts about %@." : {
+      "comment" : "Spoken Siri answer. Values are place name, localized wait until the window opens, and localized window duration.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Næste strømstille periode ved %@ er fra %@ til %@ og begynder %@."
+            "value" : "Næste strømstille periode ved %@ begynder om cirka %@ og varer cirka %@."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das nächste Stauwasserfenster bei %1$@ ist von %2$@ bis %3$@ und beginnt %4$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The next slack window at %1$@ is from %2$@ to %3$@, and starts %4$@."
+            "value" : "Das nächste Stauwasserfenster bei %@ beginnt in etwa %@ und dauert etwa %@."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La próxima ventana de estoa en %1$@ va de %2$@ a %3$@ y comienza %4$@."
+            "value" : "La próxima ventana de estoa en %@ comienza dentro de aproximadamente %@ y dura aproximadamente %@."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseman %@ seuraava heikon virtauksen jakso on %@–%@ ja alkaa %@."
+            "value" : "Seuraava heikon virtauksen jakso paikassa %@: alkuun noin %@, kesto noin %@."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prochaine fenêtre d’étale à %1$@ s’étend de %2$@ à %3$@ et commencera %4$@."
+            "value" : "La prochaine fenêtre d’étale à %@ commence dans environ %@ et dure environ %@."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beidh an chéad tréimhse fáfaill eile ag %1$@ ó %2$@ go %3$@, agus tosóidh sí %4$@."
+            "value" : "Tosóidh an chéad tréimhse fáfaill eile ag %@ i gceann thart ar %@ agus mairfidh sí thart ar %@."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tha an ath thràth marbh-shruth aig %1$@ o %2$@ gu %3$@, agus tòisichidh e %4$@."
+            "value" : "Tòisichidh an ath thràth marbh-shruth aig %@ ann an timcheall air %@ agus mairidh e timcheall air %@."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La prossima finestra di stanca a %1$@ va dalle %2$@ alle %3$@ e inizia %4$@."
+            "value" : "La prossima finestra di stanca a %@ inizia tra circa %@ e dura circa %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@の次の潮止まり時間帯は%2$@から%3$@までで、%4$@に始まります。"
+            "value" : "%@の次の潮止まり時間帯は約%@後に始まり、約%@続きます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@의 다음 정조 시간대는 %@부터 %@까지이며 %@에 시작합니다."
+            "value" : "%@의 다음 정조 시간대는 약 %@ 후에 시작하며 약 %@ 동안 이어집니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neste strømstillevindu ved %1$@ er fra %2$@ til %3$@ og starter %4$@."
+            "value" : "Neste strømstillevindu ved %@ starter om omtrent %@ og varer i omtrent %@."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Het volgende kenteringsvenster bij %1$@ is van %2$@ tot %3$@ en begint %4$@."
+            "value" : "Het volgende kenteringsvenster bij %@ begint over ongeveer %@ en duurt ongeveer %@."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A próxima janela de estofo em %1$@ vai de %2$@ a %3$@ e começa %4$@."
+            "value" : "A próxima janela de estofo em %@ começa daqui a cerca de %@ e dura cerca de %@."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O próximo período de estofo em %1$@ vai de %2$@ a %3$@ e começa %4$@."
+            "value" : "O próximo período de estofo em %@ começa daqui a cerca de %@ e dura cerca de %@."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nästa strömstilla period vid %@ är från %@ till %@ och börjar %@."
+            "value" : "Nästa strömstilla period vid %@ börjar om ungefär %@ och varar i ungefär %@."
           }
         }
       }
@@ -58941,6 +58917,386 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Licenser, erkännanden och integritet"
+          }
+        }
+      }
+    },
+    "Open Slackwater and allow location to find a nearby place." : {
+      "comment" : "Siri response when location is denied or no fix is available.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åbn Slackwater, og tillad adgang til din placering for at finde et sted i nærheden."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne Slackwater und erlaube den Standortzugriff, um einen Ort in der Nähe zu finden."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Slackwater y permite el acceso a tu ubicación para encontrar un lugar cercano."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avaa Slackwater ja salli sijainnin käyttö, jotta lähistöllä oleva paikka löytyy."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Slackwater et autorisez l’accès à votre position pour trouver un endroit à proximité."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oscail Slackwater agus ceadaigh rochtain ar do shuíomh chun áit in aice láimhe a aimsiú."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fosgail Slackwater agus ceadaich cothrom air d’ ionad gus àite faisg ort a lorg."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Slackwater e consenti l’accesso alla posizione per trovare un luogo vicino."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwaterを開いて位置情報へのアクセスを許可すると、近くの場所を探せます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가까운 장소를 찾으려면 Slackwater를 열고 위치 접근을 허용하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne Slackwater og tillat posisjonstilgang for å finne et sted i nærheten."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Slackwater en geef toegang tot je locatie om een plek in de buurt te vinden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Slackwater e permita o acesso à localização para encontrar um lugar próximo."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Slackwater e permita o acesso à localização para encontrar um local próximo."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppna Slackwater och tillåt platsåtkomst för att hitta en plats i närheten."
+          }
+        }
+      }
+    },
+    "The slack window at %@ is open now." : {
+      "comment" : "Spoken Siri answer when a current window is open and no closing crossing was observed.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den strømstille periode ved %@ er i gang."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Stauwasserfenster bei %@ ist gerade offen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La ventana de estoa en %@ está abierta."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heikon virtauksen jakso paikassa %@ on käynnissä."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La fenêtre d’étale à %@ est ouverte."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá an tréimhse fáfaill ag %@ oscailte anois."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha an tràth marbh-shruth aig %@ fosgailte an-dràsta."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La finestra di stanca a %@ è aperta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は現在、潮止まり時間帯です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 정조 시간대는 현재 진행 중입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstillevinduet ved %@ er åpent nå."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het kenteringsvenster bij %@ is nu open."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A janela de estofo em %@ está aberta."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O período de estofo em %@ está em curso."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den strömstilla perioden vid %@ pågår nu."
+          }
+        }
+      }
+    },
+    "The next slack window at %@ starts in about %@." : {
+      "comment" : "Spoken Siri answer when the window opening is known but no closing crossing was observed. Values are place name and localized wait.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Næste strømstille periode ved %@ begynder om cirka %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das nächste Stauwasserfenster bei %@ beginnt in etwa %@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La próxima ventana de estoa en %@ comienza dentro de aproximadamente %@."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuraava heikon virtauksen jakso paikassa %@: alkuun noin %@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La prochaine fenêtre d’étale à %@ commence dans environ %@."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tosóidh an chéad tréimhse fáfaill eile ag %@ i gceann thart ar %@."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tòisichidh an ath thràth marbh-shruth aig %@ ann an timcheall air %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La prossima finestra di stanca a %@ inizia tra circa %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の次の潮止まり時間帯は約%@後に始まります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 다음 정조 시간대는 약 %@ 후에 시작합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neste strømstillevindu ved %@ starter om omtrent %@."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het volgende kenteringsvenster bij %@ begint over ongeveer %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A próxima janela de estofo em %@ começa daqui a cerca de %@."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O próximo período de estofo em %@ começa daqui a cerca de %@."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nästa strömstilla period vid %@ börjar om ungefär %@."
+          }
+        }
+      }
+    },
+    "There's no slack window at %@ in the next 48 hours." : {
+      "comment" : "Spoken Siri answer when the selected current place has predictions but no slack window in the 48-hour search. Value is the place name.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der er ingen strømstille periode ved %@ i de næste 48 timer."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei %@ gibt es in den nächsten 48 Stunden kein Stauwasserfenster."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay ninguna ventana de estoa en %@ en las próximas 48 horas."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paikassa %@ ei ole heikon virtauksen jaksoa seuraavien 48 tunnin aikana."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n’y a pas de fenêtre d’étale à %@ dans les 48 prochaines heures."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níl aon tréimhse fáfaill ag %@ sna 48 uair an chloig atá romhainn."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chan eil tràth marbh-shruth aig %@ anns na 48 uairean a tha romhainn."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ci sono finestre di stanca a %@ nelle prossime 48 ore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@では、今後48時間以内に潮止まり時間帯はありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 정조 시간대는 앞으로 48시간 동안 없습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det er ikke noe strømstillevindu ved %@ de neste 48 timene."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er is de komende 48 uur geen kenteringsvenster bij %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há janela de estofo em %@ nas próximas 48 horas."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há período de estofo em %@ nas próximas 48 horas."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det finns ingen strömstilla period vid %@ under de närmaste 48 timmarna."
           }
         }
       }

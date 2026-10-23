@@ -70,13 +70,16 @@ import SlackwaterKit
         let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens)
 
         let found = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 2.0)
-        let siri = try XCTUnwrap(SlackWindowShortcutQuery.next(at: station, after: now))
+        let siriRecord = try XCTUnwrap(WidgetStationLoader.loadRecord(id: deception, at: now))
+        let siri = try XCTUnwrap(SlackWindowShortcutQuery.next(at: siriRecord, after: now))
 
         XCTAssertFalse(found.isEmpty)
         XCTAssertTrue(found.allSatisfy { $0.end != nil && !$0.noWindow })
-        // The Siri query samples from its own slack − 6 h; ours from the range − 6 h. The two
+        // Siri uses the widget curve’s grid; alerts start at the range − 6 h. The two
         // 10-minute grids interpolate the same crossing a little differently.
-        if siri.start >= now {
+        if siri.start < now {
+            XCTAssertGreaterThan(siri.end, now)
+        } else {
             XCTAssertEqual(try XCTUnwrap(found.first).event.timeIntervalSince1970,
                            siri.start.timeIntervalSince1970, accuracy: 120)
         }

@@ -91,6 +91,8 @@ extension TypeScaleTests {
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
         // See blind spot 2 above — "File.swift:declaringSymbol".
         let knownIndirections: Set<String> = [
+            // Siri details are rendered by TideShortcutSnippetView's monospaced Text.
+            "TideShortcuts.swift:next",
             // The card curve: the builders format extreme/axis strings whose
             // one renderer (the Canvas draw code) applies the mono trait.
             "StationCardGraph.swift:cardGraph",
@@ -177,7 +179,6 @@ extension TypeScaleTests {
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = [
-            "TideShortcuts.swift:spoken",
             // The strip's VoiceOver value: the lead in words.
             "TideDetailView.swift:spokenLead",
             "CurrentLead.swift:spoken",
