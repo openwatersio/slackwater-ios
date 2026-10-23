@@ -83,7 +83,7 @@ struct WidgetCard {
     let name: String
     let region: String
     let reading: ConditionsItem.Reading
-    let graph: StationCardGraph?
+    var graph: StationCardGraph?
     /// A derived gate's next slack, for its "Slack · time" line.
     let nextSlack: (time: Date, tz: TimeZone)?
     /// True when the region line should carry the location mark instead of
@@ -94,7 +94,8 @@ struct WidgetCard {
     /// not in a view body. Nil otherwise: no countdown, no "> 2 hrs".
     let countdownEnd: Date?
 
-    static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
+    static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil,
+                      through end: Date? = nil) -> WidgetCard {
         let imperial = heightUnits() != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let locationMark = stationNamePrefix != nil
@@ -103,11 +104,11 @@ struct WidgetCard {
             let state = r.cardState(at: now, station: station)
             return .init(name: r.name, region: r.region,
                          reading: .tide(state, imperial: imperial),
-                         graph: r.cardGraph(at: now, imperial: imperial, station: station), nextSlack: nil,
+                         graph: r.cardGraph(at: now, imperial: imperial, station: station, through: end), nextSlack: nil,
                          locationMark: locationMark, countdownEnd: nil)
         case .current(let r, let station):
             let state = r.cardState(at: now, station: station)
-            let graph = r.cardGraph(at: now, unit: speedUnit, station: station)
+            let graph = r.cardGraph(at: now, unit: speedUnit, station: station, through: end)
             // Inside a window the widget counts down to the closing (§15.3),
             // decided here at the entry date — not later, at render time.
             let inside = graph.windows.first { $0.holdsSlack(at: now) }

@@ -125,6 +125,7 @@ nonisolated struct StationCardGraph: View {
     var showsReadings = true
     var showsTimes = true
     var showsNow = true
+    var highlight: ClosedRange<Date>? = nil
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
@@ -333,6 +334,27 @@ nonisolated struct StationCardGraph: View {
                 }
             }
 
+            if let highlight {
+                let left = x(highlight.lowerBound), right = x(highlight.upperBound)
+                if right > left {
+                    context.fill(Path(CGRect(x: left, y: 0, width: right - left, height: plotHeight)),
+                                 with: .color(SN.go.opacity(0.12)))
+                }
+                var guides = Path()
+                for time in Set([highlight.lowerBound, highlight.upperBound]) {
+                    let at = x(time)
+                    guides.move(to: CGPoint(x: at, y: 0))
+                    guides.addLine(to: CGPoint(x: at, y: plotHeight))
+                }
+                context.stroke(guides, with: .color(SN.foam.opacity(0.7)),
+                               style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                if highlight.lowerBound == highlight.upperBound {
+                    let at = CGPoint(x: left, y: y(valueAt(highlight.lowerBound)))
+                    context.stroke(Path(ellipseIn: CGRect(x: at.x - 7, y: at.y - 7, width: 14, height: 14)),
+                                   with: .color(SN.foam), lineWidth: 2)
+                }
+            }
+
             // The "now" dot rides the curve one swing in from the left edge.
             if showsNow { CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now)))) }
         }
@@ -383,9 +405,10 @@ extension TideStationRecord {
         cardGraph(at: now, imperial: imperial, station: engineStation)
     }
 
-    func cardGraph(at now: Date, imperial: Bool, station s: any TidePredicting) -> StationCardGraph {
+    func cardGraph(at now: Date, imperial: Bool, station s: any TidePredicting,
+                   through requestedEnd: Date? = nil) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
-        let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
+        let end = max(now.addingTimeInterval(StationCardGraph.forwardWindow), requestedEnd ?? now)
         return StationCardGraph(
             points: s.heights(from: start, to: end, step: StationCardGraph.sampleStep)
                 .map { .init(time: $0.time, value: $0.height) },
@@ -397,6 +420,8 @@ extension TideStationRecord {
                       high: $0.kind == .high)
             },
             now: now,
+            forward: end.timeIntervalSince(now),
+            tz: tz,
             rates: s.rates(from: start, to: end, step: StationCardGraph.sampleStep).map(\.rate))
     }
 }
@@ -410,9 +435,10 @@ extension CurrentStationRecord {
     }
 
     func cardGraph(at now: Date, unit: String, tilde: Bool = false,
-                   station s: any CurrentPredicting, threshold: Double = slackThresholdKn) -> StationCardGraph {
+                   station s: any CurrentPredicting, threshold: Double = slackThresholdKn,
+                   through requestedEnd: Date? = nil) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
-        let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
+        let end = max(now.addingTimeInterval(StationCardGraph.forwardWindow), requestedEnd ?? now)
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
         let events = s.events(from: start, to: end)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
@@ -429,6 +455,7 @@ extension CurrentStationRecord {
                           deg: setDegrees(signed: $0.speed))
                 },
             now: now,
+            forward: end.timeIntervalSince(now),
             includesZero: true,
             tz: tz,
             windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),

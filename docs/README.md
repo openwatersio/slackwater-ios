@@ -11,6 +11,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
 | [Alerts](alerts.md) | Station calendars and notification rules: triggers, occurrence resolution, delivery horizons, the free/Premium line, and permissions |
+| [Siri and Shortcuts](siri.md) | Built-in phrases, nearest-place selection, spoken answers, and visual results |
 | [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |
 | [App Store metadata](appstore-metadata.md) | Rules for the listing copy in [`appstore-listing.json`](appstore-listing.json), privacy answers, and accessibility declarations |
 | [Licensing](licensing.md) | App licensing and the contributor agreement |

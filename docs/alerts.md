@@ -603,7 +603,7 @@ No engine or Almanac version change.
 
 - Occurrences — one case per trigger on the fixtures `SlackWindowTests` and `TideShortcutTests`
   already use. Merged runs yield one occurrence; a reversal the sampling steps over yields its own short window;
-  the first opening agrees with `SlackWindowShortcutQuery.next`; crossings interpolate and respect
+  the first upcoming opening agrees with `SlackWindowShortcutQuery.next` when Siri is not reporting an already-open window; crossings interpolate and respect
   direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.
 - `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
