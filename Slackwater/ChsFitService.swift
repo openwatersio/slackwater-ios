@@ -141,9 +141,22 @@ final class ChsFitService: ObservableObject {
     private var onlineOrigin: (lat: Double, lon: Double)?
     /// Published because `onlinePosition` counts the running fetch ahead of
     /// every pending gate. Not a queue membership: a gate is queued only while
-    /// it is in `onlinePending`, and the loop marks it `.fetching` in the same
-    /// turn it leaves the queue (see `fetchOnlineWindow`).
+    /// it is in `onlinePending`, or idle, held and uncovered (`onlineHolds`), and
+    /// the loop marks it `.fetching` in the same turn it leaves the queue (see
+    /// `fetchOnlineWindow`).
     @Published private var onlineRunning = false
+    /// Gates a caller has committed to fetching, counted by caller. A held gate
+    /// not yet covered for today counts as work in the download counts, whatever
+    /// its last fetch did; its row reads "Queued" only while it is idle: a
+    /// tap starts its fetch a turn later, and a fetch for another week leaves the
+    /// gate idle for a turn before its follow-up for today (`fetchOnlineUpdate`).
+    /// Without the hold the gate reads as no work then, and the background
+    /// task's completion poll can end the task. Holding a gate takes it out of
+    /// the prefetch queue, and the prefetch does not queue it again while held:
+    /// otherwise the loop could fetch today's week first, and the caller's fetch
+    /// for another week would join that one (coalescing is by gate). If the
+    /// prefetch wanted it meanwhile, the last release queues it (`requeue`).
+    @Published private var onlineHolds: [String: (gate: ChsCurrentGateInfo, count: Int, requeue: Bool)] = [:]
 
     /// How far out the queue is currently allowed to walk, and the stations
     /// the list was rendering when the question was last framed.
@@ -577,14 +590,16 @@ final class ChsFitService: ObservableObject {
             let state = onlineStates[gate.id] ?? .idle
             let covered = ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil
             let queued = onlinePending.contains { $0.id == gate.id }
-            active = active || Self.onlineDownloadIsActive(state, queued: queued,
+            // A failed gate's "Try again" keeps `.failed` until its fetch starts.
+            let held = onlineHolds[gate.id] != nil && !covered
+            active = active || held || Self.onlineDownloadIsActive(state, queued: queued,
                 covered: covered, online: Connectivity.shared.online)
-            inFlight = inFlight || Self.onlineDownloadIsActive(state, queued: queued,
+            inFlight = inFlight || held || Self.onlineDownloadIsActive(state, queued: queued,
                 covered: covered, online: true)
-            if case .deferred = state {
+            if case .deferred = state, !held {
                 deferred = deferred || !covered
             } else {
-                moving = moving || Self.onlineDownloadIsActive(state, queued: queued,
+                moving = moving || held || Self.onlineDownloadIsActive(state, queued: queued,
                     covered: covered, online: true)
             }
             if covered, state != .fetching {
@@ -714,9 +729,44 @@ final class ChsFitService: ObservableObject {
     }
 
     func onlinePosition(_ id: String) -> Int? {
-        if onlineState(id) == .fetching { return 1 }
+        let state = onlineState(id)
+        if state == .fetching || state == .idle && onlineHeldUncovered(id) { return 1 }
         guard let index = onlinePending.firstIndex(where: { $0.id == id }) else { return nil }
         return index + 1 + (onlineRunning ? 1 : 0)
+    }
+
+    /// Covered is checked because a hold ends a turn after its last fetch: a
+    /// fetch that covered today must not read as queued for that turn.
+    private func onlineHeldUncovered(_ id: String) -> Bool {
+        guard let gate = onlineHolds[id]?.gate else { return false }
+        return ChsModelStore.loadOnline(id)?.block(covering: todayLocal(gate.tz)) == nil
+    }
+
+    func holdOnline(_ gate: ChsCurrentGateInfo) {
+        let queued = onlinePending.contains { $0.id == gate.id }
+        onlinePending.removeAll { $0.id == gate.id }
+        let hold = onlineHolds[gate.id]
+        onlineHolds[gate.id] = (gate, (hold?.count ?? 0) + 1, queued || hold?.requeue == true)
+    }
+
+    /// The last release hands back a gate the prefetch wanted while it was
+    /// held: a permanent failure for another week must not strand the fetch
+    /// for today that the queue would have made. A deferred gate is left to
+    /// its retry timer, which queues it once the backoff ends.
+    func releaseOnline(_ id: String) {
+        guard let hold = onlineHolds[id] else { return }
+        guard hold.count == 1 else {
+            onlineHolds[id] = (hold.gate, hold.count - 1, hold.requeue)
+            return
+        }
+        onlineHolds[id] = nil
+        guard hold.requeue else { return }
+        switch onlineState(id) {
+        case .idle, .failed: break
+        case .fetching, .deferred: return
+        }
+        onlinePending.append(hold.gate)
+        drainOnlinePending()
     }
 
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
@@ -770,7 +820,7 @@ final class ChsFitService: ObservableObject {
 
     func fetchOnline(_ gate: ChsCurrentGateInfo) {
         guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
-        Task { try? await Self.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz)) }
+        Self.startOnlineWork(for: gate) { _ = try? await Self.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz)) }
     }
 
     func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
@@ -803,11 +853,18 @@ final class ChsFitService: ObservableObject {
         requestedDownloads.subtract(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
         AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
         onlinePending = []
+        onlineHolds = [:]
     }
 
     var onlineRunningForTesting: Bool {
         get { onlineRunning }
         set { onlineRunning = newValue }
+    }
+
+    /// Unit tests run with `networkKillSwitch`, so the prefetch never queues.
+    var onlinePendingForTesting: [ChsCurrentGateInfo] {
+        get { onlinePending }
+        set { onlinePending = newValue }
     }
 #endif
 
@@ -822,12 +879,33 @@ final class ChsFitService: ObservableObject {
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
         retainRequests(gates.filter { cohort.ids.contains($0.id) && onlineNeedsDownload($0) }.map(\.id))
         guard Connectivity.shared.online, !networkKillSwitch else { return }
-        var due: [ChsCurrentGateInfo] = []
-        for gate in gates where onlineState(gate.id) == .idle {
-            if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
-        }
+        let due = onlineGatesDue(gates)
         for gate in due { onlinePending.removeAll { $0.id == gate.id } }
         onlinePending.append(contentsOf: due)
+        drainOnlinePending()
+#endif
+    }
+
+    /// The idle gates to queue, once each. A held gate already has a caller
+    /// about to fetch it; it is marked so its last release queues it
+    /// (`onlineHolds`). Internal only so a test can reach it past
+    /// `networkKillSwitch`.
+    func onlineGatesDue(_ gates: [ChsCurrentGateInfo]) -> [ChsCurrentGateInfo] {
+        var due: [ChsCurrentGateInfo] = []
+        for gate in gates where onlineState(gate.id) == .idle {
+            if let hold = onlineHolds[gate.id] {
+                if !hold.requeue { onlineHolds[gate.id] = (hold.gate, hold.count, true) }
+                continue
+            }
+            if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
+        }
+        return due
+    }
+
+    /// Orders the queue and starts the loop if it is not running.
+    private func drainOnlinePending() {
+#if !os(watchOS)
+        guard Connectivity.shared.online, !networkKillSwitch else { return }
         let preferred = onlinePreferred.compactMap { id in onlinePending.first { $0.id == id } }
         var tail = onlinePending.filter { !onlinePreferred.contains($0.id) }
         if let onlineOrigin {

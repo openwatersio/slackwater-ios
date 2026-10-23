@@ -236,7 +236,7 @@ struct OnlineGateDetailView: View {
     private func prefetchNextBlock() {
         guard let window, net.online, fetchState != .fetching else { return }
         let from = prefetchAnchor(after: window, tz: tz)
-        Task { try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
+        ChsFitService.startOnlineWork(for: gate) { _ = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
     }
 
     /// The anchor moved. The store may already hold a block for it — paging back
@@ -283,7 +283,7 @@ struct OnlineGateDetailView: View {
         guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
         if landIfCovered(next, fetched: window) { return }
         pendingFetchAnchor = next
-        Task { @MainActor in
+        ChsFitService.startOnlineWork(for: gate) {
             defer {
                 pendingFetchAnchor = nil
                 // A different week gets its own budget; incomplete data must not restart this one.
@@ -305,7 +305,7 @@ struct OnlineGateDetailView: View {
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
         guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
-        Task { @MainActor in
+        ChsFitService.startOnlineWork(for: gate) {
             if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {
                 window = fresh
                 rebuild()

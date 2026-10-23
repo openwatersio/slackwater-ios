@@ -348,6 +348,145 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testATappedGateStaysQueuedUntilItsFetchStarts() async throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id)?.block(covering: todayLocal($0.tz)) == nil
+        })
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        let ran = expectation(description: "the work ran")
+        ChsFitService.startOnlineWork(for: gate) { ran.fulfill() }
+        XCTAssertTrue(service.onlineDownloads.inFlight,
+                      "the turn before the tap's fetch starts must not read as no work")
+        XCTAssertEqual(service.onlinePosition(gate.id), 1)
+        await fulfillment(of: [ran], timeout: 5)
+        XCTAssertFalse(service.onlineDownloads.inFlight, "the hold must end with the work")
+        XCTAssertNil(service.onlinePosition(gate.id))
+    }
+
+    @MainActor
+    func testAGateStaysQueuedBetweenAnotherWeeksFetchAndTodays() async throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id)?.block(covering: todayLocal($0.tz)) == nil
+        })
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = gate.tz
+        let future = calendar.date(byAdding: .day, value: 60, to: todayLocal(gate.tz))!
+        let week = onlineWindow(gate, anchor: future)
+        var between: (inFlight: Bool, position: Int?)?
+        _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+            if anchor == future {
+                service.beginOnlineFetch(gate)
+                service.finishOnlineFetch(gate.id)
+                between = (service.onlineDownloads.inFlight, service.onlinePosition(gate.id))
+            }
+            return week
+        }
+        XCTAssertEqual(between?.inFlight, true,
+                       "the gate must not read as no work before its follow-up fetch for today")
+        XCTAssertEqual(between?.position, 1)
+        XCTAssertFalse(service.onlineDownloads.inFlight, "the hold must end with the update")
+    }
+
+    @MainActor
+    func testRetryingAFailedGateCountsAsWorkBeforeItsFetchStarts() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id)?.block(covering: todayLocal($0.tz)) == nil
+        })
+        service.noteOnlineFailure(gate.id, error: "no data", permanent: true)
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        XCTAssertFalse(service.onlineDownloads.inFlight)
+        service.holdOnline(gate)
+        XCTAssertEqual(service.onlineState(gate.id), .failed("no data"),
+                       "preparing keeps the old state until the fetch starts")
+        XCTAssertTrue(service.onlineDownloads.inFlight,
+                      "a retry about to start must not read as no work")
+    }
+
+    @MainActor
+    func testAHeldGateLeavesThePrefetchQueueUntilItsLastRelease() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gates = Array(ChsCurrentGateInfo.all.filter(\.isOnline).prefix(2))
+        try XCTSkipIf(gates.count < 2, "needs two online gates")
+        service.onlinePendingForTesting = gates
+        service.holdOnline(gates[0])
+        service.holdOnline(gates[0])
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [gates[1].id],
+                       "the loop must not fetch today's week ahead of the caller's own fetch")
+        service.noteOnlineFailure(gates[0].id, error: "no data", permanent: true)
+        service.releaseOnline(gates[0].id)
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [gates[1].id])
+        service.releaseOnline(gates[0].id)
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [gates[1].id, gates[0].id],
+                       "a failed fetch for another week must not strand the queue's fetch for today")
+    }
+
+    @MainActor
+    func testThePrefetchSkipsAHeldGateAndItsReleaseQueuesIt() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gates = Array(ChsCurrentGateInfo.all.filter(\.isOnline).prefix(2))
+        try XCTSkipIf(gates.count < 2, "needs two online gates")
+        service.holdOnline(gates[0])
+        XCTAssertEqual(service.onlineGatesDue(gates).map(\.id), [gates[1].id],
+                       "the loop must not fetch today's week ahead of the caller's own fetch")
+        service.releaseOnline(gates[0].id)
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [gates[0].id],
+                       "a prefetch skipped during the hold must still happen")
+    }
+
+    @MainActor
+    func testADeferredGateIsLeftToItsRetryTimerAfterItsHold() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        service.onlinePendingForTesting = [gate]
+        service.holdOnline(gate)
+        service.noteOnlineFailure(gate.id, error: "offline", permanent: false)
+        service.releaseOnline(gate.id)
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [],
+                       "queueing it now would skip its backoff")
+    }
+
+    @MainActor
+    func testAGateThatWasNotQueuedStaysOutAfterItsHold() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        service.holdOnline(gate)
+        service.releaseOnline(gate.id)
+        XCTAssertEqual(service.onlinePendingForTesting.map(\.id), [])
+    }
+
+    @MainActor
+    func testAHeldGateCoveredForTodayIsNotQueued() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
+        })
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id)) }
+        try ChsModelStore.saveOnline(onlineWindow(gate, anchor: todayLocal(gate.tz)))
+        service.holdOnline(gate)
+        XCTAssertNil(service.onlinePosition(gate.id),
+                     "a hold outlives its last fetch by a turn; a covered gate must not read as queued then")
+    }
+
+    @MainActor
     func testAnUndecodableOnlineFileIsDecodedOnceUntilItChanges() throws {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
             $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
@@ -562,6 +701,16 @@ final class ChsQueueTests: XCTestCase {
     }
 
     private let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+
+    /// The span a fetch for `anchor` would store, with two samples.
+    private func onlineWindow(_ gate: ChsCurrentGateInfo, anchor: Date) -> ChsOnlineWindow {
+        let span = Timeline.window(anchor: anchor)
+        return ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+                               fetchedAt: appNow(), start: span.start, end: span.end,
+                               floodDirection: 45, ebbDirection: 225,
+                               times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970],
+                               speeds: [1, -1])
+    }
 
     func testADeferredJobIsSkippedUntilItsClockRunsOut() {
         var q = queue()
