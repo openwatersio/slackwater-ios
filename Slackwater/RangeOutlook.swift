@@ -69,7 +69,6 @@ struct RangeOutlook: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 3)
                                     .background(.black.opacity(0.5))
