@@ -45,6 +45,28 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(within150.isSelected)
         XCTAssert(currents.isSelected)
         XCTAssert(farGate.appears(within: 5), "unfinished downloads must resume after relaunch")
+
+        currents.tap()
+        XCTAssert(waitFor(currents, "isSelected == false"), "all currents must be reversible")
+        XCTAssert(farGate.disappears(within: 5), "deselected unfinished downloads must leave the queue")
+        within150.tap()
+        XCTAssert(waitFor(within150, "isSelected == false"), "the 150 km choice must be reversible")
+        XCTAssert(within25.isSelected)
+        within150.tap()
+        XCTAssert(waitFor(within150, "isSelected == true"))
+        within25.tap()
+        XCTAssert(waitFor(within25, "isSelected == false"), "the 25 km choice must be reversible")
+        XCTAssertFalse(within150.isSelected, "150 km cannot stay selected when its nested 25 km set is turned off")
+        XCTAssert(nearby.isSelected)
+        save(app, "canadian-download-checklist-deselected.png")
+
+        app.terminate()
+        app.launch()
+        openDownloads(app)
+        XCTAssertFalse(within25.isSelected)
+        XCTAssertFalse(within150.isSelected)
+        XCTAssertFalse(currents.isSelected)
+        XCTAssertFalse(farGate.exists, "deselected work must stay out of the queue after relaunch")
     }
 
     func testCanadianDownloadChoicesFitTranslations() {

@@ -111,13 +111,20 @@ struct ChsQueue {
     }
 
     /// Put a station into the download set. It contains the stations in the
-    /// active radius plus anything opened or already on disk. Adding an id
+    /// active radius plus direct requests and completed downloads. Adding an id
     /// already here is a no-op —
     /// re-adding must never reset a job that is downloading or done.
     mutating func add(_ job: ChsJob) {
         guard !jobs.contains(where: { $0.id == job.id }) else { return }
         jobs.append(job)
         reorder()
+    }
+
+    mutating func retainDownloads(_ selected: Set<String>) -> Bool {
+        let kept = selected.union(promoted).union(preferred)
+        let removedActive = jobs.contains { $0.status == .downloading && !kept.contains($0.id) }
+        jobs.removeAll { $0.status != .ready && !kept.contains($0.id) }
+        return removedActive
     }
 
     mutating func set(_ id: String, _ status: ChsJobStatus) {

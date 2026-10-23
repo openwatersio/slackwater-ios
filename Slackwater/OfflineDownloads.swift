@@ -333,7 +333,7 @@ struct OfflineManagerList: View {
         ScrollView {
             // Lazy, and the list is bounded by construction (M53): the queue
             // is the DOWNLOAD SET — the active radius, whatever you opened, and
-            // whatever is already on disk — not the 1,097-station catalog.
+            // completed downloads — not the 1,097-station catalog.
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
@@ -374,13 +374,17 @@ struct OfflineManagerList: View {
                            id: "download-tier-in-view") {}
             downloadChoice("Within 25 km", selected: service.tier != .inView,
                            seconds: service.estimatedSeconds(for: .nearby),
-                           id: "download-tier-nearby-accept") { service.accept(.nearby) }
+                           id: "download-tier-nearby-accept") {
+                service.accept(service.tier == .inView ? .nearby : .inView)
+            }
             downloadChoice("Within 150 km", selected: service.tier == .everything,
                            seconds: service.estimatedSeconds(for: .everything),
-                           id: "download-tier-everything-toggle") { service.accept(.everything) }
+                           id: "download-tier-everything-toggle") {
+                service.accept(service.tier == .everything ? .nearby : .everything)
+            }
             downloadChoice("All current stations", selected: service.allCurrentsSelected,
                            seconds: service.allCurrentsSeconds,
-                           id: "download-all-currents") { service.downloadAllGates() }
+                           id: "download-all-currents") { service.setAllCurrents(!service.allCurrentsSelected) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -392,9 +396,7 @@ struct OfflineManagerList: View {
     private func downloadChoice(_ title: LocalizedStringKey, selected: Bool,
                                 seconds: Double, id: String, action: @escaping () -> Void) -> some View {
         // Buttons survive queue updates that can swallow a UISwitch gesture (#462).
-        Button {
-            if !selected { action() }
-        } label: {
+        Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: selected ? "checkmark.square.fill" : "square")
                     .font(.title3)
