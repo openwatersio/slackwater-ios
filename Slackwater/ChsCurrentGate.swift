@@ -91,7 +91,8 @@ extension ChsModelStore {
     /// file's mtime+size rather than invalidated at call sites, so every
     /// writer and deleter — `saveOnline`, the orphan prune, `-chsResetModels`,
     /// tests using raw FileManager — stays correct without knowing a cache
-    /// exists.
+    /// exists. A file that fails both decodes is cached as nil, so a bad file
+    /// (a newer schema after a downgrade) costs one decode until it changes.
     static func loadOnline(_ stationID: String) -> ChsOnlineStore? {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: onlineUrl(stationID).path),
               let mtime = attrs[.modificationDate] as? Date,
@@ -99,20 +100,25 @@ extension ChsModelStore {
         onlineCacheLock.lock()
         defer { onlineCacheLock.unlock() }
         if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size { return hit.store }
+        // A read can fail and then succeed with the file unchanged (data
+        // protection before first unlock, in the widget), so only a decode
+        // failure is cached.
+        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
+        let decoder = JSONDecoder()
         let store: ChsOnlineStore?
-        if let s: ChsOnlineStore = load(stationID, suffix: "-online") {
+        if let s = try? decoder.decode(ChsOnlineStore.self, from: data) {
             store = s
-        } else if let legacy: ChsOnlineWindow = load(stationID, suffix: "-online") {
+        } else if let legacy = try? decoder.decode(ChsOnlineWindow.self, from: data) {
             store = ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
         } else {
             store = nil
         }
-        if let store { onlineCache[stationID] = (mtime, size, store) }
+        onlineCache[stationID] = (mtime, size, store)
         return store
     }
 
     // Every access holds onlineCacheLock, including decoding and replacement.
-    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
+    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore?)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 

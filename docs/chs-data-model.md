@@ -218,8 +218,9 @@ The practical list. Each of these has cost someone time.
   fit or the fetched window. Anything drawing direction has staged availability
   and must degrade honestly — `chsPinStates` (`MapPinState.swift`) already models
   this: a station the sync has not reached is absent and draws neutral.
-- **Online gates are never queued.** They have no download state, so queue-shaped
-  UI does not apply to them.
+- **Online gates never join the fit queue.** They download through their own
+  serial prefetch (`prefetchOnlineGates`), one gate at a time, with their own
+  fetch state and retry backoff, so the fit queue's job states do not apply.
 - **A derived gate resolves only when its reference port is fitted** — it has no
   model of its own.
 - **A fitted harmonic model does not expire**; a fetched online window does, and

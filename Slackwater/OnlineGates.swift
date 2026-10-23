@@ -49,16 +49,23 @@ extension ChsFitService {
     /// span the in-flight fetch asked for, which may not cover it. That path
     /// ends on the honesty card whose "Try again" fetches the parked anchor,
     /// so it is recoverable; key the span in too if that ever reads as a bug.
-    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
-                                             from anchor: Date?) async throws -> ChsOnlineWindow {
+    ///
+    /// Main-actor, like every caller, so the prefetch loop takes a gate off
+    /// `onlinePending` and marks it `.fetching` without a suspension between.
+    /// A hop there would leave it idle and unqueued for a turn, which reads as
+    /// no work to the download counts and to the background task's completion
+    /// poll. A tap still starts its fetch in a new Task, a turn later.
+    static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
+                                  from anchor: Date?) async throws -> ChsOnlineWindow {
         try await fetchOnlineUpdate(for: gate, from: anchor ?? todayLocal(gate.tz)) { from in
             try await shared.onlineFetchTask(for: gate, from: from).value
         }
     }
 
     /// A date-specific fetch must also replace any today refresh it displaced.
+    /// `fetch` is main-actor so calling it is not a hop (`fetchOnlineWindow`).
     static func fetchOnlineUpdate(for gate: ChsCurrentGateInfo, from anchor: Date,
-                                  fetch: (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
+                                  fetch: @MainActor (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
         let fetched = try await fetch(anchor)
         let today = todayLocal(gate.tz)
         if anchor != today, !fetched.covers(anchor: today),

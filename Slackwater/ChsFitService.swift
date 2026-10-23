@@ -138,9 +138,10 @@ final class ChsFitService: ObservableObject {
     private var onlinePending: [ChsCurrentGateInfo] = []
     private var onlinePreferred: [String] = []
     private var onlineOrigin: (lat: Double, lon: Double)?
-    /// Published because the strip reads it through `onlineDownloads`: the
-    /// last fetch's state change publishes before this clears, and nothing
-    /// else would tell the strip the prefetch has finished.
+    /// Published because `onlinePosition` counts the running fetch ahead of
+    /// every pending gate. Not a queue membership: a gate is queued only while
+    /// it is in `onlinePending`, and the loop marks it `.fetching` in the same
+    /// turn it leaves the queue (see `fetchOnlineWindow`).
     @Published private var onlineRunning = false
 
     /// How far out the queue is currently allowed to walk, and the stations
@@ -508,7 +509,7 @@ final class ChsFitService: ObservableObject {
             let requests = onlineRequestCount(gate)
             let state = onlineStates[gate.id] ?? .idle
             let covered = ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil
-            let queued = onlineRunning || onlinePending.contains { $0.id == gate.id }
+            let queued = onlinePending.contains { $0.id == gate.id }
             active = active || Self.onlineDownloadIsActive(state, queued: queued,
                 covered: covered, online: Connectivity.shared.online)
             inFlight = inFlight || Self.onlineDownloadIsActive(state, queued: queued,
@@ -713,6 +714,12 @@ final class ChsFitService: ObservableObject {
         onlineAttempts = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]
+        onlinePending = []
+    }
+
+    var onlineRunningForTesting: Bool {
+        get { onlineRunning }
+        set { onlineRunning = newValue }
     }
 #endif
 
