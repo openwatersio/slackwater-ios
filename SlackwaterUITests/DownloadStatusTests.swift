@@ -48,10 +48,16 @@ final class DownloadStatusTests: ScreenshotTestCase {
 
     func testQueuedDownloadCanUpdateEarly() {
         let token = UUID().uuidString
-        let app = launch(["-chsResetModels",
+        let app = launch(["-chsResetModels", "-resetFavorites", "-resetRecents",
                           "-seedOnlineWindow", "chs-sechelt-rapids",
                           "-chsFixture", token, "-chsFixtureScenario", "hold-first",
-                          "-fixLat", "49.738", "-fixLon", "-123.900"])
+                          "-chsFitOnly", "chs-second-narrows",
+                          "-fixLat", "42.3601", "-fixLon", "-71.0589"])
+        openDownloads(app)
+        app.buttons["download-all-currents"].firstMatch.tap()
+        let held = app.descendants(matching: .any)["download-row-chs-second-narrows"].firstMatch
+        XCTAssert(held.staticTexts["Downloading…"].appears(within: 10))
+        app.buttons["Done"].tap()
         openSearch(app, "skookumchuck")
         pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
         XCUIDevice.shared.press(.home)
