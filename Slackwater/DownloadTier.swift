@@ -133,9 +133,11 @@ struct OnlineDownloads: Equatable {
     /// keep a fitted job `.pending`. The strip shows this, not `active`, so a
     /// gate merely waiting for signal doesn't hide the offer.
     var inFlight = false
-    /// A gate is fetching, or queued to fetch next.
+    /// A gate is fetching, queued to fetch next, or held by a caller about to
+    /// fetch it (`ChsFitService.onlineHolds`), whatever its last fetch did.
     var moving = false
-    /// A gate with nothing covering today is sitting out a retry backoff.
+    /// A gate with nothing covering today is sitting out a retry backoff, and
+    /// no caller holds it to fetch now.
     var deferred = false
 }
 

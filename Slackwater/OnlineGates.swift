@@ -54,7 +54,8 @@ extension ChsFitService {
     /// `onlinePending` and marks it `.fetching` without a suspension between.
     /// A hop there would leave it idle and unqueued for a turn, which reads as
     /// no work to the download counts and to the background task's completion
-    /// poll. A tap still starts its fetch in a new Task, a turn later.
+    /// poll. A tap starts its fetch a turn later, so it goes through
+    /// `startOnlineWork`, which holds the gate across that turn.
     static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
                                   from anchor: Date?) async throws -> ChsOnlineWindow {
         try await fetchOnlineUpdate(for: gate, from: anchor ?? todayLocal(gate.tz)) { from in
@@ -62,10 +63,26 @@ extension ChsFitService {
         }
     }
 
+    /// Work that fetches `gate` in a new Task, for a tap or the detail view's
+    /// own fetches. The Task runs a turn later, so the gate is held from this turn until the work ends
+    /// (`onlineHolds`). Every path releases it: the release is the Task's own.
+    static func startOnlineWork(for gate: ChsCurrentGateInfo,
+                                _ work: @escaping @MainActor () async -> Void) {
+        shared.holdOnline(gate)
+        Task { @MainActor in
+            defer { shared.releaseOnline(gate.id) }
+            await work()
+        }
+    }
+
     /// A date-specific fetch must also replace any today refresh it displaced.
     /// `fetch` is main-actor so calling it is not a hop (`fetchOnlineWindow`).
+    /// The gate is held for the whole update: the first fetch returns it to
+    /// idle a turn before this resumes to start the one for today.
     static func fetchOnlineUpdate(for gate: ChsCurrentGateInfo, from anchor: Date,
                                   fetch: @MainActor (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
+        shared.holdOnline(gate)
+        defer { shared.releaseOnline(gate.id) }
         let fetched = try await fetch(anchor)
         let today = todayLocal(gate.tz)
         if anchor != today, !fetched.covers(anchor: today),

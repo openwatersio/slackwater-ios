@@ -220,7 +220,12 @@ The practical list. Each of these has cost someone time.
   this: a station the sync has not reached is absent and draws neutral.
 - **Online gates never join the fit queue.** They download through their own
   serial prefetch (`prefetchOnlineGates`), one gate at a time, with their own
-  fetch state and retry backoff, so the fit queue's job states do not apply.
+  fetch state and retry backoff, so the fit queue's job states do not apply. A
+  gate a caller is about to fetch, from a tap or as the follow-up for today after
+  another week, is held (`onlineHolds`). It counts as work until it is covered or
+  the caller's work ends. It stays out of the prefetch queue meanwhile, and goes
+  back in when the hold ends if the prefetch wanted it, unless it is waiting out
+  a retry backoff, whose timer queues it.
 - **A derived gate resolves only when its reference port is fitted** — it has no
   model of its own.
 - **A fitted harmonic model does not expire**; a fetched online window does, and
