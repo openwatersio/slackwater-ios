@@ -328,6 +328,79 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testAnIdleGateIsNotQueuedWhileTheLoopRuns() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let wasRunning = service.onlineRunningForTesting
+        defer {
+            service.onlineRunningForTesting = wasRunning
+            service.resetOnlineStateForTesting()
+        }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id)?.block(covering: todayLocal($0.tz)) == nil
+        })
+        service.beginOnlineFetch(gate)
+        service.finishOnlineFetch(gate.id)
+        service.onlineRunningForTesting = true
+        XCTAssertFalse(service.onlineDownloads.inFlight,
+                       "a gate outside the queue must not read as downloading because another one is")
+        XCTAssertNil(service.onlinePosition(gate.id))
+    }
+
+    @MainActor
+    func testAnUndecodableOnlineFileIsDecodedOnceUntilItChanges() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
+        })
+        let url = ChsModelStore.onlineUrl(gate.id)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let span = Timeline.window(anchor: todayLocal(gate.tz))
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        let valid = try Data(contentsOf: url)
+        var broken = valid
+        broken[0] = UInt8(ascii: "x")
+        let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+        let fm = FileManager.default
+        try broken.write(to: url)
+        try fm.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadOnline(gate.id))
+        // Same size and date: only a cached failure can still answer nil.
+        try valid.write(to: url)
+        try fm.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadOnline(gate.id), "a failed decode must be cached, not retried per call")
+        try fm.setAttributes([.modificationDate: stamp.addingTimeInterval(1)], ofItemAtPath: url.path)
+        XCTAssertNotNil(ChsModelStore.loadOnline(gate.id), "a changed file must be decoded again")
+    }
+
+    @MainActor
+    func testAnUnreadableOnlineFileIsReadAgainOnceItOpens() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
+        })
+        let url = ChsModelStore.onlineUrl(gate.id)
+        let fm = FileManager.default
+        defer {
+            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+            try? fm.removeItem(at: url)
+        }
+        let span = Timeline.window(anchor: todayLocal(gate.tz))
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        let stamp = Date(timeIntervalSince1970: 1_700_100_000)
+        try fm.setAttributes([.modificationDate: stamp, .posixPermissions: 0], ofItemAtPath: url.path)
+        try XCTSkipIf(fm.isReadableFile(atPath: url.path), "the runner can read a 000 file")
+        XCTAssertNil(ChsModelStore.loadOnline(gate.id))
+        // Readable again with the same date and size, as after first unlock.
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        XCTAssertNotNil(ChsModelStore.loadOnline(gate.id), "a failed read must not be cached as no window")
+    }
+
+    @MainActor
     func testCachedCoverageDoesNotHideAnOnlineRefresh() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()
