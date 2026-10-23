@@ -10,30 +10,49 @@ func tourCopy(_ step: TourCoach.Step, stationName: String, arrived: Bool) -> Str
         // True on all four detail views, including a derived gate, whose
         // `LeadCard` has no numeric value at all (shape/speed only) — this
         // says what the line marks, not what value it holds.
-        return "The center line marks the moment shown below."
+        return String(localized: "The center line marks the moment shown below.",
+                      comment: "First-run tour body. The timeline's center line selects the moment whose details appear below it.")
     case .stars:
         return arrived
             // The glide already moved the strip to sunset + 1h, so by the
             // time this shows the moment on screen is tonight, not now.
-            ? "Those are the actual stars over \(stationName) tonight."
-            : "Swipe the curve to move through time."
+            ? String(localized: "Those are the actual stars over \(stationName) tonight.",
+                     comment: "First-run tour body after moving to tonight's stars. %@ is the station/place name; keep it unchanged.")
+            : String(localized: "Swipe the curve to move through time.",
+                     comment: "First-run tour instruction to swipe the tide/current curve to change the displayed time.")
     case .moon:
-        return "And that is the real moon, at tonight's phase."
+        return String(localized: "And that is the real moon, at tonight's phase.",
+                      comment: "First-run tour body pointing at the moon in the timeline sky; its phase matches tonight.")
     case .moonCard:
-        return "Tap the moon for its rise, set and phase."
+        return String(localized: "Tap the moon for its rise, set and phase.",
+                      comment: "First-run tour instruction to tap the moon tile for moonrise, moonset and lunar phase.")
     case .star:
-        return "Star a station to keep it at the top of your list."
+        return String(localized: "Star a station to keep it at the top of your list.",
+                      comment: "First-run tour instruction. Star means tap the star button to save the station as a favorite.")
     }
 }
 
 /// One short line per mark, set bold above the copy.
 func tourTitle(_ step: TourCoach.Step, arrived: Bool) -> String {
     switch step {
-    case .read: return "Reading the strip"
-    case .stars: return arrived ? "The real sky" : "Swipe to see more"
-    case .moon: return "The moon"
-    case .moonCard: return "Moon details"
-    case .star: return "Favourites"
+    case .read:
+        return String(localized: "Reading the strip",
+                      comment: "First-run tour heading pointing at the tide/current timeline strip.")
+    case .stars:
+        return arrived
+            ? String(localized: "The real sky",
+                     comment: "First-run tour heading after the timeline has moved to tonight's actual star positions.")
+            : String(localized: "Swipe to see more",
+                     comment: "First-run tour heading before the timeline moves to tonight's stars. Swipe is a finger gesture.")
+    case .moon:
+        return String(localized: "The moon",
+                      comment: "First-run tour heading pointing at the moon drawn in the timeline sky.")
+    case .moonCard:
+        return String(localized: "Moon details",
+                      comment: "First-run tour heading pointing at the moon summary tile below the timeline.")
+    case .star:
+        return String(localized: "Favourites",
+                      comment: "First-run tour heading pointing at the star button for saving favorite stations.")
     }
 }
 
