@@ -46,6 +46,11 @@ struct RangeOutlook: View {
         }
     }
 
+    static func barHeight(magnitude: Double, biggest: Double, height: CGFloat) -> CGFloat {
+        let labelHeight = min(20, height)
+        return labelHeight + (height - labelHeight) * magnitude / biggest
+    }
+
     var body: some View {
         let days = Self.days(timeline, week: week)
         let biggest = max(days.compactMap(\.peak?.magnitude).max() ?? 0, 0.001)
@@ -55,7 +60,21 @@ struct RangeOutlook: View {
                 ForEach(days, id: \.start) { day in
                     RoundedRectangle(cornerRadius: 3)
                         .fill(SN.graphLine.opacity(day.start == scrubDay ? 1 : 0.4))
-                        .frame(height: day.peak.map { max(2, geometry.size.height * $0.magnitude / biggest) } ?? 0)
+                        .frame(height: day.peak.map {
+                            Self.barHeight(magnitude: $0.magnitude, biggest: biggest, height: geometry.size.height)
+                        } ?? 0)
+                        .overlay(alignment: .bottom) {
+                            if day.peak != nil {
+                                Text(day.start, format: Date.FormatStyle(timeZone: tz).weekday(.narrow))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 3)
+                                    .background(.black.opacity(0.5))
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
             }

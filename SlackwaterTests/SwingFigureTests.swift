@@ -77,6 +77,15 @@ import SlackwaterKit
         return noonLocal(cal.date(byAdding: .day, value: offset, to: week)!, station.tz)
     }
 
+    func testRangeOutlookPreservesSmallRangeDifferencesAboveTheWeekdayLabel() {
+        let small = RangeOutlook.barHeight(magnitude: 0.5, biggest: 4, height: 52)
+        let larger = RangeOutlook.barHeight(magnitude: 1.5, biggest: 4, height: 52)
+        XCTAssertEqual(small, 24)
+        XCTAssertEqual(larger, 32)
+        XCTAssertEqual(RangeOutlook.barHeight(magnitude: 4, biggest: 4, height: 52), 52)
+        XCTAssertEqual(RangeOutlook.barHeight(magnitude: 1, biggest: 4, height: 12), 12)
+    }
+
     private func day(_ offset: Int, from week: Date) -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = station.tz
