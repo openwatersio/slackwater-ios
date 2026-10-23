@@ -75,9 +75,12 @@ extension ChsFitService {
     private func onlineFetchTask(for gate: ChsCurrentGateInfo,
                                  from anchor: Date?, automatic: Bool) throws -> Task<ChsOnlineWindow, Error> {
         guard !automatic || isFetchingOnline(gate.id) else { throw CancellationError() }
-        if !automatic { retainOnline(gate) }
-        if let existing = onlineFetch(for: gate.id) { return existing }
+        if let existing = onlineFetch(for: gate.id) {
+            if !automatic { retainOnline(gate) }
+            return existing
+        }
         beginOnlineFetch(gate)
+        if !automatic { retainOnline(gate) }
         let task = Task { @MainActor in
             defer { ChsFitService.shared.setOnlineFetch(nil, for: gate.id) }
             do {

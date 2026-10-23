@@ -90,6 +90,13 @@ import Foundation
     }
 }
 
+private func resetSeedDownloadChoices() {
+    for key in [AppGroup.downloadTierKey, AppGroup.downloadAllCurrentsKey,
+                AppGroup.cancelledDownloadsKey, AppGroup.requestedDownloadsKey] {
+        AppGroup.defaults.removeObject(forKey: key)
+    }
+}
+
 /// UI-test hook (`-seedTideModel <id>`): a plausible M2+K1 harmonic model for
 /// one bundled CHS tide port, stored as if fitted on this device — the
 /// reference-port fit a derived gate's slacks derive from, with no network
@@ -105,6 +112,7 @@ import Foundation
 private func seedTideModel(stationID: String) {
     guard ChsStationInfo.all.contains(where: { $0.id == stationID }) else { return }
     try? FileManager.default.removeItem(at: ChsModelStore.dir)
+    resetSeedDownloadChoices()
     IwlsFetcher.chunkCache.reset()
     let now = appNow()
     let model = ChsModel(
@@ -122,6 +130,7 @@ private func seedTideModel(stationID: String) {
 private func seedCurrentModel(stationID: String, provisional: Bool) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
     try? FileManager.default.removeItem(at: ChsModelStore.dir)
+    resetSeedDownloadChoices()
     IwlsFetcher.chunkCache.reset()
     let now = appNow()
     let days = provisional ? ChsCurrentGateInfo.provisionalDays : gate.fitDays

@@ -8,13 +8,136 @@ import Combine
 
 final class ChsQueueTests: XCTestCase {
     @MainActor
-    func testNarrowingChoicesRemovesOnlyUnselectedDownloads() throws {
-        let service = ChsFitService.shared
+    func testLocationUpdatesDoNotRememberAPermanentlyFailedAutomaticGate() throws {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting(); restoreDownloadMarkers(markers) }
+        service.setAllCurrents(false)
+        service.accept(.inView)
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        service.captureCohort(ids: ["chs-tillicum-bridge"], heroID: "failed-automatic")
+        service.noteOnlineFailure("chs-tillicum-bridge", error: "no predictions", permanent: true)
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey)?.contains("chs-tillicum-bridge") == true,
+                       "a location tick must not remember a terminal failure for relaunch")
+    }
+
+    @MainActor
+    func testBulkSelectionDoesNotTakeOwnershipOfEarlierAutomaticDownloads() {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting(); restoreDownloadMarkers(markers) }
+        service.accept(.inView)
+        service.setAllCurrents(false)
+        service.prioritize(lat: 49.1344, lon: -123.8171, favorites: [])
+        service.captureCohort(ids: ["chs-dodd-narrows"], heroID: "earlier-automatic")
+        service.prioritize(lat: 44.65, lon: -63.57, favorites: [])
+        service.captureCohort(ids: ["chs-halifax"], heroID: "later-automatic")
+        XCTAssertNotNil(service.queue.job("chs-dodd-narrows"))
+        service.setAllCurrents(true)
+        service.setAllCurrents(false)
+        XCTAssertNotNil(service.queue.job("chs-dodd-narrows"), "unchecking bulk work must keep the earlier automatic download")
+    }
+
+    @MainActor
+    func testCompletedOnlineRequestsDoNotBecomeRefreshSubscriptions() throws {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        defer {
+            service.resetOnlineStateForTesting()
+            restoreDownloadMarkers(markers)
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        let span = Timeline.window(anchor: todayLocal(gate.tz))
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        service.finishOnlineFetch(gate.id)
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey)?.contains(gate.id) == true)
+        service.retainOnline(gate)
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey)?.contains(gate.id) == true,
+                       "viewing complete cached predictions must not subscribe to future downloads")
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        service.noteOnlineFailure(gate.id, error: "unavailable", permanent: true)
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey)?.contains(gate.id) == true,
+                       "a terminal failure must not restart itself on every launch")
+    }
+
+    @MainActor
+    func testUncheckingRadiiDoesNotRestartUnseenOnlineDownloads() {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
         let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
         defer {
             service.accept(oldTier)
             service.setAllCurrents(oldCurrents)
             service.resetOnlineStateForTesting()
+            restoreDownloadMarkers(markers)
+        }
+        service.resetOnlineStateForTesting()
+        service.setAllCurrents(false)
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        service.captureCohort(ids: ["chs-victoria", "chs-tillicum-bridge"], heroID: "online-radius-test")
+        service.accept(.everything)
+        XCTAssertTrue(service.isFetchingOnline("chs-gabriola-passage"))
+        service.accept(.nearby)
+        XCTAssertFalse(service.isFetchingOnline("chs-gabriola-passage"))
+        service.accept(.inView)
+        XCTAssertFalse(service.isFetchingOnline("chs-gabriola-passage"), "unchecking 25 km must not restore an unseen gate 82 km away")
+        XCTAssertTrue(service.isFetchingOnline("chs-tillicum-bridge"), "the online gate shown on the list remains automatic")
+        XCTAssertTrue(service.declinedNearby, "turning a radius off must not immediately offer it again")
+    }
+
+    @MainActor
+    func testDeselectingAllCurrentsDoesNotCancelTidesFromAnEarlierFix() {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
+        let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
+        defer {
+            service.accept(oldTier)
+            service.setAllCurrents(oldCurrents)
+            service.resetOnlineStateForTesting()
+            restoreDownloadMarkers(markers)
+        }
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        service.accept(.everything)
+        service.setAllCurrents(true)
+        XCTAssertNotNil(service.queue.job("chs-nanaimo-harbour"))
+        service.prioritize(lat: 44.65, lon: -63.57, favorites: [])
+        service.setAllCurrents(false)
+        XCTAssertNotNil(service.queue.job("chs-nanaimo-harbour"), "the current-only choice must not cancel tide work")
+    }
+
+    private var downloadPreferenceKeys: [String] {
+        [AppGroup.downloadTierKey, AppGroup.downloadAllCurrentsKey,
+         AppGroup.cancelledDownloadsKey, AppGroup.requestedDownloadsKey]
+    }
+
+    @MainActor
+    private func savedDownloadMarkers() -> [String: Any] {
+        Dictionary(uniqueKeysWithValues: downloadPreferenceKeys.compactMap { key in
+            AppGroup.defaults.object(forKey: key).map { (key, $0) }
+        })
+    }
+
+    @MainActor
+    private func restoreDownloadMarkers(_ markers: [String: Any]) {
+        for key in downloadPreferenceKeys { AppGroup.defaults.set(markers[key], forKey: key) }
+    }
+
+    @MainActor
+    func testNarrowingChoicesRemovesOnlyUnselectedDownloads() throws {
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
+        let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
+        defer {
+            service.accept(oldTier)
+            service.setAllCurrents(oldCurrents)
+            service.resetOnlineStateForTesting()
+            restoreDownloadMarkers(markers)
         }
         service.accept(.inView)
         service.setAllCurrents(false)
@@ -43,13 +166,15 @@ final class ChsQueueTests: XCTestCase {
 
     @MainActor
     func testDeselectingAllCurrentsKeepsTheRadiusAndExplicitOnlineRequests() throws {
-        let service = ChsFitService.shared
+        let markers = savedDownloadMarkers()
+        let service = ChsFitService()
         let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
         service.resetOnlineStateForTesting()
         defer {
             service.accept(oldTier)
             service.setAllCurrents(oldCurrents)
             service.resetOnlineStateForTesting()
+            restoreDownloadMarkers(markers)
         }
         service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
         service.accept(.everything)

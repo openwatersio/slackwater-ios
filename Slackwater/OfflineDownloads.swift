@@ -333,7 +333,7 @@ struct OfflineManagerList: View {
         ScrollView {
             // Lazy, and the list is bounded by construction (M53): the queue
             // is the DOWNLOAD SET — the active radius, whatever you opened, and
-            // whatever is already on disk — not the 1,097-station catalog.
+            // completed downloads — not the 1,097-station catalog.
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {

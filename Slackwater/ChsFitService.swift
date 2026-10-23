@@ -102,7 +102,7 @@ final class ChsFitService: ObservableObject {
     /// Published because the download count's total reads it: a gate desired
     /// while offline joins the total without any fetch state changing.
     @Published private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
-    private var requestedOnline: Set<String> = []
+    private var requestedDownloads: Set<String> = []
 
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
@@ -151,8 +151,8 @@ final class ChsFitService: ObservableObject {
     /// restored in `init`). The spec calls the widest one "a preference, not a
     /// job", and a switch labelled "keep downloading" that reverts to off on
     /// every cold launch cannot keep that word. It is also what makes an
-    /// accepted tier resume: `init` re-seeds jobs only for stations already on
-    /// disk, so without the restored ceiling a station queued at `.nearby` and
+    /// accepted tier resume: `init` re-seeds saved and requested jobs,
+    /// so without the restored ceiling a station queued at `.nearby` and
     /// interrupted would simply never be re-adopted.
     ///
     /// `declinedNearby` deliberately does NOT persist — "Not now" holds for
@@ -195,8 +195,6 @@ final class ChsFitService: ObservableObject {
         return jobs.filter { fitOnly?.contains($0.id) ?? true }
     }()
 
-    /// `candidates`' ids, for `captureCohort`'s filter: the station list mixes
-    /// NOAA and CHS stations, but only a CHS id ever gets a `ChsQueue` job.
     private static let candidateIDs: Set<String> = Set(candidates.map(\.id))
 
     /// Online gates use the same radius and Low Data Mode brake as fitted jobs.
@@ -266,7 +264,7 @@ final class ChsFitService: ObservableObject {
         return (jobIDs, online)
     }
 
-    private init() {
+    init() {
         ChsModelStore.resetIfRequested()
         // Before anything adopts: `adopt` reads `tier` to decide what the
         // queue may take, and the first call can arrive from the list's
@@ -274,7 +272,19 @@ final class ChsFitService: ObservableObject {
         tier = AppGroup.defaults.string(forKey: AppGroup.downloadTierKey)
             .flatMap(DownloadTier.init(rawValue:)) ?? .inView
         allCurrentsSelected = AppGroup.defaults.bool(forKey: AppGroup.downloadAllCurrentsKey)
-        cancelledDownloads = Set(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey) ?? [])
+        let cancelled = AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey) ?? []
+        let requested = AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey) ?? []
+        cancelledDownloads = Set(StationSuccessors.remap(cancelled, in: StationSuccessors.bundled))
+        requestedDownloads = Set(StationSuccessors.remap(requested, in: StationSuccessors.bundled))
+        if cancelledDownloads != Set(cancelled) {
+            AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        }
+        if requestedDownloads != Set(requested) {
+            AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
+        }
+        onlineDesired = Dictionary(uniqueKeysWithValues: ChsCurrentGateInfo.all.filter {
+            $0.isOnline && requestedDownloads.contains($0.id)
+        }.map { ($0.id, $0) })
         // One directory read, not 1,097 stat calls: which stations already
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
@@ -294,13 +304,18 @@ final class ChsFitService: ObservableObject {
             } else if !job.isCurrent, files.contains("\(job.id)-tide-preview.json"),
                       let preview = ChsModelStore.loadTidePreview(job.id) {
                 tidePreviews[job.id] = preview
-            } else if !stored {
+            } else if !stored, !requestedDownloads.contains(job.id) {
                 continue  // not downloaded, and the auto-fit set decides below
             }
             jobs.append(job)
         }
         // Deselection stops unfinished downloads without deleting their usable partial predictions.
-        queue = ChsQueue(jobs.filter { $0.status == .ready || !cancelledDownloads.contains($0.id) })
+        queue = ChsQueue(jobs.filter {
+            $0.status == .ready || requestedDownloads.contains($0.id) || !cancelledDownloads.contains($0.id)
+        })
+        if tier == .inView, !allCurrentsSelected {
+            retainRequests(queue.jobs.filter { $0.status != .ready }.map(\.id))
+        }
         // Never an arbitrary order, even before a fix lands: the prototype's
         // The first-run fallback anchors the first sort, and a real fix re-sorts.
         //
@@ -370,17 +385,20 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    /// Take the nearest stations into the download set and re-sort. Jobs only
-    /// ACCRETE: a fix moving from Victoria to Halifax adds Halifax's nearest
-    /// ports, and never drops what Victoria already paid for.
+    // Moving the origin keeps queued work; explicit deselection can narrow it.
     private func adopt(lat: Double, lon: Double) {
+        let inRange = Set(Self.autoPrefetchGates(lat: lat, lon: lon).map(\.id))
+        let online = ChsCurrentGateInfo.all.filter { $0.isOnline && (inRange.contains($0.id) || cohort.ids.contains($0.id)) }
         for choice in [DownloadTier.inView, .nearby, .everything] {
             tierJobs[choice] = Self.autoFitSet(lat: lat, lon: lon, tier: choice, cohort: cohort.ids)
-            let online = Self.autoPrefetchGates(lat: lat, lon: lon,
-                                                constrained: choice == .inView && Connectivity.shared.constrained)
-            tierOnlineGates[choice] = choice == .nearby ? online.filter {
-                distanceKm($0.latitude, $0.longitude, lat, lon) <= DownloadTier.nearbyRadiusKm
-            } : online
+            tierOnlineGates[choice] = online.filter {
+                if cohort.ids.contains($0.id) { return true }
+                switch choice {
+                case .inView: return false
+                case .nearby: return distanceKm($0.latitude, $0.longitude, lat, lon) <= DownloadTier.nearbyRadiusKm
+                case .everything: return true
+                }
+            }
         }
         let jobs = tier == .inView && Connectivity.shared.constrained
             ? Self.autoFitSet(lat: lat, lon: lon, constrained: true, tier: tier, cohort: cohort.ids)
@@ -389,6 +407,9 @@ final class ChsFitService: ObservableObject {
         if allCurrentsSelected {
             addDownloads(gatesToDownload)
         }
+        retainRequests((tierJobs[.inView] ?? []).filter {
+            queue.status($0.id) == .pending || queue.status($0.id) == .downloading
+        }.map(\.id))
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
         guard let next = tier.next else {
@@ -399,15 +420,10 @@ final class ChsFitService: ObservableObject {
             .count { queue.status($0.id) == nil }
     }
 
-    /// The list hands over what it is rendering. Captured once per place; a
-    /// capture that takes re-opens the question.
-    ///
-    /// Filtered to CHS candidates first: the list mixes NOAA and CHS
-    /// stations, but only a CHS id ever gets a `ChsQueue` job, so an
-    /// unfiltered cohort would count stations that were never going to
-    /// download in the strip's "done of total".
+    // NOAA predictions are bundled; only Canadian places need automatic downloads.
     func captureCohort(ids: [String], heroID: String?) {
-        let chsIDs = ids.filter { Self.candidateIDs.contains($0) }
+        let onlineIDs = Set(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
+        let chsIDs = ids.filter { Self.candidateIDs.contains($0) || onlineIDs.contains($0) }
         guard cohort.capture(ids: chsIDs, heroID: heroID) else { return }
         declinedNearby = false
         if let origin = onlineOrigin {
@@ -416,6 +432,7 @@ final class ChsFitService: ObservableObject {
             remainingBeyondCohort = 0
         }
         pump()
+        prefetchOnlineGates(tierOnlineGates[tier] ?? [])
     }
 
     // iOS requires a foreground user action before submitting continued background work.
@@ -425,7 +442,10 @@ final class ChsFitService: ObservableObject {
         tier = newTier
         AppGroup.defaults.set(newTier.rawValue, forKey: AppGroup.downloadTierKey)
         if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
-        if !widened { trimDownloads() }
+        if !widened {
+            declinedNearby = true
+            trimDownloads()
+        }
         pump()
         prefetchOnlineGates(tierOnlineGates[newTier] ?? [])
 #if os(iOS)
@@ -433,8 +453,13 @@ final class ChsFitService: ObservableObject {
 #endif
     }
 
-    private func trimDownloads() {
-        var selected = Set((tierJobs[tier] ?? []).map(\.id))
+    private func trimDownloads(currentsOnly: Bool = false) {
+        // Recents preserve direct opens made by a build without request tracking.
+        let recents = Self.favoriteDownloads(RecentsStore.shared.ids)
+        retainRequests(recents.jobIDs.filter { queue.job($0) != nil && queue.status($0) != .ready }
+            + recents.online.filter { onlineDesired[$0.id] != nil && onlineNeedsDownload($0) }.map(\.id))
+        var selected = Set((tierJobs[tier] ?? []).map(\.id)).union(requestedDownloads)
+        if currentsOnly { selected.formUnion(queue.jobs.filter { !$0.isCurrent }.map(\.id)) }
         if allCurrentsSelected { selected.formUnion(Self.candidates.filter(\.isCurrent).map(\.id)) }
         let previous = Set(queue.jobs.map(\.id))
         if queue.retainDownloads(selected) { fitTask?.cancel() }
@@ -442,7 +467,7 @@ final class ChsFitService: ObservableObject {
         AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
 
         var online = Set((tierOnlineGates[tier] ?? []).map(\.id))
-            .union(onlinePreferred).union(requestedOnline)
+            .union(onlinePreferred).union(requestedDownloads)
         if allCurrentsSelected { online.formUnion(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id)) }
         for id in Array(onlineDesired.keys) where !online.contains(id) {
             onlineDesired.removeValue(forKey: id)
@@ -452,6 +477,18 @@ final class ChsFitService: ObservableObject {
             if onlineFetches[id] == nil { onlineStates.removeValue(forKey: id) }
             onlineAttempts.removeValue(forKey: id)
         }
+    }
+
+    private func retainRequests(_ ids: [String]) {
+        let added = Set(ids).subtracting(requestedDownloads)
+        guard !added.isEmpty else { return }
+        requestedDownloads.formUnion(added)
+        AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
+    }
+
+    private func releaseRequest(_ id: String) {
+        guard requestedDownloads.remove(id) != nil else { return }
+        AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
     }
 
     private func addDownloads(_ jobs: [ChsJob]) {
@@ -464,8 +501,7 @@ final class ChsFitService: ObservableObject {
     }
 
     /// `.inView` < `.nearby` < `.everything` — the only ordering that
-    /// exists for tiers, since the queue walk only ever grows outward
-    /// (`DownloadTier.admits`). Kept local rather than a `Comparable`
+    /// exists for tiers (`DownloadTier.admits`). Kept local rather than a `Comparable`
     /// conformance on `DownloadTier` itself: `accept` is the only place
     /// that needs to compare two tiers.
     private static func widens(from old: DownloadTier, to new: DownloadTier) -> Bool {
@@ -623,7 +659,7 @@ final class ChsFitService: ObservableObject {
         allCurrentsSelected = selected
         AppGroup.defaults.set(selected, forKey: AppGroup.downloadAllCurrentsKey)
         guard selected else {
-            trimDownloads()
+            trimDownloads(currentsOnly: true)
             pump()
             return
         }
@@ -686,6 +722,7 @@ final class ChsFitService: ObservableObject {
                            at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()
         guard !permanent else {
+            releaseRequest(id)
             onlineStates[id] = .failed(error)
             return
         }
@@ -704,7 +741,7 @@ final class ChsFitService: ObservableObject {
 
     /// Idle releases pending-week retries, so preserve the state until the new fetch starts.
     func prepareOnlineUpdate(_ gate: ChsCurrentGateInfo) -> Bool {
-        retainOnline(gate)
+        retainRequests([gate.id])
         guard onlineState(gate.id) != .fetching else { return false }
         onlineDesired[gate.id] = gate
         onlineRetryTimers[gate.id]?.cancel()
@@ -715,8 +752,14 @@ final class ChsFitService: ObservableObject {
     }
 
     func retainOnline(_ gate: ChsCurrentGateInfo) {
-        requestedOnline.insert(gate.id)
+        if onlineNeedsDownload(gate) { retainRequests([gate.id]) }
         onlineDesired[gate.id] = gate
+    }
+
+    private func onlineNeedsDownload(_ gate: ChsCurrentGateInfo) -> Bool {
+        if case .failed = onlineState(gate.id) { return false }
+        return onlineState(gate.id) == .fetching
+            || ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) == nil
     }
 
     func onlineFetchCancelled(_ gate: ChsCurrentGateInfo) {
@@ -738,6 +781,7 @@ final class ChsFitService: ObservableObject {
     }
 
     func finishOnlineFetch(_ id: String) {
+        releaseRequest(id)
         onlineProgress[id] = 10
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
@@ -755,7 +799,8 @@ final class ChsFitService: ObservableObject {
         onlineAttempts = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]
-        requestedOnline = []
+        requestedDownloads.subtract(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
+        AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
     }
 #endif
 
@@ -768,6 +813,7 @@ final class ChsFitService: ObservableObject {
         // Guarded: every fix re-enters here with the same gates, and a
         // published write that changes nothing still redraws the list.
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
+        retainRequests(gates.filter { cohort.ids.contains($0.id) && onlineNeedsDownload($0) }.map(\.id))
         guard Connectivity.shared.online, !networkKillSwitch else { return }
         var due: [ChsCurrentGateInfo] = []
         for gate in gates where onlineState(gate.id) == .idle {
@@ -811,6 +857,7 @@ final class ChsFitService: ObservableObject {
         if queue.job(id) == nil, let job = Self.candidates.first(where: { $0.id == id }) {
             addDownloads([job])
         }
+        if let status = queue.status(id), status != .ready { retainRequests([id]) }
         queue.promote(id)
         pump()
     }
@@ -1031,6 +1078,7 @@ final class ChsFitService: ObservableObject {
                 await MainActor.run {
                     let reason = Self.reason(error)
                     if ChsError.isPermanent(error) {
+                        self.releaseRequest(job.id)
                         self.queue.set(job.id, .failed)
                         self.queue.note(job.id, error: reason)
                     } else {
@@ -1060,6 +1108,7 @@ final class ChsFitService: ObservableObject {
                 self.tidePreviews.removeValue(forKey: job.id)
             }
             self.queue.set(job.id, .ready)
+            self.releaseRequest(job.id)
             self.modelRevision += 1
         }
         IwlsFetcher.chunkCache.purge(model.iwlsID)
@@ -1273,6 +1322,7 @@ extension ChsModelStore {
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadTierKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.removeObject(forKey: AppGroup.requestedDownloadsKey)
         try? FileManager.default.removeItem(at: dir)
         IwlsFetcher.chunkCache.reset()
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)

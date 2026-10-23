@@ -83,6 +83,7 @@ enum AppGroup {
     static let downloadTierKey = "slackwater.downloadTier"
     static let downloadAllCurrentsKey = "slackwater.downloadAllCurrents"
     static let cancelledDownloadsKey = "slackwater.cancelledDownloads"
+    static let requestedDownloadsKey = "slackwater.requestedDownloads"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
     /// Alert rules (docs/alerts.md §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.

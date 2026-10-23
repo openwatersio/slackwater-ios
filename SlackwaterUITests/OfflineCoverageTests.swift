@@ -52,8 +52,11 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         within150.tap()
         XCTAssert(waitFor(within150, "isSelected == false"), "the 150 km choice must be reversible")
         XCTAssert(within25.isSelected)
+        within150.tap()
+        XCTAssert(waitFor(within150, "isSelected == true"))
         within25.tap()
         XCTAssert(waitFor(within25, "isSelected == false"), "the 25 km choice must be reversible")
+        XCTAssertFalse(within150.isSelected, "150 km cannot stay selected when its nested 25 km set is turned off")
         XCTAssert(nearby.isSelected)
         save(app, "canadian-download-checklist-deselected.png")
 

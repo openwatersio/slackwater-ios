@@ -111,7 +111,7 @@ struct ChsQueue {
     }
 
     /// Put a station into the download set. It contains the stations in the
-    /// active radius plus anything opened or already on disk. Adding an id
+    /// active radius plus direct requests and completed downloads. Adding an id
     /// already here is a no-op —
     /// re-adding must never reset a job that is downloading or done.
     mutating func add(_ job: ChsJob) {

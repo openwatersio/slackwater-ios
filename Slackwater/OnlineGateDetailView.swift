@@ -158,6 +158,7 @@ struct OnlineGateDetailView: View {
                                 stationDetails.padding(.top, 14)
                             })
             .onAppear {
+                ChsFitService.shared.retainOnline(gate)
                 let today = todayLocal(tz)
                 if anchor == .distantPast {
                     let folded = FoldHandoff.pending(gate.id)
