@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The line under the strip: which rule it reads, and what it says (docs/alerts.md §7.1).
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
 
 final class AlertLineTests: XCTestCase {
     private let moment = Date(timeIntervalSince1970: 1_700_000_040)
@@ -125,5 +126,77 @@ final class AlertLineTests: XCTestCase {
         let label = alertLineLabel(.pressed(moment), offer: .tideCrossing(heightM: 1.0, rising: false),
                                    tz: utc, imperial: false, locale: en)
         XCTAssertTrue(label.hasPrefix("Set alert for falling past 1.00 m · Tue"), label)
+    }
+
+    func testAlertSpansCoverEachOccurrenceOfTheStationsRules() throws {
+        let id = TideStationRecord.fridayHarborID
+        let every = AlertRule(stationID: id, trigger: .tideExtreme(high: false), lead: 1_800)
+        let other = AlertRule(stationID: "current:noaa/PUG1701", trigger: .slackWindowOpens)
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(10 * 86_400)
+
+        let spans = alertSpans(stationID: id, rules: [every, other], from: from, to: to, threshold: 0.5)
+
+        XCTAssertFalse(spans.isEmpty)
+        XCTAssertTrue(spans.allSatisfy { $0.ruleID == every.id }, "another station's rule draws nothing here")
+        XCTAssertTrue(spans.allSatisfy { $0.event.timeIntervalSince($0.fire) == 1_800 && $0.end == nil })
+        XCTAssertEqual(spans.map(\.event), spans.map(\.event).sorted())
+        // Review Focus 2: one span per occurrence, none overlapping.
+        for (a, b) in zip(spans, spans.dropFirst()) { XCTAssertLessThan(a.event, b.fire) }
+    }
+
+    func testAlertSpansRunAcrossASlackWindow() throws {
+        let id = "current:noaa/PUG1701"
+        let rule = AlertRule(stationID: id, trigger: .slackWindowOpens, lead: 900)
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(3 * 86_400)
+        let spans = alertSpans(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5)
+        XCTAssertFalse(spans.isEmpty)
+        XCTAssertTrue(spans.contains { $0.end != nil }, "a merged window carries its close")
+        XCTAssertTrue(spans.allSatisfy { ($0.end ?? $0.event) >= $0.event })
+        // Review Focus 2: one rule's spans never stack.
+        XCTAssertTrue(zip(spans, spans.dropFirst()).allSatisfy { ($0.end ?? $0.event) <= $1.fire })
+    }
+
+    private func flatTimeline(hours: Int) -> TimelineData {
+        let tz = TimeZone(identifier: "America/Los_Angeles")!
+        let start = Date(timeIntervalSince1970: 1_755_800_000), end = start.addingTimeInterval(Double(hours) * 3_600)
+        let times = stride(from: 0.0, through: end.timeIntervalSince(start), by: 600).map { start.addingTimeInterval($0) }
+        return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: [],
+                            tidePoints: times.map { TidePoint(time: $0, height: 1) },
+                            tideRates: times.map { TideRatePoint(time: $0, rate: 0) },
+                            tideExtremes: [], currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+    }
+
+    func testAlertBandFramesClipToTheTileAndKeepTheMoment() throws {
+        let data = flatTimeline(hours: 48)
+        let event = data.start.addingTimeInterval(5 * 3_600)
+        let early = AlertSpan(ruleID: UUID(), fire: data.start.addingTimeInterval(-3_600), event: data.start.addingTimeInterval(1_800), end: nil)
+        let window = AlertSpan(ruleID: UUID(), fire: event.addingTimeInterval(-1_800), event: event, end: event.addingTimeInterval(2_400))
+        let far = AlertSpan(ruleID: UUID(), fire: data.end.addingTimeInterval(3_600), event: data.end.addingTimeInterval(7_200), end: nil)
+
+        let frames = alertBandFrames([early, window, far], in: data, between: data.start, and: data.start.addingTimeInterval(8 * 3_600))
+
+        XCTAssertEqual(frames.count, 2, "the span past the window draws nothing")
+        // Review Focus 1: a reminder time before the window still draws, clipped at the edge.
+        XCTAssertEqual(frames[0].x0, data.x(data.start), accuracy: 0.01)
+        XCTAssertEqual(frames[0].eventX, data.x(early.event), accuracy: 0.01)
+        XCTAssertEqual(frames[1].x0, data.x(window.fire), accuracy: 0.01)
+        XCTAssertEqual(frames[1].x1, data.x(window.end!), accuracy: 0.01)
+        XCTAssertEqual(frames[1].eventX, data.x(event), accuracy: 0.01)
+    }
+
+    func testASpanRequestChangesOnlyWithTheRulesOrTheWindow() {
+        // Review: the strip's window republishes on every chunk arrival and right-edge append;
+        // the spans are re-resolved only when the rules or the window's edges change.
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let start = Date(timeIntervalSince1970: 1_755_800_000), end = start.addingTimeInterval(7 * 86_400)
+        let a = AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end)
+        XCTAssertEqual(a, AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end))
+        XCTAssertNotEqual(a, AlertSpanRequest(stationID: "a", rules: [rule], start: start, end: end.addingTimeInterval(86_400)))
+        var edited = rule; edited.lead = 900
+        XCTAssertNotEqual(a, AlertSpanRequest(stationID: "a", rules: [edited], start: start, end: end))
+        // The query reaches past both edges so a window open at the start, or a reminder for a
+        // moment just past the end, still draws (alertBandFrames clips what the window holds).
+        XCTAssertEqual(a.from, start.addingTimeInterval(-(6 * 3_600 + 86_400)))
+        XCTAssertEqual(a.to, end.addingTimeInterval(6 * 3_600))
     }
 }
