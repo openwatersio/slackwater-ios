@@ -50,9 +50,9 @@ extension ChsFitService {
     /// ends on the honesty card whose "Try again" fetches the parked anchor,
     /// so it is recoverable; key the span in too if that ever reads as a bug.
     nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
-                                             from anchor: Date?) async throws -> ChsOnlineWindow {
+                                             from anchor: Date?, automatic: Bool = false) async throws -> ChsOnlineWindow {
         try await fetchOnlineUpdate(for: gate, from: anchor ?? todayLocal(gate.tz)) { from in
-            try await shared.onlineFetchTask(for: gate, from: from).value
+            try await shared.onlineFetchTask(for: gate, from: from, automatic: automatic).value
         }
     }
 
@@ -73,7 +73,9 @@ extension ChsFitService {
     /// clears its own entry on the way out — success, failure or throw.
     @MainActor
     private func onlineFetchTask(for gate: ChsCurrentGateInfo,
-                                 from anchor: Date?) -> Task<ChsOnlineWindow, Error> {
+                                 from anchor: Date?, automatic: Bool) throws -> Task<ChsOnlineWindow, Error> {
+        guard !automatic || isFetchingOnline(gate.id) else { throw CancellationError() }
+        if !automatic { retainOnline(gate) }
         if let existing = onlineFetch(for: gate.id) { return existing }
         beginOnlineFetch(gate)
         let task = Task { @MainActor in
@@ -83,8 +85,12 @@ extension ChsFitService {
                 finishOnlineFetch(gate.id)
                 return window
             } catch {
-                noteOnlineFailure(gate.id, error: Self.reason(error),
-                                  permanent: ChsError.isPermanent(error))
+                if Task.isCancelled {
+                    onlineFetchCancelled(gate)
+                } else {
+                    noteOnlineFailure(gate.id, error: Self.reason(error),
+                                      permanent: ChsError.isPermanent(error))
+                }
                 throw error
             }
         }
@@ -119,6 +125,7 @@ extension ChsFitService {
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk, cacheEmpty: false)
             await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 3, total: total) }
         }
+        try Task.checkCancellation()
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
         // IWLS can 200 with an empty series (a quiet chunk boundary, no error
         // to catch). Saving anyway would fall through to the requested

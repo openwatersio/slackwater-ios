@@ -120,6 +120,13 @@ struct ChsQueue {
         reorder()
     }
 
+    mutating func retainDownloads(_ selected: Set<String>) -> Bool {
+        let kept = selected.union(promoted).union(preferred)
+        let removedActive = jobs.contains { $0.status == .downloading && !kept.contains($0.id) }
+        jobs.removeAll { $0.status != .ready && !kept.contains($0.id) }
+        return removedActive
+    }
+
     mutating func set(_ id: String, _ status: ChsJobStatus) {
         guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
         jobs[i].status = status

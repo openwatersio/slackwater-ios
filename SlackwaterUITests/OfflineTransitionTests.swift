@@ -3,6 +3,65 @@
 import XCTest
 
 final class OfflineTransitionTests: ScreenshotTestCase {
+    func testDeselectedPartialPredictionsStayUsableWithoutResumingAfterRelaunch() {
+        let (app, _) = fixture("provisional-final", "chs-dodd-narrows", fix: ("42.3601", "-71.0589"))
+        openDownloads(app)
+        let currents = app.buttons["download-all-currents"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        currents.tap()
+        XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
+        let readyPreview = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '~'"))
+        app.buttons["Done"].tap()
+        openSearch(app, "dodd")
+        XCTAssert(readyPreview.firstMatch.appears(within: 30), "the partial current model must be saved")
+        // Search alone does not promote a download; opening its detail does.
+        app.buttons["Close search"].firstMatch.tap()
+        openDownloads(app)
+        currents.tap()
+        XCTAssert(row.disappears(within: 5))
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-chsResetModels" }
+        app.launch()
+        openDownloads(app)
+        XCTAssertFalse(currents.isSelected)
+        XCTAssertFalse(row.exists, "the saved partial model must not restart a deselected download")
+        app.buttons["Done"].tap()
+        openSearch(app, "dodd")
+        XCTAssert(readyPreview.firstMatch.appears(within: 10), "deselection must retain usable partial predictions")
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        assertCurrentDetailRendered(app)
+    }
+
+    func testDeselectingCurrentsCancelsAnActiveDownloadAndKeepsCompletedData() {
+        let (app, token) = fixture("hold-first", "chs-dodd-narrows", fix: ("42.3601", "-71.0589"))
+        openDownloads(app)
+        let currents = app.buttons["download-all-currents"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        currents.tap()
+        XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
+        currents.tap()
+        XCTAssert(waitFor(currents, "isSelected == false"))
+        XCTAssert(row.disappears(within: 5), "the active deselected download must leave the queue")
+
+        currents.tap()
+        releaseFixture(token, "chs-dodd-narrows-first-chunk")
+        let completed = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '1 of ' AND label ENDSWITH ' ready'"))
+        XCTAssert(completed.firstMatch.appears(within: 30),
+                  "selecting again must restart the cancelled worker")
+        // Deselecting removes the unfinished rows above the completed one.
+        currents.tap()
+        XCTAssert(waitFor(currents, "isSelected == false"))
+        XCTAssert(row.staticTexts["Available offline"].exists, "deselection must retain completed predictions")
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-chsResetModels" }
+        app.launch()
+        openDownloads(app)
+        XCTAssertFalse(currents.isSelected)
+        XCTAssert(row.staticTexts["Available offline"].appears(within: 5))
+    }
+
     func testTidePreviewStaysUsableOfflineThenFinishesInOpenDetail() {
         let (app, token) = fixture("tide-preview-final", "chs-victoria", fix: ("48.4235", "-123.3705"))
         openSearch(app, "victoria")

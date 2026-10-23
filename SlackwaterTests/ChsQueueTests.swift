@@ -7,6 +7,97 @@ import Combine
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
+    @MainActor
+    func testNarrowingChoicesRemovesOnlyUnselectedDownloads() throws {
+        let service = ChsFitService.shared
+        let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
+        defer {
+            service.accept(oldTier)
+            service.setAllCurrents(oldCurrents)
+            service.resetOnlineStateForTesting()
+        }
+        service.accept(.inView)
+        service.setAllCurrents(false)
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        service.captureCohort(ids: ["chs-victoria"], heroID: "chs-victoria")
+        service.accept(.everything)
+        XCTAssertNotNil(service.queue.job("chs-nanaimo-harbour"))
+        service.accept(.nearby)
+        XCTAssertNil(service.queue.job("chs-nanaimo-harbour"))
+        XCTAssertNotNil(service.queue.job("chs-victoria"))
+        XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains("chs-nanaimo-harbour") == true)
+        service.accept(.everything)
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains("chs-nanaimo-harbour") == true)
+        service.accept(.nearby)
+
+        service.setAllCurrents(true)
+        XCTAssertNotNil(service.queue.job("chs-weynton-passage"))
+        service.accept(.inView)
+        XCTAssertNotNil(service.queue.job("chs-weynton-passage"), "all currents still selects this gate")
+        service.setAllCurrents(false)
+        XCTAssertNil(service.queue.job("chs-weynton-passage"))
+        XCTAssertNotNil(service.queue.job("chs-victoria"))
+        XCTAssertEqual(AppGroup.defaults.string(forKey: AppGroup.downloadTierKey), "inView")
+        XCTAssertFalse(AppGroup.defaults.bool(forKey: AppGroup.downloadAllCurrentsKey))
+    }
+
+    @MainActor
+    func testDeselectingAllCurrentsKeepsTheRadiusAndExplicitOnlineRequests() throws {
+        let service = ChsFitService.shared
+        let oldTier = service.tier, oldCurrents = service.allCurrentsSelected
+        service.resetOnlineStateForTesting()
+        defer {
+            service.accept(oldTier)
+            service.setAllCurrents(oldCurrents)
+            service.resetOnlineStateForTesting()
+        }
+        service.prioritize(lat: 48.4235, lon: -123.3705, favorites: [])
+        service.accept(.everything)
+        service.setAllCurrents(true)
+        let far = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && distanceKm($0.latitude, $0.longitude, 48.4235, -123.3705) > 150
+        })
+        let local = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && distanceKm($0.latitude, $0.longitude, 48.4235, -123.3705) < 150
+        })
+        XCTAssertTrue(service.isFetchingOnline(far.id))
+        service.noteOnlineFailure(far.id, error: "offline", permanent: false)
+        service.setAllCurrents(false)
+        XCTAssertFalse(service.isFetchingOnline(far.id))
+        XCTAssertEqual(service.onlineState(far.id), .idle, "deselection clears its retry state")
+        XCTAssertTrue(service.isFetchingOnline(local.id), "the selected radius still includes local currents")
+
+        service.setAllCurrents(true)
+        XCTAssertTrue(service.prepareOnlineUpdate(far))
+        service.setAllCurrents(false)
+        XCTAssertTrue(service.isFetchingOnline(far.id), "an explicit request survives bulk deselection")
+    }
+
+    func testNarrowingDownloadsKeepsReadySelectedOpenedAndFavoriteJobs() {
+        var q = ChsQueue([job("selected", 0, 0), job("ready", 0, 0),
+                          job("opened", 0, 0), job("favorite", 0, 0),
+                          job("excluded", 0, 0), job("retry", 0, 0)])
+        q.set("ready", .ready)
+        q.promote("opened")
+        q.prefer(["favorite"])
+        q.set("excluded", .downloading)
+        q.deferRetry("retry", error: "offline", at: t0)
+
+        XCTAssertTrue(q.retainDownloads(Set(["selected"])), "an excluded active job needs cancellation")
+        XCTAssertEqual(Set(q.jobs.map(\.id)), Set(["selected", "ready", "opened", "favorite"]))
+        XCTAssertNil(q.earliestRetry(after: t0))
+        XCTAssertEqual(q.nextPending()?.id, "opened")
+        XCTAssertFalse(q.retainDownloads(Set(["selected"])), "unchanged work needs no cancellation")
+    }
+
+    func testNarrowingDownloadsDoesNotInterruptARetainedActiveJob() {
+        var q = queue()
+        q.set("near", .downloading)
+        XCTAssertFalse(q.retainDownloads(Set(["near"])))
+        XCTAssertEqual(q.jobs.map(\.id), ["near"])
+        XCTAssertEqual(q.status("near"), .downloading)
+    }
+
     func testIdleOnlineDownloadsOnlyStayActiveWhenQueuedOrOffline() {
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: false, online: true))
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.idle, queued: true, covered: false, online: true))
