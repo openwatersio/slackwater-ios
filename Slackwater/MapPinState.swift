@@ -166,9 +166,9 @@ func pinSortRank(_ item: StationItem) -> Double {
 }
 
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
-/// the instant sits inside the slack window — |v| under the same
-/// `slackThresholdKn` that defines the strip's green column — and the
-/// darkened #97 ramp at the current speed otherwise. Hue no longer says
+/// the water is slack — |v| under the same `slackCoreThresholdKn` that
+/// defines the strip's green — and the darkened #97 ramp at the current speed
+/// otherwise, whose first stop is the slack window's yellow. Hue no longer says
 /// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
 /// card's arrow + cardinal) carries direction.
 func currentPinState(_ station: CurrentStationRecord, at now: Date,
@@ -176,7 +176,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
     let signed = station.isSubordinate
         ? subordinateCurrentPinSpeed(station, at: now)
         : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
-    let slack = abs(signed) <= slackThresholdKn
+    let slack = abs(signed) <= slackCoreThresholdKn(slackThresholdKn)
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),

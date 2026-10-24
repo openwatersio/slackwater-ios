@@ -1434,8 +1434,8 @@ private struct FoldPageTestHarness: View {
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
 
-        // A slack inside a run drawn as a dot is the dot's stop, its centre.
-        let dots = d.slackRuns.filter(\.isDot)
+        // A slack inside a core drawn as a dot is the dot's stop, its centre.
+        let dots = d.coreRuns.filter(\.isDot)
         let slacks = d.currentEvents.filter { e in
             e.kind == .slack && e.time >= d.start && e.time <= d.end && !dots.contains { $0.contains(e.time) }
         }
@@ -1451,12 +1451,43 @@ private struct FoldPageTestHarness: View {
                       "the strip labels a max at \(e.time) but the magnet cannot stop there")
         }
 
-        let runs = d.slackRuns.filter { $0.start >= d.start && $0.end <= d.end }
+        let runs = d.windowRuns.filter { $0.start >= d.start && $0.end <= d.end && !$0.isDot }
         XCTAssertFalse(runs.isEmpty, "no windows at this station — pick another fixture")
         for run in runs {
-            XCTAssert(stops.contains(run.axisMoment), "the strip prints \(run.axisMoment) but the magnet cannot stop there")
             for moment in run.snapMoments { XCTAssert(stops.contains(moment)) }
         }
+        for run in d.coreRuns where run.start >= d.start && run.end <= d.end {
+            for moment in run.snapMoments { XCTAssert(stops.contains(moment)) }
+        }
+        for t in d.slackAxisTimes where t >= d.start && t <= d.end {
+            XCTAssert(stops.contains(t), "the strip prints \(t) but the magnet cannot stop there")
+        }
+    }
+
+    /// Slack is the water under the fixed slack speed, inside the person's
+    /// slack window: each core is measured around the same slack as its window,
+    /// at `slackKn` or the window's own threshold when that is lower (#821).
+    func testEachSlackCoreLiesInsideItsWindow() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+        let d = TimelineData.build(tide: nil, current: station, now: Date(),
+                                   anchor: todayLocal(station.tz), threshold: 1)
+        XCTAssertFalse(d.slackCores.isEmpty)
+        for core in d.slackCores {
+            let window = try XCTUnwrap(d.slackWindows.first { $0.slack == core.slack },
+                                       "a core without the window around its slack")
+            XCTAssert(window.start <= core.start && core.end <= window.end,
+                      "the core \(core) must lie inside its window \(window)")
+            XCTAssert(core.start <= core.slack && core.slack <= core.end)
+        }
+        let inside = try XCTUnwrap(d.coreRuns.first { !$0.isDot }, "no core long enough to stroke")
+        let speed = abs(d.velocityAt(inside.centre))
+        XCTAssertLessThanOrEqual(speed, slackKn + 0.01, "a core's water is under the slack speed")
+
+        let narrow = TimelineData.build(tide: nil, current: station, now: Date(),
+                                        anchor: todayLocal(station.tz), threshold: 0.1)
+        XCTAssertEqual(narrow.slackCores.map(\.start), narrow.slackWindows.map(\.start),
+                       "a window under the slack speed is all slack")
+        XCTAssertEqual(narrow.slackCores.map(\.end), narrow.slackWindows.map(\.end))
     }
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
@@ -1669,7 +1700,7 @@ private struct FoldPageTestHarness: View {
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
         let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
                                           anchor: todayLocal(station.tz), threshold: 1)
-        let run = try XCTUnwrap(timeline.slackRuns.first { !$0.isDot })
+        let run = try XCTUnwrap(timeline.windowRuns.first { !$0.isDot })
         XCTAssertTrue(timeline.snapTimes.contains(run.start))
         XCTAssertTrue(timeline.snapTimes.contains(run.end))
     }

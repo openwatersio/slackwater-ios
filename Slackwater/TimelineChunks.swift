@@ -86,6 +86,7 @@ struct TimelineChunk {
     let currentPoints: [CurrentPoint]
     let currentEvents: [CurrentEvent]
     let slackWindows: [(slack: Date, start: Date, end: Date)]
+    let slackCores: [(slack: Date, start: Date, end: Date)]
     let eclipses: [WindowEclipse]
     let solarEclipses: [WindowSolarEclipse]
 
@@ -124,6 +125,7 @@ struct TimelineChunk {
         var currentPoints: [CurrentPoint] = []
         var currentEvents: [CurrentEvent] = []
         var windows: [(slack: Date, start: Date, end: Date)] = []
+        var cores: [(slack: Date, start: Date, end: Date)] = []
 
         switch source {
         case .tide(let record):
@@ -142,10 +144,8 @@ struct TimelineChunk {
             currentPoints = padded.filter { inSpan($0.time) }
             currentEvents = s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad)).filter { inSpan($0.time) }
-            windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
-                slackWindow(padded, around: e.time, threshold: threshold)
-                    .map { (slack: e.time, start: $0.start, end: $0.end) }
-            }
+            (windows, cores) = measureSlacks(padded, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
+                                             threshold: threshold)
         case .gate(let record):
             let g = record.engineGate
             let slacks = g.slacks(from: start.addingTimeInterval(-Self.gateSlackPad),
@@ -167,7 +167,8 @@ struct TimelineChunk {
         return TimelineChunk(index: index, start: start, end: end, days: days,
                              tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                              currentPoints: currentPoints, currentEvents: currentEvents,
-                             slackWindows: windows, eclipses: eclipses, solarEclipses: solarEclipses)
+                             slackWindows: windows, slackCores: cores,
+                             eclipses: eclipses, solarEclipses: solarEclipses)
     }
 }
 
@@ -220,10 +221,14 @@ extension TimelineData {
         let tideExtremes = dedupeExtremes(chunks.flatMap(\.tideExtremes))
         let currentPoints = chunks.flatMap(\.currentPoints)
         let currentEvents = dedupeEvents(chunks.flatMap(\.currentEvents))
-        var windows = chunks.flatMap(\.slackWindows)
-        windows = windows.enumerated().filter { i, w in
-            i == 0 || w.slack.timeIntervalSince(windows[i - 1].slack) >= 2
-        }.map(\.element)
+        // A boundary slack caught by both neighbouring chunks is measured twice.
+        func dedupeWindows(_ all: [(slack: Date, start: Date, end: Date)]) -> [(slack: Date, start: Date, end: Date)] {
+            all.enumerated().filter { i, w in
+                i == 0 || w.slack.timeIntervalSince(all[i - 1].slack) >= 2
+            }.map(\.element)
+        }
+        let windows = dedupeWindows(chunks.flatMap(\.slackWindows))
+        let cores = dedupeWindows(chunks.flatMap(\.slackCores))
         var eclipseSeen = Set<Date>()
         let eclipses = chunks.flatMap(\.eclipses).filter { eclipseSeen.insert($0.peak).inserted }
         var solarEclipseSeen = Set<Date>()
@@ -233,7 +238,7 @@ extension TimelineData {
         // The magnet's stops, assembled the way both monolithic builders do it.
         let sunTimes = days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
+                              + currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
                               + eclipses.map(\.peak)
                               + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
@@ -243,6 +248,7 @@ extension TimelineData {
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
                             slackWindows: windows,
+                            slackCores: cores,
                             slackThreshold: source.threshold,
                             speedsAreSchematic: source.isSchematic)
     }

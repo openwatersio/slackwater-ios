@@ -1,12 +1,12 @@
 // Slackwater — GPL v3. What each watch complication draws (#524). Faces tint
 // complications to one colour, so everything reads by shape: a dot at now,
-// the past at 35%, slack as a thicker line, and no unit beside a value.
+// the past at 35%, the slack window as a thicker line, and no unit beside a value.
 import SwiftUI
 import WidgetKit
 
 private let pastOpacity = 0.35
 /// The app's slack-window colour, for faces that draw full colour.
-private let slackColor = SN.go
+private let slackColor = SN.slackWindow
 
 struct LockedComplication: View {
     var body: some View {

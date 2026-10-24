@@ -126,7 +126,7 @@ import SlackwaterKit
 
         let card = record.cardGraph(at: now)
         XCTAssertFalse(card.slacks.isEmpty)
-        XCTAssertEqual(StationCardGraph.axisMoments(card.windows, slacks: card.slacks, pointsPerHour: 14),
+        XCTAssertEqual(StationCardGraph.axisMoments(card.windows, cores: card.cores, slacks: card.slacks, pointsPerHour: 14),
                        card.slacks.sorted(), "the card's time row names every slack")
     }
 

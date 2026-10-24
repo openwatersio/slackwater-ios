@@ -55,13 +55,19 @@ Three things that must never be conflated, in prose, labels, or names:
 
 | Term | Is | Duration |
 |---|---|---|
-| **slack** | the zero crossing | an instant |
+| **slack** | the zero crossing, and the run around it where `\|v\| ≤ 0.15 kn` | an instant to minutes |
 | **slack window** | the run where `\|v\| ≤ threshold` **and the sign reverses inside it** | minutes to hours |
 | **weak water** | `\|v\| ≤ threshold`, no reversal | any |
 
 Weak water is not slack. A lull that dips under the threshold and builds back
-the way it came is the flood pausing, not the pass opening. Marking it green
-promises a transit that never happens.
+the way it came is the flood pausing, not the pass opening. Marking it as a
+window promises a transit that never happens.
+
+A slack window is not slack either. The threshold is the reader's boat, and
+at a weak station a 0.5 kn window can hold a whole flood, maximum included.
+Inside the window the water is still flooding or ebbing, and the chart says
+so. Slack is physical, not a setting: the run around the crossing under
+`slackKn`, 0.15 kn, or under the threshold where that is lower.
 
 **This distinction is a predicate, not a rendering choice.** See §6.1: it holds
 identically on every surface.
@@ -217,7 +223,8 @@ is; they must not out-shout the thing the reader came for.
 - **The threshold lines** — the limit made visible everywhere at once, so the
   reader can check any moment against it. They claim nothing about time.
 - **The inked run** — when it is actually happening: the curve itself,
-  overdrawn in the go colour between the crossings.
+  overdrawn in the window colour between the crossings, and in the go colour
+  across the slack inside it.
 
 Drawing the run **on** the water rather than behind it is what stops it
 over-claiming. A peak rising past the threshold breaks the run, and two windows
@@ -235,14 +242,15 @@ justification.
 
 **Every reversal has a window.** When the sampling steps over the band, the
 line between the two samples either side of the crossing still crosses it,
-and the window is measured on that line (§8.3). A window too narrow to draw
-as a run draws as the go-colour dot a turn gets, at the window's centre, so
-a short window never pretends to be a usable duration. Where a run exists,
-the run is the mark — the crossing is already inside it. A slack with no
-window (outside the sampled span, or between two samples of the same sign)
-draws the same dot at its own instant, so every slack has one mark: a run,
-or a dot for a short window or a slack with no window. (Derived-gate
-presentation is specified in §9.)
+and the window is measured on that line (§8.3). Slack is measured the same
+way, around the same crossing, at the slack speed. A window too narrow to
+draw as a run is not drawn, so a short window never pretends to be a usable
+duration; the slack inside it marks the turn. Slack draws as a go-colour
+run on the window, or as the go-colour dot a turn gets when it is too
+narrow to draw. A slack with no run under the slack speed (outside the
+sampled span, between two samples of the same sign, or a minimum that never
+gets that slow) draws the same dot at its own instant, so every slack has
+one mark: a run, or a dot. (Derived-gate presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
@@ -291,19 +299,23 @@ provider.
 
 ### 6.1 Green is one predicate everywhere
 
-The go colour means: **`|v| ≤ effective threshold`, and the sign reverses inside
-this run.** That is the definition from §2, and it is the same on the chart, the
-map pin, the card, the widget and the notification.
+The go colour means **slack**: the run around a reversal where `|v|` is under
+the slack speed, or the slack instant itself where the water never gets that
+slow. The window colour, the speed ramp's yellow floor, means **slack window**:
+`|v| ≤ effective threshold`, and the sign reverses inside this run. Both are
+the definitions from §2, and they are the same on the chart, the card, the
+widget and the watch.
 
-Instantaneous speed under the threshold is **not** the predicate. A pin that
-goes green during weak water invites a transit through a pass that is not
-opening — the exact failure §2 exists to prevent, arriving through a surface
-that reimplemented the test. Any surface that shows the go colour computes it
-from the shared window definition, never from a fresh comparison against the
-threshold.
+Instantaneous speed under the threshold is **not** the window predicate. A
+surface that marks weak water as a window invites a transit through a pass
+that is not opening — the exact failure §2 exists to prevent, arriving
+through a surface that reimplemented the test. Any surface that shows either
+colour computes it from the shared window definition, never from a fresh
+comparison against the threshold. The map pin is the one instantaneous
+surface: it is green under the slack speed and wears the ramp otherwise.
 
 Green is the only reserved meaning on the whole chart. Not "good", not "tide
-station", not "rising".
+station", not "rising", and not the slack window.
 
 ### 6.2 The speed ramp: shape auto-fits, colour is absolute
 
@@ -335,9 +347,9 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
 3. **No green, at any stop.** A ramp that passes through green puts a second,
    opposite meaning a few hundred points from the mark that means *go*. This is
    the specific reason it is not a rainbow.
-4. **Starts at the threshold, never at zero.** Only the excess above the limit is
-   inked. Water you can work in is not drawn hot at all, and warm colour never
-   appears inside the band, which would contradict §6.1.
+4. **Starts at its first anchor, never at zero.** Only the excess above 0.5 kn
+   is inked hot. The ramp's yellow floor below that is also the slack window's
+   colour (§6.1), so a window reads as slow water on the same scale.
 5. **Luminance should climb monotonically** across the ramp — that is what makes
    it survive greyscale and Reduce Motion, and what preserves rank order. A ramp
    that descends in luminance across part of its range makes mid speeds *harder*
@@ -346,8 +358,9 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
 6. **Watch the green-beside-yellow adjacency.** Green survives partly by sitting
    against a dark ground at maximum separation. Putting the go colour next to a
    yellow ramp floor spends that margin, and green/yellow is the deuteranopia
-   trap. Mitigate with hard edges on the go marks, or by warming the ramp's
-   floor away from yellow.
+   trap. Slack sits inside its yellow window, so every go stroke keeps a halo
+   break at its ends and every go dot its halo: the hard edges. The reading's
+   word, Slack against Flooding or Ebbing, carries the same fact in text.
 7. **The anchors array is where a per-vessel limit eventually lands.** Structure
    the domain as one array so that door stays open.
 
@@ -628,8 +641,8 @@ regressed once. Minimum set:
 - **Ramp luminance is monotonic** across sampled positions (§6.3).
 - Label ink on the fill clears its contrast floor **at the ramp's worst point**,
   not at a convenient one (§6.6).
-- The go colour resolves from the **shared window predicate** on every surface
-  that shows it (§6.1).
+- The go colour and the window colour resolve from the **shared window
+  predicate** on every surface that shows them (§6.1).
 - A schematic series yields **no windows and no speed marks** (§9).
 - **Source-text tripwires** for retired colour literals and for direction colours
   inside the current-drawing path. These catch the actual failure mode — a
@@ -650,7 +663,8 @@ every mark that only earns its place at scale. The card and the widget are
 - **One swing back, three ahead.** Half the M2 period per swing (≈6.2 h);
   the past faded, the forecast at full strength, a white dot at now.
 - **The window is the only window mark.** The run is drawn on the line in
-  the go colour (§5.2), from the SHARED window predicate (§6.1). The
+  the window colour, with the slack inside it in the go colour (§5.2), from
+  the SHARED window predicate (§6.1). The
   threshold lines are dropped: their job — letting the reader see the margin
   and overrule the chart (§4.3) — belongs to the detail, one tap away.
 - **The window's edges get the dots** (§5.4.1): the opening at full
@@ -663,13 +677,15 @@ every mark that only earns its place at scale. The card and the widget are
   rows or its axis times. Values near the curve never carry a unit — the
   reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
-  one time per run at its opening, or at its centre for a run drawn as a
-  dot, and one at each slack no window covers (§5.3). Peak times are not
+  one time per drawn window at its opening, and one per slack mark outside
+  every drawn window: a slack dot at its centre, a slack run at its opening,
+  a slack with no run at its instant (§5.3). Peak times are not
   shown; they are in the schedule behind the detail. The row keeps 24 pt
   clear of each canvas edge, and in time order drops a time less than
   48 pt after the last one kept, so two marks close together print one
   time rather than two over each other.
-- **Colour is state** (§6): the go colour for the run and its dots, and
+- **Colour is state** (§6): the window colour for the window, the go colour
+  for slack and its dots, and
   nothing coloured by direction on the line or the marks. The card's fill is
   the detail's: blue beneath the curve in each flood lobe, fading to clear at
   zero, and none in an ebb lobe, where the curve-to-zero area would sit above
@@ -679,9 +695,10 @@ every mark that only earns its place at scale. The card and the widget are
 
 The top-right reading is the surface's readout: the speed with its unit,
 and under it the set — the phase word, the set (cardinal or bearing) and the bearing arrow
-by the sign of the velocity. Inside a window, closing excluded, or within a
-second of a slack no window covers, the word is *Slack* in the go colour,
-as on the detail lead, and the set still shows; under 0.05 kn the set gives way to a
+by the sign of the velocity. Inside slack, closing excluded, or within a
+second of a slack no slack run covers, the word is *Slack* in the go colour,
+as on the detail lead, and the set still shows. Elsewhere in a window the
+word is the phase; under 0.05 kn the set gives way to a
 neutral mark of the same footprint so the header never changes size. No
 pill: a pill states a phase without a speed or a set, which is two of the
 three things the reader came for.
@@ -690,11 +707,11 @@ three things the reader came for.
 
 A surface that is refreshed on a clock — the widget — counts, but only
 once the answer is worth glancing at. Under two hours before a window's
-closing, a chip floats over the card's faded past swing: "SLACK ENDS"
-over a live timer to the closing, minutes and seconds, because inside
+closing, a chip floats over the card's faded past swing: "SLACK WINDOW
+ENDS" in the window colour over a live timer to the closing, minutes and seconds, because inside
 that stretch the question has changed to *how long do I have* (§5.4.1).
 Beyond two hours the corner shows nothing — there is no "> 2 hrs" state —
-and the reading alone, unchanged, says Slack. The list card, which the
+and the reading alone, unchanged, says the phase or Slack. The list card, which the
 reader is looking at rather than glancing at, never counts down; the
 countdown is one tap away in the detail readout.
 

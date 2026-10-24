@@ -37,6 +37,13 @@ var slackThresholdKn: Double {
                                ?? defaultSlackThresholdKn)
 }
 
+/// The speed under which the water is slack, inside a slack window measured at
+/// `windowThreshold`. Slack is physical and fixed at `slackKn`; a window set
+/// lower than that is slack throughout (#821).
+func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
+    min(slackKn, windowThreshold)
+}
+
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
 /// the same series the strip renders, so the window can never disagree with
@@ -83,6 +90,17 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (min(start, slack), max(end, slack))
 }
 
+/// Each slack's window at `threshold` and its slack core, measured on the same
+/// samples. A core lies inside its window; a slack outside the samples has neither.
+func measureSlacks(_ points: [CurrentPoint], slacks: [Date], threshold: Double)
+    -> (windows: [(slack: Date, start: Date, end: Date)], cores: [(slack: Date, start: Date, end: Date)]) {
+    let core = slackCoreThresholdKn(threshold)
+    func measure(_ at: Double) -> [(slack: Date, start: Date, end: Date)] {
+        slacks.compactMap { t in slackWindow(points, around: t, threshold: at).map { (slack: t, start: $0.start, end: $0.end) } }
+    }
+    return (measure(threshold), measure(core))
+}
+
 /// One usable run of slack water. Touching or overlapping windows merge into
 /// one run and carry one label (current-charts spec §4 rule 3); the predicate that
 /// produced each window is unchanged, only the drawing joins them.
@@ -125,10 +143,21 @@ func bareSlacks(_ slacks: [Date], runs: [WindowRun]) -> [Date] {
     slacks.filter { t in !runs.contains { $0.holdsSlack(at: t) } }
 }
 
-/// The reading says Slack inside a run, or within a second of a bare slack, where the magnet parks on its dot (scrubber §9.2).
-func readsSlack(at t: Date, runs: [WindowRun], slacks: [Date]) -> Bool {
-    runs.contains { $0.holdsSlack(at: t) }
-        || bareSlacks(slacks, runs: runs).contains { abs($0.timeIntervalSince(t)) < 1 }
+/// The reading says Slack inside a slack core, or within a second of a slack no core holds, where the magnet parks on its dot (scrubber §9.2).
+func readsSlack(at t: Date, runs cores: [WindowRun], slacks: [Date]) -> Bool {
+    cores.contains { $0.holdsSlack(at: t) }
+        || bareSlacks(slacks, runs: cores).contains { abs($0.timeIntervalSince(t)) < 1 }
+}
+
+/// One time per mark at a surface's scale: each drawn window's opening, and
+/// each slack mark outside every drawn window — a core at its axis moment, a
+/// slack no core holds at its instant. A window too short to draw gives way to
+/// the slack mark inside it.
+func slackAxisMoments(windows: [WindowRun], cores: [WindowRun], slacks: [Date],
+                      pointsPerHour: CGFloat) -> [Date] {
+    let drawn = windows.filter { !$0.drawsAsDot(pointsPerHour: pointsPerHour) }
+    let marks = cores.map { $0.axisMoment(pointsPerHour: pointsPerHour) } + bareSlacks(slacks, runs: cores)
+    return (drawn.map(\.start) + marks.filter { t in !drawn.contains { $0.contains(t) } }).sorted()
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

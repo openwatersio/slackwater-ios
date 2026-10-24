@@ -272,6 +272,10 @@ struct TimelineData {
     /// Empty for a derived gate: `build(gate:)` synthesises a schematic ±1
     /// shape, and a 0.5 kn window measured off a shape would be fiction.
     let slackWindows: [(slack: Date, start: Date, end: Date)]
+    /// Slack itself inside each window: the same measurement around the same
+    /// slack, at `slackCoreThresholdKn(slackThreshold)`. The green marks and
+    /// the lead's Slack come from these; the window's yellow from the windows.
+    var slackCores: [(slack: Date, start: Date, end: Date)] = []
     /// The setting used to build `slackWindows`, retained so the chart cannot
     /// render a different threshold than the duration it reports.
     var slackThreshold: Double = defaultSlackThresholdKn
@@ -371,32 +375,47 @@ struct TimelineData {
     }
 
     /// The measured slack windows as the strip draws them: merged into runs.
-    var slackRuns: [WindowRun] {
-        mergeWindows(slackWindows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
-    }
+    var windowRuns: [WindowRun] { mergedRuns(slackWindows) }
 
-    /// The slacks no run covers, each drawn and timed as a dot at its instant. On a derived gate, every slack.
+    /// The slack cores, merged into runs: the strip's green.
+    var coreRuns: [WindowRun] { mergedRuns(slackCores) }
+
+    private var slackTimes: [Date] { currentEvents.filter { $0.kind == .slack }.map(\.time) }
+
+    /// The slacks no core holds, each drawn and timed as a dot at its instant. On a derived gate, every slack.
     var bareSlackTimes: [Date] {
-        bareSlacks(currentEvents.filter { $0.kind == .slack }.map(\.time), runs: slackRuns)
+        bareSlacks(slackTimes, runs: coreRuns)
     }
 
-    /// The lead's Slack, on the same marks the strip draws and the magnet parks on.
+    /// The lead's Slack, on the same green marks the strip draws and the magnet parks on.
     func isSlack(at time: Date) -> Bool {
-        readsSlack(at: time, runs: slackRuns, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time))
+        readsSlack(at: time, runs: coreRuns, slacks: slackTimes)
     }
 
-    /// One event time per slack mark: each run's, and each bare slack's.
+    /// One event time per mark: each drawn window's opening, and each slack mark outside one.
     var slackAxisTimes: [Date] {
-        (slackRuns.map(\.axisMoment) + bareSlackTimes).sorted()
+        slackAxisMoments(windows: windowRuns, cores: coreRuns, slacks: slackTimes, pointsPerHour: Timeline.pph)
     }
 
-    /// A run drawn as a dot is one stop at its centre, and the events inside it go with it.
+    /// A drawn window stops at its opening and closing. A core is one stop at
+    /// a dot's centre, or two at a stroke's ends, and the events inside a core's
+    /// dot go with it. A window too short to draw has no stops of its own.
     static func currentSnapTimes(events: [CurrentEvent],
-                                 windows: [(slack: Date, start: Date, end: Date)]) -> [Date] {
-        let runs = mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
-        let dots = runs.filter(\.isDot)
+                                 windows: [(slack: Date, start: Date, end: Date)],
+                                 cores: [(slack: Date, start: Date, end: Date)]) -> [Date] {
+        let coreRuns = mergedRuns(cores)
+        let dots = coreRuns.filter(\.isDot)
         return events.map(\.time).filter { t in !dots.contains { $0.holdsSlack(at: t) } }
-            + runs.flatMap(\.snapMoments)
+            + mergedRuns(windows).filter { !$0.isDot }.flatMap(\.snapMoments)
+            + coreRuns.flatMap(\.snapMoments)
+    }
+
+    private static func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {
+        mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+    }
+
+    private func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {
+        Self.mergedRuns(windows)
     }
     func day(of t: Date) -> TimelineDay? {
         days.last { $0.start <= t }
@@ -561,17 +580,14 @@ struct TimelineData {
         // downloaded rather than computed — so the window means exactly what it
         // means at a harmonic station. Same computation, same series the strip
         // draws.
-        let windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
-            slackWindow(currentPoints, around: e.time,
-                        threshold: threshold)
-                .map { (slack: e.time, start: $0.start, end: $0.end) }
-        }
+        let (windows, cores) = measureSlacks(currentPoints, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
+                                             threshold: threshold)
 
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
-        let snaps = Array(Set(currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
+        let snaps = Array(Set(currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
                               + eclipses.map(\.peak)
                               + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
@@ -581,7 +597,7 @@ struct TimelineData {
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
-                            slackWindows: windows, slackThreshold: threshold)
+                            slackWindows: windows, slackCores: cores, slackThreshold: threshold)
     }
 
     static func build(preview: ChsTidePreview, tide: TideStationRecord, now: Date, anchor: Date) -> TimelineData? {
@@ -631,16 +647,14 @@ struct TimelineData {
         // gate branch below, which overwrites `currentPoints`/`currentEvents`
         // with schematic data, can never make windows out of that fiction.
         var windows: [(slack: Date, start: Date, end: Date)] = []
+        var cores: [(slack: Date, start: Date, end: Date)] = []
         if let current {
             let s = current.engineStation
             currentPoints = s.speeds(from: start, to: end, step: 600)
             currentEvents = s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad))
-            windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
-                slackWindow(currentPoints, around: e.time,
-                            threshold: threshold)
-                    .map { (slack: e.time, start: $0.start, end: $0.end) }
-            }
+            (windows, cores) = measureSlacks(currentPoints, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
+                                             threshold: threshold)
         }
         if let gate {
             let g = gate.engineGate
@@ -663,7 +677,7 @@ struct TimelineData {
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentSnapTimes(events: currentEvents, windows: windows) + sunTimes
+                              + currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
                               + eclipses.map(\.peak)
                               + solarEclipses.map(\.peak)))
             .filter { $0 >= start && $0 <= end }.sorted()
@@ -673,6 +687,7 @@ struct TimelineData {
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
                             slackWindows: windows,
+                            slackCores: cores,
                             slackThreshold: threshold,
                             speedsAreSchematic: gate != nil)
     }
@@ -1155,6 +1170,22 @@ struct TimelineCanvas: View {
         }
     }
 
+    /// Each run the tile touches as a sub-path of the curve. Walks THIS TILE's
+    /// samples, not the window's, once per run it touches: the window-wide scan
+    /// was the strip's worst cost, a full pass per run per tile.
+    private func runSegments(_ runs: [WindowRun], _ points: ArraySlice<CurrentPoint>,
+                             _ t0: Date, _ t1: Date) -> [Path] {
+        runs.filter { $0.end >= t0 && $0.start <= t1 }.map { run -> Path in
+            var seg = Path()
+            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+            for p in points where p.time > run.start && p.time < run.end {
+                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            return seg
+        }
+    }
+
     private func drawCurrent(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
         let points = window(data.currentPoints, { $0.time }, t0, t1)
         guard let first = points.first, let last = points.last else { return }
@@ -1166,21 +1197,10 @@ struct TimelineCanvas: View {
         // Merged over the whole window — runs join across a seam, and the
         // axis labels must see every one of them or they would disagree from
         // tile to tile. Only the drawn segments are cut to the tile.
-        let allRuns = data.slackRuns
-        let runs = allRuns.filter { $0.end >= t0 && $0.start <= t1 }
         // The run segments, built before the line because the line clips
-        // itself around them. Walks THIS TILE's samples, not the window's,
-        // once per run it touches: the window-wide scan was the strip's worst
-        // cost, a full pass per run per tile.
-        let segs = runs.map { run -> Path in
-            var seg = Path()
-            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-            for p in points where p.time > run.start && p.time < run.end {
-                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
-            }
-            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-            return seg
-        }
+        // itself around the windows.
+        let segs = runSegments(data.windowRuns, points, t0, t1)
+        let coreSegs = runSegments(data.coreRuns, points, t0, t1)
         let xa = data.x(first.time), xb = data.x(last.time)
         seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
 
@@ -1206,9 +1226,11 @@ struct TimelineCanvas: View {
                                      nowX: nowX, width: data.totalWidth, height: geo.height)
         }
 
-        // The run is the mark (spec §5.2): the line itself turns the go
-        // colour between each run's interpolated edges (CurveDrawing.runs).
-        CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
+        // The run is the mark (spec §5.2): the line itself turns the window
+        // colour between each window's interpolated edges, then the go colour
+        // across the slack inside it (CurveDrawing.windows, .runs).
+        CurveDrawing.windows(ctx, segs, cores: coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
+        CurveDrawing.runs(ctx, coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1)
         let bare = data.bareSlackTimes

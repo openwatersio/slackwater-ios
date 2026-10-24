@@ -121,18 +121,19 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(g.endText, cardTime(window.end, tz))
     }
 
-    func testWordIsSlackInsideAWindowAboveTheFixedThreshold() throws {
-        // A moment the card calls slack (inside its window) whose speed is
-        // still above the phase word's fixed 0.15 kn.
+    func testWordIsThePhaseInsideAWindowAboveTheSlackSpeed() throws {
+        // A moment inside the card's slack window whose speed is still above
+        // the 0.15 kn slack speed: the water is moving, and the word says so (#821).
         guard case .current(let s, _, _) = current else { return XCTFail() }
         let runs = try cardRuns(at: now)
         let p = try XCTUnwrap(s.speeds(from: now, to: now.addingTimeInterval(48 * 3600), step: 600).first { p in
-            (slackKn..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
+            (slackKn * 1.5..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
         })
-        XCTAssertNotEqual(currentPhase(signed: p.speed), .slack)
+        let phase = currentPhase(signed: p.speed)
+        XCTAssertNotEqual(phase, .slack)
         let r = try XCTUnwrap(ComplicationReading.build(current, now: p.time))
-        XCTAssertEqual(r.word, CurrentPhase.slack.word)
-        XCTAssertEqual(r.symbol, "arrow.left.arrow.right")
+        XCTAssertEqual(r.word, phase.word)
+        XCTAssertEqual(r.symbol, phase == .flood ? "arrow.up.right" : "arrow.down.right")
     }
 
     func testWordIsNotSlackOutsideAWindowBelowTheFixedThreshold() throws {

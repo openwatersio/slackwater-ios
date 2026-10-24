@@ -91,7 +91,8 @@ import SlackwaterKit
     func testEveryCommentaryEventUsesItsOwnSymbolAndFullSpokenLabel() throws {
         let currentCases: [(scrub: Date, label: String, spoken: String, symbol: String)] = [
             (at(-100), "Max flood", "Maximum flood current", "arrow.forward"),
-            (at(10), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
+            (at(10), "Slack window", "Slack window", "arrow.right.and.line.vertical.and.arrow.left"),
+            (at(3000), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
             (at(3600), "Ebb", "Ebb current", "arrow.backward"),
             (at(4300), "Max ebb", "Maximum ebb current", "arrow.backward"),
             (at(9000), "Flood", "Flood current", "arrow.forward"),
@@ -122,10 +123,13 @@ import SlackwaterKit
 
     /// A synthetic current day: a flood max, a slack with a window either side
     /// of it, an ebb max, a second window, and a slack at the series' end that
-    /// no window covers. Velocities interpolate between the listed points, which is what
+    /// no window covers. Each window holds a slack core around its slack, short
+    /// enough to draw as a dot at its slack.
+    /// Velocities interpolate between the listed points, which is what
     /// tells a window's CLOSING whether the run after it floods or ebbs.
     private func timeline(days: [TimelineDay] = [], drawnUntil: Double = 18_000,
-                          windows: [(slack: Date, start: Date, end: Date)]? = nil) -> TimelineData {
+                          windows: [(slack: Date, start: Date, end: Date)]? = nil,
+                          cores: [(slack: Date, start: Date, end: Date)]? = nil) -> TimelineData {
         TimelineData(
             tz: utc, anchor: t0, today: t0, start: at(-3600), end: at(18_000),
             days: days, tidePoints: [], tideRates: [], tideExtremes: [],
@@ -149,6 +153,10 @@ import SlackwaterKit
             slackWindows: windows ?? [
                 (slack: at(3600), start: at(3000), end: at(4200)),
                 (slack: at(9000), start: at(8400), end: at(9600)),
+            ],
+            slackCores: cores ?? [
+                (slack: at(3600), start: at(3500), end: at(3700)),
+                (slack: at(9000), start: at(8900), end: at(9100)),
             ])
     }
 
@@ -186,12 +194,47 @@ import SlackwaterKit
         XCTAssertEqual(spokenUnit("ft"), "feet")
     }
 
-    /// Slack is the measured window and nothing else: weak water outside a
-    /// window still names its direction, and the window holds Slack at any speed.
-    func testTheLeadSaysSlackOnlyInsideAWindow() {
+    /// Slack is the measured slack core and nothing else: weak water outside a
+    /// window still names its direction, and so does water inside the slack
+    /// window but outside its core (#821).
+    func testTheLeadSaysSlackOnlyInsideASlackCore() {
         XCTAssertEqual(lead(scrub: at(5000), signed: 0.1).spoken, "Flooding 0.1 knots N")
         XCTAssertEqual(lead(scrub: at(5000), signed: -0.1).spoken, "Ebbing 0.1 knots S")
-        XCTAssertEqual(lead(scrub: at(3600), signed: 0.4).spoken, "Slack 0.4 knots")
+        XCTAssertEqual(lead(scrub: at(3100), signed: 0.4).spoken, "Flooding 0.4 knots N",
+                       "inside the slack window, the water is still flooding")
+        XCTAssertEqual(lead(scrub: at(3500), signed: 0.1).spoken, "Slack 0.1 knots", "a core dot holds its own span")
+        XCTAssertEqual(lead(scrub: at(3700), signed: -0.1).spoken, "Ebbing 0.1 knots S", "the core's closing is not slack")
+    }
+
+    /// A weak station whose whole flood stays under the comfort current: the
+    /// window covers the maximum, and the lead still says Max flood there and
+    /// Flooding around it (#821, Little Misery Island).
+    func testAWindowCoveringAMaximumStillNamesTheFlood() {
+        let weak = timeline(windows: [(slack: at(3600), start: at(-3600), end: at(4200))])
+        XCTAssertEqual(lead(scrub: t0, signed: 0.4, timeline: weak).spoken, "Max flood 0.4 knots N")
+        XCTAssertEqual(lead(scrub: at(1000), signed: 0.4, timeline: weak).spoken, "Flooding 0.4 knots N")
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0, timeline: weak).spoken, "Slack 0.0 knots")
+    }
+
+    /// A slack whose water never gets under the slack speed has no core. It
+    /// keeps its dot, and parked on that dot the lead says Slack.
+    func testASlackWithoutACoreReadsSlackOnlyOnItsDot() {
+        let rotary = timeline(cores: [(slack: at(9000), start: at(8900), end: at(9100))])
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0.3, timeline: rotary).spoken, "Slack 0.3 knots")
+        XCTAssertEqual(lead(scrub: at(3602), signed: -0.3, timeline: rotary).spoken, "Ebbing 0.3 knots S")
+        assertNext(at(10), at(3000), "Slack window", "the window still opens", in: rotary)
+        assertNext(at(3000), at(3600), "Slack", "the slack's own dot", in: rotary)
+    }
+
+    /// A comfort current under the slack speed makes the whole window slack: one
+    /// stop, named Slack, where the window and its core open together.
+    func testAWindowThatIsAllCoreOpensAsSlack() {
+        let narrow = timeline(cores: [
+            (slack: at(3600), start: at(3000), end: at(4200)),
+            (slack: at(9000), start: at(8400), end: at(9600)),
+        ])
+        assertNext(at(10), at(3000), "Slack", "one stop for the shared opening", in: narrow)
+        assertNext(at(3000), at(4200), "Ebb", "then the closing", in: narrow)
     }
 
     /// Parked on a slack no window covers, the lead agrees with its green dot and the pill that named it.
@@ -202,23 +245,28 @@ import SlackwaterKit
     }
 
     func testAClosingSlackIsNamedSlackByBothTheCommentaryAndLead() {
-        let tl = timeline(windows: [(slack: at(3600), start: at(1800), end: at(3600))])
-        assertNext(at(2000), at(3600), "Slack", "the slack owns the closing instant", in: tl)
+        let tl = timeline(windows: [(slack: at(3600), start: at(1800), end: at(3600))],
+                          cores: [(slack: at(3600), start: at(3400), end: at(3600))])
+        assertNext(at(3500), at(3600), "Slack", "the slack owns the closing instant", in: tl)
         XCTAssertEqual(lead(scrub: at(3600), signed: 0, timeline: tl).spoken, "Slack 0.0 knots")
         assertNext(at(3600), at(6000), "Max ebb", "parked on the slack, the commentary advances", in: tl)
     }
 
     /// Every kind of stop the commentary can walk to, in the order the day
-    /// presents them. A window contributes TWO stops — its opening is the
-    /// slack, its closing is the run that begins. A slack inside a window is
-    /// never a stop itself, so the pill never says "Slack" twice for one turn;
-    /// a slack no window covers is drawn as a dot, so it is one stop, at its instant.
+    /// presents them. A window contributes its opening, named Slack window, and
+    /// its closing, named for the run that begins. Its core contributes Slack at
+    /// the core's opening, or its centre when it draws as a dot, as these do.
+    /// A slack inside a core is never a stop itself, so the
+    /// pill never says "Slack" twice for one turn; a slack no core holds is
+    /// drawn as a dot, so it is one stop, at its instant.
     func testNextSignificantNamesEveryKindOfStop() {
         assertNext(at(-100), t0, "Max flood", "the flood max is the first stop of the day")
-        assertNext(at(10), at(3000), "Slack", "a window's opening is a slack")
+        assertNext(at(10), at(3000), "Slack window", "a window's opening")
+        assertNext(at(3000), at(3600), "Slack", "its core's dot is the slack")
         assertNext(at(3600), at(4200), "Ebb", "inside a window, the next stop is its closing")
         assertNext(at(4300), at(6000), "Max ebb", "the ebb max")
-        assertNext(at(6100), at(8400), "Slack", "the second window opens")
+        assertNext(at(6100), at(8400), "Slack window", "the second window opens")
+        assertNext(at(8400), at(9000), "Slack", "and its core")
         assertNext(at(9000), at(9600), "Flood",
                    "a closing is named by the velocity after it, not by the one before")
         assertNext(at(9700), at(12_600), "Slack", "a slack no window covers is one stop, at its instant")
@@ -229,8 +277,9 @@ import SlackwaterKit
     /// tapping the commentary scrubs you to where you already are, and the
     /// walk stops dead — the magnet snaps onto these times exactly.
     func testScrubOnAStopAdvancesToTheFollowingOne() {
-        assertNext(t0, at(3000), "Slack", "parked on the flood max, the next stop is the window")
-        assertNext(at(3000), at(4200), "Ebb", "parked on the opening, the next stop is the closing")
+        assertNext(t0, at(3000), "Slack window", "parked on the flood max, the next stop is the window")
+        assertNext(at(3000), at(3600), "Slack", "parked on the opening, the next stop is the core")
+        assertNext(at(3600), at(4200), "Ebb", "parked on the core, the next stop is the closing")
     }
 
     /// The summary tile: the maximum the water is heading FOR. Slack events
@@ -342,7 +391,7 @@ import SlackwaterKit
                        at(6 * 3600), "the tide's walk skips the turn it is on")
         XCTAssertEqual(firstCommentaryStop([at(0.5), at(3600)], at: { $0 }, after: t0, drawn: wholeDay),
                        at(3600), "and so does a derived gate's")
-        assertNext(at(2999.5), at(4200), "Ebb", "the current's walk skips the opening it is on")
+        assertNext(at(2999.5), at(3600), "Slack", "the current's walk skips the opening it is on")
     }
 
     /// A stop past the last drawn sample, water or sun, would send the tap past the data.
@@ -365,9 +414,10 @@ import SlackwaterKit
 
     /// A run drawn as one dot is one stop, so the walk never names an opening and closing around a single mark.
     func testADotRunIsOneStopAtItsCentre() {
-        let dot = timeline(windows: [(slack: at(3600), start: at(3200), end: at(3800))])
-        assertNext(at(10), at(3500), "Slack", "the dot's centre is the stop", in: dot)
-        assertNext(at(3500), at(6000), "Max ebb", "a dot has no closing to name", in: dot)
+        let dot = timeline(windows: [(slack: at(3600), start: at(3200), end: at(3800))],
+                           cores: [(slack: at(3600), start: at(3500), end: at(3650))])
+        assertNext(at(10), at(3575), "Slack", "a window that short is not drawn: its core's dot is the stop", in: dot)
+        assertNext(at(3575), at(6000), "Max ebb", "a dot has no closing to name", in: dot)
     }
 
     /// The sun's clock is exact even when the velocities are a fast answer —
@@ -389,10 +439,10 @@ import SlackwaterKit
         XCTAssertEqual(
             lead(scrub: at(2010), provisional: true, days: [sunsetDay]).commentary,
             CommentaryContent(
-                label: "~Slack",
+                label: "~Slack window",
                 duration: "16m",
                 systemImage: "arrow.right.and.line.vertical.and.arrow.left",
-                accessibilityLabel: "Slack current in 16 minutes"
+                accessibilityLabel: "Slack window in 16 minutes"
             )
         )
     }

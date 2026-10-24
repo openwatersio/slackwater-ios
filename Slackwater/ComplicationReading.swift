@@ -84,7 +84,9 @@ struct ComplicationReading: Equatable {
             let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
             let runs = cardWindows(points: points, slacks: slacks)
             let windows = runs.map { hours($0.start)...hours($0.end) }
-            let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: runs, slacks: slacks))
+            // Slack is the core inside the window, as on the card's reading.
+            let cores = cardCores(points: points, slacks: slacks)
+            let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
             let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
             return ComplicationReading(
