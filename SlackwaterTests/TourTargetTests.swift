@@ -4,6 +4,20 @@ import XCTest
 @testable import Slackwater
 
 final class TourTargetTests: XCTestCase {
+    func testStarsTimeStaysInsideDownloadedCoverage() {
+        let days = [day(0, sunrise: 6, sunset: 20, moonrise: 22, moonset: 30),
+                    day(1, sunrise: 30, sunset: 44, moonrise: 46, moonset: 54)]
+        XCTAssertNil(tourStarsTime(days: days, after: h(23.5), within: h(0)...h(24)))
+        XCTAssertEqual(tourStarsTime(days: days, after: h(12), within: h(0)...h(24)), h(21))
+    }
+
+    func testMoonTimeStaysInsideDownloadedCoverage() {
+        let days = [day(0, sunrise: 6, sunset: 20, moonrise: 22, moonset: 30),
+                    day(1, sunrise: 30, sunset: 44, moonrise: 46, moonset: 54)]
+        XCTAssertNil(tourMoonTime(days: days, after: h(23.5), within: h(0)...h(24)))
+        XCTAssertEqual(tourMoonTime(days: days, after: h(12), within: h(0)...h(30)), h(26))
+    }
+
     private let t0 = Date(timeIntervalSince1970: 1_758_000_000)  // arbitrary fixed epoch
     private func h(_ hours: Double) -> Date { t0.addingTimeInterval(hours * 3600) }
 

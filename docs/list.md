@@ -322,7 +322,7 @@ The map's preview panel uses the station card (§6) without a distance; tapping 
 
 The app opens straight to the list. There is no gate screen. The list's first appearance asks for location once, and never again on a later launch; the Not determined card (§4) is the way back to the prompt after that.
 
-If the coach-mark tour has not been seen and no deep link has opened a station, that same first appearance opens the nearest bundled NOAA tide station within 150 km of the anchor, or Friday Harbor (`noaa/9449880`) when none is that close. On a true first launch there is no fix yet, so it is Friday Harbor, with the system location prompt over it. The tour draws on that detail, not on the list. While the prompt is up, the My Location slot shows its locating state; once a fix arrives, the list re-ranks around it.
+If the coach-mark tour has not been seen and no deep link has opened a station, that same first appearance opens the nearest bundled or Canadian tide place within 150 km of the available device fix, or Friday Harbor (`noaa/9449880`) when no fix or nearby tide place is available. A Canadian place opens its waiting page and prioritizes its download. The tour begins when the initial usable prediction timeline appears while the remaining download and progress continue. The completed model preserves the tour step and selected instant. On a true first launch with no fix yet, Friday Harbor opens with the system location prompt over it. The tour draws on that detail, not on the list. While the prompt is up, the My Location slot shows its locating state; once a fix arrives, the list re-ranks around it.
 
 ## 12. Accessibility
 

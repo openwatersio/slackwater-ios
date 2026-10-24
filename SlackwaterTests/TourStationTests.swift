@@ -4,15 +4,19 @@ import CoreLocation
 @testable import Slackwater
 
 final class TourStationTests: XCTestCase {
-    // Victoria BC: Canadian fix, but the nearby bundled NOAA stations need no
-    // download, which is what lets the tour run during the CHS wait.
-    func testPicksANearbyBundledStationForAVictoriaFix() {
-        let id = tourStationID(near: CLLocationCoordinate2D(latitude: 48.42, longitude: -123.37))
-        let picked = StationIndex.bundled.tides.first { $0.id == id }
-        XCTAssertNotNil(picked, "the pick must name a bundled station")
-        let d = CLLocation(latitude: picked!.latitude, longitude: picked!.longitude)
-            .distance(from: CLLocation(latitude: 48.42, longitude: -123.37))
-        XCTAssertLessThan(d, 60_000, "a Victoria fix should teach on local water")
+    func testPicksNanaimoRatherThanAFartherBundledStation() {
+        XCTAssertEqual(tourStationID(near: CLLocationCoordinate2D(latitude: 49.1659, longitude: -123.9401)),
+                       "chs-nanaimo-harbour")
+    }
+
+    func testPicksVictoriaForAVictoriaFix() {
+        XCTAssertEqual(tourStationID(near: CLLocationCoordinate2D(latitude: 48.42, longitude: -123.37)),
+                       "chs-victoria")
+    }
+
+    func testPicksSeattleForASeattleFix() {
+        XCTAssertEqual(tourStationID(near: CLLocationCoordinate2D(latitude: 47.60, longitude: -122.34)),
+                       "noaa/9447130")
     }
 
     // No fix at all — a first launch before the location prompt is answered,
@@ -43,6 +47,17 @@ final class TourStationTests: XCTestCase {
         coach.begin(on: "noaa/9449880", starsAvailable: true, moonAvailable: true)
         XCTAssertNil(coach.station, "the replaced station claimed the tour back")
 
+        coach.begin(on: "noaa/9447130", starsAvailable: true, moonAvailable: true)
+        XCTAssertEqual(coach.station, "noaa/9447130")
+        XCTAssertEqual(coach.step, .read)
+    }
+
+    @MainActor func testALinkReservesTheTourBeforeCanadianPredictionsArrive() {
+        let coach = TourCoach()
+        coach.replay()
+        coach.handOff(to: "noaa/9447130")
+        coach.begin(on: "chs-nanaimo-harbour", starsAvailable: true, moonAvailable: true)
+        XCTAssertNil(coach.step, "late predictions must not claim a tour handed to a link")
         coach.begin(on: "noaa/9447130", starsAvailable: true, moonAvailable: true)
         XCTAssertEqual(coach.station, "noaa/9447130")
         XCTAssertEqual(coach.step, .read)
