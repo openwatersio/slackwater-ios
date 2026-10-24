@@ -266,12 +266,16 @@ jobs:
       group: ci-app-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: macos-latest
-    # Keep each iPad test session under about 45 min: setup before it takes
-    # about 10, and the rerun step below can add a few tests' worth. A runner
-    # that hangs inside xcodebuild sits at GitHub's six-hour default otherwise:
-    # #550's list shard was 67 min into a 10-minute step, holding a slot, until
-    # someone cancelled it.
-    timeout-minutes: 60
+    # Balance lanes so a typical iPad test session stays under about 45 min:
+    # setup before it takes about 10, and the rerun step below can add a few
+    # tests' worth. The cap sits higher because hosted runners vary more than
+    # the lanes do: the same five unchanged Settings tests took 6 to 12 min on
+    # different runners, and one offline · iPad job took 57 min. A slow runner
+    # plus a long rerun can still reach it. A runner that hangs inside
+    # xcodebuild sits at GitHub's six-hour default otherwise: #550's list
+    # shard was 67 min into a 10-minute step, holding a slot, until someone
+    # cancelled it.
+    timeout-minutes: 75
     # Five shards per device: a PR's five iPhone jobs fill the org's five macOS
     # slots in one wave, and a push to main's ten fill them in two.
     #
