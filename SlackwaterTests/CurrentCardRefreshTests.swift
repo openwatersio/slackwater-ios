@@ -32,21 +32,21 @@ final class CurrentCardRefreshTests: XCTestCase {
             host.view.layoutIfNeeded()
             try await Task.sleep(for: .milliseconds(300))
             let narrowImage = snapshot(host.view)
-            let narrow = try windowPixels(narrowImage)
+            let narrow = try beyondPixels(narrowImage)
 
             defaults.set(10.0, forKey: key)
             try await Task.sleep(for: .milliseconds(300))
             host.view.layoutIfNeeded()
-            let wide = try windowPixels(snapshot(host.view))
-            XCTAssertGreaterThan(wide, narrow * 2,
-                                 "The mounted \(eager ? "eager" : "lazy") card kept its old slack window")
+            let wide = try beyondPixels(snapshot(host.view))
+            XCTAssertLessThan(wide * 2, narrow,
+                              "The mounted \(eager ? "eager" : "lazy") card kept its old slack window")
             let reopened = ImageRenderer(content:
                 CurrentCardView(record: record, eager: true)
                     .frame(width: 364, height: 168)
                     .background(SN.canvas))
             reopened.scale = narrowImage.scale
-            XCTAssertGreaterThan(try windowPixels(XCTUnwrap(reopened.uiImage)), narrow * 2,
-                                 "Reopening the preview reused the old cached window")
+            XCTAssertLessThan(try beyondPixels(XCTUnwrap(reopened.uiImage)) * 2, narrow,
+                              "Reopening the preview reused the old cached window")
         }
     }
 
@@ -79,13 +79,13 @@ final class CurrentCardRefreshTests: XCTestCase {
         defer { window.isHidden = true }
         host.view.layoutIfNeeded()
         try await Task.sleep(for: .milliseconds(300))
-        let narrow = try windowPixels(snapshot(host.view))
+        let narrow = try beyondPixels(snapshot(host.view))
 
         defaults.set(10.0, forKey: key)
         try await Task.sleep(for: .milliseconds(300))
         host.view.layoutIfNeeded()
-        XCTAssertGreaterThan(try windowPixels(snapshot(host.view)), narrow * 2,
-                             "The mounted online card kept its old slack window")
+        XCTAssertLessThan(try beyondPixels(snapshot(host.view)) * 2, narrow,
+                          "The mounted online card kept its old slack window")
     }
 
     @MainActor
@@ -95,8 +95,9 @@ final class CurrentCardRefreshTests: XCTestCase {
         }
     }
 
-    /// The slack window's ink: the window colour, or the go colour of the slack inside it.
-    private func windowPixels(_ image: UIImage) throws -> Int {
+    /// The line outside every slack window, in the beyond-window yellow: a
+    /// wider window leaves less of it.
+    private func beyondPixels(_ image: UIImage) throws -> Int {
         let cg = try XCTUnwrap(image.cgImage)
         var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
         let context = try XCTUnwrap(CGContext(
@@ -106,9 +107,7 @@ final class CurrentCardRefreshTests: XCTestCase {
         context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
         return stride(from: 0, to: bytes.count, by: 4).filter {
             let r = Int(bytes[$0]), g = Int(bytes[$0 + 1]), b = Int(bytes[$0 + 2])
-            let green = g > r + 15 && r > b + 15
-            let yellow = r > 200 && g > 160 && r > g + 20 && b < 150
-            return green || yellow
+            return r > 200 && g > 160 && r > g + 20 && b < 150
         }.count
     }
 }

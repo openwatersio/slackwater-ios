@@ -44,11 +44,14 @@ enum SN {
     static let flood = Color(hex: floodHex)
     static let ebb = Color(hex: ebbHex)
     static let go = Color(hex: goHex)
+    /// A measured current's line outside its slack window: water over the
+    /// person's slack-window speed. The speed ramp's first stop, so the excess
+    /// over the limit reads warm on the same scale (#821).
+    static let beyondWindowHex: UInt32 = 0xF5C96B
+    static let beyondWindow = Color(hex: beyondWindowHex)
     /// A slack window: water under the person's slack-window speed that is
-    /// still moving. The speed ramp's first stop, so the window reads as slow
-    /// water on the same scale; green stays for slack itself (#821).
-    static let slackWindowHex: UInt32 = 0xF5C96B
-    static let slackWindow = Color(hex: slackWindowHex)
+    /// still moving, in the curve's own blue. Green stays for slack itself.
+    static let slackWindow = graphLine
     static let rising = flood
     static let falling = ebb
     /// Pale flood/ebb for small chart text on near-black — derived from the
