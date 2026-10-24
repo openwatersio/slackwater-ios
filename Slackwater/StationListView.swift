@@ -58,11 +58,7 @@ struct StationListView: View {
     /// The locate FAB was tapped with no fix to center on yet — the first fix
     /// that lands recenters the map, exactly once.
     @State private var pendingLocate = false
-    /// One shot per launch: without it, popping back to the list before the
-    /// pushed detail's first timeline build (the only thing that clears
-    /// `TourCoach.shared.armed`) leaves `armed` set, so `.onAppear` would
-    /// re-open the same tour station forever. Settings' replay bypasses this
-    /// latch entirely — it opens the station directly, not through here.
+    /// Open the first-run destination once per list lifetime; Settings replay opens its place directly.
     @State private var hasOpenedTourStation = false
     /// A link opened a station. Set before the first appear, it keeps the
     /// tour push from replacing the station the user asked for.
@@ -247,11 +243,7 @@ struct StationListView: View {
         .overlay { if searching { searchOverlay } }
         .onAppear {
             loc.refreshIfAuthorized()
-            // First run: bring the user to a detail that can teach, before
-            // anything else claims the tour. With no fix yet this is Friday
-            // Harbor, and the location prompt below lands over it. A bundled
-            // station needs no download, so this works offline and with
-            // location denied.
+            // A Canadian place keeps the tour armed on its waiting page until usable predictions arrive.
             if TourCoach.shared.armed, !hasOpenedTourStation, !hasOpenedLink,
                let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] {
                 hasOpenedTourStation = true
@@ -608,7 +600,7 @@ struct StationListView: View {
     }
 
     /// Settings' "Show the tour again". A sheet dismissal does not re-fire
-    /// this view's `.onAppear` (unlike a pop from a pushed detail), so the
+    /// this view's `.onAppear`, so the
     /// existing armed-tour `.onAppear` path can never claim this — open the
     /// station directly instead. `open` pushes it, and the pushed detail's
     /// own `begin()` fires once its timeline builds, the same as any other
@@ -616,6 +608,7 @@ struct StationListView: View {
     private func replayTour() {
         TourCoach.shared.replay()
         guard let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] else { return }
+        hasOpenedTourStation = true
         open(item)
     }
 

@@ -310,6 +310,8 @@ A host moves the strip only by an explicit request. Commentary, Now, foreground 
 
 A finger that is still down retains control. A request that arrives during an active drag waits; when the finger lifts, it replaces the drag's momentum and moves by the rule above, and a newer request replaces a waiting one. On the first-run tour, a drag on the stars step advances the tour on its first frame, so the moon step's ride starts when that finger lifts. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour.
 
+The tour enables its stars and moon steps only when their target instants lie within the loaded prediction interval. A finite Canadian tide preview skips a sky step whose target falls beyond its downloaded bounds. The enabled steps stay fixed for that tour run when a completed model widens the interval.
+
 When nothing is moving and no request is waiting, but the offset and the selection disagree by more than one unit, the strip lands directly on the selection without animation.
 
 When the viewport width changes—rotation, split screen, or browser resize—recompute the offset so the existing `selectedTime` remains under the new centreline. Cancel momentum or a magnetic settle if needed. The resize must not change `selectedTime`, replay the opening, or briefly publish the wrong centre value.

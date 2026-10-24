@@ -112,23 +112,22 @@ let seenTourKey = "slackwater.seenTour"
 /// dark and the stars are worth pointing at.
 private let darkMargin: TimeInterval = 3600
 
-/// The moment the tour glides to for its stars beat, or nil above the Arctic
-/// Circle in summer, where the window holds no sunset at all.
+/// An upcoming dark instant inside coverage, or nil when none is reachable.
 ///
 /// Read off `TimelineDay`, never searched for: `SkyState` documents why a rise
 /// or set search does not belong on this page (Theme.swift), and the timeline
 /// build has already paid for these.
-func tourStarsTime(days: [TimelineDay], after now: Date) -> Date? {
+func tourStarsTime(days: [TimelineDay], after now: Date, within coverage: ClosedRange<Date>? = nil) -> Date? {
     days.compactMap(\.sunset)
-        .sorted()
-        .first { $0.addingTimeInterval(darkMargin) > now }
         .map { $0.addingTimeInterval(darkMargin) }
+        .sorted()
+        .first { $0 > now && (coverage?.contains($0) ?? true) }
 }
 
 /// The midpoint of the first span where the moon is up AND the sun is down —
 /// the only kind of moment where "that is the real moon" is worth showing.
-/// Nil when no such span falls in the window.
-func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
+/// Nil when no such midpoint falls inside coverage.
+func tourMoonTime(days: [TimelineDay], after now: Date, within coverage: ClosedRange<Date>? = nil) -> Date? {
     let sunsets = days.compactMap(\.sunset).sorted()
     let sunrises = days.compactMap(\.sunrise).sorted()
     // A dark span runs from a sunset to the next sunrise after it.
@@ -153,7 +152,7 @@ func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
         }
     }
     .sorted()
-    .first { $0 > now }
+    .first { $0 > now && (coverage?.contains($0) ?? true) }
 }
 
 // MARK: - Which station the tour teaches on
@@ -167,16 +166,14 @@ let tourFallbackStationID = "noaa/9449880"
 /// is more honest than a station on another coast.
 private let tourStationRangeKm = 150.0
 
-/// The nearest bundled tide station to the fix, else Friday Harbor.
-///
-/// Reads `StationIndex.bundled`, the identity-only index — never
-/// `StationItem.all`, whose decode is the launch cost #317 is about. Bundled
-/// stations need no download, which is what lets the tour run with no network
-/// and no location at all.
+/// The nearest bundled or Canadian tide place within range, else Friday Harbor.
+/// Only identities are needed here; a Canadian detail waits for its first usable predictions.
 func tourStationID(near fix: CLLocationCoordinate2D?) -> String {
     guard let fix else { return tourFallbackStationID }
     let here = CLLocation(latitude: fix.latitude, longitude: fix.longitude)
-    let nearest = StationIndex.bundled.tides
+    let stations = StationIndex.bundled.tides
+        + ChsStationInfo.all.map { StationIndexInfo($0, timezone: $0.timezone) }
+    let nearest = stations
         .map { ($0.id, CLLocation(latitude: $0.latitude, longitude: $0.longitude).distance(from: here)) }
         .min { $0.1 < $1.1 }
     guard let nearest, nearest.1 <= tourStationRangeKm * 1000 else { return tourFallbackStationID }
