@@ -31,27 +31,30 @@ struct CurrentLead: View {
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
-    /// The stops the commentary walks: a slack run's opening, its closing
-    /// (the run that begins), each max, and the sun's next rise or set when
-    /// it beats all of them. A run drawn as a dot is one stop, its centre, and a slack no run covers is one stop, its instant.
+    /// The stops the commentary walks: a slack window's opening, its closing
+    /// (the run that begins), the slack inside it, each max, and the sun's
+    /// next rise or set when it beats all of them. The slack is its core's
+    /// opening, or one stop at a core dot's centre or at a slack no core holds.
+    /// A window too short to draw has no stops; the slack inside it does.
     var nextSignificant: CommentaryStop? {
-        var stops: [(time: Date, text: String)] = []
+        var slacks: [Date] = []
+        for core in timeline.coreRuns {
+            slacks.append(core.isDot ? core.centre : core.start)
+        }
+        slacks += timeline.bareSlackTimes
+        var stops: [(time: Date, text: String)] = slacks.map { ($0, "Slack") }
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
-        for run in timeline.slackRuns {
-            if run.isDot {
-                stops.append((run.centre, "Slack"))
-                continue
+        for run in timeline.windowRuns where !run.isDot {
+            // A window and its core opening together are one stop, the slack.
+            if !slacks.contains(run.start) {
+                stops.append((run.start, "Slack window"))
             }
-            stops.append((run.start, "Slack"))
             // A run that reaches the series' end never closes, so no run
             // begins there. Direction is read a second past the edge.
             if run.end < seriesEnd && !timeline.isSlack(at: run.end) {
                 let v = timeline.velocityAt(run.end.addingTimeInterval(1))
                 stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
             }
-        }
-        for t in timeline.bareSlackTimes {
-            stops.append((t, "Slack"))
         }
         for e in timeline.currentEvents where e.kind != .slack {
             stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))

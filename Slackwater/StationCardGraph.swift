@@ -114,6 +114,9 @@ nonisolated struct StationCardGraph: View {
     /// effective threshold — never re-derived in the canvas (§6.1). Only
     /// signed current curves carry them.
     var windows: [WindowRun] = []
+    /// The slack inside each window (`slackCoreThresholdKn`), from the same
+    /// predicate: the card's green, and its reading's Slack.
+    var cores: [WindowRun] = []
     /// Every slack instant in the span. One no window covers draws as a dot at its instant; a derived gate's are all such dots, on the zero line.
     var slacks: [Date] = []
     /// A normalized phase shape, never a speed measurement.
@@ -129,14 +132,14 @@ nonisolated struct StationCardGraph: View {
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
-    /// The card's reading says Slack on the marks this curve draws, as the detail lead does.
+    /// The card's reading says Slack on the green marks this curve draws, as the detail lead does.
     func isSlack(at t: Date) -> Bool {
-        readsSlack(at: t, runs: windows, slacks: slacks)
+        readsSlack(at: t, runs: cores, slacks: slacks)
     }
 
-    /// One time per slack mark, under the mark at the card's own scale: each run, and each slack no run covers.
-    static func axisMoments(_ runs: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
-        (runs.map { $0.axisMoment(pointsPerHour: pointsPerHour) } + bareSlacks(slacks, runs: runs)).sorted()
+    /// One time per mark, under the mark at the card's own scale: each drawn window's opening, and each slack mark outside one.
+    static func axisMoments(_ windows: [WindowRun], cores: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
+        slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour)
     }
 
     /// Which way a reading hangs from its dot (+1 down, −1 up): toward the plot middle, unless
@@ -204,15 +207,19 @@ nonisolated struct StationCardGraph: View {
             // Slack: each run is a REAL sub-path of the curve (interpolated
             // endpoints), computed by the builders from the SHARED
             // slackWindow predicate — never re-derived here.
-            let segs = windows.map { w -> Path in
-                var seg = Path()
-                seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
-                for p in points where p.time > w.start && p.time < w.end {
-                    seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+            func segments(_ runs: [WindowRun]) -> [Path] {
+                runs.map { w -> Path in
+                    var seg = Path()
+                    seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
+                    for p in points where p.time > w.start && p.time < w.end {
+                        seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+                    }
+                    seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
+                    return seg
                 }
-                seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
-                return seg
             }
+            let segs = segments(windows)
+            let coreSegs = segments(cores)
 
             // The area, closed to the zero line for a current and to chart
             // datum for a tide — the same line each fill is anchored at.
@@ -248,15 +255,16 @@ nonisolated struct StationCardGraph: View {
             }
 
             // The axis row: each tide turn's time under its dot, and for a
-            // current each run's opening, or a bare slack only where no run
-            // covers it — the same moments the detail strip prints. One edge
-            // rule for all of them.
+            // current each drawn window's opening, or a slack mark only where
+            // no drawn window covers it — the same moments the detail strip
+            // prints. One edge rule for all of them.
             // A tide turn arrives with its time already formatted.
             var axisMoments: [(time: Date, text: String?)] = []
             if showsTimes {
                 axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText) }
                 if includesZero {
-                    axisMoments += Self.axisMoments(windows, slacks: slacks, pointsPerHour: xScale * 3600).map { ($0, nil) }
+                    axisMoments += Self.axisMoments(windows, cores: cores, slacks: slacks,
+                                                    pointsPerHour: xScale * 3600).map { ($0, nil) }
                 }
             }
             let keptAxisTimes = Self.thinAxisMoments(axisMoments.map(\.time), x: x, width: size.width)
@@ -321,11 +329,12 @@ nonisolated struct StationCardGraph: View {
                                        valueFontSize: CurveStyle.hangValueFontSize)
             }
 
-            CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
+            CurveDrawing.windows(context, segs, cores: coreSegs, nowX: nowX, width: size.width, height: size.height)
+            CurveDrawing.runs(context, coreSegs, nowX: nowX, width: size.width, height: size.height)
 
             for time in axisTimes { context.draw(time.text, at: time.at) }
 
-            for when in bareSlacks(slacks, runs: windows) where when >= start && when <= end {
+            for when in bareSlacks(slacks, runs: cores) where when >= start && when <= end {
                 if speedsAreSchematic {
                     CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(0)), color: SN.go)
                 } else {
@@ -338,7 +347,7 @@ nonisolated struct StationCardGraph: View {
                 let left = x(highlight.lowerBound), right = x(highlight.upperBound)
                 if right > left {
                     context.fill(Path(CGRect(x: left, y: 0, width: right - left, height: plotHeight)),
-                                 with: .color(SN.go.opacity(0.12)))
+                                 with: .color(SN.slackWindow.opacity(0.12)))
                 }
                 var guides = Path()
                 for time in Set([highlight.lowerBound, highlight.upperBound]) {
@@ -400,6 +409,11 @@ func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = sla
     mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
 }
 
+/// The slack inside the card's windows at `threshold`, measured the same way.
+func cardCores(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [WindowRun] {
+    cardWindows(points: points, slacks: slacks, threshold: slackCoreThresholdKn(threshold))
+}
+
 extension TideStationRecord {
     func cardGraph(at now: Date, imperial: Bool) -> StationCardGraph {
         cardGraph(at: now, imperial: imperial, station: engineStation)
@@ -459,6 +473,7 @@ extension CurrentStationRecord {
             includesZero: true,
             tz: tz,
             windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
+            cores: cardCores(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }
@@ -487,6 +502,7 @@ extension ChsOnlineWindow {
             includesZero: true,
             tz: tz,
             windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
+            cores: cardCores(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }

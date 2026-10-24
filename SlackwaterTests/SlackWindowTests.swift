@@ -81,18 +81,22 @@ final class SlackWindowTests: XCTestCase {
                               WindowRun(start: s(500), end: s(700))])
     }
 
-    /// The card prints one time per slack mark: a stroke at its opening, a dot at its centre,
-    /// judged at the card's own scale rather than the strip's, and a slack no run covers at its instant.
+    /// The card prints one time per mark: a drawn window at its opening, and a slack
+    /// mark outside every drawn window at its own time — a core dot at its centre,
+    /// judged at the card's own scale rather than the strip's, and a slack no core holds at its instant.
     func testTheCardPrintsEachRunWhereItDrawsTheRun() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
         let cardPPH: CGFloat = 350 / CGFloat(StationCardGraph.window / 3600)
         let stroke = WindowRun(start: s(50), end: s(340))
         let dot = WindowRun(start: s(500), end: s(520))
+        let core = WindowRun(start: s(505), end: s(515))
         XCTAssertFalse(dot.isDot, "a run the strip strokes")
         XCTAssertTrue(dot.drawsAsDot(pointsPerHour: cardPPH), "the card draws the same run as a dot")
-        XCTAssertEqual(StationCardGraph.axisMoments([dot, stroke], slacks: [s(200), s(900)], pointsPerHour: cardPPH),
-                       [s(50), s(510), s(900)], "a slack inside a run is the run's; one outside every run is its own")
+        XCTAssertEqual(StationCardGraph.axisMoments([dot, stroke], cores: [core], slacks: [s(200), s(510), s(900)],
+                                                    pointsPerHour: cardPPH),
+                       [s(50), s(510), s(900)],
+                       "a slack inside a drawn window is the window's; a window too short to draw gives way to its core's dot")
 
         for run in [stroke, dot] {
             var path = Path()
@@ -118,28 +122,33 @@ final class SlackWindowTests: XCTestCase {
         XCTAssertEqual(wide.snapMoments, [s(10_000), s(12_000)])
         XCTAssertEqual(wide.axisMoment, s(10_000))
 
+        // A window too short to draw has no stops; its core's dot is the one stop.
         let snaps = TimelineData.currentSnapTimes(
             events: [CurrentEvent(time: s(600), speed: 0, kind: .slack),
                      CurrentEvent(time: s(5000), speed: 2, kind: .maxFlood),
                      CurrentEvent(time: s(11_000), speed: 0, kind: .slack)],
             windows: [(slack: s(600), start: s(200), end: s(800)),
-                      (slack: s(11_000), start: s(10_000), end: s(12_000))])
-        XCTAssertEqual(snaps.sorted(), [s(500), s(5000), s(10_000), s(11_000), s(12_000)])
+                      (slack: s(11_000), start: s(10_000), end: s(12_000))],
+            cores: [(slack: s(600), start: s(550), end: s(650)),
+                    (slack: s(11_000), start: s(10_400), end: s(11_600))])
+        XCTAssertEqual(snaps.sorted(), [s(600), s(5000), s(10_000), s(10_400), s(11_000), s(11_600), s(12_000)])
     }
 
-    /// A slack no window covers is one mark like a short window's dot: one magnet stop and one event time, at its instant.
+    /// A slack no core holds is one mark like a short core's dot: one magnet stop and one event time, at its instant.
+    /// Inside a drawn window the window's opening is the time printed.
     func testASlackWithoutAWindowIsOneStopAndOneTime() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let h = { (hours: Double) in t0.addingTimeInterval(hours * 3600) }
         let events = [CurrentEvent(time: h(3), speed: 0, kind: .slack), CurrentEvent(time: h(8), speed: 0, kind: .slack)]
         let windows = [(slack: h(8), start: h(7), end: h(9))]
+        let cores = [(slack: h(8), start: h(7.9), end: h(8.1))]
         let data = TimelineData(tz: .gmt, anchor: t0, today: t0, start: t0, end: h(12), days: [],
                                 tidePoints: [], tideRates: [], tideExtremes: [],
                                 currentPoints: [CurrentPoint(time: t0, speed: 1), CurrentPoint(time: h(12), speed: 1)],
-                                currentEvents: events, snapTimes: [], slackWindows: windows)
+                                currentEvents: events, snapTimes: [], slackWindows: windows, slackCores: cores)
         XCTAssertEqual(data.bareSlackTimes, [h(3)])
         XCTAssertEqual(data.slackAxisTimes, [h(3), h(7)])
-        XCTAssertTrue(TimelineData.currentSnapTimes(events: events, windows: windows).contains(h(3)))
+        XCTAssertTrue(TimelineData.currentSnapTimes(events: events, windows: windows, cores: cores).contains(h(3)))
     }
 
     /// Data that disagreed with the drawing would name two stops around one dot, or one stop on a stroke.
@@ -159,18 +168,22 @@ final class SlackWindowTests: XCTestCase {
         let slack = t0.addingTimeInterval(600)
         let points = [CurrentPoint(time: t0, speed: 1), CurrentPoint(time: slack, speed: 0)]
         let window = try XCTUnwrap(slackWindow(points, around: slack, threshold: 0.5))
+        let coreWindow = try XCTUnwrap(slackWindow(points, around: slack, threshold: slackKn))
         let run = WindowRun(start: window.start, end: window.end)
+        let core = WindowRun(start: coreWindow.start, end: coreWindow.end)
         XCTAssertEqual(run.end, slack)
+        XCTAssertEqual(core.end, slack)
         XCTAssertTrue(run.isDot)
-        XCTAssertEqual(bareSlacks([run.start, run.centre, slack], runs: [run]), [slack])
-        XCTAssertTrue(readsSlack(at: slack, runs: [run], slacks: [slack]))
-        XCTAssertFalse(readsSlack(at: slack.addingTimeInterval(1), runs: [run], slacks: [slack]))
-        XCTAssertEqual(StationCardGraph.axisMoments([run], slacks: [slack], pointsPerHour: 14),
-                       [run.centre, slack])
+        XCTAssertEqual(bareSlacks([core.start, core.centre, slack], runs: [core]), [slack])
+        XCTAssertTrue(readsSlack(at: slack, runs: [core], slacks: [slack]))
+        XCTAssertFalse(readsSlack(at: slack.addingTimeInterval(1), runs: [core], slacks: [slack]))
+        XCTAssertEqual(StationCardGraph.axisMoments([run], cores: [core], slacks: [slack], pointsPerHour: 14),
+                       [core.centre, slack])
         XCTAssertEqual(TimelineData.currentSnapTimes(
             events: [CurrentEvent(time: slack, speed: 0, kind: .slack)],
-            windows: [(slack: slack, start: window.start, end: window.end)]).sorted(),
-                       [run.centre, slack])
+            windows: [(slack: slack, start: window.start, end: window.end)],
+            cores: [(slack: slack, start: coreWindow.start, end: coreWindow.end)]).sorted(),
+                       [core.centre, slack])
     }
 
     /// A fast reversal whose bracketing samples are both outside the band, at

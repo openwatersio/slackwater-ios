@@ -18,6 +18,8 @@ struct SlackWindowPreview: View {
         let slacks = [Self.start.addingTimeInterval(Self.span / 2)]
         let windows = cardWindows(points: Self.points, slacks: slacks,
                                   threshold: normalizedSlackThresholdKn(threshold))
+        let cores = cardCores(points: Self.points, slacks: slacks,
+                              threshold: normalizedSlackThresholdKn(threshold))
         let width = windows.first.map { $0.end.timeIntervalSince($0.start) } ?? 0
         let duration = Duration.seconds(width).formatted(
             .units(allowed: [.hours, .minutes], width: .abbreviated))
@@ -25,13 +27,13 @@ struct SlackWindowPreview: View {
             StationCardGraph(
                 points: Self.points.map { .init(time: $0.time, value: $0.speed) },
                 extremes: [], now: Self.start, back: 0, forward: Self.span,
-                includesZero: true, windows: windows,
+                includesZero: true, windows: windows, cores: cores,
                 showsReadings: false, showsTimes: false, showsNow: false, timeLabelSpace: 0)
                 .frame(height: 90)
                 .background {
                     GeometryReader { geometry in
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(SN.go.opacity(0.12))
+                            .fill(SN.slackWindow.opacity(0.12))
                             .frame(width: geometry.size.width * width / Self.span)
                             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     }
@@ -40,7 +42,7 @@ struct SlackWindowPreview: View {
             HStack {
                 Text("Example", comment: "Label on the illustrative current curve in slack-window settings; this is not a real place prediction.")
                 Spacer()
-                Text(duration).monospacedDigit().foregroundStyle(SN.go)
+                Text(duration).monospacedDigit().foregroundStyle(SN.slackWindow)
             }
         }
         .accessibilityElement(children: .ignore)

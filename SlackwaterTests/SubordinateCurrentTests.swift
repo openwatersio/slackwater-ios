@@ -48,7 +48,7 @@ final class SubordinateCurrentTests: XCTestCase {
         for hour in 0..<24 {
             let t = day.addingTimeInterval(Double(hour) * 3600)
             let exact = bonita.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first!.speed
-            let exactColour = abs(exact) <= slackThresholdKn
+            let exactColour = abs(exact) <= slackCoreThresholdKn(slackThresholdKn)
                 ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN) : pinRampHex(forSpeedKn: abs(exact))
             XCTAssertEqual(currentPinState(bonita, at: t, speedUnit: "kn").state, exactColour, "hour \(hour)")
         }

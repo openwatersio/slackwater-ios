@@ -188,16 +188,7 @@ enum CurveDrawing {
                             slackRuns: [Path] = [],
                             samples: [(x: CGFloat, speedKn: Double)],
                             nowX: CGFloat, width: CGFloat, height: CGFloat) {
-        var track = ctx
-        let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
-        let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
-        for run in slackRuns where !isDot(run) {
-            let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
-            let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
-            let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
-            track.clip(to: bounds.subtracting(body))
-            track.clip(to: bounds.subtracting(round.subtracting(butt)))
-        }
+        let track = clipped(ctx, around: slackRuns, width: width, height: height)
         strokeSplitAtNow(track, line, with: .color(SN.graphLine), nowX: nowX, width: width, height: height)
         let stops = speedCoreStops(samples, width: width)
         guard !stops.isEmpty else { return }
@@ -224,6 +215,39 @@ enum CurveDrawing {
                                  lineWidth: CurveStyle.runWidth)
             }
         }
+    }
+
+    /// The slack windows: the line turns the window colour along each one,
+    /// clipped around the green slack strokes drawn over it so each slack
+    /// stroke keeps the same small break at its ends that a run keeps against
+    /// the blue line. Green beside yellow is the deuteranopia pair; the break
+    /// is its hard edge (current-charts §6.3). A window too short to stroke is
+    /// not drawn; the slack mark inside it stands for it.
+    static func windows(_ ctx: GraphicsContext, _ segments: [Path], cores: [Path],
+                        nowX: CGFloat, width: CGFloat, height: CGFloat) {
+        let track = clipped(ctx, around: cores, width: width, height: height)
+        for seg in segments where !isDot(seg) {
+            strokeSplitAtNow(track, seg, with: .color(SN.slackWindow), nowX: nowX, width: width, height: height,
+                             lineWidth: CurveStyle.runWidth)
+        }
+    }
+
+    /// `ctx` with each stroked run and a halo gap around its round end caps cut
+    /// away, so a line drawn through it leaves room for the run without cutting
+    /// the fill or sky below. A run drawn as a dot erases with its own halo.
+    private static func clipped(_ ctx: GraphicsContext, around runs: [Path],
+                                width: CGFloat, height: CGFloat) -> GraphicsContext {
+        var track = ctx
+        let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
+        let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
+        for run in runs where !isDot(run) {
+            let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
+            let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
+            let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
+            track.clip(to: bounds.subtracting(body))
+            track.clip(to: bounds.subtracting(round.subtracting(butt)))
+        }
+        return track
     }
 
     static func isDot(_ run: Path) -> Bool {

@@ -47219,7 +47219,7 @@
       }
     },
     "Slack window" : {
-      "comment" : "An alert's title when a slack window opens, and the Settings row for the comfort current.",
+      "comment" : "An alert's title when a slack window opens, and the Settings row for the comfort current.\nCurrent event: the water slows under the person's slack-window speed.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -47309,6 +47309,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strömstilla period"
+          }
+        }
+      }
+    },
+    "Slack window ends" : {
+      "comment" : "Widget label above a live slack-window countdown.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstille periode slutter"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stauwasserfenster endet"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la ventana de estoa"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heikon virtauksen jakso päättyy"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la fenêtre d’étale"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deireadh na tréimhse fáfaill"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crìoch tràth a' mharbh-shrutha"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fine della finestra di stanca"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "潮止まり時間帯終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정조 시간대 종료"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstillevindu slutter"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kenteringsvenster eindigt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fim da janela de estofo"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fim do período de estofo"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strömstilla period slutar"
           }
         }
       }

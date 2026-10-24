@@ -144,15 +144,15 @@ import SlackwaterKit
                                rowBytes: width * 4,
                                bounds: CGRect(x: 0, y: 0, width: width, height: height),
                                format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
-            // SN.go == 0x88B868, ±24/channel.
-            let goInk = (0..<height).reduce(into: 0) { count, y in
+            // SN.slackWindow == 0xF5C96B, ±24/channel.
+            let windowInk = (0..<height).reduce(into: 0) { count, y in
                 for x in 0..<width {
                     let i = (y * width + x) * 4
-                    if abs(Int(pixels[i]) - 0x88) <= 24, abs(Int(pixels[i + 1]) - 0xB8) <= 24,
-                       abs(Int(pixels[i + 2]) - 0x68) <= 24 { count += 1 }
+                    if abs(Int(pixels[i]) - 0xF5) <= 24, abs(Int(pixels[i + 1]) - 0xC9) <= 24,
+                       abs(Int(pixels[i + 2]) - 0x6B) <= 24 { count += 1 }
                 }
             }
-            XCTAssertGreaterThan(goInk, 100, "expected go-coloured slack window ink")
+            XCTAssertGreaterThan(windowInk, 100, "expected slack-window ink")
         }
     }
 
@@ -302,8 +302,8 @@ import SlackwaterKit
 
         let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
         let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
-        if case .current(_, _, _, _, let inWindow) = card.reading {
-            XCTAssertTrue(inWindow)
+        if case .current(_, _, _, _, let slack) = card.reading {
+            XCTAssertFalse(slack, "an hour before the window closes the water is moving, though the countdown runs")
         } else {
             XCTFail("expected a .current reading")
         }

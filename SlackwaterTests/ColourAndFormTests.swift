@@ -398,13 +398,16 @@ import XCTest
     }
 
     /// #13: a speed-bearing current pin's colour is the #97 ramp darkened by
-    /// the land-contrast factor — except inside the slack window, where it is
-    /// the go colour. The boundary is `slackThresholdKn`, the same number the
-    /// strip's green column uses.
-    func testCurrentPinColourIsRampOutsideWindowGoInside() {
+    /// the land-contrast factor — except at slack, where it is the go colour.
+    /// The boundary is `slackCoreThresholdKn`, the same number the strip's
+    /// green uses; inside the slack window above it the pin is the ramp (#821).
+    func testCurrentPinColourIsRampOutsideSlackGoInside() {
         let still = record(speedKn: 0)
         XCTAssertEqual(currentPinState(still, at: refTime, speedUnit: "kn").state,
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
+        let windowed = record(speedKn: 0.4)
+        XCTAssertEqual(currentPinState(windowed, at: refTime, speedUnit: "kn").state,
+                       pinRampHex(forSpeedKn: 0.4), "water in the slack window is still moving")
         let fast = record(speedKn: 3.0)
         XCTAssertEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                        pinRampHex(forSpeedKn: 3.0), "moving pin must be the ramp")
