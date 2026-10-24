@@ -224,11 +224,12 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // no moon tile and no scrubber — nothing to teach — so the tour
             // stays armed and fires on the next detail that does.
             .onChange(of: timeline?.revision, initial: true) { _, _ in
-                guard let days = timeline?.days else { return }
+                guard let timeline else { return }
+                let coverage = timeline.start...timeline.end
                 TourCoach.shared.begin(
                     on: favoriteId,
-                    starsAvailable: tourStarsTime(days: days, after: appNow()) != nil,
-                    moonAvailable: tourMoonTime(days: days, after: appNow()) != nil)
+                    starsAvailable: tourStarsTime(days: timeline.days, after: appNow(), within: coverage) != nil,
+                    moonAvailable: tourMoonTime(days: timeline.days, after: appNow(), within: coverage) != nil)
             }
             .onDisappear {
                 if TourCoach.shared.station == favoriteId { TourCoach.shared.finish() }
@@ -333,10 +334,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     private func tourNext() {
         tourArrived = false
         TourCoach.shared.advance()
-        guard let step = TourCoach.shared.step, let days = timeline?.days else { return }
+        guard let step = TourCoach.shared.step, let timeline else { return }
+        let coverage = timeline.start...timeline.end
         let target: Date? = switch step {
-        case .stars: tourStarsTime(days: days, after: appNow())
-        case .moon: tourMoonTime(days: days, after: appNow())
+        case .stars: tourStarsTime(days: timeline.days, after: appNow(), within: coverage)
+        case .moon: tourMoonTime(days: timeline.days, after: appNow(), within: coverage)
         default: nil
         }
         guard let target else { return }

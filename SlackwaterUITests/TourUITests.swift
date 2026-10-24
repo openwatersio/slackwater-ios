@@ -3,6 +3,106 @@
 import XCTest
 
 final class TourUITests: ScreenshotTestCase {
+    func testCachedPreviewSkipsSkyTargetsBeyondItsCoverage() {
+        let token = UUID().uuidString
+        let app = canadianFirstRun(["-chsFixture", token, "-chsFixtureScenario", "tide-preview-final"])
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].firstMatch.appears(within: 10))
+        releaseFixture(token, "chs-nanaimo-harbour-first-chunk")
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15))
+        app.terminate()
+
+        // The saved preview ends at local midnight, one hour after this relaunch.
+        app.launchArguments = testArguments(["-resetTour", "-networkKillSwitch", "-nowOffsetDays", "4.75",
+            "-fixLat", "49.1659", "-fixLon", "-123.9401"])
+            .filter { $0 != "-seedTour" }
+        app.launch()
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15))
+        XCTAssert(waitFor(app.buttons["tour-next"], "isHittable == true"))
+        let selected = leadReading(app).value as? String
+        XCTAssertNotNil(selected)
+        app.buttons["tour-next"].tap()
+        XCTAssert(app.staticTexts["Tap the moon for its rise, set and phase."].firstMatch.appears(within: 10),
+                  "an almost-expired preview must skip unreachable stars and moon targets")
+        XCTAssertEqual(leadReading(app).value as? String, selected)
+        save(app, "tour-nanaimo-short-preview.png")
+    }
+
+    func testLeavingACanadianReplayWaitingPageStaysOnTheList() {
+        let app = launch("-networkKillSwitch", "-chsResetModels", "-resetFavorites", "-resetRecents",
+                         "-fixLat", "49.1659", "-fixLon", "-123.9401")
+        openSettings(app)
+        let replay = app.buttons["settings-replay-tour"].firstMatch
+        scrollTo(replay, in: app)
+        replay.tap()
+        XCTAssert(app.staticTexts["Nanaimo Harbour"].firstMatch.appears(within: 10))
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].firstMatch.exists)
+        app.buttons["detail-back"].firstMatch.tap()
+        openSearch(app, "seattle")
+        XCTAssert(app.staticTexts["Seattle"].firstMatch.appears(within: 5), "Back must leave the waiting page usable")
+    }
+
+    func testCanadianTourStartsOnThePreviewAndSurvivesTheFullModel() {
+        let token = UUID().uuidString
+        let app = canadianFirstRun(["-chsFixture", token, "-chsFixtureScenario", "tide-preview-final"])
+        let mark = app.otherElements["tour-mark"].firstMatch
+        XCTAssert(app.staticTexts["Nanaimo Harbour"].firstMatch.appears(within: 10))
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].firstMatch.exists)
+        XCTAssertFalse(mark.exists, "the tour needs usable predictions before it can teach")
+        save(app, "tour-nanaimo-waiting.png")
+
+        releaseFixture(token, "chs-nanaimo-harbour-first-chunk")
+        XCTAssert(mark.appears(within: 15), "the preview must start the tour before the full model finishes")
+        XCTAssert(waitFor(app.buttons["tour-next"], "isHittable == true"))
+        let notice = app.descendants(matching: .any)["chs-download-notice"].firstMatch
+        XCTAssert(notice.exists)
+        XCTAssert(app.progressIndicators["chs-download-notice"].firstMatch.exists)
+        save(app, "tour-nanaimo-preview.png")
+        app.buttons["tour-next"].tap()
+        let sky = app.staticTexts["The real sky"].firstMatch
+        XCTAssert(sky.appears(within: 15))
+        let selected = leadReading(app).value as? String
+        XCTAssertNotNil(selected)
+
+        releaseFixture(token, "after-tide-preview")
+        XCTAssert(notice.disappears(within: 30))
+        XCTAssert(sky.exists, "finishing the model must preserve the tour step")
+        XCTAssertEqual(leadReading(app).value as? String, selected)
+        XCTAssert(app.staticTexts["Nanaimo Harbour"].firstMatch.exists)
+        save(app, "tour-nanaimo-full-model.png")
+    }
+
+    func testCanadianTourWaitsOfflineAtTheLocalPlace() {
+        let app = canadianFirstRun(["-networkKillSwitch"])
+        XCTAssert(app.staticTexts["Nanaimo Harbour"].firstMatch.appears(within: 10))
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].firstMatch.exists)
+        XCTAssertFalse(app.otherElements["tour-mark"].firstMatch.appears(within: 3))
+        XCTAssertFalse(app.staticTexts["Point Roberts"].exists)
+        XCTAssert(app.buttons["detail-back"].firstMatch.isHittable)
+        save(app, "tour-nanaimo-offline.png")
+    }
+
+    private func canadianFirstRun(_ args: [String]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(args + ["-resetTour", "-resetRecents", "-resetFavorites",
+            "-chsResetModels", "-chsFitOnly", "chs-nanaimo-harbour",
+            "-fixLat", "49.1659", "-fixLon", "-123.9401"])
+            .filter { $0 != "-seedTour" }
+        app.launch()
+        return app
+    }
+
+    func testADeepLinkWinsWhileTheCanadianTourIsWaiting() {
+        let app = canadianFirstRun(["-networkKillSwitch"])
+        XCTAssert(app.staticTexts["Nanaimo Harbour"].firstMatch.appears(within: 10))
+        XCTAssertFalse(app.otherElements["tour-mark"].firstMatch.exists)
+        XCUIDevice.shared.system.open(URL(string: "slackwater://station/noaa%2F9447130")!)
+        let confirm = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"].firstMatch
+        if confirm.appears(within: 5) { confirm.tap() }
+        XCTAssert(app.staticTexts["Seattle"].firstMatch.appears(within: 20))
+        XCTAssert(app.otherElements["tour-mark"].firstMatch.appears(within: 15))
+        XCTAssertFalse(app.descendants(matching: .any)["chs-waiting-warning"].firstMatch.exists)
+    }
+
     func testTourUsesAppLanguage() {
         let translations: [(String, [(String, String)])] = [
             ("de", [
