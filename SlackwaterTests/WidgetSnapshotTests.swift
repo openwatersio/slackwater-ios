@@ -144,12 +144,12 @@ import SlackwaterKit
                                rowBytes: width * 4,
                                bounds: CGRect(x: 0, y: 0, width: width, height: height),
                                format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
-            // SN.slackWindow == 0xF5C96B, ±24/channel.
+            // SN.slackWindow == 0x38BDF8, ±24/channel.
             let windowInk = (0..<height).reduce(into: 0) { count, y in
                 for x in 0..<width {
                     let i = (y * width + x) * 4
-                    if abs(Int(pixels[i]) - 0xF5) <= 24, abs(Int(pixels[i + 1]) - 0xC9) <= 24,
-                       abs(Int(pixels[i + 2]) - 0x6B) <= 24 { count += 1 }
+                    if abs(Int(pixels[i]) - 0x38) <= 24, abs(Int(pixels[i + 1]) - 0xBD) <= 24,
+                       abs(Int(pixels[i + 2]) - 0xF8) <= 24 { count += 1 }
                 }
             }
             XCTAssertGreaterThan(windowInk, 100, "expected slack-window ink")

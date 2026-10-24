@@ -181,15 +181,16 @@ enum CurveDrawing {
         strokeSplitAtNow(ctx, line, with: shading, nowX: nowX, width: width, height: height)
     }
 
-    /// The current line: blue, with the speed thread down its middle at
-    /// `CurveStyle.speedCore`. Its own strokes leave room for the slack run's
-    /// end caps without cutting the fill or sky below them.
+    /// The current line: the beyond-window yellow, since every stretch under
+    /// the slack-window speed is overdrawn by its window, with the speed thread
+    /// down its middle at `CurveStyle.speedCore`. Its own strokes leave room
+    /// for the windows' end caps without cutting the fill or sky below them.
     static func currentLine(_ ctx: GraphicsContext, _ line: Path,
                             slackRuns: [Path] = [],
                             samples: [(x: CGFloat, speedKn: Double)],
                             nowX: CGFloat, width: CGFloat, height: CGFloat) {
         let track = clipped(ctx, around: slackRuns, width: width, height: height)
-        strokeSplitAtNow(track, line, with: .color(SN.graphLine), nowX: nowX, width: width, height: height)
+        strokeSplitAtNow(track, line, with: .color(SN.beyondWindow), nowX: nowX, width: width, height: height)
         let stops = speedCoreStops(samples, width: width)
         guard !stops.isEmpty else { return }
         strokeSplitAtNow(track, line,
@@ -217,12 +218,11 @@ enum CurveDrawing {
         }
     }
 
-    /// The slack windows: the line turns the window colour along each one,
+    /// The slack windows: the line turns the window's blue along each one,
     /// clipped around the green slack strokes drawn over it so each slack
-    /// stroke keeps the same small break at its ends that a run keeps against
-    /// the blue line. Green beside yellow is the deuteranopia pair; the break
-    /// is its hard edge (current-charts §6.3). A window too short to stroke is
-    /// not drawn; the slack mark inside it stands for it.
+    /// stroke keeps the same small break at its ends that a window keeps
+    /// against the yellow line. A window too short to stroke is not drawn;
+    /// the slack mark inside it stands for it.
     static func windows(_ ctx: GraphicsContext, _ segments: [Path], cores: [Path],
                         nowX: CGFloat, width: CGFloat, height: CGFloat) {
         let track = clipped(ctx, around: cores, width: width, height: height)

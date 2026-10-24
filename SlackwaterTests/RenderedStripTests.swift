@@ -89,7 +89,8 @@ final class RenderedStripTests: XCTestCase {
         XCTAssertGreaterThan(pixels[halo], 200, "the halo must erase down to what is behind the strip")
         XCTAssertLessThan(pixels[halo + 1], 80, "the halo must erase down to what is behind the strip")
         let line = (12 * image.width + 50) * 4
-        XCTAssertGreaterThan(pixels[line + 2], pixels[line], "the curve continues beyond the halo")
+        XCTAssertGreaterThan(pixels[line], pixels[line + 2] + 80,
+                             "the curve continues beyond the halo, yellow outside any slack window")
     }
 
     /// A flood lobe fills beneath its curve; an ebb lobe's curve-to-zero area sits above the
