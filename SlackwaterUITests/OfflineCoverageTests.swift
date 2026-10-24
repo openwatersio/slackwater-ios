@@ -184,6 +184,31 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         returnToNow(app)
     }
 
+    /// The chart-pack card in the offline manager: automatic downloads have
+    /// to be visible, or a sailor cannot tell whether the map is ready before
+    /// leaving signal.
+    func testChartPackCardShowsStateAndOffersRefresh() throws {
+        // Reset, or the queue keeps unfinished requests from earlier tests' fixes.
+        let app = launch("-chsResetModels", "-connectivityOnline",
+                         "-fixLat", "48.406", "-fixLon", "-122.643")
+        openDownloads(app)
+        // The state line is the card: a VStack identifier does not surface as
+        // its own element, so assert on what the user actually reads.
+        let state = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Charts'")).firstMatch
+        // The card closes a lazy list, which draws it only once scrolled near.
+        let list = app.scrollViews["downloads-manager"]
+        XCTAssert(eventually(within: 10) {
+            if state.exists { return true }
+            list.swipeUp(velocity: .slow)
+            return false
+        }, "the downloads manager must say what state the map is in")
+        scrollTo(state, in: app)
+        save(app, "chart-packs-manager.png")
+        XCTAssert(app.buttons["charts-refresh"].firstMatch.exists,
+                  "a sailor must be able to top the charts up before departure")
+    }
+
     /// Issue #33: a Downloads row is a live tap — it closes the sheet and opens
     /// the station's own detail via `openChsRoute` (Theme.swift), the same
     /// generalized closure the online-gate honesty card's nearest-shipped link
@@ -194,24 +219,6 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// queue is adopted from the anchor and nothing else seeds it, so without
     /// one this test inherits whatever station the previous test opened
     /// (#205 — `init` sorts around the fallback, it does not adopt it).
-    /// The chart-pack card in the offline manager: automatic downloads have
-    /// to be visible, or a sailor cannot tell whether the map is ready before
-    /// leaving signal.
-    func testChartPackCardShowsStateAndOffersRefresh() throws {
-        let app = launch("-connectivityOnline",
-                         "-fixLat", "48.406", "-fixLon", "-122.643")
-        openDownloads(app)
-        // The state line is the card: a VStack identifier does not surface as
-        // its own element, so assert on what the user actually reads.
-        let state = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Charts'")).firstMatch
-        XCTAssert(state.appears(within: 10),
-                  "the downloads manager must say what state the map is in")
-        save(app, "chart-packs-manager.png")
-        XCTAssert(app.buttons["charts-refresh"].firstMatch.exists,
-                  "a sailor must be able to top the charts up before departure")
-    }
-
     func testDownloadsRowOpensDetail() throws {
         let app = launch("-chsResetModels",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
