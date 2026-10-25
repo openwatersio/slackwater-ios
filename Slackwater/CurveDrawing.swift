@@ -184,7 +184,9 @@ enum CurveDrawing {
     /// The current line: the beyond-window yellow, since every stretch under
     /// the slack-window speed is overdrawn by its window, with the speed thread
     /// down its middle at `CurveStyle.speedCore`. Its own strokes leave room
-    /// for the windows' end caps without cutting the fill or sky below them.
+    /// for the end caps of the windows and slack runs in `slackRuns` without
+    /// cutting the fill or sky below them. The slack runs are there for a
+    /// window turned off, where green would otherwise meet the yellow.
     static func currentLine(_ ctx: GraphicsContext, _ line: Path,
                             slackRuns: [Path] = [],
                             samples: [(x: CGFloat, speedKn: Double)],
@@ -203,31 +205,25 @@ enum CurveDrawing {
 
     /// The slack runs: the line itself turns the go colour along each
     /// segment. No end dots: a run is one mark, with one time on the axis.
-    /// A run shorter than a turn's dot draws as that dot: a stroke that short reads as a blot.
+    /// The callers stretch a short run first (`slackStrokes`), so slack is
+    /// always a line.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
         for seg in segments {
-            if isDot(seg) {
-                let centre = runCentre(seg)
-                dot(ctx, at: centre,
-                    color: SN.go.opacity(centre.x < nowX ? CurveStyle.pastLabelFade : 1))
-            } else {
-                strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
-                                 lineWidth: CurveStyle.runWidth)
-            }
+            strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
+                             lineWidth: CurveStyle.runWidth)
         }
     }
 
-    /// The slack windows: the line turns the window's blue along each one,
-    /// clipped around the green slack strokes drawn over it so each slack
-    /// stroke keeps the same small break at its ends that a window keeps
-    /// against the yellow line. A window too short to stroke is not drawn;
-    /// the slack mark inside it stands for it.
-    static func windows(_ ctx: GraphicsContext, _ segments: [Path], cores: [Path],
+    /// The slack windows: the line turns the window's blue along each one, and
+    /// the green slack strokes drawn over it join it without a break. Green and
+    /// blue are not the deuteranopia pair; only yellow needs the gap, and a gap
+    /// at every colour change read as a dashed line. A window too short to
+    /// stroke is not drawn; the slack stroke over it stands for it.
+    static func windows(_ ctx: GraphicsContext, _ segments: [Path],
                         nowX: CGFloat, width: CGFloat, height: CGFloat) {
-        let track = clipped(ctx, around: cores, width: width, height: height)
         for seg in segments where !isDot(seg) {
-            strokeSplitAtNow(track, seg, with: .color(SN.slackWindow), nowX: nowX, width: width, height: height,
+            strokeSplitAtNow(ctx, seg, with: .color(SN.slackWindow), nowX: nowX, width: width, height: height,
                              lineWidth: CurveStyle.runWidth)
         }
     }
@@ -253,17 +249,6 @@ enum CurveDrawing {
     static func isDot(_ run: Path) -> Bool {
         let xs = vertices(run).map(\.x)
         return CurveStyle.runDrawsAsDot(width: (xs.max() ?? 0) - (xs.min() ?? 0))
-    }
-
-    static func runCentre(_ run: Path) -> CGPoint {
-        let points = vertices(run)
-        let xs = points.map(\.x)
-        let midX = ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2
-        for (a, b) in zip(points, points.dropFirst()) where min(a.x, b.x) <= midX && midX <= max(a.x, b.x) {
-            let f = b.x == a.x ? 0.5 : (midX - a.x) / (b.x - a.x)
-            return CGPoint(x: midX, y: a.y + (b.y - a.y) * f)
-        }
-        return points.first ?? .zero
     }
 
     private static func vertices(_ run: Path) -> [CGPoint] {

@@ -219,7 +219,8 @@ nonisolated struct StationCardGraph: View {
                 }
             }
             let segs = segments(windows)
-            let coreSegs = segments(cores)
+            let bare = speedsAreSchematic ? [] : bareSlacks(slacks, runs: cores).filter { $0 >= start && $0 <= end }
+            let coreSegs = segments(slackStrokes(cores: cores, bare: bare, pointsPerHour: xScale * 3600))
 
             // The area, closed to the zero line for a current and to chart
             // datum for a tide — the same line each fill is anchored at.
@@ -232,7 +233,7 @@ nonisolated struct StationCardGraph: View {
                 if !speedsAreSchematic {
                     CurveDrawing.referenceLine(context, at: y(0), width: size.width)
                     CurveDrawing.currentLine(context, line,
-                                             slackRuns: segs,
+                                             slackRuns: segs + coreSegs,
                                              samples: points.map { (x: x($0.time), speedKn: $0.value) },
                                              nowX: nowX, width: size.width, height: size.height)
                 } else {
@@ -329,17 +330,15 @@ nonisolated struct StationCardGraph: View {
                                        valueFontSize: CurveStyle.hangValueFontSize)
             }
 
-            CurveDrawing.windows(context, segs, cores: coreSegs, nowX: nowX, width: size.width, height: size.height)
+            CurveDrawing.windows(context, segs, nowX: nowX, width: size.width, height: size.height)
             CurveDrawing.runs(context, coreSegs, nowX: nowX, width: size.width, height: size.height)
 
             for time in axisTimes { context.draw(time.text, at: time.at) }
 
-            for when in bareSlacks(slacks, runs: cores) where when >= start && when <= end {
-                if speedsAreSchematic {
+            // A schematic shape has no speed to draw a slack along, so its slack is a dot on the zero line.
+            if speedsAreSchematic {
+                for when in bareSlacks(slacks, runs: cores) where when >= start && when <= end {
                     CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(0)), color: SN.go)
-                } else {
-                    CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(valueAt(when))),
-                                     color: SN.go.opacity(when < now ? CurveStyle.pastLabelFade : 1))
                 }
             }
 

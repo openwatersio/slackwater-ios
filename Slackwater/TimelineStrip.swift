@@ -1173,17 +1173,22 @@ struct TimelineCanvas: View {
     /// Each run the tile touches as a sub-path of the curve. Walks THIS TILE's
     /// samples, not the window's, once per run it touches: the window-wide scan
     /// was the strip's worst cost, a full pass per run per tile.
+    /// Every run whose mark reaches the tile: a stroke's round cap and its gap
+    /// spill past the run's own ends, and a tile that skipped a run just over
+    /// its seam left that gap cut square at the seam.
     private func runSegments(_ runs: [WindowRun], _ points: ArraySlice<CurrentPoint>,
                              _ t0: Date, _ t1: Date) -> [Path] {
-        runs.filter { $0.end >= t0 && $0.start <= t1 }.map { run -> Path in
-            var seg = Path()
-            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-            for p in points where p.time > run.start && p.time < run.end {
-                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+        let reach = TimeInterval(CurveStyle.runWidth / 2 + CurveStyle.haloGap) / Timeline.pph * 3600
+        return runs.filter { $0.end >= t0.addingTimeInterval(-reach) && $0.start <= t1.addingTimeInterval(reach) }
+            .map { run -> Path in
+                var seg = Path()
+                seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+                for p in points where p.time > run.start && p.time < run.end {
+                    seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+                }
+                seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+                return seg
             }
-            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-            return seg
-        }
     }
 
     private func drawCurrent(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
@@ -1200,7 +1205,10 @@ struct TimelineCanvas: View {
         // The run segments, built before the line because the line clips
         // itself around the windows.
         let segs = runSegments(data.windowRuns, points, t0, t1)
-        let coreSegs = runSegments(data.coreRuns, points, t0, t1)
+        // A schematic shape keeps its slack dot on the zero line, drawn with the events below.
+        let bare = data.speedsAreSchematic ? [] : data.bareSlackTimes.filter(data.contains)
+        let coreSegs = runSegments(slackStrokes(cores: data.coreRuns, bare: bare, pointsPerHour: Timeline.pph),
+                                   points, t0, t1)
         let xa = data.x(first.time), xb = data.x(last.time)
         seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
 
@@ -1221,7 +1229,7 @@ struct TimelineCanvas: View {
             strokeSplitAtNow(ctx, line, with: .color(SN.graphLine))
         } else {
             CurveDrawing.currentLine(ctx, line,
-                                     slackRuns: segs,
+                                     slackRuns: segs + coreSegs,
                                      samples: points.map { (x: data.x($0.time), speedKn: $0.speed) },
                                      nowX: nowX, width: data.totalWidth, height: geo.height)
         }
@@ -1229,11 +1237,10 @@ struct TimelineCanvas: View {
         // The run is the mark (spec §5.2): the line itself turns the window
         // colour between each window's interpolated edges, then the go colour
         // across the slack inside it (CurveDrawing.windows, .runs).
-        CurveDrawing.windows(ctx, segs, cores: coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
+        CurveDrawing.windows(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
         CurveDrawing.runs(ctx, coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1)
-        let bare = data.bareSlackTimes
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.
@@ -1244,10 +1251,6 @@ struct TimelineCanvas: View {
                 if data.speedsAreSchematic {
                     guard data.clearsLabelEdges(e.time) else { continue }
                     CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.zeroY),
-                                     color: SN.go.opacity(fade(e.time)))
-                } else if data.contains(e.time), bare.contains(e.time) {
-                    // A windowless slack's dot stands in for its run, so it draws to the edge as a short run's does (§12.3).
-                    CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.curY(data.velocityAt(e.time))),
                                      color: SN.go.opacity(fade(e.time)))
                 }
             case .maxFlood, .maxEbb:

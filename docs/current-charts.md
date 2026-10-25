@@ -247,11 +247,11 @@ and the window is measured on that line (§8.3). Slack is measured the same
 way, around the same crossing, at the slack speed. A window too narrow to
 draw as a run is not drawn, so a short window never pretends to be a usable
 duration; the slack inside it marks the turn. Slack draws as a go-colour
-run on the window, or as the go-colour dot a turn gets when it is too
+run on the window, stretched to a short stroke centred on it when it is too
 narrow to draw. A slack with no run under the slack speed (outside the
 sampled span, between two samples of the same sign, or a minimum that never
-gets that slow) draws the same dot at its own instant, so every slack has
-one mark: a run, or a dot. (Derived-gate presentation is specified in §9.)
+gets that slow) draws the same short stroke at its own instant, so every
+slack has one mark, and it is always a line. (Derived-gate presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
@@ -360,8 +360,9 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
 6. **Watch the green-beside-yellow adjacency.** Green survives partly by sitting
    against a dark ground at maximum separation. Putting the go colour next to a
    yellow ramp floor spends that margin, and green/yellow is the deuteranopia
-   trap. Slack sits inside its blue window, never against the yellow, and every
-   go stroke still keeps a halo break at its ends and every go dot its halo.
+   trap. Slack sits inside its blue window, never against the yellow, and joins
+   the blue without a break. Where it does meet the yellow, with the window
+   off, every go stroke keeps a halo break at its ends and every go dot its halo.
    The reading's word, Slack against Flooding or Ebbing, carries the same fact
    in text.
 7. **The anchors array is where a per-vessel limit eventually lands.** Structure
@@ -488,7 +489,7 @@ Handled by 8.1, not separately.
 
 **8.3 A window shorter than the sample step.** A violent gate stepped over by
 the sampling interval. Measured on the line between the samples either side
-of the crossing, widened to hold the slack instant when the event search puts it outside that line's band, and drawn as a dot when narrower than one (§5.3). The *events* still resolve,
+of the crossing, widened to hold the slack instant when the event search puts it outside that line's band, and drawn as a short slack stroke when narrower than one (§5.3). The *events* still resolve,
 because crossings are interpolated rather than looked up among the samples —
 this is why §4.1's interpolation rule is not an optimisation.
 
@@ -682,14 +683,14 @@ every mark that only earns its place at scale. The card and the widget are
   reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
   one time per drawn window at its opening, and one per slack mark outside
-  every drawn window: a slack dot at its centre, a slack run at its opening,
+  every drawn window: a short slack at its centre, a slack run at its opening,
   a slack with no run at its instant (§5.3). Peak times are not
   shown; they are in the schedule behind the detail. The row keeps 24 pt
   clear of each canvas edge, and in time order drops a time less than
   48 pt after the last one kept, so two marks close together print one
   time rather than two over each other.
 - **Colour is state** (§6): yellow over the limit, blue for the window, the go colour
-  for slack and its dots, and
+  for slack, and
   nothing coloured by direction on the line or the marks. The card's fill is
   the detail's: blue beneath the curve in each flood lobe, fading to clear at
   zero, and none in an ebb lobe, where the curve-to-zero area would sit above
