@@ -5,8 +5,9 @@ import SlackwaterKit
 
 /// The boat-specific speed that defines a usable slack window. It is shared
 /// with the widget and map, and falls back safely when a stored value is bad.
+/// Zero turns the window off: only slack itself is drawn and named (#821).
 let defaultSlackThresholdKn = 0.5
-let slackThresholdRange = 0.1...10.0
+let slackThresholdRange = 0.0...10.0
 let currentSpeedRampAnchorsKn: [Double] = [0.5, 3, 8, 12]
 
 /// Position on a ramp for `v`: piecewise-linear between `anchors`, which
@@ -28,9 +29,15 @@ func widgetSpeedRampT(_ speedKn: Double) -> Double {
     rampT(speedKn, anchors: currentSpeedRampAnchorsKn)
 }
 
+/// Rounded to the stepper's tenth first, so 0.3 stepped down three times is off,
+/// not −3e-17 kn and the default.
 func normalizedSlackThresholdKn(_ value: Double) -> Double {
-    slackThresholdRange.contains(value) ? value : defaultSlackThresholdKn
+    let tenth = (value * 10).rounded() / 10
+    return slackThresholdRange.contains(tenth) ? tenth : defaultSlackThresholdKn
 }
+
+/// The person has turned the slack window off.
+func slackWindowIsOff(_ threshold: Double) -> Bool { threshold <= 0 }
 
 var slackThresholdKn: Double {
     normalizedSlackThresholdKn(AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey) as? Double
@@ -39,18 +46,20 @@ var slackThresholdKn: Double {
 
 /// The speed under which the water is slack, inside a slack window measured at
 /// `windowThreshold`. Slack is physical and fixed at `slackKn`; a window set
-/// lower than that is slack throughout (#821).
+/// lower than that is slack throughout, and with the window off slack stands alone (#821).
 func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
-    min(slackKn, windowThreshold)
+    slackWindowIsOff(windowThreshold) ? slackKn : min(slackKn, windowThreshold)
 }
 
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
 /// the same series the strip renders, so the window can never disagree with
 /// the curve. Clamped to the series and widened to hold the slack itself; nil
-/// for a slack outside it or between two above-threshold samples of one sign.
+/// for a slack outside it, between two above-threshold samples of one sign,
+/// or with the window off.
 func slackWindow(_ points: [CurrentPoint], around slack: Date,
                  threshold: Double) -> (start: Date, end: Date)? {
+    guard !slackWindowIsOff(threshold) else { return nil }
     // A slack outside the sampled series has no measurable window. Events are
     // scanned with a ±6h pad beyond the strip while `currentPoints` is clipped
     // to it, so a padded slack can otherwise walk the series' trailing

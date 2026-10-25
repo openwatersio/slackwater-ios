@@ -72,20 +72,24 @@ struct SettingsView: View {
                             .pickerStyle(.segmented)
                         }
                         row(String(localized: "Slack window", comment: "An alert's title when a slack window opens, and the Settings row for the comfort current.")) {
-                            Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
+                            Stepper(value: slackWindowSpeedBinding, in: slackThresholdRange, step: 0.1) {
                                 HStack {
                                     Text("Comfort current")
                                     Spacer()
-                                    Text(
-                                        slackWindowSpeedBinding.wrappedValue,
-                                        format: .number.precision(.fractionLength(1))
-                                    )
-                                    .monospacedDigit()
-                                    Text(verbatim: "kn")
+                                    if slackWindowIsOff(slackWindowSpeedBinding.wrappedValue) {
+                                        Text("Off", comment: "Comfort-current setting at zero: no slack window, only slack.")
+                                    } else {
+                                        Text(
+                                            slackWindowSpeedBinding.wrappedValue,
+                                            format: .number.precision(.fractionLength(1))
+                                        )
+                                        .monospacedDigit()
+                                        Text(verbatim: "kn")
+                                    }
                                 }
                             }
                             SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
-                            Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
+                            Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn). Off shows only slack.")
                         }
                     }
 

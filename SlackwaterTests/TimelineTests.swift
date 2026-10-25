@@ -199,15 +199,18 @@ private struct FoldPageTestHarness: View {
 
     func testSlackWindowSettingHasIncrementalTouchControls() throws {
         let source = try repoSource("Slackwater/SettingsView.swift")
-        XCTAssertTrue(source.contains("Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1)"),
+        XCTAssertTrue(source.contains("Stepper(value: slackWindowSpeedBinding, in: slackThresholdRange, step: 0.1)"),
                       "Comfort current needs visible ± controls in 0.1-kn steps")
+        XCTAssertEqual(slackThresholdRange, 0...10, "zero is Off (#821)")
         XCTAssertFalse(source.contains("TextField(\"0.5\""),
                        "a bare text field makes the setting look non-interactive")
     }
 
     func testSlackWindowSpeedStaysInItsSupportedRange() {
         XCTAssertEqual(normalizedSlackThresholdKn(1), 1)
-        XCTAssertEqual(normalizedSlackThresholdKn(0), defaultSlackThresholdKn)
+        XCTAssertEqual(normalizedSlackThresholdKn(0), 0, "Off")
+        XCTAssertEqual(normalizedSlackThresholdKn(0.3 - 0.1 - 0.1 - 0.1), 0, "a stepped-down tenth is Off, not −3e-17 kn")
+        XCTAssertEqual(normalizedSlackThresholdKn(-0.1), defaultSlackThresholdKn)
         XCTAssertEqual(normalizedSlackThresholdKn(10.1), defaultSlackThresholdKn)
     }
 
@@ -1488,6 +1491,21 @@ private struct FoldPageTestHarness: View {
         XCTAssertEqual(narrow.slackCores.map(\.start), narrow.slackWindows.map(\.start),
                        "a window under the slack speed is all slack")
         XCTAssertEqual(narrow.slackCores.map(\.end), narrow.slackWindows.map(\.end))
+    }
+
+    /// With the comfort current Off there is no window anywhere, and slack is
+    /// still measured at the slack speed (#821).
+    func testAnOffSlackWindowLeavesOnlySlack() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+        let d = TimelineData.build(tide: nil, current: station, now: Date(),
+                                   anchor: todayLocal(station.tz), threshold: 0)
+        let slack = TimelineData.build(tide: nil, current: station, now: Date(),
+                                       anchor: todayLocal(station.tz), threshold: slackKn)
+        XCTAssert(d.slackWindows.isEmpty && d.windowRuns.isEmpty, "Off draws no window")
+        XCTAssertFalse(d.slackCores.isEmpty)
+        XCTAssertEqual(d.slackCores.map(\.start), slack.slackCores.map(\.start),
+                       "slack is the same water with the window off")
+        XCTAssertEqual(d.slackCores.map(\.end), slack.slackCores.map(\.end))
     }
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).

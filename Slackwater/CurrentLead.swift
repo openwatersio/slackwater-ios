@@ -31,8 +31,8 @@ struct CurrentLead: View {
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { provisional ? SN.amber : ink }
 
-    /// The stops the commentary walks: a slack window's opening, its closing
-    /// (the run that begins), the slack inside it, each max, and the sun's
+    /// The stops the commentary walks: a slack window's opening, the slack
+    /// inside it, the window's closing, each max, and the sun's
     /// next rise or set when it beats all of them. The slack is its core's
     /// opening, or one stop at a core dot's centre or at a slack no core holds.
     /// A window too short to draw has no stops; the slack inside it does.
@@ -49,11 +49,9 @@ struct CurrentLead: View {
             if !slacks.contains(run.start) {
                 stops.append((run.start, "Slack window"))
             }
-            // A run that reaches the series' end never closes, so no run
-            // begins there. Direction is read a second past the edge.
+            // A run that reaches the series' end never closes.
             if run.end < seriesEnd && !timeline.isSlack(at: run.end) {
-                let v = timeline.velocityAt(run.end.addingTimeInterval(1))
-                stops.append((run.end, v >= 0 ? "Flood" : "Ebb"))
+                stops.append((run.end, "Slack window closes"))
             }
         }
         for e in timeline.currentEvents where e.kind != .slack {

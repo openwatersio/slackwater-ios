@@ -21,8 +21,9 @@ struct SlackWindowPreview: View {
         let cores = cardCores(points: Self.points, slacks: slacks,
                               threshold: normalizedSlackThresholdKn(threshold))
         let width = windows.first.map { $0.end.timeIntervalSince($0.start) } ?? 0
-        let duration = Duration.seconds(width).formatted(
-            .units(allowed: [.hours, .minutes], width: .abbreviated))
+        let duration = slackWindowIsOff(normalizedSlackThresholdKn(threshold))
+            ? String(localized: "Off", comment: "Comfort-current setting at zero: no slack window, only slack.")
+            : Duration.seconds(width).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
         VStack(spacing: 6) {
             StationCardGraph(
                 points: Self.points.map { .init(time: $0.time, value: $0.speed) },

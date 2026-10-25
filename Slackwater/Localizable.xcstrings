@@ -3860,6 +3860,101 @@
         }
       }
     },
+    "Off" : {
+      "comment" : "Comfort-current setting at zero: no slack window, only slack.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fra"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pois"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dheth"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "끔"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Av"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uit"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Av"
+          }
+        }
+      }
+    },
     "Perihelion" : {
       "comment" : "Sun–Earth orbit diagram.",
       "localizations" : {
@@ -4436,6 +4531,101 @@
         }
       }
     },
+    "Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn). Off shows only slack." : {
+      "comment" : "Tide and current interface text.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indstiller den højeste strømhastighed, Slackwater regner som en brugbar strømstille periode (0,1–10 kn). Fra viser kun strømstille."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legt die höchste Strömungsgeschwindigkeit fest, die Slackwater als nutzbares Stauwasserfenster behandelt (0.1–10 kn). Aus zeigt nur Stauwasser."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Establece la corriente más rápida que Slackwater considera una ventana de estoa utilizable (0,1–10 kn). Desactivado muestra solo la estoa."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asettaa suurimman virtausnopeuden, jonka Slackwater hyväksyy heikon virtauksen jaksoksi (0.1–10 kn). Pois näyttää vain lähes tyynen."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Définit la vitesse de courant maximale que Slackwater considère comme une fenêtre d’étale utilisable (0,1 à 10 kn). Désactivé n’affiche que l’étale."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Socraíonn sé seo an sruth is tapa a mheasann Slackwater a bheith inúsáidte mar thréimhse fáfaill (0.1–10 kn). Ní thaispeánann As ach an fáfall."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suidhichidh seo an sruth as luaithe a bhios Slackwater a' meas mar thràth marbh-shruth a ghabhas cleachdadh (0.1–10 kn). Cha sheall Dheth ach am marbh-shruth."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imposta la corrente massima che Slackwater considera una finestra di stanca utilizzabile (0,1–10 kn). Disattivato mostra solo la stanca."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwaterが利用しやすい潮止まり時間帯とみなす流速の上限を設定します（0.1–10 kn）。オフにすると潮止まりだけを表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater가 이용 가능한 정조 시간대로 취급할 최대 조류 속도를 설정합니다 (0.1–10 kn). 끔으로 설정하면 정조만 표시합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angir den høyeste strømhastigheten Slackwater regner som et brukbart strømstillevindu (0.1–10 kn). Av viser bare strømstille."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stelt de hoogste stroomsnelheid in die Slackwater als bruikbaar kenteringsvenster beschouwt (0.1–10 kn). Uit toont alleen de kentering."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define a corrente máxima que Slackwater considera uma janela de estofo utilizável (0.1–10 kn). Desativado mostra apenas o estofo."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define a corrente máxima que o Slackwater considera um período de estofo utilizável (0,1–10 kn). Desativado mostra apenas o estofo."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ställer in den högsta strömhastighet Slackwater räknar som en användbar strömstilla period (0,1–10 kn). Av visar bara strömstilla."
+          }
+        }
+      }
+    },
     "Slack runs %lld minutes around it, against about %lld here usually." : {
       "comment" : "Current sheet fact. Both integers are counts of minutes; vary by plural.",
       "localizations" : {
@@ -4934,6 +5124,101 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Slack window closes" : {
+      "comment" : "Current event: the water speeds up past the person's slack-window speed.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstille periode slutter"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stauwasserfenster endet"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la ventana de estoa"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heikon virtauksen jakso päättyy"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la fenêtre d’étale"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deireadh na tréimhse fáfaill"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crìoch tràth a' mharbh-shrutha"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fine della finestra di stanca"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "潮止まり時間帯終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정조 시간대 종료"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstillevindu slutter"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kenteringsvenster eindigt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fim da janela de estofo"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fim do período de estofo"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strömstilla period slutar"
           }
         }
       }
@@ -8001,6 +8286,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Störst runt %@."
+          }
+        }
+      }
+    },
+    "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on." : {
+      "comment" : "Spoken Siri answer when the comfort current is set to Off.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Din strømstille periode er slået fra. Indstil en behagelig strømhastighed i Slackwaters indstillinger for at slå den til."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Stauwasserfenster ist aus. Lege in den Einstellungen von Slackwater eine angenehme Strömung fest, um es einzuschalten."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ventana de estoa está desactivada. Establece una corriente cómoda en los ajustes de Slackwater para activarla."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heikon virtauksen jakso on pois päältä. Ota se käyttöön asettamalla sopiva virtausnopeus Slackwaterin asetuksissa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta fenêtre d’étale est désactivée. Définis un courant confortable dans les réglages de Slackwater pour l’activer."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá do thréimhse fáfaill múchta. Socraigh sruth compordach i socruithe Slackwater chun í a chasadh air."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha an tràth marbh-shruth agad dheth. Suidhich sruth socair ann an roghainnean Slackwater gus a chur air."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La finestra di stanca è disattivata. Imposta una corrente tollerata nelle impostazioni di Slackwater per attivarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "潮止まり時間帯はオフになっています。オンにするには、Slackwaterの設定で利用しやすい流速を設定してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정조 시간대가 꺼져 있습니다. 켜려면 Slackwater 설정에서 편안한 조류 속도를 설정하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstillevinduet ditt er av. Angi en komfortabel strøm i Slackwater-innstillingene for å slå det på."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je kenteringsvenster staat uit. Stel een comfortabele stroming in bij de instellingen van Slackwater om het aan te zetten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua janela de estofo está desativada. Defina uma corrente confortável nos ajustes do Slackwater para ativá-la."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O seu período de estofo está desativado. Defina uma corrente tolerável nas definições do Slackwater para o ativar."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Din strömstilla period är avstängd. Ställ in en bekväm strömhastighet i Slackwaters inställningar för att slå på den."
           }
         }
       }
@@ -23590,7 +23970,7 @@
       }
     },
     "Ebb" : {
-      "comment" : "Ebb-current event label.",
+      "comment" : "Current direction, used in a sentence.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -23775,101 +24155,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ebb vid %@"
-          }
-        }
-      }
-    },
-    "Ebb current" : {
-      "comment" : "VoiceOver current-event label.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ebbestrøm"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ebbstrom"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corriente de reflujo"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laskuvirtaus"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Courant de jusant"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sruth aife"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sruth-tràghaidh"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente di riflusso"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下げ潮流"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "낙조류"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utgående strøm"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ebstroom"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente de vazante"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente de vazante"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ebbström"
           }
         }
       }
@@ -26670,7 +26955,7 @@
       }
     },
     "Flood" : {
-      "comment" : "Flood-current event label.",
+      "comment" : "Current direction, used in a sentence.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -26956,101 +27241,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flod vid %@"
-          }
-        }
-      }
-    },
-    "Flood current" : {
-      "comment" : "VoiceOver current-event label.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flodstrøm"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flutstrom"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corriente de flujo"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nousuvirtaus"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Courant de flot"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sruth tuile"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sruth-lìonaidh"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente di flusso"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上げ潮流"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "창조류"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inngående strøm"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vloedstroom"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente de enchente"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corrente de enchente"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flodström"
           }
         }
       }
@@ -45107,101 +45297,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ange höjden igen: höjderna på den här platsen mäts nu från en annan sjökortsreferensnivå."
-          }
-        }
-      }
-    },
-    "Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn)." : {
-      "comment" : "Tide and current interface text.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indstiller den højeste strømhastighed, Slackwater regner som en brugbar strømstille periode (0,1–10 kn)."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Legt die höchste Strömungsgeschwindigkeit fest, die Slackwater als nutzbares Stauwasserfenster behandelt (0.1–10 kn)."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Establece la corriente más rápida que Slackwater considera una ventana de estoa utilizable (0,1–10 kn)."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Asettaa suurimman virtausnopeuden, jonka Slackwater hyväksyy heikon virtauksen jaksoksi (0.1–10 kn)."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Définit la vitesse de courant maximale que Slackwater considère comme une fenêtre d’étale utilisable (0,1 à 10 kn)."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Socraíonn sé seo an sruth is tapa a mheasann Slackwater a bheith inúsáidte mar thréimhse fáfaill (0.1–10 kn)."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suidhichidh seo an sruth as luaithe a bhios Slackwater a' meas mar thràth marbh-shruth a ghabhas cleachdadh (0.1–10 kn)."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Imposta la corrente massima che Slackwater considera una finestra di stanca utilizzabile (0,1–10 kn)."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwaterが利用しやすい潮止まり時間帯とみなす流速の上限を設定します（0.1–10 kn）。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slackwater가 이용 가능한 정조 시간대로 취급할 최대 조류 속도를 설정합니다 (0.1–10 kn)."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Angir den høyeste strømhastigheten Slackwater regner som et brukbart strømstillevindu (0.1–10 kn)."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stelt de hoogste stroomsnelheid in die Slackwater als bruikbaar kenteringsvenster beschouwt (0.1–10 kn)."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Define a corrente máxima que Slackwater considera uma janela de estofo utilizável (0.1–10 kn)."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Define a corrente máxima que o Slackwater considera um período de estofo utilizável (0,1–10 kn)."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ställer in den högsta strömhastighet Slackwater räknar som en användbar strömstilla period (0,1–10 kn)."
           }
         }
       }
