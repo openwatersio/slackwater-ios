@@ -433,12 +433,12 @@ Walk strictly forward—more than one second after `selectedTime`—through thes
 
 1. a drawn slack window's opening, named `Slack window`;
 2. a merged measured slack run's opening, named `Slack`;
-3. the window's closing, named `Slack window closes`; and
+3. the window's closing, named `Slack window` with the closing glyph; and
 4. `Max flood` and `Max ebb`.
 
 A slack run's closing is not a stop: the window goes on around it. A short slack run (§13.2) is one stop instead: its centre, named `Slack`. A slack inside a run is never a stop of its own: its run's opening, or a short run's centre, names it. A slack no run covers is one stop at its own instant, named `Slack`, and parked on that instant the lead says `Slack` (§9.2). A window too short to draw has no stops; the slack inside it does. When a window and its slack run open together, which happens when the slack-window speed is under the slack speed, the one stop is named `Slack`.
 
-The `Slack window` stop uses the slack glyph in the visual label and is spoken `Slack window`. The `Slack window closes` stop uses `arrow.left.and.line.vertical.and.arrow.right` and is spoken `Slack window closes`. With the slack-window speed off there are no windows, so the commentary walks slack and the maxima alone. When a bare slack coincides with a window's closing, the stop is named `Slack`. A window ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
+The `Slack window` stop uses the slack glyph in the visual label and is spoken `Slack window`. The closing stop shows the same words, so the pill is no wider than the opening's, and uses `arrow.left.and.line.vertical.and.arrow.right`; the glyph tells the two apart. It is spoken `Slack window closes`. With the slack-window speed off there are no windows, so the commentary walks slack and the maxima alone. When a bare slack coincides with a window's closing, the stop is named `Slack`. A window ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
 
 The next current stop competes with sunrise and sunset. A derived gate compares its next slack instant with the sun events; it never offers a current maximum.
 

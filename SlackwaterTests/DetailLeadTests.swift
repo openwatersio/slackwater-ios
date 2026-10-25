@@ -93,7 +93,7 @@ import SlackwaterKit
             (at(-100), "Max flood", "Maximum flood current", "arrow.forward"),
             (at(10), "Slack window", "Slack window", "arrow.right.and.line.vertical.and.arrow.left"),
             (at(3000), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
-            (at(3600), "Slack window closes", "Slack window closes", "arrow.left.and.line.vertical.and.arrow.right"),
+            (at(3600), "Slack window", "Slack window closes", "arrow.left.and.line.vertical.and.arrow.right"),
             (at(4300), "Max ebb", "Maximum ebb current", "arrow.backward"),
         ]
 
@@ -173,11 +173,15 @@ import SlackwaterKit
 
     private func assertNext(_ scrub: Date, _ time: Date, _ text: String,
                             _ message: String, in tl: TimelineData? = nil, line: UInt = #line) {
+        // The closing shows the opening's words; its spoken label tells them apart.
+        let spoken = text == "Slack window closes" ? text : nil
+        let text = spoken == nil ? text : "Slack window"
         guard let next = lead(scrub: scrub, timeline: tl).nextSignificant else {
             return XCTFail("no stop after the scrub — \(message)", line: line)
         }
         XCTAssertEqual(next.time, time, message, line: line)
         XCTAssertEqual(next.label, text, message, line: line)
+        if let spoken { XCTAssertEqual(next.spokenLabel, spoken, message, line: line) }
     }
 
     /// The strip's spoken value is the lead in words: the state, then the
@@ -253,7 +257,7 @@ import SlackwaterKit
 
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes its opening, named Slack window, and
-    /// its closing, named Slack window closes. Its core contributes Slack at
+    /// its closing, spoken Slack window closes. Its core contributes Slack at
     /// the core's opening, or its centre when it draws as a dot, as these do.
     /// A slack inside a core is never a stop itself, so the
     /// pill never says "Slack" twice for one turn; a slack no core holds is
