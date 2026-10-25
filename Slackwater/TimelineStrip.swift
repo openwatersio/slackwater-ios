@@ -1323,6 +1323,7 @@ struct MultiDaySchedule: View {
     let scrubTime: Date
     let onTap: (Date) -> Void
     @State private var expandedOffset: Int? = 0
+    @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
@@ -1489,7 +1490,7 @@ struct MultiDaySchedule: View {
             HStack(spacing: 3) {
                 if let deg = e.arrowDeg {
                     CompassArrow(deg: deg)
-                    Text(compass16(deg))
+                    Text(formatSet(deg, format: setFormat))
                 }
                 if e.pill == .flood {
                     Text("Flood").opacity(0.9)

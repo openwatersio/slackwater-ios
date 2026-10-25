@@ -678,7 +678,7 @@ every mark that only earns its place at scale. The card and the widget are
 ### 15.2 The reading
 
 The top-right reading is the surface's readout: the speed with its unit,
-and under it the set — the phase word, the cardinal and the bearing arrow
+and under it the set — the phase word, the set (cardinal or bearing) and the bearing arrow
 by the sign of the velocity. Inside a window, closing excluded, or within a
 second of a slack no window covers, the word is *Slack* in the go colour,
 as on the detail lead, and the set still shows; under 0.05 kn the set gives way to a
@@ -711,7 +711,7 @@ turn times are thinned by the same edge and spacing rule as a current's.
 
 The small widget is the same card one row shorter: the name, then the
 reading with its direction on one line — height and a rising/falling arrow,
-or speed and the set arrow with its cardinal, *Slack* in the go colour
+or speed and the set arrow with its cardinal or bearing, *Slack* in the go colour
 where the reading says it (§15.2) — and the curve below. The curve is the medium card's own
 points over a narrower span: half a swing behind now and one and a half
 ahead, so now sits a quarter in and the next turn or window lands mid-card

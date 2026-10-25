@@ -253,6 +253,7 @@ struct ConditionsItem: View {
     /// Slack, then the arrow before its cardinal. The phase word is spoken,
     /// not shown: the arrow's colour is the phase.
     var compact = false
+    @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
 
     var body: some View {
         switch reading {
@@ -287,7 +288,7 @@ struct ConditionsItem: View {
             // states a phase without either.
             let phase = reading.currentWord ?? .flood
             let slack = phase == .slack
-            let spoken = "\(formatSpeed(abs(signed), unit: unit)) \(speedUnitLabel(unit)), \(slack ? "slack" : "\(phase.word), setting \(compass16(deg))")"
+            let spoken = "\(formatSpeed(abs(signed), unit: unit)) \(speedUnitLabel(unit)), \(slack ? "slack" : "\(phase.word), setting \(formatSet(deg, format: setFormat))")"
             let value = (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(speedUnitLabel(unit))")
@@ -301,7 +302,7 @@ struct ConditionsItem: View {
             let tint = slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
             if compact {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    // The number never truncates; a tight row loses the cardinal.
+                    // The number never truncates; a tight row loses the set's words.
                     value.layoutPriority(1)
                     if slack { Text("Slack").font(.caption).foregroundStyle(tint) }
                     set(deg: deg, signed: signed, tint: tint, font: .caption, arrowFirst: true)
@@ -339,10 +340,23 @@ struct ConditionsItem: View {
             Text(verbatim: "•").font(font).foregroundStyle(SN.foam.opacity(0.6))
                 .frame(width: 30)
         } else {
-            HStack(spacing: arrowFirst ? 2 : 4) {
-                if arrowFirst { CompassArrow(deg: deg) }
-                Text(compass16(deg))
-                if !arrowFirst { CompassArrow(deg: deg) }
+            Group {
+                if arrowFirst {
+                    // A cut bearing reads as another bearing ("28…"), so a
+                    // tight row drops the words and keeps the arrow.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 2) {
+                            CompassArrow(deg: deg)
+                            Text(formatSet(deg, format: setFormat))
+                        }
+                        CompassArrow(deg: deg)
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Text(formatSet(deg, format: setFormat))
+                        CompassArrow(deg: deg)
+                    }
+                }
             }.font(font).foregroundStyle(tint)
         }
     }

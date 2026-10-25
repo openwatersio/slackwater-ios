@@ -9,14 +9,14 @@ struct ScrubReading: Equatable {
     let value: String?
     let unit: String?
     let symbol: String?
-    /// A current's set as a compass point ("SW"); nil for tides and at slack.
+    /// A current's set as a compass point ("SW") or bearing ("225°"); nil for tides and at slack.
     let set: String?
     let next: String?
 
     /// One strip point: closer than that, the ring has not visibly left the event.
     private static let onEvent: TimeInterval = Timeline.scrubbedSeconds
 
-    static func at(_ t: Date, in data: TimelineData, imperial: Bool, speedUnit: String, floodDeg: Double? = nil, ebbDeg: Double? = nil) -> ScrubReading {
+    static func at(_ t: Date, in data: TimelineData, imperial: Bool, speedUnit: String, setFormat: String = "compass", floodDeg: Double? = nil, ebbDeg: Double? = nil) -> ScrubReading {
         if data.hasTide {
             let turn = data.tideExtremes.first { abs($0.time.timeIntervalSince(t)) < onEvent }
             let next = data.tideExtremes.first { $0.time.timeIntervalSince(t) >= onEvent }
@@ -43,7 +43,7 @@ struct ScrubReading: Equatable {
         return ScrubReading(title: phase.word,
                             value: schematic ? nil : formatSpeed(abs(v), unit: speedUnit),
                             unit: schematic ? nil : speedUnitLabel(speedUnit), symbol: nil,
-                            set: bearing.map(compass16),
+                            set: bearing.map { formatSet($0, format: setFormat) },
                             next: next.map { currentLine($0, data, speedUnit) })
     }
 

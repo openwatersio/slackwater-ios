@@ -31,6 +31,7 @@ import Foundation
     if CommandLine.arguments.contains("-resetUnits") {
         AppGroup.defaults.removeObject(forKey: unitsKey)
         AppGroup.defaults.removeObject(forKey: speedUnitKey)
+        AppGroup.defaults.removeObject(forKey: setFormatKey)
     }
     if CommandLine.arguments.contains("-resetComfortCurrent") {
         AppGroup.defaults.removeObject(forKey: AppGroup.slackWindowSpeedKey)

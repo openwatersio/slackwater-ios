@@ -279,8 +279,8 @@ Daylight duration totals the elapsed time above the horizon between that day’s
 |---|---|---|
 | High | ↑ HIGH | Navy on high teal `#2DD4BF` |
 | Low | ↓ LOW | Navy on low amber `#FBBF24` |
-| Flood | Set arrow, 16-point compass, FLOOD | Navy on flood `#4A9FD8` |
-| Ebb | Set arrow, 16-point compass, EBB | Navy on ebb `#E8A33D` |
+| Flood | Set arrow, set (compass point or bearing), FLOOD | Navy on flood `#4A9FD8` |
+| Ebb | Set arrow, set (compass point or bearing), EBB | Navy on ebb `#E8A33D` |
 | Slack | Opposed arrows, SLACK | Navy on go `#88B868` |
 | Lunar eclipse | 🌘 ECLIPSE | Foam on umbra `#6B2A18` |
 | Solar eclipse | Sun, SOLAR ECLIPSE | Foam on umbra `#6B2A18` |

@@ -160,7 +160,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
 /// The place goes in front of it (`alertRuleSummary`, `alertCopy`).
 func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: Bool) -> String {
     switch trigger {
-    case .slackWindowOpens: return noWindow ? String(localized: "Slack") : String(localized: "Slack window")
+    case .slackWindowOpens: return noWindow ? String(localized: "Slack") : String(localized: "Slack window", comment: "An alert's title when a slack window opens, and the Settings row for the comfort current.")
     case .slack: return String(localized: "Slack")
     case .currentPeak(let flood): return flood ? String(localized: "Max flood") : String(localized: "Max ebb")
     case .tideExtreme(let high, let ofDay):

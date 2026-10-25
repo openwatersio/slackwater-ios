@@ -91,7 +91,7 @@ Near Me, search, and the map's opening camera rank by distance from one anchor, 
 
 Distance is the haversine great-circle distance with a mean Earth radius of 6371.0088 km. Equal distances keep catalog order: name alphabetically, then id. Implementations may cache the ranking per anchor; the reference rounds the anchor to 0.001° for that cache.
 
-Without a saved height preference, tide heights use feet for the device’s US region and metres elsewhere, independently of app language. Current speed defaults to knots. Explicit choices, including iCloud-synced choices, override regional defaults across the app, watch, widgets, Siri, and alerts. Regional defaults are not saved or uploaded to iCloud.
+Without a saved height preference, tide heights use feet for the device’s US region and metres elsewhere, independently of app language. Current speed defaults to knots, and a current's set to a compass point. Explicit choices, including iCloud-synced choices, override regional defaults across the app, watch, widgets, Siri, and alerts. Regional defaults are not saved or uploaded to iCloud.
 
 Distances always display in nautical miles, whatever the height and speed units: one decimal below 10 nm, whole numbers from 10 nm, formatted with the locale's decimal separator ("1.2 nm", "14 nm").
 
@@ -166,7 +166,7 @@ Readings describe the moment the card was built (§6.5).
 | Station | Value | Below the value |
 |---|---|---|
 | Tide | Height: feet to one decimal or metres to two, then " ft" or " m" | "Rising" with a teal (`#2DD4BF`) up-right arrow, or "Falling" with an amber (`#FBBF24`) down-right arrow |
-| Measured current | Absolute speed to one decimal, then "kn", "km/h", or "m/s" | A state word, a 16-point compass direction, and an arrow rotated to the set |
+| Measured current | Absolute speed to one decimal, then "kn", "km/h", or "m/s" | A state word, the set as a 16-point compass direction or a three-digit true bearing (Settings), and an arrow rotated to the set |
 | Derived gate | None | The phase word with a forward, back, or slack glyph |
 | Canadian tide preview | Downloaded height, with the ordinary tide state | Additional download status below the identity |
 | Canadian station without readings | None | The download status (§6.3) |

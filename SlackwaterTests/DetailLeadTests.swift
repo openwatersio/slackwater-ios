@@ -11,6 +11,19 @@ import SlackwaterKit
 @MainActor final class DetailLeadTests: XCTestCase {
 
     private let utc = TimeZone(identifier: "UTC")!
+    private var savedSetFormat: Any?
+
+    // The lead reads the set format from the shared defaults, which a Settings tap on this simulator can leave at degrees.
+    override func setUp() async throws {
+        try await super.setUp()
+        savedSetFormat = AppGroup.defaults.object(forKey: setFormatKey)
+        AppGroup.defaults.set("compass", forKey: setFormatKey)
+    }
+
+    override func tearDown() async throws {
+        AppGroup.defaults.set(savedSetFormat, forKey: setFormatKey)
+        try await super.tearDown()
+    }
 
     /// 2026-08-10 12:00 UTC. A fixed wall-clock moment, so the captions this
     /// file asserts are readable strings rather than epoch arithmetic.
@@ -166,6 +179,9 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: at(0)).spoken, "Max flood 1.0 knots N")
         XCTAssertEqual(lead(scrub: at(3600)).spoken, "Slack 1.0 knots", "slack claims no set")
         XCTAssertEqual(lead(scrub: at(5000), signed: -1).spoken, "Ebbing 1.0 knots S", "an ebb speaks the ebb set")
+        AppGroup.defaults.set("degrees", forKey: setFormatKey)
+        XCTAssertEqual(lead(scrub: at(5000), signed: -1).spoken, "Ebbing 1.0 knots 180°", "degrees follow the setting (#822)")
+        AppGroup.defaults.set("compass", forKey: setFormatKey)
         XCTAssertEqual(spokenUnit("km/h"), "kilometres per hour")
         XCTAssertEqual(spokenUnit("ft"), "feet")
     }
