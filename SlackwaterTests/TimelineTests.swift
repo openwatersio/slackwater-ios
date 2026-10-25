@@ -478,7 +478,7 @@ private struct FoldPageTestHarness: View {
     func testCurrentHeadersLeadWithPlainLanguageAndRestoreNow() throws {
         let lead = try repoSource("Slackwater/CurrentLead.swift")
         XCTAssertTrue(lead.contains("phase.word"), "the lead names the phase in words")
-        XCTAssertTrue(lead.contains("compass16("), "and the set as a cardinal point")
+        XCTAssertTrue(lead.contains("formatSet(setDegrees, format: setFormat)"), "and the set in the chosen format")
         for file in ["Slackwater/CurrentDetailView.swift", "Slackwater/OnlineGateDetailView.swift"] {
             let source = try repoSource(file)
             XCTAssertTrue(source.contains("CurrentScrubCard("), "\(file) must draw the shared scrub card")

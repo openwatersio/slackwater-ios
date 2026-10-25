@@ -1,13 +1,14 @@
 import Foundation
 
-/// Display preferences that follow the person between devices: units and the
-/// comfort current. The App Group copy is what every reader uses.
+/// Display preferences that follow the person between devices: units, the set's
+/// format, and the comfort current. The App Group copy is what every reader uses.
 @MainActor final class UnitsCloud {
     static let shared = UnitsCloud()
 
     private static let allowed: [String: (Any) -> Bool] = [
         unitsKey: { ["imperial", "metric"].contains($0 as? String) },
         speedUnitKey: { ["kn", "kmh", "ms"].contains($0 as? String) },
+        setFormatKey: { ["compass", "degrees"].contains($0 as? String) },
         AppGroup.slackWindowSpeedKey: { ($0 as? Double).map(slackThresholdRange.contains) == true },
     ]
     private let defaults: UserDefaults

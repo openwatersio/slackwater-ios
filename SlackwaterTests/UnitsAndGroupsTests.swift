@@ -85,6 +85,16 @@ import XCTest
         XCTAssertNotEqual(kn, kmh)
     }
 
+    /// Degrees are three digits like a chart bearing (#822); compass stays the default.
+    func testSetFormats() {
+        XCTAssertEqual(formatSet(225, format: "compass"), "SW")
+        XCTAssertEqual(formatSet(225, format: "degrees"), "225°")
+        XCTAssertEqual(formatSet(45.4, format: "degrees"), "045°")
+        XCTAssertEqual(formatSet(359.6, format: "degrees"), "000°")
+        XCTAssertEqual(formatSet(-90, format: "degrees"), "270°")
+        XCTAssertEqual(formatSet(225, format: "unsupported"), "SW")
+    }
+
     // MARK: - Dedupe rule: each station renders in at most one group
     // (M4.5 precedence: My Location > Favorites > Near Me > Recents)
 

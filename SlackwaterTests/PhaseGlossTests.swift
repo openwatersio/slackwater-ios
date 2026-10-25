@@ -42,12 +42,12 @@ final class PhaseGlossTests: XCTestCase {
         // moved into StationCardFace.swift so the widget extension can share
         // it with the list.
         let cards = try repoSource("Slackwater/StationCardFace.swift")
-        XCTAssertTrue(cards.contains("compass16("),
+        XCTAssertTrue(cards.contains("formatSet(deg, format: setFormat)"),
                       "list cards lost their direction-first cardinal (#59)")
         XCTAssertTrue(cards.contains("struct ConditionsItem"),
                       "the single shared reading renderer is gone — if the cards' "
                       + "direction rows have split up again, restore the ≥2 count here")
-        XCTAssertTrue(try repoSource("Slackwater/TimelineStrip.swift").contains("compass16("),
+        XCTAssertTrue(try repoSource("Slackwater/TimelineStrip.swift").contains("formatSet(deg, format: setFormat)"),
                       "schedule pills lost their direction-first cardinal (#59)")
     }
 }

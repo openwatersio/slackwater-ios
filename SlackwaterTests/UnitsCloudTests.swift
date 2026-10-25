@@ -161,6 +161,14 @@ import XCTest
         }
     }
 
+    func testSetFormatSyncsOnlyKnownValues() {
+        let sync = sync()
+        sync.set("degrees", forKey: setFormatKey)
+        sync.set("radians", forKey: setFormatKey)
+        XCTAssertEqual(cloud.values[setFormatKey] as? String, "degrees")
+        XCTAssertEqual(defaults.string(forKey: setFormatKey), "degrees")
+    }
+
     func testComfortCurrentSyncsOnlyInRangeNumbers() {
         let key = AppGroup.slackWindowSpeedKey
         let sync = sync()

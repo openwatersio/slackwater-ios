@@ -584,14 +584,14 @@ import XCTest
                       "a current maximum hangs a set arrow")
         XCTAssertTrue(drawCurrent.contains("value: data.speedsAreSchematic ? nil : formatSpeed("),
                       "a measured maximum prints its speed; a schematic one prints none")
-        XCTAssertTrue(strip.contains("Text(compass16(deg))"),
-                      "the schedule names the set as a compass word beside its arrow")
+        XCTAssertTrue(strip.contains("Text(formatSet(deg, format: setFormat))"),
+                      "the schedule names the set in words or degrees beside its arrow")
 
         let lead = try repoSource("Slackwater/CurrentLead.swift")
         XCTAssertTrue(lead.contains("if isSlack { return String(localized: \"Slack\""),
                       "the measured-current lead names slack in words")
-        XCTAssertTrue(lead.contains("Text(compass16(setDegrees))"),
-                      "the measured-current lead names the set in words")
+        XCTAssertTrue(lead.contains("Text(formatSet(setDegrees, format: setFormat))"),
+                      "the measured-current lead names the set in words or degrees")
         let derived = try repoSource("Slackwater/DerivedGateDetailView.swift")
         XCTAssertTrue(derived.contains("leadState(word, ink: ink)"),
                       "the derived lead names its phase in words")

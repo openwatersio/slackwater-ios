@@ -7,6 +7,7 @@ struct SettingsView: View {
     var onReplayTour: (() -> Void)? = nil
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @Environment(\.dismiss) private var dismiss
@@ -32,46 +33,60 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    section(String(localized: "Tide height", comment: "Settings section heading.")) {
-                        Picker(
-                            "Tide height units",
-                            selection: Binding(
-                                get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })
-                        ) {
-                            Text("Feet").tag("imperial")
-                            Text("Meters").tag("metric")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    section(String(localized: "Current speed", comment: "Settings section heading.")) {
-                        Picker(
-                            "Current speed units",
-                            selection: Binding(
-                                get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })
-                        ) {
-                            Text("Knots").tag("kn")
-                            Text(verbatim: "km/h").tag("kmh")
-                            Text(verbatim: "m/s").tag("ms")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    section(String(localized: "Slack window", comment: "Settings section heading.")) {
-                        Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
-                            HStack {
-                                Text("Comfort current")
-                                Spacer()
-                                Text(
-                                    slackWindowSpeedBinding.wrappedValue,
-                                    format: .number.precision(.fractionLength(1))
-                                )
-                                .monospacedDigit()
-                                Text(verbatim: "kn")
+                    section(String(localized: "Tides", comment: "Tide stations: the station list's series filter chip, and the Settings section for tide settings.")) {
+                        row(String(localized: "Height", comment: "Settings row label: the unit tide heights are written in.")) {
+                            Picker(
+                                "Tide height units",
+                                selection: Binding(
+                                    get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })
+                            ) {
+                                Text("Feet").tag("imperial")
+                                Text("Meters").tag("metric")
                             }
+                            .pickerStyle(.segmented)
                         }
-                        SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
-                        Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
+                    }
+
+                    section(String(localized: "Currents", comment: "Current stations: the station list's series filter chip, and the Settings section for current settings.")) {
+                        row(String(localized: "Speed", comment: "Settings row label: the unit current speeds are written in.")) {
+                            Picker(
+                                "Current speed units",
+                                selection: Binding(
+                                    get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })
+                            ) {
+                                Text("Knots").tag("kn")
+                                Text(verbatim: "km/h").tag("kmh")
+                                Text(verbatim: "m/s").tag("ms")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        row(String(localized: "Direction", comment: "Settings row label: how a current's set (the direction it flows toward) is written.")) {
+                            Picker(
+                                "Current direction format",
+                                selection: Binding(
+                                    get: { setFormat }, set: { UnitsCloud.shared.set($0, forKey: setFormatKey) })
+                            ) {
+                                Text("Compass").tag("compass")
+                                Text("Degrees °T").tag("degrees")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        row(String(localized: "Slack window", comment: "An alert's title when a slack window opens, and the Settings row for the comfort current.")) {
+                            Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
+                                HStack {
+                                    Text("Comfort current")
+                                    Spacer()
+                                    Text(
+                                        slackWindowSpeedBinding.wrappedValue,
+                                        format: .number.precision(.fractionLength(1))
+                                    )
+                                    .monospacedDigit()
+                                    Text(verbatim: "kn")
+                                }
+                            }
+                            SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
+                            Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
+                        }
                     }
 
                     section(String(localized: "Alerts", comment: "Settings section heading."), premium: true) {
@@ -226,6 +241,17 @@ struct SettingsView: View {
                     WidgetReload.trigger()
                 }
             })
+    }
+
+    /// One setting inside a section: its label over its control.
+    @ViewBuilder private func row(_ label: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(SN.foam.opacity(0.85))
+            content()
+        }
+        .padding(.top, 4)
     }
 
     @ViewBuilder private func section(_ label: String, premium: Bool = false, @ViewBuilder content: () -> some View) -> some View {

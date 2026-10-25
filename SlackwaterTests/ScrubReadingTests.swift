@@ -81,5 +81,7 @@ final class ScrubReadingTests: XCTestCase {
         let ebb = try XCTUnwrap(tl.currentEvents.first { $0.kind == .maxEbb && $0.time > at })
         XCTAssertEqual(ScrubReading.at(ebb.time, in: tl, imperial: true, speedUnit: "kn",
                                        floodDeg: 225, ebbDeg: 45).set, "NE")
+        XCTAssertEqual(ScrubReading.at(ebb.time, in: tl, imperial: true, speedUnit: "kn", setFormat: "degrees",
+                                       floodDeg: 225, ebbDeg: 45).set, "045°")
     }
 }

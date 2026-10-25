@@ -23,6 +23,7 @@ struct CurrentLead: View {
     /// Where the next maximum stands among its own direction's maxima over the
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
+    @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
 
     private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
     private var phase: CurrentPhase { currentPhase(signed: signed, inWindow: isSlack) }
@@ -107,10 +108,10 @@ struct CurrentLead: View {
         return phase.word
     }
 
-    /// The lead in words, for the strip's spoken value: the set's compass point follows outside slack, as on the watch.
+    /// The lead in words, for the strip's spoken value: the set follows outside slack, as on the watch.
     var spoken: String {
         let reading = spokenReading(state, formatSpeed(abs(signed), unit: speedUnit), unit: speedUnitLabel(speedUnit))
-        return isSlack ? reading : "\(reading) \(compass16(setDegrees))"
+        return isSlack ? reading : "\(reading) \(formatSet(setDegrees, format: setFormat))"
     }
 
     var body: some View {
@@ -128,7 +129,8 @@ struct CurrentLead: View {
                     LeadGlyph(systemName: "arrow.right.and.line.vertical.and.arrow.left")
                 } else {
                     LeadGlyph(systemName: "arrow.up", degrees: setDegrees)
-                    Text(compass16(setDegrees))
+                    // Unpinned, the eyebrow truncated "282°" to "28…" on iPhone 17.
+                    Text(formatSet(setDegrees, format: setFormat)).fixedSize()
                 }
             }
             .foregroundStyle(phaseColor)

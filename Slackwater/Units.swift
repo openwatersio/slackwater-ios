@@ -52,6 +52,16 @@ func speedUnitLabel(_ unit: String) -> String {
     unit == "kmh" ? "km/h" : unit == "ms" ? "m/s" : "kn"
 }
 
+// A current's set (#822): "compass" | "degrees", compass when unset.
+let setFormatKey = "slackwater.setFormat"
+
+/// The set as a compass point ("SW") or a three-digit true bearing ("225°").
+func formatSet(_ deg: Double, format: String) -> String {
+    guard format == "degrees" else { return compass16(deg) }
+    let d = (Int(deg.rounded()) % 360 + 360) % 360
+    return String(format: "%03d°", d)
+}
+
 /// A printed unit as VoiceOver should say it: "kn" is read as a word.
 func spokenUnit(_ label: String) -> String {
     switch label {

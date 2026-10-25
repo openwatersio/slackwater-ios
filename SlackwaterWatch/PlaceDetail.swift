@@ -29,6 +29,7 @@ struct PlaceDetail: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
     // The source captures the threshold, so one arriving from iCloud reloads it.
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults) private var slackWindowSpeed = defaultSlackThresholdKn
     @State private var store: TimelineWindowStore?
@@ -115,7 +116,7 @@ struct PlaceDetail: View {
         let sky = SkyState(time: scrubTime, latitude: source.latitude, longitude: source.longitude,
                            days: tl.days, eclipses: tl.eclipses)
         let reading = ScrubReading.at(scrubTime, in: tl, imperial: imperial, speedUnit: speedUnit,
-                                      floodDeg: flow?.flood, ebbDeg: flow?.ebb)
+                                      setFormat: setFormat, floodDeg: flow?.flood, ebbDeg: flow?.ebb)
         return VStack(spacing: 6) {
             card(reading)
                 // The system clock owns the top-right corner and cannot be
