@@ -147,6 +147,17 @@ extension WindowRun {
     }
 }
 
+/// The green a strip or card draws: each slack run, stretched around its
+/// centre to `CurveStyle.shortestSlackStroke` when it is shorter, and a run
+/// that long at each slack in `bare`. Slack is all lines, never a dot, so it
+/// joins its window's blue the way a long run does (#821).
+func slackStrokes(cores: [WindowRun], bare: [Date], pointsPerHour: CGFloat) -> [WindowRun] {
+    let half = TimeInterval(CurveStyle.shortestSlackStroke / pointsPerHour) * 3600 / 2
+    func around(_ t: Date) -> WindowRun { WindowRun(start: t.addingTimeInterval(-half), end: t.addingTimeInterval(half)) }
+    return (cores.map { $0.drawsAsDot(pointsPerHour: pointsPerHour) ? around($0.centre) : $0 } + bare.map(around))
+        .sorted { $0.start < $1.start }
+}
+
 /// The slacks no run covers. Each keeps one mark, a dot at its own instant, so every slack the alerts and the magnet know is drawn and timed.
 func bareSlacks(_ slacks: [Date], runs: [WindowRun]) -> [Date] {
     slacks.filter { t in !runs.contains { $0.holdsSlack(at: t) } }

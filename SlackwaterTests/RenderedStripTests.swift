@@ -57,22 +57,12 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
-    /// A run narrower than a turn's dot draws as that dot at its centre, and
-    /// its halo erases the ground under it the way a turn dot's does.
     @MainActor
-    func testAShortSlackRunDrawsTheDot() throws {
+    private func render(_ draw: @escaping (GraphicsContext, CGSize) -> Void) throws -> (pixels: [UInt8], width: Int) {
         let renderer = ImageRenderer(content:
             Canvas { context, size in
                 context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
-                var line = Path()
-                line.move(to: CGPoint(x: 0, y: 12))
-                line.addLine(to: CGPoint(x: 80, y: 12))
-                var run = Path()
-                run.move(to: CGPoint(x: 39, y: 12))
-                run.addLine(to: CGPoint(x: 41, y: 12))
-                CurveDrawing.currentLine(context, line, slackRuns: [run], samples: [],
-                                         nowX: 0, width: size.width, height: size.height)
-                CurveDrawing.runs(context, [run], nowX: 0, width: size.width, height: size.height)
+                draw(context, size)
             }
             .frame(width: 80, height: 24)
             .background(Color.red))
@@ -83,14 +73,67 @@ final class RenderedStripTests: XCTestCase {
                                               space: CGColorSpaceCreateDeviceRGB(),
                                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        let centre = (12 * image.width + 40) * 4
-        XCTAssertGreaterThan(pixels[centre + 1], pixels[centre + 2], "the dot is not the go colour")
-        let halo = (12 * image.width + 44) * 4
-        XCTAssertGreaterThan(pixels[halo], 200, "the halo must erase down to what is behind the strip")
-        XCTAssertLessThan(pixels[halo + 1], 80, "the halo must erase down to what is behind the strip")
-        let line = (12 * image.width + 50) * 4
-        XCTAssertGreaterThan(pixels[line], pixels[line + 2] + 80,
-                             "the curve continues beyond the halo, yellow outside any slack window")
+        return (pixels, image.width)
+    }
+
+    private func horizontal(_ a: CGFloat, _ b: CGFloat) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: a, y: 12))
+        path.addLine(to: CGPoint(x: b, y: 12))
+        return path
+    }
+
+    /// Slack joins its window's blue with no break: green and blue are not the
+    /// deuteranopia pair, and a break at every colour change read as a dashed line (#821).
+    @MainActor
+    func testSlackJoinsItsWindowsBlue() throws {
+        let (pixels, width) = try render { context, size in
+            let window = self.horizontal(30, 50), slack = self.horizontal(36, 44)
+            CurveDrawing.currentLine(context, self.horizontal(0, 80), slackRuns: [window, slack], samples: [],
+                                     nowX: 0, width: size.width, height: size.height)
+            CurveDrawing.windows(context, [window], nowX: 0, width: size.width, height: size.height)
+            CurveDrawing.runs(context, [slack], nowX: 0, width: size.width, height: size.height)
+        }
+        let green = (12 * width + 40) * 4
+        XCTAssertGreaterThan(pixels[green + 1], pixels[green + 2], "the slack is not the go colour")
+        let joined = (12 * width + 47) * 4
+        XCTAssertGreaterThan(pixels[joined + 2], 150, "the blue must run up to the green")
+        XCTAssertLessThan(pixels[joined], 150, "the blue must run up to the green")
+    }
+
+    /// With the window off, slack meets the yellow line, and keeps the small
+    /// break at its ends that separates the deuteranopia pair.
+    @MainActor
+    func testSlackWithNoWindowKeepsItsBreakFromTheYellow() throws {
+        let (pixels, width) = try render { context, size in
+            let slack = self.horizontal(30, 50)
+            CurveDrawing.currentLine(context, self.horizontal(0, 80), slackRuns: [slack], samples: [],
+                                     nowX: 0, width: size.width, height: size.height)
+            CurveDrawing.runs(context, [slack], nowX: 0, width: size.width, height: size.height)
+        }
+        let gap = (12 * width + 53) * 4
+        XCTAssertGreaterThan(pixels[gap + 2], 200, "the break must keep the layer below the curve")
+        XCTAssertGreaterThan(pixels[gap + 1], 200, "the break must keep the layer below the curve")
+        let line = (12 * width + 60) * 4
+        XCTAssertGreaterThan(pixels[line], pixels[line + 2] + 80, "the curve beyond is yellow")
+    }
+
+    /// Slack is all lines: a run too short to stroke, and a slack no run
+    /// holds, each draw as the shortest slack stroke centred on the slack.
+    func testAShortSlackDrawsAsTheShortestStroke() {
+        let t = Date(timeIntervalSince1970: 0)
+        let long = WindowRun(start: t, end: t.addingTimeInterval(3600))
+        let short = WindowRun(start: t.addingTimeInterval(7200), end: t.addingTimeInterval(7260))
+        let bare = t.addingTimeInterval(14_400)
+        let strokes = slackStrokes(cores: [long, short], bare: [bare], pointsPerHour: Timeline.pph)
+        XCTAssertEqual(strokes.count, 3)
+        XCTAssertEqual(strokes[0], long, "a run long enough to stroke is drawn as measured")
+        let width = { (r: WindowRun) in CGFloat(r.end.timeIntervalSince(r.start) / 3600) * Timeline.pph }
+        XCTAssertEqual(width(strokes[1]), CurveStyle.shortestSlackStroke, accuracy: 0.001)
+        XCTAssertEqual(strokes[1].centre, short.centre)
+        XCTAssertEqual(width(strokes[2]), CurveStyle.shortestSlackStroke, accuracy: 0.001)
+        XCTAssertEqual(strokes[2].centre, bare)
+        XCTAssertFalse(strokes.contains { $0.drawsAsDot(pointsPerHour: Timeline.pph) }, "never a dot")
     }
 
     /// A flood lobe fills beneath its curve; an ebb lobe's curve-to-zero area sits above the
