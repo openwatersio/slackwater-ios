@@ -227,7 +227,8 @@ vanishes off the user's Mac without them having read that sentence.
   the platform's ceiling, not a tuning value.
 - Title "Race Passage - Slack window": the place, then the event in as few words as it takes.
   Body "14:32–15:10, under 0.5 kn · in 30 min", in the station's time zone. With `noWindow`:
-  "Race Passage - Slack", "14:32, no window under 0.5 kn".
+  "Race Passage - Slack", "14:32, no window under 0.5 kn". With the comfort current Off every
+  occurrence is `noWindow` and the body is the time alone.
 - Never provisional: provisional delivery does not reach the Lock Screen.
 - One notification per thing the user perceives: two rules agreeing on station, trigger, moment
   and fire time deliver once — a `once` rule and its repeating twin are separate rules (§3) and

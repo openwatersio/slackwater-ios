@@ -181,6 +181,9 @@ struct SlackWindowShortcutResult {
         guard let selected, case .current(let record, _) = selected else {
             return String(localized: "Slackwater couldn't find a slack window for your nearest current station.", comment: "Spoken Siri failure response.")
         }
+        if slackWindowIsOff(slackThresholdKn) {
+            return String(localized: "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.", comment: "Spoken Siri answer when the comfort current is set to Off.")
+        }
         return String(localized: "There's no slack window at \(record.name) in the next 48 hours.", comment: "Spoken Siri answer when the selected current place has predictions but no slack window in the 48-hour search. Value is the place name.")
     }
 

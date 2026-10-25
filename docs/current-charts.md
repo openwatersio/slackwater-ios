@@ -104,7 +104,8 @@ The station remembers its delta.
 pin, notifications, share card. The effective threshold is one lookup, never a
 global constant read directly at a call site.
 
-Settable range 0.1–10 kn, default 0.5. Where a surface genuinely cannot ask (a
+Settable range 0.1–10 kn, default 0.5, or Off at 0: no window anywhere, only
+slack at `slackKn`, and a slack-window alert fires at each slack (#821). Where a surface genuinely cannot ask (a
 public page with no settings), it ships the same default the settable version
 uses — a reader comparing two of our surfaces for the same station on the same
 day must not see two different windows.

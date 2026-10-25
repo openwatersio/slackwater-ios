@@ -97,6 +97,19 @@ import SlackwaterKit
         XCTAssertLessThan(same.event, first.event)
     }
 
+    func testAnOffWindowAlertsAtEachSlack() throws {
+        // Off has no window to open, so the rule fires at the slack itself, named Slack (#821).
+        let (station, position) = try load(deception)
+        guard case .current(let engine, _, _) = station else { return XCTFail("expected a current station") }
+        let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens)
+        let found = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0)
+        let slacks = engine.events(from: now, to: week).filter { $0.kind == .slack && $0.time >= now && $0.time <= week }
+
+        XCTAssertFalse(found.isEmpty)
+        XCTAssertTrue(found.allSatisfy { $0.noWindow && $0.end == nil })
+        XCTAssertEqual(found.map(\.event), slacks.map { alertMinute($0.time) })
+    }
+
     // MARK: a once rule takes the occurrence nearest the pressed minute
 
     func testAOnceRuleInsideAWindowResolvesToItsOpening() throws {

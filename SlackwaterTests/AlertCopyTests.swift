@@ -9,11 +9,11 @@ final class AlertCopyTests: XCTestCase {
 
     private func copy(_ trigger: AlertTrigger, lead: TimeInterval = 0, end: Date? = nil, noWindow: Bool = false,
                       heightM: Double? = nil, imperial: Bool = true, includeLead: Bool = true,
-                      includePlace: Bool = true) -> AlertCopy {
+                      includePlace: Bool = true, threshold: Double = 0.5) -> AlertCopy {
         let rule = AlertRule(stationID: "x", trigger: trigger, lead: lead)
         let o = AlertOccurrence(ruleID: rule.id, event: event, fire: event.addingTimeInterval(-lead),
                                 end: end, noWindow: noWindow, heightM: heightM)
-        return alertCopy(rule, o, place: place, imperial: imperial, threshold: 0.5,
+        return alertCopy(rule, o, place: place, imperial: imperial, threshold: threshold,
                          includeLead: includeLead, includePlace: includePlace, locale: gb)
     }
 
@@ -26,6 +26,11 @@ final class AlertCopyTests: XCTestCase {
     func testAHairlineSlackSaysThereIsNoWindow() {
         XCTAssertEqual(copy(.slackWindowOpens, noWindow: true),
                        AlertCopy(title: "Race Passage - Slack", body: "14:32, no window under 0.5 kn"))
+    }
+
+    func testAnOffWindowAlertIsJustTheSlack() {
+        XCTAssertEqual(copy(.slackWindowOpens, noWindow: true, threshold: 0),
+                       AlertCopy(title: "Race Passage - Slack", body: "14:32"))
     }
 
     func testTheCalendarLeavesTheLeadOut() {

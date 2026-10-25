@@ -93,9 +93,8 @@ import SlackwaterKit
             (at(-100), "Max flood", "Maximum flood current", "arrow.forward"),
             (at(10), "Slack window", "Slack window", "arrow.right.and.line.vertical.and.arrow.left"),
             (at(3000), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
-            (at(3600), "Ebb", "Ebb current", "arrow.backward"),
+            (at(3600), "Slack window closes", "Slack window closes", "arrow.left.and.line.vertical.and.arrow.right"),
             (at(4300), "Max ebb", "Maximum ebb current", "arrow.backward"),
-            (at(9000), "Flood", "Flood current", "arrow.forward"),
         ]
 
         for expected in currentCases {
@@ -234,7 +233,7 @@ import SlackwaterKit
             (slack: at(9000), start: at(8400), end: at(9600)),
         ])
         assertNext(at(10), at(3000), "Slack", "one stop for the shared opening", in: narrow)
-        assertNext(at(3000), at(4200), "Ebb", "then the closing", in: narrow)
+        assertNext(at(3000), at(4200), "Slack window closes", "then the closing", in: narrow)
     }
 
     /// Parked on a slack no window covers, the lead agrees with its green dot and the pill that named it.
@@ -254,7 +253,7 @@ import SlackwaterKit
 
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes its opening, named Slack window, and
-    /// its closing, named for the run that begins. Its core contributes Slack at
+    /// its closing, named Slack window closes. Its core contributes Slack at
     /// the core's opening, or its centre when it draws as a dot, as these do.
     /// A slack inside a core is never a stop itself, so the
     /// pill never says "Slack" twice for one turn; a slack no core holds is
@@ -263,12 +262,11 @@ import SlackwaterKit
         assertNext(at(-100), t0, "Max flood", "the flood max is the first stop of the day")
         assertNext(at(10), at(3000), "Slack window", "a window's opening")
         assertNext(at(3000), at(3600), "Slack", "its core's dot is the slack")
-        assertNext(at(3600), at(4200), "Ebb", "inside a window, the next stop is its closing")
+        assertNext(at(3600), at(4200), "Slack window closes", "inside a window, the next stop is its closing")
         assertNext(at(4300), at(6000), "Max ebb", "the ebb max")
         assertNext(at(6100), at(8400), "Slack window", "the second window opens")
         assertNext(at(8400), at(9000), "Slack", "and its core")
-        assertNext(at(9000), at(9600), "Flood",
-                   "a closing is named by the velocity after it, not by the one before")
+        assertNext(at(9000), at(9600), "Slack window closes", "the second window closes")
         assertNext(at(9700), at(12_600), "Slack", "a slack no window covers is one stop, at its instant")
         XCTAssertNil(lead(scrub: at(12_600)).nextSignificant, "parked on it, nothing follows")
     }
@@ -279,7 +277,7 @@ import SlackwaterKit
     func testScrubOnAStopAdvancesToTheFollowingOne() {
         assertNext(t0, at(3000), "Slack window", "parked on the flood max, the next stop is the window")
         assertNext(at(3000), at(3600), "Slack", "parked on the opening, the next stop is the core")
-        assertNext(at(3600), at(4200), "Ebb", "parked on the core, the next stop is the closing")
+        assertNext(at(3600), at(4200), "Slack window closes", "parked on the core, the next stop is the closing")
     }
 
     /// The summary tile: the maximum the water is heading FOR. Slack events

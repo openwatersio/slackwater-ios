@@ -102,7 +102,8 @@ func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imper
     var body: String
     switch rule.trigger {
     case .slackWindowOpens where o.noWindow:
-        body = "\(time), no window under \(limit)"
+        // With the window off every slack is windowless, and saying so each time is noise.
+        body = slackWindowIsOff(threshold) ? time : "\(time), no window under \(limit)"
     case .slackWindowOpens:
         body = o.end.map { "\(time)–\($0.formatted(clock)), under \(limit)" } ?? time
     case .tideExtreme:
