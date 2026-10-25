@@ -5129,7 +5129,7 @@
       }
     },
     "Slack window closes" : {
-      "comment" : "Current event: the water speeds up past the person's slack-window speed.",
+      "comment" : "VoiceOver current-event label: the water speeds up past the person's slack-window speed.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
