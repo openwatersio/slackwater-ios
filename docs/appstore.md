@@ -7,16 +7,28 @@ Credentials are the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY` TestFlight
 ## Per release
 
 1. **Pick the build.** It is a nightly that was promoted to Beta and checked on a device. `node scripts/asc.mjs builds` shows it as `<version> (<build>)`, `VALID`. Its number goes on the first line of `docs/release-notes/<version>.md`.
-2. **Shoot the screenshots** on the current UI. The medium iPhone, iPad and Watch sets are required; the large iPhone set is optional. These runs write the directories `asc.mjs` reads:
+2. **Shoot and caption the screenshots** on the current UI. The medium iPhone, iPad and Watch sets are required; the large iPhone set is optional. Keep raw captures separate from the upload directories:
 
    ```sh
-   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.3 \
+   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/iphone-6.3 \
      SLACKWATER_SIM='iPhone 18 Pro' ./scripts/screenshots.sh
-   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 ./scripts/screenshots.sh
-   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
+   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/iphone-6.9 ./scripts/screenshots.sh
+   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/ipad-13 \
      SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh
    WALK=WatchAppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/watch ./scripts/screenshots.sh
+   swift scripts/appstore-artwork.swift /tmp/slackwater-appstore-raw/iphone-6.3 \
+     /tmp/slackwater-appstore/watch /tmp/slackwater-appstore/iphone-6.3
+   swift scripts/appstore-artwork.swift /tmp/slackwater-appstore-raw/iphone-6.9 \
+     /tmp/slackwater-appstore/watch /tmp/slackwater-appstore/iphone-6.9
+   swift scripts/appstore-artwork.swift /tmp/slackwater-appstore-raw/ipad-13 \
+     /tmp/slackwater-appstore/watch /tmp/slackwater-appstore/ipad-13
    ```
+
+   The artwork exporter needs all five numbered raw frames, `widgets.png` (the free widget previews cropped from Settings), and the Watch set's `02-tide.png`. It writes six opaque PNGs at the raw device's accepted portrait dimensions: currents, tides, widgets and Watch, night, nearby, map. It reduces captures to fit without enlarging UI pixels and refuses an existing output directory. Use a fresh output directory for each export. Raw directories include a cropped widget image and must never be passed to the uploader.
+
+   Captions are English. Check the Canadian storefront's inherited English set and every other locale's fallback before submission; these assets do not localize Spanish or French screenshots. The third frame shows only free features, with no Premium lock-screen widgets or complications. Canadian places can require an initial download before offline use. Inspect every export at full size and at search-result size before uploading. The widget previews use the preview screen's current clock; recapture the phone and Watch in the same session rather than mixing old and new UI.
+
+   Export checks run without the simulator: `python3 scripts/appstore-artwork.test.py`.
 
 3. **Push the listing.** Set `VERSION` and `BUILD` to the selected nightly train and build number. Read the dry run, then run it for real:
 

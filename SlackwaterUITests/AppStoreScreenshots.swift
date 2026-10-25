@@ -12,10 +12,8 @@
 // it. Frames are numbered because App Store Connect orders an upload by
 // filename.
 //
-// Two standing constraints on what may appear. The walk never opens Settings
-// or the widgets gallery, the only two places PREMIUM_ENABLED surfaces
-// anything, so the listing shows the free app (#470). And nothing here may
-// imply navigation use.
+// Only the free widget previews are cropped from Settings; no paid feature
+// or navigation use may be implied by the exported artwork.
 import XCTest
 
 final class AppStoreScreenshots: ShotWalk {
@@ -36,6 +34,13 @@ final class AppStoreScreenshots: ShotWalk {
         seededFavorites = "noaa/9444900"
     }
 
+    override func launchShots(_ extra: [String] = [], scrubTo time: String? = nil,
+                              epoch: String? = nil, instant: String? = nil) -> XCUIApplication {
+        // These frames use bundled NOAA places; nearby Canadian downloads obscure the list.
+        super.launchShots(extra + ["-chsResetModels", "-chsFitOnly", "none"],
+                          scrubTo: time, epoch: epoch, instant: instant)
+    }
+
     func testAppStoreShots() throws {
         try skipUnlessShooting()
         // Every accepted size is a portrait pixel count, and a simulator keeps
@@ -47,6 +52,12 @@ final class AppStoreScreenshots: ShotWalk {
         scrubbedUnderTheMoon()
         nearbyWithFavorites()
         mapAtRegionalScale()
+    }
+
+    func testFreeWidgetPreviews() throws {
+        try skipUnlessShooting()
+        XCUIDevice.shared.orientation = .portrait
+        freeWidgetPreviews()
     }
 
     // MARK: - 1. Currents centered on slack
@@ -146,6 +157,35 @@ final class AppStoreScreenshots: ShotWalk {
     }
 
     // MARK: - Helpers
+
+    private func freeWidgetPreviews() {
+        let app = launchShots()
+        guard app.windows.firstMatch.frame.width < app.windows.firstMatch.frame.height else { return }
+        openSettings(app)
+        let heading = app.staticTexts["Home screen — free"].firstMatch
+        let next = app.staticTexts["Next Event"].firstMatch
+        scrollTo(next, in: app)
+        settleLayout(next)
+        let bounds = app.windows.firstMatch.frame
+        let crop = CGRect(x: heading.frame.minX, y: heading.frame.maxY + 10,
+                          width: min(364, bounds.maxX - 2 * heading.frame.minX),
+                          height: next.frame.minY - heading.frame.maxY - 20)
+        XCTAssert(heading.isHittable && next.isHittable)
+        XCTAssertGreaterThan(crop.height, 330, "both widget previews must be loaded")
+        XCTAssert(bounds.contains(crop), "widget previews must be entirely visible")
+        let shot = XCUIScreen.main.screenshot().image
+        let pixels = crop.applying(CGAffineTransform(scaleX: shot.scale, y: shot.scale))
+        guard let image = shot.cgImage?.cropping(to: pixels),
+              let data = UIImage(cgImage: image).pngData() else {
+            XCTFail("could not crop the free widget previews")
+            return
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: shotDir + "/widgets.png"))
+        } catch {
+            XCTFail("could not save widget previews: \(error)")
+        }
+    }
 
     private func openDeceptionPass(_ app: XCUIApplication) {
         openStation(app, search: "deception", named: "Deception Pass (Narrows)")

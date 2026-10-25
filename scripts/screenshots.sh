@@ -9,15 +9,17 @@
 #   for f in $SHOT_DIR/*.png; do cwebp -q 85 -resize 780 0 $f -o .../public/shots/${f:t:r}.webp; done
 #
 # The App Store sets (SlackwaterUITests/AppStoreScreenshots.swift, #4) — five
-# numbered frames per size, which upload as they come out. App Store Connect
+# numbered frames and a free-widget crop per size. Caption the raw captures
+# with scripts/appstore-artwork.swift before uploading (docs/appstore.md).
+# App Store Connect
 # requires the 6.3" iPhone (it does not scale the 6.9" set into that slot) and
 # the 13" iPad; the 6.9" iPhone is optional. Upload each directory to its size:
 #
-#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.3 \
+#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/iphone-6.3 \
 #     SLACKWATER_SIM='iPhone 18 Pro' ./scripts/screenshots.sh    # 1206×2622
-#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 \
+#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/iphone-6.9 \
 #     ./scripts/screenshots.sh                                   # 1320×2868
-#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
+#   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore-raw/ipad-13 \
 #     SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh   # 2064×2752
 #
 #
