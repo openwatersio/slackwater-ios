@@ -93,6 +93,7 @@ extension TypeScaleTests {
         let knownIndirections: Set<String> = [
             // Siri details are rendered by TideShortcutSnippetView's monospaced Text.
             "TideShortcuts.swift:next",
+            "TideShortcuts.swift:on",
             // The card curve: the builders format extreme/axis strings whose
             // one renderer (the Canvas draw code) applies the mono trait.
             "StationCardGraph.swift:cardGraph",

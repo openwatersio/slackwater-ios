@@ -6,6 +6,109 @@ import CoreLocation
 @testable import Slackwater
 
 @MainActor final class TideShortcutTests: XCTestCase {
+    func testDatedCurrentCardDoesNotCountDownFromAFutureMidnight() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = record.tz
+        let midnight = try XCTUnwrap(calendar.date(from: DateComponents(year: 2028, month: 10, day: 27)))
+        let day = try XCTUnwrap(calendar.dateInterval(of: .day, for: midnight))
+        let hours = [-12.0, -6, -2, -1, 0, 1, 2, 6, 12, 18, 24, 30]
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name,
+            timezone: record.tz.identifier, fetchedAt: midnight,
+            start: midnight.addingTimeInterval(-12 * 3_600), end: midnight.addingTimeInterval(30 * 3_600),
+            floodDirection: 0, ebbDirection: 180,
+            times: hours.map { midnight.addingTimeInterval($0 * 3_600).timeIntervalSince1970 },
+            speeds: [1, 1, 1, 0.4, 0, -0.4, -1, 1, -1, 1, -1, 1])
+        let selected = WidgetRecord.current(record, station: online)
+        XCTAssertNotNil(WidgetCard.build(selected, now: midnight).countdownEnd,
+                        "The fixture must reproduce a widget countdown at the synthetic midnight")
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(day, at: selected))
+        XCTAssertNil(result.card.countdownEnd, "A dated answer must not display a live countdown")
+    }
+
+    func testNamedTidePlaceResolvesWithoutLocationAndDoesNotChangeKind() throws {
+        let service = LocationService.shared
+        let saved = service.status
+        defer { service.status = saved }
+        service.status = .denied
+        let matches = ShortcutPlaceQuery.matches("Savannah", kind: .tide)
+        let place = try XCTUnwrap(matches.first)
+        XCTAssertTrue(place.name.localizedCaseInsensitiveContains("Savannah"))
+        let selected = try ShortcutPlaceQuery.record(id: place.id, kind: .tide)
+        guard case .tide(let record, _) = selected else { return XCTFail("expected tide") }
+        XCTAssertEqual(record.id, place.id)
+        XCTAssertThrowsError(try ShortcutPlaceQuery.record(id: place.id, kind: .current))
+        XCTAssertThrowsError(try ShortcutPlaceQuery.record(id: "missing-place", kind: .tide))
+    }
+
+    func testPlaceSearchKeepsNamesakesAndFindsAliasesWithoutLoadingPredictions() throws {
+        let results = ShortcutPlaceQuery.matches("Friday Harbor", kind: .tide)
+        XCTAssertFalse(results.isEmpty)
+        XCTAssertTrue(results.allSatisfy { $0.series == .tide })
+        let currents = ShortcutPlaceQuery.matches("Friday Harbor", kind: .current)
+        XCTAssertTrue(currents.allSatisfy { $0.series == .current })
+        XCTAssertTrue(ShortcutPlaceQuery.matches("xyz-no-such-place", kind: .tide).isEmpty)
+        XCTAssertTrue(ShortcutPlaceQuery.matches("   ", kind: .tide).isEmpty)
+        let namesakes = try XCTUnwrap(StationItem.byPlace.values.first { $0.count > 1 && $0[0].series == .tide })
+        let named = ShortcutPlaceQuery.matches(namesakes[0].name, kind: .tide)
+        for place in namesakes { XCTAssertTrue(named.contains { $0.id == place.id }) }
+        let aliased = try XCTUnwrap(StationItem.all.first { $0.series == .tide && !$0.fields.aliases.isEmpty })
+        XCTAssertTrue(ShortcutPlaceQuery.matches(aliased.fields.aliases[0], kind: .tide).contains { $0.id == aliased.id })
+    }
+
+    func testRequestedDayKeepsCalendarComponentsInThePlacesZoneAcrossDST() throws {
+        var device = Calendar(identifier: .gregorian)
+        device.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let selected = try XCTUnwrap(device.date(from: DateComponents(year: 2026, month: 3, day: 8)))
+        let zone = TimeZone(identifier: "America/Los_Angeles")!
+        let day = try XCTUnwrap(shortcutDateInterval(selected, in: zone, inputCalendar: device))
+        var local = device; local.timeZone = zone
+        XCTAssertEqual(local.component(.day, from: day.start), 8)
+        XCTAssertEqual(local.component(.hour, from: day.start), 0)
+        XCTAssertEqual(day.duration, 23 * 3_600)
+        var buddhist = Calendar(identifier: .buddhist); buddhist.timeZone = device.timeZone
+        XCTAssertEqual(shortcutDateInterval(selected, in: zone, inputCalendar: buddhist), day)
+        let autumn = try XCTUnwrap(device.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+        XCTAssertEqual(try XCTUnwrap(shortcutDateInterval(autumn, in: zone, inputCalendar: device)).duration, 25 * 3_600)
+    }
+
+    func testDatedTidesIncludeEveryMatchingExtremeOnlyInsideTheRequestedDay() throws {
+        let selected = try XCTUnwrap(WidgetStationLoader.loadRecord(id: TideStationRecord.fridayHarborID))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 27)))
+        let day = try XCTUnwrap(calendar.dateInterval(of: .day, for: date))
+        guard case .tide(_, let engine) = selected else { return XCTFail("expected tide") }
+        let expected = engine.extremes(from: day.start, to: day.end).filter { $0.kind == .high && $0.time < day.end }
+        let result = try XCTUnwrap(TideShortcutQuery.on(day, kind: .high, at: selected))
+        XCTAssertGreaterThan(expected.count, 1)
+        XCTAssertEqual(result.extremes.map(\.time), expected.map(\.time))
+        XCTAssertFalse(result.spoken.contains("in about"), result.spoken)
+        XCTAssertTrue(result.spoken.contains("Friday Harbor"), result.spoken)
+        for event in expected { XCTAssertTrue(result.spoken.contains(event.time.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: calendar.timeZone)))) }
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(result.card.graph?.points.last).time, expected.last!.time)
+    }
+
+    func testDatedSlackWindowsStayOnTheRequestedDayAndSpeakLocalTimes() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        let date = Date(timeIntervalSince1970: 1_755_800_000)
+        let selected = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701", at: date))
+        let zone = WidgetStationLoader.station(from: selected).tz
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        let day = try XCTUnwrap(calendar.dateInterval(of: .day, for: date))
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(day, at: selected))
+        XCTAssertFalse(result.windows.isEmpty)
+        for window in result.windows { XCTAssertLessThan(window.start, day.end); XCTAssertGreaterThan(window.end, day.start) }
+        XCTAssertFalse(result.spoken.contains("in about"), result.spoken)
+        XCTAssertFalse(result.spoken.contains("open now"), result.spoken)
+        XCTAssertEqual(Set(result.windows.map(\.start)).count, result.windows.count)
+    }
+
     func testNoWindowNamesTheNearestPlaceWithoutTryingAFartherOne() throws {
         let record = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/KOD0926" })
         let now = Date(timeIntervalSince1970: 1_755_800_000)
@@ -267,11 +370,13 @@ import CoreLocation
         guard case .current(let selected, _) = try XCTUnwrap(LocalStationQuery.nearest(
             .current, to: (gate.latitude, gate.longitude), at: now)) else { return XCTFail("expected current") }
         XCTAssertNotEqual(selected.id, gate.id, "Siri must not present provisional speeds without their warning")
+        XCTAssertThrowsError(try ShortcutPlaceQuery.record(id: gate.id, kind: .current, at: now))
         model.fitDays = gate.fitDays
         try ChsModelStore.saveCurrent(model)
         guard case .current(let complete, _) = try XCTUnwrap(LocalStationQuery.nearest(
             .current, to: (gate.latitude, gate.longitude), at: now)) else { return XCTFail("expected current") }
         XCTAssertEqual(complete.id, gate.id)
+        XCTAssertNoThrow(try ShortcutPlaceQuery.record(id: gate.id, kind: .current, at: now))
     }
 
     func testTomorrowUsesThePlacesCalendarAcrossTheSpringDSTChange() throws {
@@ -310,11 +415,18 @@ import CoreLocation
         let current = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701", at: now))
         let high = try XCTUnwrap(TideShortcutQuery.next(.high, at: tide, after: now))
         let slack = try XCTUnwrap(SlackWindowShortcutQuery.next(at: current, after: now))
+        let zone = WidgetStationLoader.station(from: tide).tz
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        let day = try XCTUnwrap(calendar.dateInterval(of: .day, for: now))
+        let datedHigh = try XCTUnwrap(TideShortcutQuery.on(day, kind: .high, at: tide))
+        let datedSlack = try XCTUnwrap(SlackWindowShortcutQuery.on(day, at: current))
         for locale in [Bundle.main.preferredLocalizations.first ?? "en"] {
             for largeText in [false, true] {
                 for (answer, detail, card, name) in [
                     (high.spoken, high.detail, high.card, "tide"),
-                    (slack.spoken, slack.detail, slack.card, "current")
+                    (slack.spoken, slack.detail, slack.card, "current"),
+                    (datedHigh.spoken, datedHigh.detail, datedHigh.card, "dated-tide"),
+                    (datedSlack.spoken, datedSlack.detail, datedSlack.card, "dated-current")
                 ] {
                     let renderer = ImageRenderer(content:
                         TideShortcutSnippetView(answer: answer, detail: detail, card: card)

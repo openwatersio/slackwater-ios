@@ -18,6 +18,7 @@ struct SlackwaterApp: App {
         // alert scheduler only ever see ids that ship.
         _ = FavoritesStore.shared
         _ = RecentsStore.shared
+        Task.detached(priority: .utility) { SlackwaterShortcuts.updateAppShortcutParameters() }
         _ = ChsModelTransfer.shared
         // The widget-reload hook (ChsStation.swift's `WidgetReload`): a no-op
         // until the app assigns it, so the widget extension — which also
