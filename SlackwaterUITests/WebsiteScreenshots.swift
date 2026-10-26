@@ -60,7 +60,7 @@ final class WebsiteScreenshots: ShotWalk {
         save(app, "currents-victoria.png")
 
         // The kayak page's comfort-current frame, beside a Settings frame at
-        // 1.4 kn, so its green windows are drawn at 1.4 kn too. Off Oak Bay,
+        // 1.4 kn, so its slack windows are drawn at 1.4 kn too. Off Oak Bay,
         // where paddlers cross to Discovery Island, and fast enough that the
         // windows stand apart from the runs between them.
         app = launchShots(["-comfortCurrent", "1.4"], scrubTo: "15:30")
@@ -72,7 +72,7 @@ final class WebsiteScreenshots: ShotWalk {
 
         // The boating page's pass frame: Deception Pass with the comfort
         // current at 2 knots, a cruising sailboat's limit rather than a
-        // paddler's, so the green windows are the ones a boat would use.
+        // paddler's, so the slack windows are the ones a boat would use.
         // 3pm sits inside the window around the 3:06pm turn; at 1pm the sun
         // is drawn over the reading.
         app = launchShots(["-comfortCurrent", "2.0"], scrubTo: "15:00")

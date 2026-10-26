@@ -104,7 +104,7 @@ struct AlertSheet: View {
                     }
                 }
                 Section {
-                    Text(alertRuleSummary(rule.trigger, stationName: stationName, imperial: imperial))
+                    Text(alertRuleSummary(rule.trigger, stationName: stationName, noWindow: slackWindowIsOff(slackThresholdKn), imperial: imperial))
                         .monospacedDigit()
                         .accessibilityIdentifier("alert-summary")
                 }

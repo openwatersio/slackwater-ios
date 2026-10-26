@@ -18,6 +18,18 @@ final class SlackWindowTests: XCTestCase {
         XCTAssertEqual(w.end.timeIntervalSince(t0), 900, accuracy: 1)
     }
 
+    /// One sample inside the band and one outside it across the reversal: the
+    /// edge is where the signed line meets −0.15, not a mirrored speed (#826 review).
+    func testAnEdgeAcrossTheReversalCrossesOnTheOutsideSamplesSide() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = [CurrentPoint(time: t0, speed: -1),
+                   CurrentPoint(time: t0.addingTimeInterval(600), speed: 0.1),
+                   CurrentPoint(time: t0.addingTimeInterval(1200), speed: 1)]
+        let w = slackWindow(pts, around: t0.addingTimeInterval(545.45), threshold: 0.15)!
+        XCTAssertEqual(w.start.timeIntervalSince(t0), 463.64, accuracy: 0.1)
+        XCTAssertEqual(w.end.timeIntervalSince(t0), 633.33, accuracy: 0.1)
+    }
+
     func testSlackOutsideSeriesHasNoWindow() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let pts = [CurrentPoint(time: t0, speed: -1),

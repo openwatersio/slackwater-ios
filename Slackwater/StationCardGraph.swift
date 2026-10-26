@@ -117,7 +117,7 @@ nonisolated struct StationCardGraph: View {
     /// The slack inside each window (`slackCoreThresholdKn`), from the same
     /// predicate: the card's green, and its reading's Slack.
     var cores: [WindowRun] = []
-    /// Every slack instant in the span. One no window covers draws as a dot at its instant; a derived gate's are all such dots, on the zero line.
+    /// Every slack instant in the span. One no slack run covers draws as the shortest slack stroke at its instant; a derived gate's draw as dots, on the zero line.
     var slacks: [Date] = []
     /// A normalized phase shape, never a speed measurement.
     var speedsAreSchematic = false
@@ -132,7 +132,8 @@ nonisolated struct StationCardGraph: View {
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
-    /// The card's reading says Slack on the green marks this curve draws, as the detail lead does.
+    /// The card's reading says Slack inside the slack it measures, as the detail lead does. A
+    /// short slack's green stroke is wider than its time: the mark is the moment, the reading the water.
     func isSlack(at t: Date) -> Bool {
         readsSlack(at: t, runs: cores, slacks: slacks)
     }

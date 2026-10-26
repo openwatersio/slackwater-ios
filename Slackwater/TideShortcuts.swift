@@ -144,7 +144,7 @@ struct SlackWindowShortcutResult {
                 ? shortcutTime(start, relativeTo: queriedAt, in: timeZone) : nil
         }
         if !hasOpeningBoundary {
-            return "\(String(localized: "Slack ends", comment: "Siri detail prefix before the observed local closing time of a slack window.")) · \(shortcutTime(end, relativeTo: queriedAt, in: timeZone))"
+            return "\(String(localized: "Slack window ends", comment: "Siri detail prefix before the observed local closing time of a slack window.")) · \(shortcutTime(end, relativeTo: queriedAt, in: timeZone))"
         }
         let formatter = DateIntervalFormatter()
         formatter.timeZone = timeZone
@@ -189,7 +189,8 @@ struct SlackWindowShortcutResult {
 
     static func next(at selected: WidgetRecord?,
                      after now: Date = .now) -> SlackWindowShortcutResult? {
-        guard let selected, case .current(let record, let engine) = selected else { return nil }
+        guard let selected, case .current(let record, let engine) = selected,
+              !slackWindowIsOff(slackThresholdKn) else { return nil }
         let events = engine.events(from: now.addingTimeInterval(-21_600), to: now.addingTimeInterval(172_800))
         for slack in events where slack.kind == .slack {
             let requestedEnd = slack.time.addingTimeInterval(21_600)

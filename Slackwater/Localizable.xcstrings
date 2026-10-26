@@ -47218,101 +47218,6 @@
         }
       }
     },
-    "Slack ends" : {
-      "comment" : "Widget countdown label and Siri detail prefix before the observed local closing time of a slack window.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstille slutter"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stauwasser endet"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fin de la estoa"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heikko virtaus päättyy"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fin de l’étale"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deireadh an fháfaill"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crìoch a' mharbh-shrutha"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine della stanca"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "潮止まり終了"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정조 종료"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstille slutter"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kentering eindigt"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fim do estofo"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fim do estofo"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strömstilla slutar"
-          }
-        }
-      }
-    },
     "Slack window" : {
       "comment" : "An alert's title when a slack window opens, and the Settings row for the comfort current.\nCurrent event: the water slows under the person's slack-window speed.",
       "localizations" : {
@@ -47409,7 +47314,7 @@
       }
     },
     "Slack window ends" : {
-      "comment" : "Widget label above a live slack-window countdown.",
+      "comment" : "Widget label above a live slack-window countdown.\nSiri detail prefix before the observed local closing time of a slack window.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

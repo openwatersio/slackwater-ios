@@ -168,7 +168,7 @@ func pinSortRank(_ item: StationItem) -> Double {
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
 /// the water is slack — |v| under the same `slackCoreThresholdKn` that
 /// defines the strip's green — and the darkened #97 ramp at the current speed
-/// otherwise, whose first stop is the slack window's yellow. Hue no longer says
+/// otherwise. The pin is the instantaneous speed on that ramp, not the strip's window, so it can be yellow where the strip is blue (current-charts §5). Hue no longer says
 /// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
 /// card's arrow + cardinal) carries direction.
 func currentPinState(_ station: CurrentStationRecord, at now: Date,

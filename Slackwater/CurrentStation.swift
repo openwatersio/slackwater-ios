@@ -311,8 +311,7 @@ enum CurrentPhase {
 
     /// Plain-word companion for non-sailors ("Flooding · incoming", #59).
     /// Rendered only where there's room — the detail heroes; tight surfaces
-    /// lead with direction instead. Slack is nil: it is always glossed by
-    /// "under 0.5 kn" at its render sites.
+    /// lead with direction instead. Slack is nil: the word needs no gloss.
     var gloss: String? {
         switch self {
         case .flood: String(localized: "incoming", comment: "Plain-language gloss for a flooding current.")

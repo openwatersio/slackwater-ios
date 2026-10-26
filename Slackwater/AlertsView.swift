@@ -68,7 +68,7 @@ struct AlertsView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Button { editing = rule } label: {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(alertRuleSummary(rule.trigger, stationName: group.name,
+                                    Text(alertRuleSummary(rule.trigger, stationName: group.name, noWindow: slackWindowIsOff(slackThresholdKn),
                                                           imperial: units == "imperial"))
                                         .monospacedDigit()
                                         .foregroundStyle(.white)

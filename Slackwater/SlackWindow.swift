@@ -79,11 +79,7 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
                 max(a.time.addingTimeInterval(dt * (abs(a.speed) + threshold) / span), slack))
     }
     else { return nil }
-    func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
-        let va = abs(a.speed), vb = abs(b.speed)
-        let f = (threshold - va) / (vb - va)
-        return a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f)
-    }
+    func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date { bandCrossing(a, b, threshold: threshold) }
     var start = points[0].time
     var a = k
     while a > 0 {
@@ -97,6 +93,16 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
         b += 1
     }
     return (min(start, slack), max(end, slack))
+}
+
+/// Where the straight line between one sample inside the ±`threshold` band and
+/// one outside it crosses the band's edge. Signed, so a pair either side of a
+/// reversal crosses on the outside sample's side rather than at a mirrored speed.
+func bandCrossing(_ a: CurrentPoint, _ b: CurrentPoint, threshold: Double) -> Date {
+    let outside = abs(a.speed) > threshold ? a.speed : b.speed
+    let edge = outside > 0 ? threshold : -threshold
+    let f = (edge - a.speed) / (b.speed - a.speed)
+    return a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f)
 }
 
 /// Each slack's window at `threshold` and its slack core, measured on the same

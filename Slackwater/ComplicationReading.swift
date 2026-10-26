@@ -30,6 +30,8 @@ struct ComplicationReading: Equatable {
     let symbol: String
     let samples: [Sample]
     let slackRuns: [ClosedRange<Double>]
+    /// True when `slackRuns` are slack itself, the window being off: drawn in the go colour.
+    var runsAreSlack = false
     let gauge: Gauge?
 
     /// The line's reach: the circular draws ±3 h of it, and nothing reads
@@ -82,10 +84,12 @@ struct ComplicationReading: Equatable {
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             // The card's windows, so the complication's slack is the app's slack.
             let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
-            let runs = cardWindows(points: points, slacks: slacks)
-            let windows = runs.map { hours($0.start)...hours($0.end) }
             // Slack is the core inside the window, as on the card's reading.
             let cores = cardCores(points: points, slacks: slacks)
+            let windows = cardWindows(points: points, slacks: slacks).map { hours($0.start)...hours($0.end) }
+            // With the window off the face thickens slack itself; like the widget, it counts down only a window.
+            let off = slackWindowIsOff(slackThresholdKn)
+            let runs = off ? cores.map { hours($0.start)...hours($0.end) } : windows
             let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
             let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
@@ -94,7 +98,8 @@ struct ComplicationReading: Equatable {
                 word: phase.word,
                 symbol: symbol,
                 samples: samples,
-                slackRuns: windows.filter { $0.overlaps(span) },
+                slackRuns: runs.filter { $0.overlaps(span) },
+                runsAreSlack: off,
                 gauge: Self.currentGauge(windows, now: now, tz: tz))
 
         case .derived:

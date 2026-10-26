@@ -125,6 +125,8 @@ final class ComplicationReadingTests: XCTestCase {
         // A moment inside the card's slack window whose speed is still above
         // the 0.15 kn slack speed: the water is moving, and the word says so (#821).
         guard case .current(let s, _, _) = current else { return XCTFail() }
+        // The App Group's comfort current is shared state; at or under 0.22 kn there is no such moment.
+        try XCTSkipUnless(slackThresholdKn > slackKn * 1.5, "comfort current \(slackThresholdKn) kn leaves no moving water in the window")
         let runs = try cardRuns(at: now)
         let p = try XCTUnwrap(s.speeds(from: now, to: now.addingTimeInterval(48 * 3600), step: 600).first { p in
             (slackKn * 1.5..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
@@ -150,6 +152,10 @@ final class ComplicationReadingTests: XCTestCase {
 
     /// The complication's Slack is the phone lead's: up to but not at a window's closing, and on a windowless slack's own second.
     func testWordIsSlackOnTheLeadsSlackMarks() throws {
+        // The comfort current is shared App Group state; Off would leave no windows to test.
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
         let bare = now.addingTimeInterval(3 * 3600)
         let points = stride(from: -720, through: 1440, by: 10).map { minute in
             CurrentPoint(time: now.addingTimeInterval(Double(minute) * 60), speed: minute == 0 ? 0 : 1)

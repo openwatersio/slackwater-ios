@@ -158,6 +158,10 @@ import CoreLocation
     }
 
     func testOpenWindowCardCountdownAgreesWithTheSpokenClosing() throws {
+        // The comfort current is shared App Group state; Off would leave no windows to test.
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
         let selected = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701"))
         let next = try XCTUnwrap(SlackWindowShortcutQuery.next(at: selected,
             after: Date(timeIntervalSince1970: 1_755_800_000)))

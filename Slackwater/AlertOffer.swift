@@ -56,7 +56,7 @@ func alertEveryLabel(_ trigger: AlertTrigger, imperial: Bool) -> String {
         return rising ? String(localized: "Every time it rises past \(height) \(unit)")
                       : String(localized: "Every time it falls past \(height) \(unit)")
     default:
-        let name = alertEventName(trigger, imperial: imperial)
+        let name = alertEventName(trigger, noWindow: slackWindowIsOff(slackThresholdKn), imperial: imperial)
         return String(localized: "Every \(name.prefix(1).lowercased() + name.dropFirst())")
     }
 }

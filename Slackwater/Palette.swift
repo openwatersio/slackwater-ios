@@ -44,9 +44,9 @@ enum SN {
     static let flood = Color(hex: floodHex)
     static let ebb = Color(hex: ebbHex)
     static let go = Color(hex: goHex)
-    /// A measured current's line outside its slack window: water over the
-    /// person's slack-window speed. The speed ramp's first stop, so the excess
-    /// over the limit reads warm on the same scale (#821).
+    /// A measured current's line outside every slack window, weak water that
+    /// never turns included (current-charts §6.1). The speed ramp's first stop,
+    /// so the water beyond the window reads warm on the same scale (#821).
     static let beyondWindowHex: UInt32 = 0xF5C96B
     static let beyondWindow = Color(hex: beyondWindowHex)
     /// A slack window: water under the person's slack-window speed that is
@@ -88,9 +88,9 @@ enum SN {
 
     /// The shared speed scale: yellow at the comfort threshold, orange beyond
     /// it, red at the fast end. It deliberately never enters green: green is
-    /// reserved for a usable Slack window.
+    /// reserved for slack.
     static let speedRampStops: [(t: Double, hex: UInt32)] = [
-        (0.0, 0xF5C96B), (1.0 / 3.0, 0xF5C96B),
+        (0.0, SN.beyondWindowHex), (1.0 / 3.0, SN.beyondWindowHex),
         (2.0 / 3.0, 0xE8763C), (1.0, 0xC93A32),
     ]
 
