@@ -407,7 +407,7 @@ The marks above represent SF Symbols, not translated glyphs, drawn between the l
 | Max flood, Max ebb | None |
 | Sunrise, Sunset | `sunrise`, `sunset` |
 
-Max flood and max ebb commentary have no symbol; the current reading and curve carry the set arrows. Fast-tide commentary has no symbol.
+Max flood and max ebb commentary have no symbol. The current reading and curve show bearing arrows where a set bearing is available. Fast-tide commentary has no symbol.
 
 The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
 
@@ -453,12 +453,12 @@ At the reference scale this is 200 seconds. The threshold is one visible unit: s
 
 The pill sits at the outer edge on the side where now lies:
 
-- selected in the future: `← Now` on the left;
-- selected in the past: `Now →` on the right.
+- selected in the future: `‹ Now` on the left;
+- selected in the past: `Now ›` on the right.
 
-The pill row is inset 16 units from each viewport edge. Now uses the `arrow.left` or `arrow.right` symbol 4 units from the word, and is announced `Return to now`. It appears only when the host supplies a return action. On the watch, Now is an `xmark` toolbar button labelled `Now`, shown behind the same 200-second test.
+The pill row is inset 16 units from each viewport edge. Now uses the `chevron.left` or `chevron.right` symbol 4 units from the word, and is announced `Return to now`. It appears only when the host supplies a return action. On the watch, Now is an `xmark` toolbar button labelled `Now`, shown behind the same 200-second test.
 
-The arrow is both instruction and spatial truth. Activating Now refreshes the reference `now`, ensures its data window is active, and moves that instant beneath the centreline. After landing, the pill disappears.
+The chevron points toward now on the timeline. Activating Now refreshes the reference `now`, ensures its data window is active, and moves that instant beneath the centreline. After landing, the pill disappears.
 
 Now moves by §8, so it wins over the opening, momentum, a ride, or a magnetic animation. Because both pills are hidden and inert while the strip moves (§6.4), this matters for requests that arrive while the strip coasts: a scene reactivation that returns to now, and a schedule-row tap, which goes to its own event.
 
