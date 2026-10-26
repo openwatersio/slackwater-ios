@@ -6,6 +6,50 @@ import XCTest
 import SlackwaterKit
 
 final class SlackWindowTests: XCTestCase {
+    @MainActor
+    func testExampleKeepsZeroMarkWithComfortOnAndOff() throws {
+        for threshold in [0.0, 0.5] {
+            let image = try XCTUnwrap(ImageRenderer(content:
+                SlackWindowPreview(threshold: threshold)
+                    .frame(width: 360, height: 140)
+                    .background(.black)
+                    .preferredColorScheme(.dark)).uiImage)
+            let cg = try XCTUnwrap(image.cgImage)
+            var pixels = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+            let context = try XCTUnwrap(CGContext(data: &pixels, width: cg.width, height: cg.height,
+                bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            let green = stride(from: 0, to: pixels.count, by: 4).filter {
+                Int(pixels[$0 + 1]) > Int(pixels[$0]) + 20
+                    && Int(pixels[$0]) > Int(pixels[$0 + 2]) + 20
+            }
+            XCTAssertFalse(green.isEmpty, "the zero mark disappeared with comfort current \(threshold)")
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "comfort-\(threshold)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
+    func testSlackIsOnlyTheZeroInstantRegardlessOfComfortCurrent() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let slack = t0.addingTimeInterval(600)
+        let points = [CurrentPoint(time: t0, speed: -1),
+                      CurrentPoint(time: slack, speed: 0),
+                      CurrentPoint(time: t0.addingTimeInterval(1200), speed: 1)]
+        for threshold in [0.0, 0.1, 0.5, 2] {
+            let measured = measureSlacks(points, slacks: [slack], threshold: threshold)
+            let cores = mergeWindows(measured.cores.map { (start: $0.start, end: $0.end) })
+            XCTAssertTrue(cores.isEmpty, "zero has no duration at comfort current \(threshold)")
+            XCTAssertTrue(readsSlack(at: slack, runs: cores, slacks: [slack]))
+            XCTAssertFalse(readsSlack(at: slack.addingTimeInterval(30), runs: cores, slacks: [slack]))
+            XCTAssertEqual(measured.windows.isEmpty, threshold == 0)
+            XCTAssertEqual(slackCoreThresholdKn(threshold), 0)
+        }
+    }
+
     /// Symmetric V through zero: -1 kn at t0, 0 at t0+600, +1 at t0+1200.
     /// Threshold 0.5 crosses halfway down each leg.
     func testInterpolatedWindow() {
@@ -180,7 +224,7 @@ final class SlackWindowTests: XCTestCase {
         let slack = t0.addingTimeInterval(600)
         let points = [CurrentPoint(time: t0, speed: 1), CurrentPoint(time: slack, speed: 0)]
         let window = try XCTUnwrap(slackWindow(points, around: slack, threshold: 0.5))
-        let coreWindow = try XCTUnwrap(slackWindow(points, around: slack, threshold: slackKn))
+        let coreWindow = try XCTUnwrap(slackWindow(points, around: slack, threshold: 0.15))
         let run = WindowRun(start: window.start, end: window.end)
         let core = WindowRun(start: coreWindow.start, end: coreWindow.end)
         XCTAssertEqual(run.end, slack)

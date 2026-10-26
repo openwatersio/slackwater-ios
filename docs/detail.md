@@ -166,7 +166,7 @@ Title "Next max", with Done. It opens with the speed and "The hardest the water 
 
 **"Is this beyond normal?"** One bar per whole station-local day across the fortnight, each carrying that day's hardest maximum *in the selected direction*, on one scale. The selected day is marked and the next harder day flagged ahead of it. Labelled "Each bar is one day's hardest flood" or "…hardest ebb". Captioned "The hardest flood of the fortnight." or "Harder than all but N of this fortnight's M.", the latter tapping through to that maximum.
 
-Beneath it, what the maximum costs: **"Slack runs N minutes around it, against about M here usually."** Slack is a threshold crossing, so a harder maximum drives the water through that band faster and slack is shorter. Both figures are the loaded timeline's slack runs, the green the strip draws, so they hold with the slack window off. The sentence is omitted when slack is within a tenth of this station's usual, which is most maxima.
+Slack is a zero instant, so the sheet does not compare slack durations around the selected maximum.
 
 **"When this gate runs hardest"** is twelve whole calendar months, drawn as the envelope that direction's monthly maxima trace — its strongest and its weakest — with the strongest months marked and the reader's own month ruled. Captioned "Hardest around <month>."
 

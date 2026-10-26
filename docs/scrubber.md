@@ -289,7 +289,7 @@ The reference target set is the sorted, de-duplicated union of all applicable in
 - the fastest-rate instant of each tide run that reaches the rate-warning scale;
 - current maxima and slack instants;
 - the opening and closing of each merged measured slack window drawn as a stroke (§13.2);
-- the opening and closing of each merged measured slack run, or for a short run (§13.2) its centre alone, which replaces the slack instant and any other event inside the run;
+- each measured-current zero instant (§13.2);
 - sunrise and sunset;
 - greatest eclipse of each lunar eclipse that has a contact or its greatest eclipse above the station's horizon, and of each locally visible solar eclipse, but none of their other contacts; and
 - derived-gate slack instants.
@@ -362,7 +362,7 @@ The value is the absolute speed at `selectedTime`; the phase carries its sign. P
 
 The state is:
 
-- `Slack` while `selectedTime` lies in a measured slack run (§13.2), including its opening but excluding its closing, or within one second of a slack no run covers, where the magnet parks on that slack's mark; never elsewhere, however slow the water, and never merely inside a slack window, where the water is still flooding or ebbing;
+- `Slack` within one second of a predicted zero instant (§13.2), where the magnet parks on its mark; never elsewhere, however slow the water, and never merely inside a slack window;
 - `Max flood` or `Max ebb` within one second of that maximum; or
 - `Flooding` / `Ebbing` otherwise.
 
@@ -434,11 +434,11 @@ A rising or falling run whose rate reaches 0.6 m/hour is one stop, at its fastes
 Walk strictly forward—more than one second after `selectedTime`—through these significant stops:
 
 1. a drawn slack window's opening, named `Slack window`;
-2. a merged measured slack run's opening, named `Slack`;
+2. a measured-current zero instant, named `Slack`;
 3. the window's closing, named `Slack window` with the closing glyph; and
 4. `Max flood` and `Max ebb`.
 
-A slack run's closing is not a stop: the window goes on around it. A short slack run (§13.2) is one stop instead: its centre, named `Slack`. A slack inside a run is never a stop of its own: its run's opening, or a short run's centre, names it. A slack no run covers is one stop at its own instant, named `Slack`, and parked on that instant the lead says `Slack` (§9.2). A window too short to draw has no stops; the slack inside it does. When a window and its slack run open together, which happens when the slack-window speed is under the slack speed, the one stop is named `Slack`.
+Slack is one stop at the predicted zero instant, named `Slack`. A window too short to draw has no stops; its zero instant still does. Comfort current changes only the window edges.
 
 The `Slack window` stop uses the slack glyph in the visual label and is spoken `Slack window`. The closing stop shows the same words, so the pill is no wider than the opening's, and uses `arrow.left.and.line.vertical.and.arrow.right`; the glyph tells the two apart. It is spoken `Slack window closes`. With the slack-window speed off there are no windows, so the commentary walks slack and the maxima alone. When a bare slack coincides with a window's closing, the stop is named `Slack`. A window ending at the sampled series boundary has no measured closing and must not invent one. Activating the pill moves to the stop it names. Once parked on a stop, the pill names the following stop rather than pointing to itself.
 
@@ -532,7 +532,7 @@ These sRGB values are the portable reference palette:
 | Low | `#FBBF24` | Tide low, and the tide fill below chart datum |
 | Flood | `#4A9FD8` | Flood set glyph and derived flood glyph in the lead, and the schedule's flood pill |
 | Ebb | `#E8A33D` | Ebb set glyph and derived ebb glyph in the lead, and the schedule's ebb pill |
-| Go | `#88B868` | A measured slack run, the mark of a slack no run covers, and a derived gate's known slack instant |
+| Go | `#88B868` | A measured-current zero instant and a derived gate's known slack instant |
 | Beyond window | `#F5C96B` | A measured current's curve outside its slack windows; the magnitude ramp's first stop |
 | Neutral unknown | `#5888A8` | Unknown or unavailable state: map pin, unavailable-station card and page, Unfavorite swipe action |
 | Sun | `#F0C860` | Sunrise/sunset dot |
@@ -543,7 +543,7 @@ These sRGB values are the portable reference palette:
 | Attention | `#EF6F4A` | Provisional or exceptional state, not alarm |
 | Eclipse umbra | `#6B2A18` | Eclipse-only copper, drawn at 94% |
 
-Inside the graph, green is reserved for slack evidence: a measured slack run or slack instant and its direct state, or a derived gate's known slack instant, which has no speed to measure a duration from. It must not identify a station type, rising tide, weak water without a reversal, the slack window around a slack, or generic success there. The same hex is also the app's leaf accent outside the graph: section labels, controls, card strokes, and the schedule's selected-row bar.
+Inside the graph, green is reserved for slack evidence: a measured-current zero instant and its direct state, or a derived gate's known slack instant, which has no speed to measure a duration from. It must not identify a station type, rising tide, weak water without a reversal, the slack window around a slack, or generic success there. The same hex is also the app's leaf accent outside the graph: section labels, controls, card strokes, and the schedule's selected-row bar.
 
 The magnitude ramp contains no green:
 
@@ -598,7 +598,7 @@ Draw in this order:
 4. the dashed zero reference line;
 5. the base curve and its magnitude thread;
 6. measured slack windows: each window drawn as a stroke, and none shorter than a turn dot;
-7. measured slack marks over them: each slack run a stroke, stretched to the shortest slack stroke when shorter than a turn dot, and the shortest slack stroke at each slack no run covers;
+7. measured slack marks over them: the shortest slack stroke centred on each zero instant;
 8. drawn window openings, and the time of each slack mark outside every drawn window;
 9. derived-gate slack dots and peak readings; and
 10. the absolute-now dot.
@@ -614,9 +614,9 @@ Draw the curve in the beyond-window yellow at 2.5 units: everywhere the water is
 
 An online sampled series derives its events from the samples. A slack falls at an exact-zero sample or at the linear crossing between opposite-sign samples. A maximum is the largest-magnitude sample of each signed run, without interpolation; the partial runs at the series ends also yield a maximum at their largest sample. Events are kept up to six hours beyond the fixed window.
 
-A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. Either way the window holds its own slack instant: where the event search puts the slack outside the interpolated edges, the window widens to it. A measured slack run is measured the same way around the same slack instant, at the slack speed: `slackKn`, 0.15 kn, or the slack-window threshold where that is lower. A slack run therefore lies inside its window, and a window set under the slack speed is a slack run throughout. The closing edge is excluded from slack coverage: a slack exactly at a slack run's closing keeps its own mark, its own time, and its own magnetic target, including when the closing is the final loaded sample. A slack outside the sampled series, or between two above-threshold samples of the same sign, has no window and no slack run; a slack whose water never gets under the slack speed, such as a rotary station's minimum, has a window but no slack run. Either way it still has a mark: the same shortest slack stroke as a short run, centred on the slack's own instant, which is its one magnetic target, commentary stop (§10.1), and event time. Every slack therefore has a mark, and every mark is a line. Merge touching or overlapping windows into one window, and touching or overlapping slack runs into one run. Draw the curve itself in graph blue across each window at 3.5 units, slightly wider than the base curve, then in the go colour across each slack run over it. Weak water that eases under the slack-window speed without turning is not a window and stays yellow (current-charts §6.1). The base yellow curve and speed thread must be absent under either stroke, including the faded past section. Leave a small break around each round end cap of a window, and of a slack run with no window around it, against the yellow curve, using a 2.5-unit halo gap, without erasing the underlying fill or sky. A slack run joins its window's blue stroke with no break: green against blue is not the deuteranopia pair, and a break at every colour change reads as a dashed line. Yellow, blue, and green then read in order: outside the window, the window, and slack. Do not outline the whole run, add endpoint dots, or add an area band. Each window's and each slack run's opening and closing is magnetic, except for a short slack run, whose one magnetic target is its centre.
+A measured slack window is measured around each slack instant on the drawn samples. A predicted station takes the instant from the engine's event search and measures on its chunk's ten-minute samples plus six hours either side. An online current takes the instant from the sample-derived events above and measures on its 15-minute samples inside the fixed window. When one of the two samples bracketing the slack is at or below the configured threshold (an exact-zero sample always is), the window extends to the interpolated threshold crossings on each side and clamps to the loaded series. When both bracketing samples are above the threshold but have opposite signs, the straight line between them crosses the ±threshold band, and the window runs from where that line enters the band to where it leaves it, so a reversal inside the series always has a window. Either way the window holds its own slack instant: where the event search puts the slack outside the interpolated edges, the window widens to it. Slack is only the predicted zero instant, independent of the comfort current. It has no measured duration. A current that never reaches zero has no slack; a nonzero minimum is not a fallback slack event. Merge touching or overlapping windows. Draw the curve in graph blue across each window at 3.5 units, slightly wider than the base curve. At each zero instant draw a short go-colour stroke centred on it. Weak water without a reversal stays yellow (current-charts §6.1). The base yellow curve and speed thread are absent under window and slack strokes, including the faded past section. Use a 2.5-unit halo gap where blue or green meets yellow, preserving the fill and sky. Green joins blue without a break. Each drawn window's opening and closing is magnetic, and each zero instant is one magnetic target, commentary stop, and event time.
 
-A merged slack run narrower than a turn dot's five-unit diameter is a short run. It draws as the shortest slack stroke: a six-unit go-colour stroke along the curve, centred on the run's midpoint in time, so slack is always a line and never a dot. A merged window that narrow is not drawn at all, and has no magnetic targets, commentary stops, or event times of its own; the slack mark inside it stands for it. At 18 units an hour that is a window shorter than about 17 minutes. The shortest slack stroke draws like any slack run: over the window's blue with no break, or with its end gaps where it meets the yellow curve. A run's true length at that size would read as a blot rather than a duration, and the stretch is drawing only: the run's measured edges are unchanged. Decide this from the run's duration at the strip's 18 units an hour, with the same width test the drawing uses, so data code never needs the drawn geometry. A short run is one moment: its centre is the run's only magnetic target (§7), commentary stop (§10.1), and event time, and it replaces the slack instant inside it. Station cards stretch the same way at their own scale.
+Each zero instant draws as a six-unit go-colour stroke along the curve, centred on the instant. Its width is a rendering minimum, not a slack duration. A merged window narrower than a turn dot's five-unit diameter is not drawn and has no magnetic targets, commentary stops, or event times of its own; its zero instant still has a mark and stop. At 18 units an hour that is a window shorter than about 17 minutes. Station cards apply the same minimum at their own scale. Derived gates retain their schematic slack presentation because they have no measured speeds.
 
 Current maxima are drawn as context rather than as marks:
 
@@ -625,7 +625,7 @@ Current maxima are drawn as context rather than as marks:
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The event-time row contains each drawn window's opening, and each slack mark outside every drawn window: a slack run's opening, or for a short run its centre, and the instant of each slack no run covers. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
+The event-time row contains each drawn window's opening and each zero instant outside every drawn window. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
 
 ### 13.3 Schematic derived current
 
@@ -778,8 +778,8 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 16. **Tide turn:** At an exact high, the lead says High, the high's reading hangs below its dot, and the commentary advances to the following event.
 17. **Fast tide:** At 0.6 m/hr or faster, the lead's state carries the rate in the ramp's lifted colour, with the glyph. A run that reaches that rate has one commentary stop, `Fastest rise` or `Fastest fall` at its fastest point in the peak rate's lifted ramp colour, named until the selection reaches it; the run's high or low, or an earlier sunrise or sunset, is next after that. A passed peak is never named again.
-18. **Measured slack window:** The curve is yellow outside the slack windows, graph blue across interpolated window edges, and green only across the slack run inside it; the lead says Flooding or Ebbing inside the window, Slack at the slack run's opening, and changes phase at its half-open closing, and outside a slack run says Slack only within a second of a slack no run covers (§9.2). At a weak station whose window covers a maximum, the lead says Max flood or Max ebb on it.
-19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged window narrower than a turn dot is not drawn, and a slack run that narrow draws as the shortest slack stroke, and its centre is its event time, its only magnetic target, and its one commentary stop. A slack with no run, at a sampled-series edge, between two same-sign samples, or at a minimum that never gets under the slack speed, draws the same stroke centred on its own instant, with the same single time, target, and stop, and the lead says Slack parked on it. When the engine's slack falls just outside the line's ±threshold span, the window widens to hold it, with a separate stroke, time, magnetic target, and Slack commentary stop when the slack is exactly at the half-open closing.
+18. **Measured slack window:** The curve is yellow outside the slack windows, graph blue across interpolated window edges, and has a short green stroke at the zero instant. The lead says Slack only within a second of zero and Flooding or Ebbing elsewhere in the window. At a weak station whose window covers a maximum, the lead says Max flood or Max ebb on it.
+19. **Short slack window:** A fast reversal whose bracketing samples both exceed the comfort current still has a window, interpolated where the line crosses ±threshold. A window narrower than a turn dot is not drawn. The zero instant keeps its short green stroke, event time, magnetic target, and Slack commentary stop even with comfort current Off. A current that never reaches zero has no slack mark.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
 21. **Derived gate:** The lead has no number or bearing, the shape has blue zero-fading fill beneath its positive half only and no speed thread, and only known slack instants get green dots, each with its time in the event-time row; there is no dashed zero line.
 22. **Past/future:** A graph with now in view has a 35%-opacity past stroke and full-strength future stroke split exactly at the absolute-now dot.

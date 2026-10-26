@@ -325,10 +325,11 @@ import CoreLocation
         let active = try XCTUnwrap(SlackWindowShortcutQuery.next(at: selected, after: now))
         XCTAssertLessThan(active.end.timeIntervalSince(now), 7_200)
         XCTAssertEqual(active.card.countdownEnd, active.end)
-        guard case .current(_, _, _, _, let inWindow) = active.card.reading else {
+        guard case .current(_, _, _, _, let isSlack) = active.card.reading else {
             return XCTFail("expected a current reading")
         }
-        XCTAssertTrue(inWindow)
+        XCTAssertFalse(isSlack, "a minute after zero is moving water inside the comfort window")
+        XCTAssertTrue(try XCTUnwrap(active.card.graph).windows.contains { $0.contains(now) })
     }
 
     func testHighlightPreservesAMergedWindowWithObservedBoundaries() throws {

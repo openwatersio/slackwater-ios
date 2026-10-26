@@ -44,11 +44,9 @@ var slackThresholdKn: Double {
                                ?? defaultSlackThresholdKn)
 }
 
-/// The speed under which the water is slack, inside a slack window measured at
-/// `windowThreshold`. Slack is physical and fixed at `slackKn`; a window set
-/// lower than that is slack throughout, and with the window off slack stands alone (#821).
+/// Slack is the zero instant. The comfort current defines only the window.
 func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
-    slackWindowIsOff(windowThreshold) ? slackKn : min(slackKn, windowThreshold)
+    0
 }
 
 /// The workable window around a slack: where |v| stays under `threshold`,

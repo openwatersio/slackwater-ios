@@ -5,9 +5,6 @@ import CoreLocation
 import Foundation
 import SlackwaterKit
 
-/// Below this magnitude the water reads "Slack", not a direction (web chs/current.ts SLACK_KN).
-let slackKn = 0.15
-
 // MARK: - Geo
 
 /// Great-circle distance in kilometres.
@@ -326,8 +323,9 @@ func currentPhase(signed: Double, inWindow: Bool) -> CurrentPhase {
     inWindow ? .slack : signed >= 0 ? .flood : .ebb
 }
 
-func currentPhase(signed: Double) -> CurrentPhase {
-    abs(signed) < slackKn ? .slack : signed > 0 ? .flood : .ebb
+func schematicCurrentPhase(signed: Double) -> CurrentPhase {
+    // Derived gates use a dimensionless schematic, not a speed in knots.
+    abs(signed) < 0.15 ? .slack : signed > 0 ? .flood : .ebb
 }
 
 

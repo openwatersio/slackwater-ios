@@ -35,7 +35,7 @@ struct ScrubReading: Equatable {
         let next = data.currentEvents.first { $0.time.timeIntervalSince(t) >= onEvent }
         let schematic = data.speedsAreSchematic
         // The strip's slack, so the Crown reads what the line draws green; a shape has no speeds to measure.
-        let phase = schematic ? currentPhase(signed: v) : currentPhase(signed: v, inWindow: data.isSlack(at: t))
+        let phase = schematic ? schematicCurrentPhase(signed: v) : currentPhase(signed: v, inWindow: data.isSlack(at: t))
         let bearing: Double? = switch phase {
         case .flood: floodDeg
         case .ebb: ebbDeg
