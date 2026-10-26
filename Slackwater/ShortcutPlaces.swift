@@ -21,17 +21,49 @@ enum ShortcutPlaceQuery {
         return true
     }
 
-    static func matches(_ query: String, kind: LocalStationKind) -> [StationItem] {
+    static func matches(_ query: String, kind: LocalStationKind, preferredIDs: [String] = [],
+                        near anchor: (lat: Double, lon: Double)? = nil) -> [StationItem] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return [] }
-        return StationItem.all.compactMap { item -> (StationItem, Int)? in
+        var priority: [String: Int] = [:]
+        for id in preferredIDs where priority[id] == nil { priority[id] = priority.count }
+        return StationItem.all.compactMap { item -> (item: StationItem, rank: Int, priority: Int, km: Double)? in
             guard accepts(item, kind: kind), let rank = item.searchRank(query) else { return nil }
-            return (item, rank)
+            let matchRank = item.name.lowercased() == query ? -1 : rank
+            return (item, matchRank, priority[item.id] ?? .max,
+                    anchor.map { item.km(fromLat: $0.lat, lon: $0.lon) } ?? 0)
         }.sorted {
-            if $0.1 != $1.1 { return $0.1 < $1.1 }
-            return $0.0.placeLabel == $1.0.placeLabel
-                ? $0.0.id < $1.0.id : $0.0.placeLabel < $1.0.placeLabel
-        }.map { $0.0 }
+            if $0.priority != $1.priority { return $0.priority < $1.priority }
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            if $0.km != $1.km { return $0.km < $1.km }
+            if $0.item.name != $1.item.name { return $0.item.name < $1.item.name }
+            if $0.item.region != $1.item.region { return $0.item.region < $1.item.region }
+            return $0.item.id < $1.item.id
+        }.map(\.item)
+    }
+
+    @MainActor private static func context(defaults: UserDefaults) -> (ids: [String], anchor: (lat: Double, lon: Double)?) {
+        let service = LocationService.shared
+        let fix = service.authorized ? LocationService.recentLocation(service.location) : nil
+        let anchor = fix.map { (lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
+        var localIDs: [String] = []
+        if let anchor {
+            let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
+            localIDs = StationItem.heroItems(ranked: ranked, lat: anchor.lat, lon: anchor.lon)
+                .map { places.shown($0.id) }
+        }
+        return (StationSuccessors.remap(localIDs
+            + (defaults.stringArray(forKey: AppGroup.favoritesKey) ?? [])
+            + (defaults.stringArray(forKey: AppGroup.recentsKey) ?? [])), anchor)
+    }
+
+    @MainActor static func resolveMatches(_ query: String, kind: LocalStationKind,
+                                         defaults: UserDefaults = AppGroup.defaults) -> [StationItem] {
+        let context = context(defaults: defaults)
+        let ranked = matches(query, kind: kind, preferredIDs: context.ids, near: context.anchor)
+        // A matching place from the person's list is an explicit preference; leave other ambiguity to Siri.
+        if let first = ranked.first, context.ids.contains(first.id) { return [first] }
+        return ranked
     }
 
     static func timeZone(_ item: StationItem) -> TimeZone {
@@ -59,9 +91,8 @@ enum ShortcutPlaceQuery {
         return record
     }
 
-    static func suggestions(kind: LocalStationKind) -> [StationItem] {
-        let ids = (AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey) ?? [])
-            + (AppGroup.defaults.stringArray(forKey: AppGroup.recentsKey) ?? [])
+    @MainActor static func suggestions(kind: LocalStationKind) -> [StationItem] {
+        let ids = context(defaults: AppGroup.defaults).ids
         var seen = Set<String>()
         let preferred = ids.compactMap { id -> StationItem? in
             guard seen.insert(id).inserted, let item = StationItem.widgetItem(id: id),
@@ -95,10 +126,10 @@ struct TideShortcutPlaceQuery: EntityStringQuery {
             .filter { ShortcutPlaceQuery.accepts($0, kind: .tide) }.map(TideShortcutPlace.init)
     }
     func entities(matching string: String) async throws -> [TideShortcutPlace] {
-        ShortcutPlaceQuery.matches(string, kind: .tide).map(TideShortcutPlace.init)
+        await ShortcutPlaceQuery.resolveMatches(string, kind: .tide).map(TideShortcutPlace.init)
     }
     func suggestedEntities() async throws -> [TideShortcutPlace] {
-        ShortcutPlaceQuery.suggestions(kind: .tide).map(TideShortcutPlace.init)
+        await ShortcutPlaceQuery.suggestions(kind: .tide).map(TideShortcutPlace.init)
     }
 }
 
@@ -118,9 +149,9 @@ struct CurrentShortcutPlaceQuery: EntityStringQuery {
             .filter { ShortcutPlaceQuery.accepts($0, kind: .current) }.map(CurrentShortcutPlace.init)
     }
     func entities(matching string: String) async throws -> [CurrentShortcutPlace] {
-        ShortcutPlaceQuery.matches(string, kind: .current).map(CurrentShortcutPlace.init)
+        await ShortcutPlaceQuery.resolveMatches(string, kind: .current).map(CurrentShortcutPlace.init)
     }
     func suggestedEntities() async throws -> [CurrentShortcutPlace] {
-        ShortcutPlaceQuery.suggestions(kind: .current).map(CurrentShortcutPlace.init)
+        await ShortcutPlaceQuery.suggestions(kind: .current).map(CurrentShortcutPlace.init)
     }
 }
