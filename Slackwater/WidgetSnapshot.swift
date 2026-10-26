@@ -92,7 +92,7 @@ struct WidgetCard {
     /// The window's closing when under two hours remain at the ENTRY date —
     /// WidgetKit renders every entry at delivery, so this is decided here,
     /// not in a view body. Nil otherwise: no countdown, no "> 2 hrs".
-    let countdownEnd: Date?
+    var countdownEnd: Date?
 
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil,
                       through end: Date? = nil) -> WidgetCard {

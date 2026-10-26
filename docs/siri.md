@@ -4,6 +4,14 @@ Slackwater includes three App Shortcuts: Next Low Tide, Next High Tide, and Next
 
 Open Slackwater and allow location before asking for a nearby prediction. Try "When is the next high tide in Slackwater?", "When is the next low tide in Slackwater?", or "When is the next slack window in Slackwater?" The actions also appear under App Shortcuts → Slackwater in Shortcuts.
 
+## Place and date parameters
+
+Each action has optional Place and Date parameters in Shortcuts. With both left empty, it answers the next event near the person, as above. Place searches the bundled names, regions and aliases, with separate tide and current choices. For example, try "When is high tide at Savannah in Slackwater?" Same-named places remain separate choices with their regions; Siri's entity resolution handles disambiguation. An explicitly selected place never falls back to another place or asks for the person's location. Unavailable saved predictions produce a named error directing the person to open Slackwater.
+
+Date selects a whole calendar day at the chosen place. The selected calendar date is retained when the phone and place have different time zones; a local day can span 23 or 25 hours. High/low actions list every matching tide on that day, including times earlier today. The slack-window action lists windows overlapping the day, including windows that cross midnight, without inventing unobserved boundaries. Dated answers speak the date and exact local times rather than a relative wait. The curve is anchored at the requested day's midnight with its usual look-back and highlights its first matching tide or window.
+
+App Shortcut invocation phrases include Place. Apple's App Shortcut phrase substitutions do not support an arbitrary Date, so Date is exposed as an intent parameter rather than interpolated into a phrase. Configure it in Shortcuts, including through an Ask Each Time variable for Siri to collect when running a saved shortcut. Recognition and date collection for an unconfigured sentence such as "high tide tomorrow in Savannah" require device validation and are not established by the parameter metadata or unit tests.
+
 ## Place selection
 
 High and low tide requests use the nearest available tide prediction. Slack-window requests use the nearest available current prediction. A recent location fix lets the action answer directly in Siri. When that fix needs refreshing, the action uses App Intents' dynamic foreground continuation before requesting location, with a five-second bound on that request. If foreground continuation is unavailable, or location is denied or unavailable, Siri asks the person to open Slackwater and allow location. A favorite, recent place, or first-run coordinate does not substitute for the person's location.
@@ -22,4 +30,4 @@ The visual result leads with the same relative answer Siri speaks. The exact det
 
 `TideShortcutTests` checks relative answers, tide selection, observed versus clipped window boundaries, provisional-model selection, foreground preparation for stale location, and agreement between spoken and visual results. Rendered snippet attachments cover tides and currents at compact widths, for manual inspection of larger answer and detail text above the fixed-size widget drawing. The tests do not cover Core Location failure callbacks or the five-second timeout. Tests that exercise App Intents in-process do not prove that Siri recognizes a spoken phrase or presents the snippet on a physical device.
 
-Device verification covers all three phrases, Siri with the app closed, location denied or unavailable, a current window before and after slack, and speech alongside the visible result. Website examples should use a verified device capture.
+Device verification covers named-place recognition, same-name disambiguation, configured and Ask Each Time dates, cross-time-zone dates, all three original phrases, Siri with the app closed, location denied or unavailable, a current window before and after slack, and speech alongside the visible result. Website examples should use a verified device capture.
