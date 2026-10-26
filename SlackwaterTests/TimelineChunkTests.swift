@@ -112,14 +112,14 @@ import SlackwaterKit
             XCTAssertEqual(a.end.timeIntervalSince(b.end), 0, accuracy: 30)
         }
 
-        // Slack runs, the green, the same way: a builder that forgot them would draw no slack.
-        let monoCore = mono.slackCores.filter { $0.slack >= mono.start && $0.slack <= mono.end }
-        let mergedCore = m.slackCores.filter { $0.slack >= mono.start && $0.slack <= mono.end }
-        XCTAssertFalse(monoCore.isEmpty)
-        XCTAssertEqual(mergedCore.count, monoCore.count)
-        for (a, b) in zip(mergedCore, monoCore) {
-            XCTAssertEqual(a.start.timeIntervalSince(b.start), 0, accuracy: 30)
-            XCTAssertEqual(a.end.timeIntervalSince(b.end), 0, accuracy: 30)
+        XCTAssertTrue(mono.slackCores.isEmpty)
+        XCTAssertTrue(m.slackCores.isEmpty)
+        let monoZeros = mono.bareSlackTimes.filter { mono.contains($0) }
+        let mergedZeros = m.bareSlackTimes.filter { mono.contains($0) }
+        XCTAssertFalse(monoZeros.isEmpty, "zero instants still need green marks")
+        XCTAssertEqual(mergedZeros.count, monoZeros.count)
+        for (a, b) in zip(mergedZeros, monoZeros) {
+            XCTAssertEqual(a.timeIntervalSince(b), 0, accuracy: 2)
         }
     }
 

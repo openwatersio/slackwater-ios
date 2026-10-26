@@ -405,6 +405,9 @@ import XCTest
         let still = record(speedKn: 0)
         XCTAssertEqual(currentPinState(still, at: refTime, speedUnit: "kn").state,
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
+        let slow = record(speedKn: 0.01)
+        XCTAssertEqual(currentPinState(slow, at: refTime, speedUnit: "kn").state,
+                       pinRampHex(forSpeedKn: 0.01), "nonzero water is never slack")
         let windowed = record(speedKn: 0.4)
         XCTAssertEqual(currentPinState(windowed, at: refTime, speedUnit: "kn").state,
                        pinRampHex(forSpeedKn: 0.4), "water in the slack window is still moving")

@@ -88,6 +88,15 @@ struct ComplicationLine: View {
             }
             let ink: Color = mode == .fullColor ? (reading.runsAreSlack ? SN.go : slackColor) : .primary
             for run in reading.slackRuns {
+                if reading.runsAreSlack, run.lowerBound == run.upperBound {
+                    var mark = Path()
+                    let centre = x(run.lowerBound)
+                    mark.move(to: CGPoint(x: centre - line, y: y(0)))
+                    mark.addLine(to: CGPoint(x: centre + line, y: y(0)))
+                    context.stroke(mark, with: .color(ink.opacity(run.lowerBound < 0 ? pastOpacity : 1)),
+                                   style: StrokeStyle(lineWidth: line * 2.3, lineCap: .round))
+                    continue
+                }
                 let part = pts.filter { run.contains($0.hours) }
                 for (half, opacity) in [(part.filter { $0.hours <= 0 }, pastOpacity),
                                         (part.filter { $0.hours >= 0 }, 1.0)] where half.count > 1 {

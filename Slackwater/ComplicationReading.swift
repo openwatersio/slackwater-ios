@@ -89,7 +89,7 @@ struct ComplicationReading: Equatable {
             let windows = cardWindows(points: points, slacks: slacks).map { hours($0.start)...hours($0.end) }
             // With the window off the face thickens slack itself; like the widget, it counts down only a window.
             let off = slackWindowIsOff(slackThresholdKn)
-            let runs = off ? cores.map { hours($0.start)...hours($0.end) } : windows
+            let runs = off ? slacks.map { hours($0)...hours($0) } : windows
             let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
             let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"

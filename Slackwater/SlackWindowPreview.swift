@@ -28,7 +28,7 @@ struct SlackWindowPreview: View {
             StationCardGraph(
                 points: Self.points.map { .init(time: $0.time, value: $0.speed) },
                 extremes: [], now: Self.start, back: 0, forward: Self.span,
-                includesZero: true, windows: windows, cores: cores,
+                includesZero: true, windows: windows, cores: cores, slacks: slacks,
                 showsReadings: false, showsTimes: false, showsNow: false, timeLabelSpace: 0)
                 .frame(height: 90)
                 .background {

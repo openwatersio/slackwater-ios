@@ -106,15 +106,36 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(r.slackRuns, expected)
     }
 
+    func testComfortOffKeepsOnlyZeroInstantMarks() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0, forKey: AppGroup.slackWindowSpeedKey)
+        let zero = now.addingTimeInterval(600)
+        let station = WidgetStation.current(GivenCurrent(points: [
+            CurrentPoint(time: now, speed: -1), CurrentPoint(time: zero, speed: 0),
+            CurrentPoint(time: now.addingTimeInterval(1200), speed: 1)
+        ], slacks: [zero]), tz: utc, name: "Given")
+        let reading = try XCTUnwrap(ComplicationReading.build(station, now: now))
+        XCTAssertTrue(reading.runsAreSlack)
+        XCTAssertEqual(reading.slackRuns, [(1.0 / 6)...(1.0 / 6)])
+        XCTAssertNil(reading.gauge)
+        XCTAssertEqual(ComplicationReading.build(station, now: zero)?.word, "Slack")
+        XCTAssertEqual(ComplicationReading.build(station, now: now)?.word, "Ebbing")
+    }
+
     func testInsideAWindowTheDotSitsInTheWindow() throws {
-        guard case .current(_, let tz, _) = current else { return XCTFail() }
+        guard case .current(let s, let tz, _) = current else { return XCTFail() }
         let ahead = try XCTUnwrap(try cardRuns(at: now).first { $0.start > now })
         let t = ahead.start.addingTimeInterval(ahead.end.timeIntervalSince(ahead.start) / 2)
+        let signed = s.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first!.speed
         let r = try XCTUnwrap(ComplicationReading.build(current, now: t))
         let g = try XCTUnwrap(r.gauge)
         XCTAssertGreaterThanOrEqual(g.fraction, try XCTUnwrap(g.windowStart))
         XCTAssertLessThanOrEqual(g.fraction, 1)
-        XCTAssertEqual(r.word, CurrentPhase.slack.word)
+        let slacks = s.events(from: t.addingTimeInterval(-600), to: t.addingTimeInterval(600))
+            .filter { $0.kind == .slack }.map(\.time)
+        XCTAssertEqual(r.word, currentPhase(signed: signed,
+            inWindow: readsSlack(at: t, runs: [], slacks: slacks)).word)
         // The label is when the window closes, never a time already past.
         let window = try XCTUnwrap(try cardRuns(at: t).first { $0.contains(t) })
         XCTAssertGreaterThan(window.end, t)
@@ -123,15 +144,15 @@ final class ComplicationReadingTests: XCTestCase {
 
     func testWordIsThePhaseInsideAWindowAboveTheSlackSpeed() throws {
         // A moment inside the card's slack window whose speed is still above
-        // the 0.15 kn slack speed: the water is moving, and the word says so (#821).
+        // zero: the water is moving, and the word says so (#821).
         guard case .current(let s, _, _) = current else { return XCTFail() }
-        // The App Group's comfort current is shared state; at or under 0.22 kn there is no such moment.
-        try XCTSkipUnless(slackThresholdKn > slackKn * 1.5, "comfort current \(slackThresholdKn) kn leaves no moving water in the window")
+        // The App Group's comfort current is shared state; at or under 0.01 kn there is no such moment.
+        try XCTSkipUnless(slackThresholdKn > 0.01, "comfort current \(slackThresholdKn) kn leaves no moving water in the window")
         let runs = try cardRuns(at: now)
         let p = try XCTUnwrap(s.speeds(from: now, to: now.addingTimeInterval(48 * 3600), step: 600).first { p in
-            (slackKn * 1.5..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
+            (0.01..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
         })
-        let phase = currentPhase(signed: p.speed)
+        let phase = currentPhase(signed: p.speed, inWindow: false)
         XCTAssertNotEqual(phase, .slack)
         let r = try XCTUnwrap(ComplicationReading.build(current, now: p.time))
         XCTAssertEqual(r.word, phase.word)
@@ -143,7 +164,7 @@ final class ComplicationReadingTests: XCTestCase {
         let weak = SteadyCurrent(station: Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 0.5, phase: 0)],
                                                   offset: 0.6))
         let p = try XCTUnwrap(weak.speeds(from: now, to: now.addingTimeInterval(13 * 3600), step: 600)
-            .first { abs($0.speed) < slackKn })
+            .first { abs($0.speed) < 0.15 })
         let r = try XCTUnwrap(ComplicationReading.build(.current(weak, tz: utc, name: "Weak"), now: p.time))
         XCTAssertTrue(r.slackRuns.isEmpty)
         XCTAssertEqual(r.word, "Flooding", "the phone's lead says Slack only inside a window")

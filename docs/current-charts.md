@@ -55,7 +55,7 @@ Three things that must never be conflated, in prose, labels, or names:
 
 | Term | Is | Duration |
 |---|---|---|
-| **slack** | the zero crossing, and the run around it where `\|v\| ≤ 0.15 kn` | an instant to minutes |
+| **slack** | the zero crossing (`v = 0`) | an instant |
 | **slack window** | the run where `\|v\| ≤ threshold` **and the sign reverses inside it** | minutes to hours |
 | **weak water** | `\|v\| ≤ threshold`, no reversal | any |
 
@@ -66,8 +66,8 @@ window promises a transit that never happens.
 A slack window is not slack either. The threshold is the reader's boat, and
 at a weak station a 0.5 kn window can hold a whole flood, maximum included.
 Inside the window the water is still flooding or ebbing, and the chart says
-so. Slack is physical, not a setting: the run around the crossing under
-`slackKn`, 0.15 kn, or under the threshold where that is lower.
+so. Slack is the zero crossing, independent of the comfort-current setting.
+There is no positive slack-speed cutoff.
 
 **This distinction is a predicate, not a rendering choice.** See §6.1: it holds
 identically on every surface.
@@ -244,15 +244,11 @@ justification.
 
 **Every reversal has a window.** When the sampling steps over the band, the
 line between the two samples either side of the crossing still crosses it,
-and the window is measured on that line (§8.3). Slack is measured the same
-way, around the same crossing, at the slack speed. A window too narrow to
-draw as a run is not drawn, so a short window never pretends to be a usable
-duration; the slack inside it marks the turn. Slack draws as a go-colour
-run on the window, stretched to a short stroke centred on it when it is too
-narrow to draw. A slack with no run under the slack speed (outside the
-sampled span, between two samples of the same sign, or a minimum that never
-gets that slow) draws the same short stroke at its own instant, so every
-slack has one mark, and it is always a line. (Derived-gate presentation is specified in §9.)
+and the window is measured on that line (§8.3). A window too narrow to
+draw as a run is not drawn. Slack has no duration: a short go-colour stroke
+centred on the zero instant marks it, with or without a window. The stroke's
+width is a rendering minimum, not a span of slack water. A current that never
+reaches zero has no slack. (Derived-gate presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
@@ -301,11 +297,10 @@ provider.
 
 ### 6.1 Green is one predicate everywhere
 
-The go colour means **slack**: the run around a reversal where `|v|` is under
-the slack speed, or the slack instant itself where the water never gets that
-slow. Blue, the curve's own colour, means **slack window**:
+The go colour means **slack**: the zero instant, shown with a short stroke.
+Blue, the curve's own colour, means **slack window**:
 `|v| ≤ effective threshold`, and the sign reverses inside this run. Both are
-the definitions from §2, and they are the same on the chart, the card, the
+the definitions from §2, and they are the same on the chart, the card,
 widget and the watch.
 
 Instantaneous speed under the threshold is **not** the window predicate. A
@@ -314,7 +309,7 @@ that is not opening — the exact failure §2 exists to prevent, arriving
 through a surface that reimplemented the test. Any surface that shows either
 colour computes it from the shared window definition, never from a fresh
 comparison against the threshold. The map pin is the one instantaneous
-surface: it is green under the slack speed and wears the ramp otherwise.
+surface: it is green only at exactly zero and wears the ramp otherwise.
 
 Green is the only reserved meaning on the whole chart. Not "good", not "tide
 station", not "rising", and not the slack window.
@@ -684,7 +679,7 @@ every mark that only earns its place at scale. The card and the widget are
   reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
   one time per drawn window at its opening, and one per slack mark outside
-  every drawn window: a short slack at its centre, a slack run at its opening,
+  every drawn window: each zero instant at its own time,
   a slack with no run at its instant (§5.3). Peak times are not
   shown; they are in the schedule behind the detail. The row keeps 24 pt
   clear of each canvas edge, and in time order drops a time less than
@@ -701,8 +696,8 @@ every mark that only earns its place at scale. The card and the widget are
 
 The top-right reading is the surface's readout: the speed with its unit,
 and under it the set — the phase word, the set (cardinal or bearing) and the bearing arrow
-by the sign of the velocity. Inside slack, closing excluded, or within a
-second of a slack no slack run covers, the word is *Slack* in the go colour,
+by the sign of the velocity. Within one second of the predicted zero
+instant, the word is *Slack* in the go colour,
 as on the detail lead, and the set still shows. Elsewhere in a window the
 word is the phase; under 0.05 kn the set gives way to a
 neutral mark of the same footprint so the header never changes size. No

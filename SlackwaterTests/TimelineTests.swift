@@ -1471,45 +1471,22 @@ private struct FoldPageTestHarness: View {
         }
     }
 
-    /// Slack is the water under the fixed slack speed, inside the person's
-    /// slack window: each core is measured around the same slack as its window,
-    /// at `slackKn` or the window's own threshold when that is lower (#821).
-    func testEachSlackCoreLiesInsideItsWindow() throws {
+    func testComfortCurrentChangesOnlyTheWindowAroundZero() throws {
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
-        let d = TimelineData.build(tide: nil, current: station, now: Date(),
-                                   anchor: todayLocal(station.tz), threshold: 1)
-        XCTAssertFalse(d.slackCores.isEmpty)
-        for core in d.slackCores {
-            let window = try XCTUnwrap(d.slackWindows.first { $0.slack == core.slack },
-                                       "a core without the window around its slack")
-            XCTAssert(window.start <= core.start && core.end <= window.end,
-                      "the core \(core) must lie inside its window \(window)")
-            XCTAssert(core.start <= core.slack && core.slack <= core.end)
+        let now = Date(), anchor = todayLocal(station.tz)
+        for threshold in [0.0, 0.1, 1] {
+            let d = TimelineData.build(tide: nil, current: station, now: now,
+                                       anchor: anchor, threshold: threshold)
+            let slacks = d.currentEvents.filter { $0.kind == .slack && d.contains($0.time) }.map(\.time)
+            XCTAssertFalse(slacks.isEmpty)
+            XCTAssertTrue(d.slackCores.isEmpty)
+            XCTAssertEqual(d.slackWindows.isEmpty, threshold == 0)
+            for slack in slacks {
+                XCTAssertTrue(d.isSlack(at: slack))
+                XCTAssertFalse(d.isSlack(at: slack.addingTimeInterval(30)))
+                XCTAssertTrue(d.snapTimes.contains(slack))
+            }
         }
-        let inside = try XCTUnwrap(d.coreRuns.first { !$0.isDot }, "no core long enough to stroke")
-        let speed = abs(d.velocityAt(inside.centre))
-        XCTAssertLessThanOrEqual(speed, slackKn + 0.01, "a core's water is under the slack speed")
-
-        let narrow = TimelineData.build(tide: nil, current: station, now: Date(),
-                                        anchor: todayLocal(station.tz), threshold: 0.1)
-        XCTAssertEqual(narrow.slackCores.map(\.start), narrow.slackWindows.map(\.start),
-                       "a window under the slack speed is all slack")
-        XCTAssertEqual(narrow.slackCores.map(\.end), narrow.slackWindows.map(\.end))
-    }
-
-    /// With the comfort current Off there is no window anywhere, and slack is
-    /// still measured at the slack speed (#821).
-    func testAnOffSlackWindowLeavesOnlySlack() throws {
-        let station = try XCTUnwrap(CurrentStationRecord.all.first)
-        let d = TimelineData.build(tide: nil, current: station, now: Date(),
-                                   anchor: todayLocal(station.tz), threshold: 0)
-        let slack = TimelineData.build(tide: nil, current: station, now: Date(),
-                                       anchor: todayLocal(station.tz), threshold: slackKn)
-        XCTAssert(d.slackWindows.isEmpty && d.windowRuns.isEmpty, "Off draws no window")
-        XCTAssertFalse(d.slackCores.isEmpty)
-        XCTAssertEqual(d.slackCores.map(\.start), slack.slackCores.map(\.start),
-                       "slack is the same water with the window off")
-        XCTAssertEqual(d.slackCores.map(\.end), slack.slackCores.map(\.end))
     }
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
