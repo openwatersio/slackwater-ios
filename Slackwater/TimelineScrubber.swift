@@ -996,9 +996,9 @@ struct TimelineScrubStrip: View {
     private func nowPill(past: Bool) -> some View {
         Button(action: { jumpToken += 1; onReturn?() }) {
             HStack(spacing: 4) {
-                if !past { Image(systemName: "arrow.left") }
+                if !past { Image(systemName: "chevron.left") }
                 Text("Now")
-                if past { Image(systemName: "arrow.right") }
+                if past { Image(systemName: "chevron.right") }
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(chromeInk)
