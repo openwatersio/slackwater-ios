@@ -60,48 +60,40 @@ struct TideDetailView: View {
     }
     /// Metres per hour under the centerline, signed.
     private var scrubRate: Double { timeline?.rateAt(scrubTime) ?? 0 }
-    /// The line is on the ramp here: the water is moving faster than the
-    /// first anchor, the same test `tideRateStops` colours by.
-    private var fastTide: Bool { abs(scrubRate) >= tideMovementRampAnchorsMHr[0] }
     /// The rate ramp's colour when the rate is out of the ordinary (#95: at
     /// Friday Harbor 0.8 ft/hr is nothing, at Ile Haute 8 ft/hr is the
-    /// warning), else nil and the direction colour stands. The lead's glyph
-    /// and the pill under it wear the one ink, lifted for the sky both float
-    /// on — the ramp's red end is unreadable against a sunrise otherwise.
-    private func rateWarning(over ground: UInt32) -> Color? {
-        fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate)), over: ground) : nil
+    /// warning), else nil and the direction colour stands. The lead's word
+    /// and glyph wear it for the selection's rate, the pill for the peak it
+    /// names, lifted for the sky they float on — the ramp's red end is
+    /// unreadable against a sunrise otherwise.
+    private func rateWarning(_ rate: Double, over ground: UInt32) -> Color? {
+        abs(rate) >= tideMovementRampAnchorsMHr[0]
+            ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(rate)), over: ground) : nil
     }
-    /// The stop the pill names and its tap walks to: the next turn, or the
-    /// sun's next rise or set when that comes first.
+    /// "Rising 2.3 ft/hr" in place of the lead's bare word while the water is
+    /// fast: it explains the yellow line under it.
+    private var leadRate: String? {
+        atTurn == nil ? tideRateReading(rate: scrubRate, imperial: imperial) : nil
+    }
+    /// The stop the pill names and its tap walks to: the next turn, a fast
+    /// run's peak before it, or the sun's next rise or set when that comes
+    /// first.
     private var nextStop: CommentaryStop? {
-        let drawn = timeline?.drawnSpan
-        let turn = timeline.flatMap {
-            firstCommentaryStop($0.tideExtremes, at: \.time, after: scrubTime, drawn: drawn)
-        }
-        return nextCommentaryStop(turn.map {
-            let high = $0.kind == .high
-            return CommentaryStop(time: $0.time,
-                                  label: high
-                                    ? String(localized: "High", comment: "High-tide event label.")
-                                    : String(localized: "Low", comment: "Low-tide event label."),
-                                  spokenLabel: high
-                                    ? String(localized: "High tide", comment: "VoiceOver tide-event label.")
-                                    : String(localized: "Low tide", comment: "VoiceOver tide-event label."),
-                                  systemImage: high ? "arrow.up" : "arrow.down")
-        },
-                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
+        guard let timeline else { return nil }
+        return nextCommentaryStop(tideWaterStop(in: timeline, after: scrubTime),
+                                  sun: timeline.days, after: scrubTime, drawn: timeline.drawnSpan)
     }
-    /// What the pill says: the rate while the tide is fast — it explains the
-    /// yellow line under it — else the next stop.
     private var commentary: CommentaryContent? {
-        if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) {
-            return CommentaryContent(label: fast, accessibilityLabel: fast)
-        }
-        return nextStop.map { commentaryContent($0, from: scrubTime) }
+        nextStop.map { commentaryContent($0, from: scrubTime) }
+    }
+    /// The fast-run peak the pill names, if that is its stop: the pill still
+    /// leads to a warning, so it wears the peak's ramp colour.
+    private var commentaryPeak: TideRatePoint? {
+        guard let timeline, let stop = nextStop else { return nil }
+        return tideFlowArrows(timeline.tideRates).first { $0.time == stop.time }
     }
     private func scrubToCommentary() {
-        guard let timeline,
-              let target = tideCommentaryTarget(in: timeline, at: scrubTime, nextStop: nextStop?.time) else { return }
+        guard let target = nextStop?.time else { return }
         scrubTime = target
     }
 
@@ -139,7 +131,7 @@ struct TideDetailView: View {
                                                    onResumeScrubbedAway: { live = appNow() },
                                                    spokenLead: spokenLead,
                                                    commentary: commentary,
-                                                   commentaryTint: rateWarning(over: sky.chromeGround),
+                                                   commentaryTint: commentaryPeak.flatMap { rateWarning($0.rate, over: sky.chromeGround) },
                                                    onCommentary: scrubToCommentary,
                                                    scrollGate: store?.gate ?? previewGate,
                                                    onViewportWidth: { viewportPts = $0 },
@@ -348,27 +340,33 @@ struct TideDetailView: View {
     }
     /// The lead in words, for the strip's spoken value.
     private var spokenLead: String {
-        spokenReading(leadState, formatHeight(scrubHeight, imperial: imperial), unit: unit)
+        let reading = spokenReading(leadState, formatHeight(scrubHeight, imperial: imperial), unit: unit)
+        return leadRate == nil ? reading : spokenTideRate(after: reading, rate: scrubRate, imperial: imperial)
     }
 
     private func lead(sky: SkyState) -> some View {
         let ink = sky.ink
         let turn = atTurn
         let up = turn.map { $0.kind == .high } ?? rising
-        let state = leadState
+        let state = leadRate ?? leadState
+        let warning = rateWarning(scrubRate, over: sky.chromeGround)
         return LeadCard(value: formatHeight(scrubHeight, imperial: imperial),
                         unit: unit,
                         time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {
             // Word then glyph, the order the current lead reads in.
-            Text(state).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
+            // The rate, when it shows, outranks the word's usual ink (#95).
+            Text(state).fontWeight(.medium).monospacedDigit()
+                .foregroundStyle(leadRate == nil ? ink.opacity(0.85) : warning ?? ink)
+                .accessibilityLabel(leadRate == nil ? leadState
+                                    : spokenTideRate(after: leadState, rate: scrubRate, imperial: imperial))
             // The graph's own two inks, so the eyebrow names the curve the
             // reader is looking at — unless the rate is out of the ordinary
             // (#95), which outranks direction.
             LeadGlyph(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
                                   ?? (rising ? "arrow.up.right" : "arrow.down.right"))
-                .foregroundStyle(rateWarning(over: sky.chromeGround) ?? (up ? SN.graphHigh : SN.graphLow))
+                .foregroundStyle(warning ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
 
@@ -520,7 +518,7 @@ struct ChsDownloadNotice: View {
 /// "Falling 5.2 ft/hr" while the water moves faster than the ramp's first
 /// anchor — the reason the line is yellow — else nil. `rate` is metres per
 /// hour, signed; the height formatter converts it like a height.
-func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
+func tideRateReading(rate: Double, imperial: Bool) -> String? {
     guard abs(rate) >= tideMovementRampAnchorsMHr[0] else { return nil }
     let value = formatHeight(abs(rate), imperial: imperial)
     let unit = heightUnit(imperial: imperial)
@@ -529,17 +527,46 @@ func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
         : String(localized: "Rising \(value) \(unit)/hr", comment: "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.")
 }
 
-func tideCommentaryTarget(in timeline: TimelineData, at time: Date, nextStop: Date?) -> Date? {
-    let rate = timeline.rateAt(time)
-    guard abs(rate) >= tideMovementRampAnchorsMHr[0],
-          let turn = firstCommentaryStop(timeline.tideExtremes, at: \.time,
-                                         after: time, drawn: timeline.drawnSpan) else { return nextStop }
-    // Stay within this run so a passed peak cannot send the next tap backward.
-    let peak = tideFlowArrows(timeline.tideRates).first {
-        ($0.rate < 0) == (rate < 0) && $0.time < turn.time
-            && commentaryCanName($0.time, after: time, drawn: timeline.drawnSpan)
+/// The tide's next stop: its next high or low, or a fast run's fastest
+/// point before it. A fast run is one stop, so once the selection reaches
+/// its peak the turn is next.
+func tideWaterStop(in timeline: TimelineData, after time: Date) -> CommentaryStop? {
+    let drawn = timeline.drawnSpan
+    let turn = firstCommentaryStop(timeline.tideExtremes, at: \.time, after: time, drawn: drawn).map {
+        let high = $0.kind == .high
+        return CommentaryStop(time: $0.time,
+                              label: high
+                                ? String(localized: "High", comment: "High-tide event label.")
+                                : String(localized: "Low", comment: "Low-tide event label."),
+                              spokenLabel: high
+                                ? String(localized: "High tide", comment: "VoiceOver tide-event label.")
+                                : String(localized: "Low tide", comment: "VoiceOver tide-event label."),
+                              systemImage: high ? "arrow.up" : "arrow.down")
     }
-    return peak?.time ?? turn.time
+    let peak = firstCommentaryStop(tideFlowArrows(timeline.tideRates), at: \.time, after: time, drawn: drawn)
+    return [turn, peak.map(tideRatePeakStop)].compactMap { $0 }.min { $0.time < $1.time }
+}
+
+/// "Rising, 2.3 feet per hour": the rate as VoiceOver reads it, after the
+/// state or the whole reading, since "ft/hr" is notation.
+func spokenTideRate(after spoken: String, rate: Double, imperial: Bool) -> String {
+    let value = formatHeight(abs(rate), imperial: imperial)
+    let unit = spokenUnit(heightUnit(imperial: imperial))
+    return String(localized: "\(spoken), \(value) \(unit) per hour", comment: "VoiceOver tide reading while the water moves fast. Values are the spoken state or reading, a formatted rate, and its spoken height unit.")
+}
+
+/// A fast run's fastest point as a commentary stop. Its rate is the lead's
+/// to say; the pill names the moment.
+func tideRatePeakStop(_ peak: TideRatePoint) -> CommentaryStop {
+    peak.rate < 0
+        ? CommentaryStop(time: peak.time,
+                         label: String(localized: "Fastest fall", comment: "Tide event: the falling tide's fastest point."),
+                         spokenLabel: String(localized: "Fastest falling tide", comment: "VoiceOver tide-event label."),
+                         systemImage: "arrow.down.right")
+        : CommentaryStop(time: peak.time,
+                         label: String(localized: "Fastest rise", comment: "Tide event: the rising tide's fastest point."),
+                         spokenLabel: String(localized: "Fastest rising tide", comment: "VoiceOver tide-event label."),
+                         systemImage: "arrow.up.right")
 }
 
 #Preview {

@@ -448,40 +448,59 @@ import SlackwaterKit
         )
     }
 
-    func testFastTideCommentaryWalksFromRatePeakToItsTurn() {
+    /// A fast run is one stop, at its fastest point, between its turns: once
+    /// the selection reaches the peak, the turn is next. A quiet run has none.
+    func testFastTideRunIsOneStopAtItsPeak() {
         for sign in [1.0, -1.0] {
-            let rates: [Double] = [0, 0.8, 1.8, 1.0, 0, -0.8, -1.8, -1.0, 0, 0.8, 1.8, 1.0, 0]
-            let timeline = TimelineData(
-                tz: utc, anchor: t0, today: t0, start: t0, end: at(12 * 3600),
-                days: [],
-                tidePoints: rates.enumerated().map { TidePoint(time: at(Double($0.offset) * 3600), height: 0) },
-                tideRates: rates.enumerated().map { TideRatePoint(time: at(Double($0.offset) * 3600), rate: sign * $0.element) },
-                tideExtremes: [
-                    TideExtreme(time: at(4 * 3600), height: 0, kind: sign > 0 ? .high : .low),
-                    TideExtreme(time: at(8 * 3600), height: 0, kind: sign > 0 ? .low : .high),
-                    TideExtreme(time: at(12 * 3600), height: 0, kind: sign > 0 ? .high : .low),
-                ],
-                currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
-            let cases: [(hours: Double, target: Double)] = [
-                (1, 2), (2, 4), (2 + 0.5 / 3600, 4), (3, 4), (5, 6), (6, 8), (7, 8), (9, 10),
+            func timeline(scale: Double) -> TimelineData {
+                let rates: [Double] = [0, 0.8, 1.8, 1.0, 0, -0.8, -1.8, -1.0, 0, 0.8, 1.8, 1.0, 0]
+                return TimelineData(
+                    tz: utc, anchor: t0, today: t0, start: t0, end: at(12 * 3600),
+                    days: [],
+                    tidePoints: rates.enumerated().map { TidePoint(time: at(Double($0.offset) * 3600), height: 0) },
+                    tideRates: rates.enumerated().map { TideRatePoint(time: at(Double($0.offset) * 3600), rate: sign * scale * $0.element) },
+                    tideExtremes: [
+                        TideExtreme(time: at(4 * 3600), height: 0, kind: sign > 0 ? .high : .low),
+                        TideExtreme(time: at(8 * 3600), height: 0, kind: sign > 0 ? .low : .high),
+                        TideExtreme(time: at(12 * 3600), height: 0, kind: sign > 0 ? .high : .low),
+                    ],
+                    currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+            }
+            let fast = timeline(scale: 1)
+            let rise = sign > 0 ? "Fastest rise" : "Fastest fall"
+            let fall = sign > 0 ? "Fastest fall" : "Fastest rise"
+            let turn = sign > 0 ? "High" : "Low"
+            let cases: [(hours: Double, stop: Double, label: String)] = [
+                (0, 2, rise), (1, 2, rise), (2 - 0.5 / 3600, 4, turn), (2, 4, turn), (3, 4, turn),
+                (4, 6, fall), (5, 6, fall), (7, 8, sign > 0 ? "Low" : "High"), (9, 10, rise),
             ]
             for c in cases {
-                XCTAssertEqual(tideCommentaryTarget(in: timeline, at: at(c.hours * 3600),
-                                                    nextStop: at((c.hours < 3 ? 3 : 7.5) * 3600)),
-                               at(c.target * 3600), "sign \(sign), hour \(c.hours)")
+                let stop = tideWaterStop(in: fast, after: at(c.hours * 3600))
+                XCTAssertEqual(stop?.time, at(c.stop * 3600), "sign \(sign), hour \(c.hours)")
+                XCTAssertEqual(stop?.label, c.label, "sign \(sign), hour \(c.hours)")
             }
-            XCTAssertEqual(tideCommentaryTarget(in: timeline, at: t0, nextStop: at(1800)), at(1800),
-                           "a quiet tide still walks to the earlier sun event")
+            XCTAssertEqual(tideWaterStop(in: timeline(scale: 0.3), after: t0)?.label, turn,
+                           "a run under the rate-warning scale has no peak stop")
         }
     }
 
-    /// The pill explains the yellow line: the rate, direction first, in the
+    func testFastTidePeakStopNamesTheMomentWithTheLeadsGlyph() {
+        let rise = tideRatePeakStop(TideRatePoint(time: t0, rate: 0.7))
+        XCTAssertEqual(rise.label, "Fastest rise")
+        XCTAssertEqual(rise.spokenLabel, "Fastest rising tide")
+        XCTAssertEqual(rise.systemImage, "arrow.up.right")
+        let fall = tideRatePeakStop(TideRatePoint(time: t0, rate: -0.7))
+        XCTAssertEqual(fall.label, "Fastest fall")
+        XCTAssertEqual(fall.systemImage, "arrow.down.right")
+    }
+
+    /// The lead explains the yellow line: the rate, direction first, in the
     /// station's height unit per hour, and nothing at all below the ramp's
     /// first anchor.
-    func testFastTideCommentaryNamesTheRate() {
-        XCTAssertNil(tideRateCommentary(rate: 0.3, imperial: true))
-        XCTAssertNil(tideRateCommentary(rate: -0.59, imperial: false))
-        XCTAssertEqual(tideRateCommentary(rate: 0.6, imperial: false), "Rising 0.60 m/hr")
-        XCTAssertEqual(tideRateCommentary(rate: -1.6, imperial: true), "Falling 5.2 ft/hr")
+    func testFastTideLeadNamesTheRate() {
+        XCTAssertNil(tideRateReading(rate: 0.3, imperial: true))
+        XCTAssertNil(tideRateReading(rate: -0.59, imperial: false))
+        XCTAssertEqual(tideRateReading(rate: 0.6, imperial: false), "Rising 0.60 m/hr")
+        XCTAssertEqual(tideRateReading(rate: -1.6, imperial: true), "Falling 5.2 ft/hr")
     }
 }
