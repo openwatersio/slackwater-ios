@@ -6,6 +6,59 @@ import CoreLocation
 @testable import Slackwater
 
 @MainActor final class TideShortcutTests: XCTestCase {
+    func testNamedPlaceUsesLocalThenFavoritesThenRecentsBeforeTheCatalog() throws {
+        let choices = ShortcutPlaceQuery.matches("Savannah", kind: .tide)
+        XCTAssertGreaterThanOrEqual(choices.count, 4)
+        let local = choices[3], favorite = choices[2], recent = choices[1]
+        let order = [local.id, favorite.id, recent.id]
+        let ranked = ShortcutPlaceQuery.matches("Savannah", kind: .tide, preferredIDs: order)
+        XCTAssertEqual(Array(ranked.prefix(3).map(\.id)), order)
+        let withoutLocal = ShortcutPlaceQuery.matches("Savannah", kind: .tide,
+            preferredIDs: [favorite.id, recent.id])
+        XCTAssertEqual(withoutLocal.first?.id, favorite.id)
+        let withoutFavorite = ShortcutPlaceQuery.matches("Savannah", kind: .tide, preferredIDs: [recent.id])
+        XCTAssertEqual(withoutFavorite.first?.id, recent.id)
+        let specific = ShortcutPlaceQuery.matches("Fort Pulaski", kind: .tide, preferredIDs: order)
+        XCTAssertTrue(specific.allSatisfy { $0.name == "Fort Pulaski" })
+        XCTAssertEqual(Set(ranked.map(\.id)), Set(choices.map(\.id)))
+    }
+
+    func testNamedPlaceResolutionUsesSavedListAndOnlyAFreshAuthorizedLocalPlace() throws {
+        let suite = "siri-ranking-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = LocationService.shared
+        let savedStatus = service.status, savedLocation = service.location
+        defer { service.status = savedStatus; service.location = savedLocation }
+        let local = try XCTUnwrap(StationItem.byId["noaa/8670870"])
+        let favorite = "noaa/8670678", recent = "noaa/8669277"
+        defaults.set([favorite], forKey: AppGroup.favoritesKey)
+        defaults.set([recent], forKey: AppGroup.recentsKey)
+        service.status = .authorizedWhenInUse
+        service.location = CLLocation(latitude: local.latitude, longitude: local.longitude)
+        XCTAssertEqual(ShortcutPlaceQuery.resolveMatches("Savannah", kind: .tide, defaults: defaults).map(\.id), [local.id])
+        service.status = .denied
+        XCTAssertEqual(ShortcutPlaceQuery.resolveMatches("Savannah", kind: .tide, defaults: defaults).map(\.id), [favorite])
+        defaults.removeObject(forKey: AppGroup.favoritesKey)
+        XCTAssertEqual(ShortcutPlaceQuery.resolveMatches("Savannah", kind: .tide, defaults: defaults).map(\.id), [recent])
+        service.status = .authorizedWhenInUse
+        service.location = CLLocation(coordinate: .init(latitude: local.latitude, longitude: local.longitude),
+            altitude: 0, horizontalAccuracy: 10, verticalAccuracy: 10,
+            timestamp: Date.now.addingTimeInterval(-601))
+        XCTAssertEqual(ShortcutPlaceQuery.resolveMatches("Savannah", kind: .tide, defaults: defaults).map(\.id), [recent])
+        defaults.removeObject(forKey: AppGroup.recentsKey)
+        XCTAssertGreaterThan(ShortcutPlaceQuery.resolveMatches("Savannah", kind: .tide, defaults: defaults).count, 1)
+    }
+
+    func testNamedPlaceBestGuessUsesMatchingQualityThenDistance() throws {
+        let local = try XCTUnwrap(StationItem.byId["noaa/8670870"])
+        let choices = ShortcutPlaceQuery.matches("Savannah", kind: .tide,
+            near: (local.latitude, local.longitude))
+        XCTAssertEqual(choices.first?.name, "Savannah")
+        let regionMatches = choices.filter { $0.searchRank("savannah") == 1 }
+        XCTAssertEqual(regionMatches.first?.id, local.id)
+    }
+
     func testDatedCurrentCardDoesNotCountDownFromAFutureMidnight() throws {
         let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
         defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
