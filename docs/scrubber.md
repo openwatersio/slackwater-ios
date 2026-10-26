@@ -394,7 +394,7 @@ The visual label uses the same selected-time-relative order at now and while pla
 High ↑ 28m
 Low ↓ 3h 28m
 Slack →|← 1h 12m
-Max flood → 28m
+Max flood 28m
 Sunset ☀︎↓ 2h 5m
 ```
 
@@ -404,11 +404,10 @@ The marks above represent SF Symbols, not translated glyphs, drawn between the l
 | --- | --- |
 | High, Low | `arrow.up`, `arrow.down` |
 | Slack | `arrow.right.and.line.vertical.and.arrow.left` |
-| Flood, Max flood | `arrow.forward` |
-| Ebb, Max ebb | `arrow.backward` |
+| Max flood, Max ebb | None |
 | Sunrise, Sunset | `sunrise`, `sunset` |
 
-Fast-tide commentary has no symbol.
+Max flood and max ebb commentary have no symbol; the current reading and curve carry the set arrows. Fast-tide commentary has no symbol.
 
 The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
 

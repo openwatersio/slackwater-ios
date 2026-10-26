@@ -855,7 +855,7 @@ func commentaryEventStop(_ label: String, at time: Date,
                          prefix: String = "") -> CommentaryStop {
     let visible: String
     let spoken: String
-    let systemImage: String
+    let systemImage: String?
     switch label {
     case "Sunrise": (visible, spoken, systemImage) = (String(localized: "Sunrise", comment: "Next-event label."), String(localized: "Sunrise", comment: "VoiceOver next-event label."), "sunrise")
     case "Sunset": (visible, spoken, systemImage) = (String(localized: "Sunset", comment: "Next-event label."), String(localized: "Sunset", comment: "VoiceOver next-event label."), "sunset")
@@ -863,8 +863,8 @@ func commentaryEventStop(_ label: String, at time: Date,
     case "Slack window": (visible, spoken, systemImage) = (String(localized: "Slack window", comment: "Current event: the water slows under the person's slack-window speed."), String(localized: "Slack window", comment: "Current event: the water slows under the person's slack-window speed."), "arrow.right.and.line.vertical.and.arrow.left")
     // The glyph tells the closing from the opening, so the visible label stays as short as the opening's.
     case "Slack window closes": (visible, spoken, systemImage) = (String(localized: "Slack window", comment: "Current event: the water slows under the person's slack-window speed."), String(localized: "Slack window closes", comment: "VoiceOver current-event label: the water speeds up past the person's slack-window speed."), "arrow.left.and.line.vertical.and.arrow.right")
-    case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), "arrow.forward")
-    case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
+    case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), nil)
+    case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), nil)
     default: return CommentaryStop(time: time, label: prefix + label, spokenLabel: label)
     }
     // The prefix is the printed provisional tilde, which VoiceOver would read as a word.

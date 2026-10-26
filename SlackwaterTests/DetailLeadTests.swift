@@ -88,13 +88,13 @@ import SlackwaterKit
         )
     }
 
-    func testEveryCommentaryEventUsesItsOwnSymbolAndFullSpokenLabel() throws {
-        let currentCases: [(scrub: Date, label: String, spoken: String, symbol: String)] = [
-            (at(-100), "Max flood", "Maximum flood current", "arrow.forward"),
+    func testCommentaryEventsUseAppropriateSymbolsAndFullSpokenLabels() throws {
+        let currentCases: [(scrub: Date, label: String, spoken: String, symbol: String?)] = [
+            (at(-100), "Max flood", "Maximum flood current", nil),
             (at(10), "Slack window", "Slack window", "arrow.right.and.line.vertical.and.arrow.left"),
             (at(3000), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
             (at(3600), "Slack window", "Slack window closes", "arrow.left.and.line.vertical.and.arrow.right"),
-            (at(4300), "Max ebb", "Maximum ebb current", "arrow.backward"),
+            (at(4300), "Max ebb", "Maximum ebb current", nil),
         ]
 
         for expected in currentCases {
@@ -311,7 +311,6 @@ import SlackwaterKit
             CommentaryContent(
                 label: "~Max flood",
                 duration: "1m",
-                systemImage: "arrow.forward",
                 accessibilityLabel: "Maximum flood current in 1 minute"
             )
         )
