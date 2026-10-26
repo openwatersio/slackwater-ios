@@ -51,7 +51,7 @@ struct SlackwaterApp: App {
                 .preferredColorScheme(.dark)
                 // The SwiftUI half of `-uiTestQuiet`: `setAnimationsEnabled`
                 // above governs UIKit's own transitions, not SwiftUI's.
-                .transaction { if uiTestQuiet { $0.disablesAnimations = true } }
+                .transaction { @Sendable in if uiTestQuiet { $0.disablesAnimations = true } }
         }
     }
 }
