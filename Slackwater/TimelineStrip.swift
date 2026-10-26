@@ -274,7 +274,7 @@ struct TimelineData {
     let slackWindows: [(slack: Date, start: Date, end: Date)]
     /// Slack itself inside each window: the same measurement around the same
     /// slack, at `slackCoreThresholdKn(slackThreshold)`. The green marks and
-    /// the lead's Slack come from these; the window's yellow from the windows.
+    /// the lead's Slack come from these; the window's blue from the windows.
     var slackCores: [(slack: Date, start: Date, end: Date)] = []
     /// The setting used to build `slackWindows`, retained so the chart cannot
     /// render a different threshold than the duration it reports.

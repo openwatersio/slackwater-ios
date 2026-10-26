@@ -174,7 +174,7 @@ station kind, `lead: 0` and no sun window:
 | Station kind | Events |
 |---|---|
 | Tide | every high and every low, plus lunar eclipse first contact |
-| Current, or a fitted current gate | each slack window, one event spanning open to close at the user's comfort speed, plus first contact |
+| Current, or a fitted current gate | each slack window, one event spanning open to close at the user's comfort speed, plus first contact; with the comfort current Off, each slack at its instant |
 | Derived gate | each slack, plus first contact |
 | Online gate | not offered (§8) |
 

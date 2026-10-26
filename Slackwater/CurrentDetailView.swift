@@ -288,14 +288,15 @@ struct CurrentDetailView: View {
         guard let standing = l.standing, let e = l.nextMaxEvent, let value = l.nextMax?.value
         else { return nil }
         let place = record.name, months = standings.months(e.kind), tz = tz, now = live
-        let windows = tl.slackWindows
+        // Slack itself, which the sentence names and which survives the window being off.
+        let slackRuns = tl.slackCores
         let direction = e.kind == .maxFlood
             ? String(localized: "Flood", comment: "Current direction, used in a sentence.")
             : String(localized: "Ebb", comment: "Current direction, used in a sentence.")
         return {
             AnyView(MaxDetailSheet(value: value, direction: direction, place: place,
                                    standing: standing, months: months,
-                                   slackWindows: windows, maximumAt: e.time,
+                                   slackRuns: slackRuns, maximumAt: e.time,
                                    tz: tz, now: now, onJump: jump))
         }
     }

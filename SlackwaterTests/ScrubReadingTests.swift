@@ -48,6 +48,16 @@ final class ScrubReadingTests: XCTestCase {
         XCTAssertEqual(r.unit, "kn")
     }
 
+    /// The Crown says Slack exactly where the strip draws slack, so weak water off a slack is still moving.
+    func testSlackIsTheStripsSlack() throws {
+        let tl = try current()
+        for minute in stride(from: 0, through: 24 * 60, by: 5) {
+            let t = at.addingTimeInterval(Double(minute) * 60)
+            let r = ScrubReading.at(t, in: tl, imperial: true, speedUnit: "kn")
+            XCTAssertEqual(r.title == CurrentPhase.slack.word, tl.isSlack(at: t), "at +\(minute) min")
+        }
+    }
+
     func testSchematicCurrentHasNoValue() throws {
         var tl = try current()
         tl.speedsAreSchematic = true

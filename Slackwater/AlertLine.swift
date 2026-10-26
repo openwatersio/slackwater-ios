@@ -59,7 +59,8 @@ func alertLineLabel(_ state: AlertLineState, offer: AlertTrigger, tz: TimeZone, 
         date.formatted(Date.FormatStyle(timeZone: tz).weekday(.abbreviated).hour().minute().locale(locale))
     }
     func lowered(_ s: String) -> String { s.prefix(1).lowercased() + s.dropFirst() }
-    let event = lowered(alertEventName(offer, imperial: imperial))
+    // With the window off, the slack-window alert fires at slack and says so.
+    let event = lowered(alertEventName(offer, noWindow: slackWindowIsOff(slackThresholdKn), imperial: imperial))
     switch state {
     case .rest:
         return String(localized: "Set an alert", comment: "The line under the timeline, at rest.")

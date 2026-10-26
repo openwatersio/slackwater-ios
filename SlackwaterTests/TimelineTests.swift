@@ -1432,6 +1432,10 @@ private struct FoldPageTestHarness: View {
     /// Window edges are labelled as the start/end of the usable window, so
     /// they need to be valid stops too.
     func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
+        // The comfort current is shared App Group state; Off would leave no windows to test.
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
         let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
         let d = TimelineData.build(tide: nil, current: victoria, now: Date(), anchor: todayLocal(victoria.tz))
         let stops = Set(d.snapTimes)

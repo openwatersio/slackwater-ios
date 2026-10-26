@@ -55,7 +55,7 @@ let PIN_HALO: Double = 1.5
 // (Task 5), so kind (which layer a pin lands in) cannot influence colour.
 //
 // #13: a speed-bearing current pin's state IS a colour literal — the #97 ramp
-// darkened for land contrast, or go inside the slack window — which the
+// darkened for land contrast, or go at slack — which the
 // to-color head renders as itself. Named states (tide rising/falling, and
 // flood/ebb/slack for the one speed-less kind, derived gates — "No speed
 // exists to show", ChsGate.swift) fall through to the match. Anything else

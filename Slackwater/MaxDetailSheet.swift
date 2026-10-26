@@ -20,8 +20,8 @@ struct MaxDetailSheet: View {
     var standing: PeakStanding? = nil
     /// Twelve months of signed monthly extremes: flood above, ebb below.
     var months: [YearFigure.Month] = []
-    /// The loaded timeline's slack windows, for what this maximum costs.
-    var slackWindows: [(slack: Date, start: Date, end: Date)] = []
+    /// The loaded timeline's slack runs, for what this maximum costs.
+    var slackRuns: [(slack: Date, start: Date, end: Date)] = []
     var maximumAt: Date = .now
     var tz: TimeZone = .current
     var now: Date = .now
@@ -89,7 +89,7 @@ struct MaxDetailSheet: View {
     /// The ranking in words, then what it costs at slack — the fact that is
     /// this sheet's own, and the reason to open it rather than read the tile.
     @ViewBuilder private var facts: some View {
-        let items = [rankFact, slackFact(windows: slackWindows, around: maximumAt)].compactMap { $0 }
+        let items = [rankFact, slackFact(windows: slackRuns, around: maximumAt)].compactMap { $0 }
         VStack(alignment: .leading, spacing: 10) {
             ForEach(items, id: \.text) { fact in
                 if let to = fact.jumpTo, let onJump {

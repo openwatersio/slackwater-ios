@@ -176,6 +176,6 @@ func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: B
 
 /// "Race Passage - Slack window": the place, then the event — the same shape calendar events
 /// and notifications are titled with.
-func alertRuleSummary(_ trigger: AlertTrigger, stationName: String, imperial: Bool) -> String {
-    "\(stationName) - \(alertEventName(trigger, imperial: imperial))"
+func alertRuleSummary(_ trigger: AlertTrigger, stationName: String, noWindow: Bool = false, imperial: Bool) -> String {
+    "\(stationName) - \(alertEventName(trigger, noWindow: noWindow, imperial: imperial))"
 }

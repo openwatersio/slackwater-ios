@@ -86,7 +86,7 @@ struct ComplicationLine: View {
                 context.stroke(zero, with: .color(.primary.opacity(pastOpacity)),
                                style: StrokeStyle(lineWidth: line / 2, dash: [line, line]))
             }
-            let ink: Color = mode == .fullColor ? slackColor : .primary
+            let ink: Color = mode == .fullColor ? (reading.runsAreSlack ? SN.go : slackColor) : .primary
             for run in reading.slackRuns {
                 let part = pts.filter { run.contains($0.hours) }
                 for (half, opacity) in [(part.filter { $0.hours <= 0 }, pastOpacity),

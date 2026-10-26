@@ -225,7 +225,8 @@ is; they must not out-shout the thing the reader came for.
   reader can check any moment against it. They claim nothing about time.
 - **The inked run** — when it is actually happening: the curve itself,
   overdrawn in blue between the crossings, and in the go colour across the
-  slack inside it. Outside every window the line is the ramp's yellow floor.
+  slack inside it. Outside every window the line is the ramp's yellow floor,
+  including weak water that eases under the limit without turning (§6.1).
 
 Drawing the run **on** the water rather than behind it is what stops it
 over-claiming. A peak rising past the threshold breaks the run, and two windows
@@ -689,7 +690,7 @@ every mark that only earns its place at scale. The card and the widget are
   clear of each canvas edge, and in time order drops a time less than
   48 pt after the last one kept, so two marks close together print one
   time rather than two over each other.
-- **Colour is state** (§6): yellow over the limit, blue for the window, the go colour
+- **Colour is state** (§6): yellow outside the window, blue for the window, the go colour
   for slack, and
   nothing coloured by direction on the line or the marks. The card's fill is
   the detail's: blue beneath the curve in each flood lobe, fading to clear at
