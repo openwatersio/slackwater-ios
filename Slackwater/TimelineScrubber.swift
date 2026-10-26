@@ -874,7 +874,7 @@ struct TimelineScrubStrip: View {
     var spokenLead = ""
     /// The next significant event from the scrub, and the scrub to it.
     var commentary: CommentaryContent? = nil
-    /// The commentary's ink when it is a warning rather than a next event.
+    /// The commentary's ink when its stop is a warning.
     var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
     /// Infinite-strip plumbing, nil on a fixed window: the store's scroll

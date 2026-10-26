@@ -331,7 +331,7 @@ Its anatomy is:
 
 The lead prints the station-local date and clock without a weekday or relative day word: the locale's abbreviated month and day, a fixed ` · `, then the locale's hour and minute. Date order, month names, clock cycle, and meridiem follow the platform locale; the ` · ` separator is not localized. A figure space pads a one-digit hour when the locale uses one, keeping the centred tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same localized time style without the date or padding.
 
-The lead is a centred column overlaid at the top of the strip, and it takes no touches (§6.3): 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and set 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink. The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
+The lead is a centred column overlaid at the top of the strip, and it takes no touches (§6.3): 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and set 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink, except a fast tide's rate (§9.1). The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
 
 VoiceOver reads the lead as one combined element: the state word, the set (compass point or bearing) on a measured current outside slack, the value without a provisional `~` (§9.2), and the unit. The eyebrow glyph is hidden from VoiceOver, because the word and the set already say what it shows and a set arrow's symbol name is its unrotated one. The date and clock are its value, with the padding figure space removed.
 
@@ -341,11 +341,20 @@ The tide value is the engine-exact height at `selectedTime`, not the graph's ten
 
 Within one second of an extreme, the state is `High` or `Low` with `arrow.up.to.line` or `arrow.down.to.line`. Otherwise the state is `Rising` or `Falling` with `arrow.up.right` or `arrow.down.right`. Direction comes from the next extreme (rising toward a high), or from the sign of the sampled rate on a CHS tide preview, and defaults to rising when no later extreme is loaded.
 
+When the absolute tide rate at `selectedTime`, linearly interpolated from the ten-minute rate series, reaches 0.6 m/hour, the state carries the rate and explains the warm-coloured curve under it, with tabular digits, its direction from the rate's sign:
+
+```text
+Rising 0.60 m/hr
+Falling 5.2 ft/hr
+```
+
+The rate text takes the rate-ramp colour lifted toward white: at least a quarter of the way, then in 5% steps until it reaches 4.5:1 contrast against the sky's horizon colour composited over the canvas at the sky's opacity (§14), the brightest ground the lead can sit on. The ramp's red end is unreadable against a sunrise. Where no step reaches 4.5:1, the ink is white. VoiceOver reads the unit in words: the lead as `Rising, 2.3 feet per hour, 4.2 feet`, and the strip's value as `Rising 4.2 feet, 2.3 feet per hour`.
+
 Glyph colour:
 
 - high/rising uses the high teal;
 - low/falling uses the low amber; and
-- while the absolute rate is at least 0.6 m/hr, the glyph takes the fast-tide commentary's ink instead: the rate-ramp colour lifted toward white for the sky behind the pill row (§10.1).
+- while the absolute rate is at least 0.6 m/hr, the glyph takes the rate text's ink instead.
 
 ### 9.2 Measured-current lead
 
@@ -403,28 +412,22 @@ The marks above represent SF Symbols, not translated glyphs, drawn between the l
 | Stop | Symbol |
 | --- | --- |
 | High, Low | `arrow.up`, `arrow.down` |
+| Fastest rise, Fastest fall | `arrow.up.right`, `arrow.down.right` |
 | Slack | `arrow.right.and.line.vertical.and.arrow.left` |
 | Max flood, Max ebb | None |
 | Sunrise, Sunset | `sunrise`, `sunset` |
 
-Max flood and max ebb commentary have no symbol. The current reading and curve show bearing arrows where a set bearing is available. Fast-tide commentary has no symbol.
+Max flood and max ebb commentary have no symbol. The current reading and curve show bearing arrows where a set bearing is available.
 
 The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
 
-All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Every candidate, water or sun, is the first stop more than one second after the selection, so landing on a stop advances the pill, and it must lie between the first and last drawn sample: water events kept beyond the strip for event search and sun events from day chrome beyond the data never count. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop, and activation moves there by §8. When a sun event and a water stop share an instant, the sun event is named. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
+All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Every candidate, water or sun, is the first stop more than one second after the selection, so landing on a stop advances the pill, and it must lie between the first and last drawn sample: water events kept beyond the strip for event search and sun events from day chrome beyond the data never count. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop, and activation moves there by §8. When a sun event and a water stop share an instant, the sun event is named. Commentary is absent when there is no applicable later target.
 
 #### Tide commentary
 
-Ordinarily name the next extreme (`High …` or `Low …`) or an earlier `Sunrise …` or `Sunset …`.
+Name the next extreme (`High …` or `Low …`), a fast run's peak before it (`Fastest rise …` or `Fastest fall …`), or an earlier `Sunrise …` or `Sunset …`.
 
-When the absolute tide rate, linearly interpolated from the ten-minute rate series, reaches 0.6 m/hour, commentary instead explains the warm-coloured curve at the selected instant:
-
-```text
-Rising 0.60 m/hr
-Falling 5.2 ft/hr
-```
-
-Tint this text, and the lead glyph above it, with the rate-ramp colour lifted toward white: at least a quarter of the way, then in 5% steps until it reaches 4.5:1 contrast against the sky's horizon colour composited over the canvas at the sky's opacity (§14), the brightest ground the pill row can sit on. The ramp's red end is unreadable against a sunrise. Where no step reaches 4.5:1, the ink is white. It has no countdown, and its accessible label is the visible text. Activating it moves forward to the fastest-rate point of the current rising or falling run, before its next high or low tide. Once within one second of that peak or past it, activation moves directly to that high or low tide, even when sunrise or sunset comes first. The rate remains visible while the tide is fast. A peak from another run or outside the drawn samples is never a target.
+A rising or falling run whose rate reaches 0.6 m/hour is one stop, at its fastest-rate point, the same instant §7 snaps to. It is named from anywhere before it, including the preceding turn, and once the selection is within one second of it or past it, the run's high or low is next. The pill names the moment, not the rate, which is the lead's (§9.1). It still leads to a warning, so its text and glyph take the ramp colour of the peak's rate, lifted as in §9.1; every other stop keeps the chrome ink. VoiceOver reads `Fastest rising tide in 25 minutes`.
 
 #### Current commentary
 
@@ -774,7 +777,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 ### Track meaning
 
 16. **Tide turn:** At an exact high, the lead says High, the high's reading hangs below its dot, and the commentary advances to the following event.
-17. **Fast tide:** At 0.6 m/hr or faster, the line and commentary share the same ramp position. Activation goes forward to that run's fastest point, then directly to its high or low tide. A selection within one second of the peak, or past it, goes directly to the turn. Sunrise or sunset between the peak and turn cannot send a later tap back to the peak. The rising or falling rate remains visible while fast.
+17. **Fast tide:** At 0.6 m/hr or faster, the lead's state carries the rate in the ramp's lifted colour, with the glyph. A run that reaches that rate has one commentary stop, `Fastest rise` or `Fastest fall` at its fastest point in the peak rate's lifted ramp colour, named until the selection reaches it; the run's high or low, or an earlier sunrise or sunset, is next after that. A passed peak is never named again.
 18. **Measured slack window:** The curve is yellow outside the slack windows, graph blue across interpolated window edges, and green only across the slack run inside it; the lead says Flooding or Ebbing inside the window, Slack at the slack run's opening, and changes phase at its half-open closing, and outside a slack run says Slack only within a second of a slack no run covers (§9.2). At a weak station whose window covers a maximum, the lead says Max flood or Max ebb on it.
 19. **Short slack window:** A fast reversal whose bracketing samples both exceed the threshold still has a window, interpolated where the line between them crosses ±threshold; a merged window narrower than a turn dot is not drawn, and a slack run that narrow draws as the shortest slack stroke, and its centre is its event time, its only magnetic target, and its one commentary stop. A slack with no run, at a sampled-series edge, between two same-sign samples, or at a minimum that never gets under the slack speed, draws the same stroke centred on its own instant, with the same single time, target, and stop, and the lead says Slack parked on it. When the engine's slack falls just outside the line's ±threshold span, the window widens to hold it, with a separate stroke, time, magnetic target, and Slack commentary stop when the slack is exactly at the half-open closing.
 20. **Different current peaks:** Equal speeds have equal thread colours across stations; a 6 kn and 12 kn peak do not both become local “maximum red.”
@@ -794,7 +797,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
 29. **Plot tap:** A tap selects its moment or a magnetic target strictly within 4.5 units and rides to a reachable centre time, holding left-edge chunk publishes until it lands.
 30. **Date or sun tap:** A tap nearer the drawn date than any sun time stops motion and opens the picker where the host can change dates; a sun tap centres that event.
-31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
+31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. A fast run's peak is a water stop like any other.
 32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
 33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it. Either way, when the refreshed now falls on a new station-local day, the Today, Tomorrow, and Yesterday labels move with it.
 34. **Far destination:** A shared link opens at its requested instant, and a picked week at station-local noon of the picked day unless the selection already lies inside that week's window, with data on both sides. A picked day, link, or Now within seven days of travel rides there; over seven days it lands without travel. Now restores the current schedule.
@@ -822,7 +825,7 @@ The living implementation is split by responsibility:
 | Lead card, commentary pill and stop walk, lead clock, sky state and backdrop | `Slackwater/DetailPieces.swift` |
 | Colour tokens, curve style, station-local clock formatting | `Slackwater/Palette.swift` |
 | Shared current lead and direct commentary walk | `Slackwater/CurrentLead.swift` |
-| Tide lead and fast-rate commentary; Canadian tide preview binding and its sample model (coverage, interpolation, rates, extremes) | `Slackwater/TideDetailView.swift`, `Slackwater/ChsTidePreview.swift` |
+| Tide lead and its fast-rate reading, tide commentary stops; Canadian tide preview binding and its sample model (coverage, interpolation, rates, extremes) | `Slackwater/TideDetailView.swift`, `Slackwater/ChsTidePreview.swift` |
 | Predicted-current binding (harmonic, subordinate, and fitted) | `Slackwater/CurrentDetailView.swift` |
 | Derived phase-only lead | `Slackwater/DerivedGateDetailView.swift` |
 | Online sampled-current binding | `Slackwater/OnlineGateDetailView.swift` |

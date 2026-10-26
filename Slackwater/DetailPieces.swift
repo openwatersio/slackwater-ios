@@ -922,9 +922,8 @@ func nextCommentaryStop(_ water: CommentaryStop?,
 /// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
     let content: CommentaryContent?
-    /// Set when the text is a warning about the scrub instant — a fast tide —
-    /// rather than the next event; the ramp's colour, so the pill explains
-    /// the line under it.
+    /// Set when the stop is a warning — a fast tide's peak — rather than an
+    /// ordinary event; the ramp's colour at that peak.
     var tint: Color? = nil
     var ink: Color = SN.foam
     let onTap: () -> Void

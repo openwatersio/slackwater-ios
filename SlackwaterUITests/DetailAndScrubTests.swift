@@ -663,17 +663,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         return values[0]
     }
 
-    /// Over a fast tide the pill explains the yellow line: the rate, in the
-    /// ramp's colour, instead of the next turn. Landing on a turn first (the
-    /// commentary tap) and then dragging about three hours on puts the scrub
-    /// mid-run, near the run's fastest point, so the pill reads the rate.
+    /// A fast run is one commentary stop at its fastest point, and the rate
+    /// is the lead's. Walking the pill from now reaches a `Fastest rise` or
+    /// `Fastest fall` within a turn and a sun event; tapping it parks on the
+    /// peak, where the lead names the rate and the pill moves on to the next
+    /// event instead of naming the peak again.
     ///
-    /// Eastport, not Boston: the pill names a rate only once it clears the
-    /// ramp's first anchor (0.6 m/hr — slower, it names the next stop).
-    /// Boston's weaker limb dips under the anchor at neaps; Eastport's
-    /// worst-case limb (M2 − S2 − N2) stays well over it, any day of the
-    /// lunar month.
-    func testFastTideCommentaryNamesTheRate() throws {
+    /// Eastport, not Boston: a run is a stop only once it clears the ramp's
+    /// first anchor (0.6 m/hr). Boston's weaker limb dips under the anchor at
+    /// neaps; Eastport's worst-case limb (M2 − S2 − N2) stays well over it,
+    /// any day of the lunar month.
+    func testFastTidePeakIsOneStopAndTheLeadNamesTheRate() throws {
         let app = launch("-networkKillSwitch")
         openSearch(app, "eastport")
         pickSearchResult(app, app.staticTexts["Eastport"].firstMatch)
@@ -681,45 +681,27 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(strip.appears(within: 10))
         settleLayout(strip)
         let pill = commentaryPill(app)
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "no commentary pill on the Eastport detail")
+        let namesThePeak = #"^Fastest (rising|falling) tide in "#
+        let namesTheRate = #"^(Rising|Falling), \d+(\.\d+)? (feet|metres) per hour, "#
+        // Turn, sunrise, sunset, then the peak at the latest: four stops.
+        var steps = 0
+        while true {
+            XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                      "no commentary pill on the Eastport detail")
+            if pill.label.range(of: namesThePeak, options: .regularExpression) != nil { break }
+            steps += 1
+            guard steps <= 4 else { return XCTFail("the pill never named a fast run's peak: '\(pill.label)'") }
+            pill.tap()
+            settleScrub(app)
+        }
         pill.tap()
         settleScrub(app)
-        // The tap's destination depends on the water at "now": already fast,
-        // it goes to the run's peak — the pill reads the rate and there is
-        // nothing left to stage. Quiet, it parks on the next TURN, and
-        // mid-run is a drag away. The hold releases the drag at rest: a
-        // flicked release keeps UIScrollView momentum, which carries the
-        // scrub about a half-cycle on, toward the next turn — slack water.
-        //
-        // That drag is measured in POINTS, never as a fraction of the strip
-        // (#289): a fraction's hours change with the device's width. Three
-        // hours is about a quarter-cycle from a turn, which is where a
-        // semidiurnal run runs fastest — the run Eastport always grows (the
-        // doc comment above). The points per hour are the app's own and a UI
-        // test cannot link them, so they are spelled out here and the move is
-        // asserted below rather than trusted.
-        let pointsPerHour: CGFloat = 18     // Timeline.pph
-        let dragHours: CGFloat = 3
-        let namesTheRate = #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#
-        if pill.label.range(of: namesTheRate, options: .regularExpression) == nil {
-            let parked = scrubClock(app)
-            let dx = dragHours * pointsPerHour / strip.frame.width
-            strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.05,
-                       thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5 - dx, dy: 0.5)),
-                       withVelocity: .default,
-                       thenHoldForDuration: 0.5)
-            settleScrub(app)
-            XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                      "the commentary did not come back after the drag")
-            // Without this, a drag that never moved the scrub reads below as
-            // "the commentary is wrong" rather than "the scrub never moved".
-            XCTAssertNotEqual(scrubClock(app), parked,
-                              "the drag did not move the scrub — it is still parked on \(parked)")
-        }
-        XCTAssert(pill.label.range(of: namesTheRate, options: .regularExpression) != nil,
-                  "over a fast tide the commentary names the rate: '\(pill.label)'")
+        XCTAssert(leadReading(app).label.range(of: namesTheRate, options: .regularExpression) != nil,
+                  "on the peak the lead names the rate: '\(leadReading(app).label)'")
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the peak")
+        XCTAssertNil(pill.label.range(of: namesThePeak, options: .regularExpression),
+                     "on the peak the pill names the next event, not the peak: '\(pill.label)'")
         save(app, "fast-tide-commentary.png")
     }
 

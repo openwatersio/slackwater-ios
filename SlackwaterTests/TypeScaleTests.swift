@@ -121,9 +121,9 @@ extension TypeScaleTests {
             // monospacedDigit. `dimensionLabel` is its own one-line
             // declaration so this key names what the walk computes.
             "StandingFigure.swift:dimensionLabel",
-            // The fast tide's rate, consumed by `Commentary`'s Text, which
-            // carries the mono trait (Theme.swift).
-            "TideDetailView.swift:tideRateCommentary",
+            // The fast tide's rate, consumed by the tide lead's eyebrow
+            // Text, which carries `.monospacedDigit()`.
+            "TideDetailView.swift:tideRateReading",
             // The nearby link's distance: formatted in NearbyStationLink's
             // body and consumed by `BranchLink`'s one Text, which carries
             // the mono trait (Theme.swift).
@@ -182,6 +182,9 @@ extension TypeScaleTests {
         let knownNonVisual: Set<String> = [
             // The strip's VoiceOver value: the lead in words.
             "TideDetailView.swift:spokenLead",
+            // A fast tide's rate in words, for the lead's and the strip's
+            // VoiceOver labels; the visible rate is `tideRateReading`.
+            "TideDetailView.swift:spokenTideRate",
             "CurrentLead.swift:spoken",
             // Alert copy is shown by Notification Center and Calendar, never by a Text of
             // ours. The call lives in `alertCopy`, whose signature spans two lines, so the
