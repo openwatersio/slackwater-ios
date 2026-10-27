@@ -56,6 +56,10 @@ struct PremiumPurchaseControls: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    // Canvas ink on the leaf fill, as the Settings CTA wears.
+                    // The sheet's foam otherwise rides the fill at 2.0:1;
+                    // canvas measures 8.1:1 (slackwater-feedback#23).
+                    .foregroundStyle(SN.canvas)
                     .disabled(purchasing)
                 }
                 if let purchaseError {
