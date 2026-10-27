@@ -78,8 +78,7 @@ nonisolated struct StationCardGraph: View {
         /// The number with its unit, for VoiceOver only.
         let spokenText: String
         let timeText: String
-        /// High tide / max flood (vs low / max ebb) — picks the dot tint
-        /// (teal vs amber) and the direction the reading hangs.
+        /// High tide / velocity crest (vs low / trough) — picks the tide dot tint and the reading's side.
         let high: Bool
         /// A current extreme's set bearing. When present the pointer is the
         /// set arrow (↑ rotated to the bearing, "water goes this way")
@@ -143,8 +142,7 @@ nonisolated struct StationCardGraph: View {
         slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour)
     }
 
-    /// Which way a reading hangs from its dot (+1 down, −1 up): toward the plot middle, unless
-    /// that side runs off the plot, where it would land on the card's identity rows or its axis times.
+    /// Keep the reading on its preferred side unless it would land on the identity rows or axis times.
     static func hangToward(dotY: CGFloat, high: Bool, plotHeight: CGFloat) -> CGFloat {
         if high { return dotY + hangReach > plotHeight ? -1 : 1 }
         return dotY - hangReach < 0 ? 1 : -1
@@ -290,8 +288,7 @@ nonisolated struct StationCardGraph: View {
                 let ink = SN.foam.opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
                 let isCurrent = e.isCurrent
-                // A tide turn is the event and gets a dot; a current peak is
-                // context inside its lobe and does not.
+                // A tide turn is the event and gets a dot; a current peak is context and does not.
                 if !isCurrent {
                     CurveDrawing.dot(context, at: dotAt, color: tint)
                 }
@@ -313,10 +310,7 @@ nonisolated struct StationCardGraph: View {
                     let reading = Self.hangingInk(below: dotAt, valueWidth: valueWidth)
                     if axisTimes.contains(where: { $0.ink.intersects(reading) }) { continue }
                 }
-                // The reading hangs off the turn toward the plot middle with
-                // its pointer nearest the dot (current-charts §15.1). The set
-                // arrow wears the reading's ink, not a direction colour. No
-                // unit: the card's reading states it once.
+                // The card's reading carries the unit; the set arrow shares the value's ink (current-charts §15.1).
                 let glyph: HangGlyph = if let flow = e.flow {
                     .flow(flood: flow == .flood)
                 } else if let deg = e.deg {
@@ -414,6 +408,15 @@ func cardCores(points: [CurrentPoint], slacks: [Date], threshold: Double = slack
     cardWindows(points: points, slacks: slacks, threshold: slackCoreThresholdKn(threshold))
 }
 
+func cardSpeed(_ points: [CurrentPoint], at time: Date) -> Double? {
+    guard let first = points.first, let last = points.last,
+          time >= first.time, time <= last.time else { return nil }
+    guard let i = points.firstIndex(where: { $0.time >= time }), i > 0 else { return first.speed }
+    let a = points[i - 1], b = points[i]
+    let fraction = time.timeIntervalSince(a.time) / b.time.timeIntervalSince(a.time)
+    return a.speed + (b.speed - a.speed) * fraction
+}
+
 extension TideStationRecord {
     func cardGraph(at now: Date, imperial: Bool) -> StationCardGraph {
         cardGraph(at: now, imperial: imperial, station: engineStation)
@@ -460,13 +463,14 @@ extension CurrentStationRecord {
             points: raw.map { .init(time: $0.time, value: $0.speed) },
             extremes: events
                 .filter { $0.kind != .slack }
-                .map {
-                    .init(time: $0.time, value: $0.speed,
-                          valueText: "\(tilde ? "~" : "")\(formatSpeed(abs($0.speed), unit: unit))",
-                          spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
-                          timeText: cardTime($0.time, tz),
-                          high: $0.kind == .maxFlood,
-                          deg: setDegrees(signed: $0.speed))
+                .map { event in
+                    let before = cardSpeed(raw, at: event.time.addingTimeInterval(-StationCardGraph.sampleStep)) ?? event.speed
+                    return .init(time: event.time, value: event.speed,
+                                 valueText: "\(tilde ? "~" : "")\(formatSpeed(abs(event.speed), unit: unit))",
+                                 spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs(event.speed), unit: unit)) \(speedUnitLabel(unit))",
+                                 timeText: cardTime(event.time, tz),
+                                 high: maxHangToward(speed: event.speed, before: before) > 0,
+                                 deg: setDegrees(signed: event.speed))
                 },
             now: now,
             forward: end.timeIntervalSince(now),
@@ -483,20 +487,22 @@ extension ChsOnlineWindow {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let tz = TimeZone(identifier: timezone) ?? .current
-        let raw = points.filter { $0.time >= start && $0.time <= end }
-        let events = sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        let samples = points
+        let raw = samples.filter { $0.time >= start && $0.time <= end }
+        let events = sampleEvents(samples).filter { $0.time >= start && $0.time <= end }
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
             extremes: events
                 .filter { $0.kind != .slack }
-                .map {
-                    .init(time: $0.time, value: $0.speed,
-                          valueText: formatSpeed(abs($0.speed), unit: unit),
-                          spokenText: "\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
-                          timeText: cardTime($0.time, tz),
-                          high: $0.kind == .maxFlood,
-                          deg: $0.speed >= 0 ? floodDirection : ebbDirection)
+                .map { event in
+                    let before = cardSpeed(samples, at: event.time.addingTimeInterval(-StationCardGraph.sampleStep)) ?? event.speed
+                    return .init(time: event.time, value: event.speed,
+                                 valueText: formatSpeed(abs(event.speed), unit: unit),
+                                 spokenText: "\(formatSpeed(abs(event.speed), unit: unit)) \(speedUnitLabel(unit))",
+                                 timeText: cardTime(event.time, tz),
+                                 high: maxHangToward(speed: event.speed, before: before) > 0,
+                                 deg: event.speed >= 0 ? floodDirection : ebbDirection)
                 },
             now: now,
             includesZero: true,

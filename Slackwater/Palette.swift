@@ -207,7 +207,7 @@ enum CurveStyle {
     /// The dotted datum/zero reference line.
     static let referenceLineOpacity = 0.35
     static let referenceLineDash: [CGFloat] = [1, 3]
-    /// The reading hangs off a turn or peak toward the plot middle: the
+    /// The reading hangs off a turn or peak on its preferred side: the
     /// pointer glyph nearest the dot, the value beyond it. The two gaps are
     /// applied as ± around `hangOffset` in the direction the reading hangs,
     /// so neither one names a fixed screen direction. Both tracks and the

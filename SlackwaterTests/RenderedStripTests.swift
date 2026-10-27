@@ -380,7 +380,7 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
-    /// A card reading hangs toward the plot middle unless its value would leave the plot, where it hangs off the other side of its dot.
+    /// A card reading keeps its preferred side unless its value would leave the plot, where it hangs off the other side of its dot.
     func testACardReadingFlipsWhenItsSideWouldLeaveThePlot() {
         let plot: CGFloat = 108
         XCTAssertEqual(StationCardGraph.hangToward(dotY: 80, high: false, plotHeight: plot), -1, "a low hangs up, toward the middle")

@@ -258,7 +258,7 @@ absolute times belong; the chart is not a table.
 **No dot.** A peak or trough is context — what the window is measured
 against — and a dot would make it a point of interest, which is the
 tide-chart reading this whole chart exists to undo. The speed and the
-**true bearing arrow** for the set hang off the peak inside its lobe, styled
+**true bearing arrow** for the set hang below a velocity crest and above a trough, following the curve's approach, styled
 as context, not as the event.
 
 The arrow states the set. An up/down arrow would only restate which side of zero
@@ -672,7 +672,7 @@ every mark that only earns its place at scale. The card and the widget are
   strength while it is ahead, the closing at half; inside the window they
   swap. Nothing else on a current curve gets a dot.
 - **Peaks are context** (§5.4): the speed, no unit, and the set arrow hang
-  off the peak inside its lobe, toward the zero line. A reading that would
+  off the peak, below a velocity crest and above a trough, following the curve's approach with flood/ebb sign as the flat-approach fallback. A reading that would
   leave the plot that way (its value reaches about 38 pt from the peak)
   hangs off the other side instead, so it never lands on the card's name
   rows or its axis times. Values near the curve never carry a unit — the

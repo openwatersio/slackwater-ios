@@ -621,7 +621,7 @@ Each zero instant draws as a six-unit go-colour stroke along the curve, centred 
 Current maxima are drawn as context rather than as marks:
 
 - no peak dot;
-- hang the absolute speed, without unit, toward the zero line;
+- hang the absolute speed, without unit, below a velocity crest and above a trough, following the curve's approach with flood/ebb sign as the flat-approach fallback;
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
