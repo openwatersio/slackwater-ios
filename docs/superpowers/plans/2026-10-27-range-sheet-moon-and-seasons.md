@@ -1,5 +1,7 @@
 # Range Sheet: Sliding Bars, Moon Strip, Season Marks — Implementation Plan
 
+> **Status (2026-10-27):** executed; all five tasks landed on `feat/range-sheet-moon`. Two review rounds then changed what the plan describes — the gesture is a hold-then-drag, phases are searched past the window, the moon sentence is data-gated, the season band is 50 days and both months must agree, VoiceOver is adjustable. The spec and `docs/detail.md` carry the as-built behaviour; this plan is the record of the argument, not of the code.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Range and Next max sheets' fortnight bars slide-to-a-day, draw the moon phases under them, and mark the real solstices and equinoxes on the year figure with a caption that says which pair the station follows.
