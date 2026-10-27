@@ -1,5 +1,6 @@
 import XCTest
 import SlackwaterKit
+import Almanac
 @testable import Slackwater
 
 /// Section 1's figure: the day's biggest swing, for each day of the fortnight.
@@ -215,6 +216,38 @@ import SlackwaterKit
 
     /// With nowhere to go, a finger on the bars does nothing: no lit bar and
     /// no sheet closing under it.
+    /// The beat the bars show is the moon's, so each phase in the window is
+    /// drawn under the bar of the station-local day it falls on.
+    func testEachPhaseLandsOnItsDaysBar() throws {
+        let s = standing()
+        let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
+        let phases = SwingFigure.moonPhases(in: s.window)
+        XCTAssertGreaterThanOrEqual(phases.count, 3, "a 30-day window holds four phases, three at the least")
+        let marks = SwingFigure.phaseMarks(phases, peaks: peaks, tz: station.tz)
+        XCTAssertEqual(marks.count, phases.count, "every phase inside the whole days has a bar")
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        for mark in marks {
+            let phase = try XCTUnwrap(phases.first { $0.phase == mark.phase })
+            XCTAssertEqual(cal.startOfDay(for: peaks[mark.index].time), cal.startOfDay(for: phase.time))
+        }
+        XCTAssertEqual(marks.map(\.index), marks.map(\.index).sorted(), "in time order")
+    }
+
+    /// A phase on a day with no bar — the window's dropped fragment — draws
+    /// nothing rather than landing on a neighbour.
+    func testAPhaseOnADayWithoutABarDrawsNothing() throws {
+        let s = standing()
+        let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
+        let phase = try XCTUnwrap(SwingFigure.moonPhases(in: s.window).first)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let day = cal.startOfDay(for: phase.time)
+        let without = peaks.filter { cal.startOfDay(for: $0.time) != day }
+        XCTAssertEqual(without.count, peaks.count - 1, "the phase's own day had a bar to remove")
+        XCTAssertEqual(SwingFigure.phaseMarks([phase], peaks: without, tz: station.tz), [])
+    }
+
     func testWithoutAJumpTheBarsIgnoreTouches() {
         XCTAssertFalse(SwingFigure(standing: standing(), tz: station.tz).respondsToTouch)
         XCTAssertTrue(SwingFigure(standing: standing(), tz: station.tz, onJump: { _ in }).respondsToTouch)

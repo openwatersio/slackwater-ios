@@ -9,6 +9,7 @@
 // complete on its own and stays inert.
 import SwiftUI
 import SlackwaterKit
+import Almanac
 
 struct RangeDetailSheet: View {
     /// The swing itself, exactly as the tile prints it: "0.1 ft".
@@ -28,6 +29,8 @@ struct RangeDetailSheet: View {
     /// Where this swing sits among the fortnight's swings — section 1's
     /// subject, and a different judgement from `standing`'s.
     var swing: PeakStanding? = nil
+    /// The Moon's quarter phases across the swing's window, for section 1.
+    var phases: [MoonPhaseEvent] = []
     /// Twelve months of monthly extremes — section 3. Empty until the sheet's
     /// own scan lands, and empty for good where the station has no bounds.
     var months: [YearFigure.Month] = []
@@ -70,14 +73,17 @@ struct RangeDetailSheet: View {
                                 // the captions do; the figure's own Text
                                 // carries the mono trait.
                                 SwingFigure(standing: swing, tz: tz, onJump: onJump,
-                                            format: { "\(formatHeight($0, imperial: imperial)) \(unit)" })
+                                            format: { "\(formatHeight($0, imperial: imperial)) \(unit)" },
+                                            phases: phases)
                                     .accessibilityIdentifier("range-section-swings")
                                 // The bars are days and the caption counts
                                 // swings, so the series has to say which it is
                                 // — at a mixed station the marked day's
                                 // biggest swing is often not the selected one.
-                                Text("Each bar is one day's biggest swing.",
-                                     comment: "Explains the unit of the swing figure's bars.")
+                                // And the phases under them are why the bars
+                                // beat at all.
+                                Text("Each bar is one day's biggest swing. Springs follow the new and full moon.",
+                                     comment: "Explains the unit of the swing figure's bars and why they beat with the moon.")
                                     .font(.caption)
                                     .foregroundStyle(SN.foam.opacity(0.5))
                             }

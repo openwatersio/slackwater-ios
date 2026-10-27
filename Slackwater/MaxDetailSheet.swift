@@ -9,6 +9,7 @@
 // `CurrentStationRecord` carries no datum fields at all.
 import SwiftUI
 import SlackwaterKit
+import Almanac
 
 struct MaxDetailSheet: View {
     /// The speed itself, exactly as the tile prints it: "5.9 kn".
@@ -18,6 +19,9 @@ struct MaxDetailSheet: View {
     let place: String
     /// Where this maximum stands among its own direction's over the fortnight.
     var standing: PeakStanding? = nil
+    /// The Moon's quarter phases across the standing's window: the speed
+    /// beats with them the way a swing does.
+    var phases: [MoonPhaseEvent] = []
     /// Twelve months of signed monthly extremes: flood above, ebb below.
     var months: [YearFigure.Month] = []
     /// The loaded timeline's slack runs, for what this maximum costs.
@@ -44,10 +48,11 @@ struct MaxDetailSheet: View {
                                 // the tile does; the figure's own Text
                                 // carries the mono trait.
                                 SwingFigure(standing: standing, tz: tz, onJump: onJump,
-                                            format: { "\(formatSpeed($0, unit: speedUnit)) \(speedUnitLabel(speedUnit))" })
+                                            format: { "\(formatSpeed($0, unit: speedUnit)) \(speedUnitLabel(speedUnit))" },
+                                            phases: phases)
                                     .accessibilityIdentifier("max-section-peaks")
-                                Text("Each bar is one day's hardest \(direction.lowercased()).",
-                                     comment: "Explains the unit of the current figure's bars. The value is 'flood' or 'ebb'.")
+                                Text("Each bar is one day's hardest \(direction.lowercased()). Springs follow the new and full moon.",
+                                     comment: "Explains the unit of the current figure's bars and why they beat with the moon. The value is 'flood' or 'ebb'.")
                                     .font(.caption)
                                     .foregroundStyle(SN.foam.opacity(0.5))
                             }
