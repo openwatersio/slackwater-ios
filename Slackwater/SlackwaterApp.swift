@@ -94,6 +94,7 @@ struct RootView: View {
         // prompts and no-ops when unauthorized, so the overlap costs one
         // coalesced `requestLocation`.
         .onChange(of: scenePhase) { _, phase in
+            Task.detached(priority: .utility) { SlackwaterShortcuts.updateAppShortcutParameters() }
             if phase == .active {
                 LocationService.shared.refreshIfAuthorized()
                 ChsFitService.shared.resumeForForeground()

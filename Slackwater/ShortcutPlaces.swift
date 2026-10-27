@@ -94,12 +94,12 @@ enum ShortcutPlaceQuery {
     @MainActor static func suggestions(kind: LocalStationKind) -> [StationItem] {
         let ids = context(defaults: AppGroup.defaults).ids
         var seen = Set<String>()
-        let preferred = ids.compactMap { id -> StationItem? in
-            guard seen.insert(id).inserted, let item = StationItem.widgetItem(id: id),
+        // Entity substitutions expand Siri phrases; keep all three actions below Apple's 1,000-phrase budget.
+        return Array(ids.compactMap { id -> StationItem? in
+            guard seen.insert(id).inserted, let item = StationItem.byId[id],
                   accepts(item, kind: kind) else { return nil }
             return item
-        }
-        return preferred + StationItem.all.filter { accepts($0, kind: kind) && seen.insert($0.id).inserted }
+        }.prefix(100))
     }
 }
 
@@ -122,7 +122,7 @@ struct TideShortcutPlace: AppEntity {
 
 struct TideShortcutPlaceQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [TideShortcutPlace] {
-        identifiers.compactMap { StationItem.widgetItem(id: $0) }
+        identifiers.compactMap { StationItem.byId[StationSuccessors.resolve($0)] }
             .filter { ShortcutPlaceQuery.accepts($0, kind: .tide) }.map(TideShortcutPlace.init)
     }
     func entities(matching string: String) async throws -> [TideShortcutPlace] {
@@ -145,7 +145,7 @@ struct CurrentShortcutPlace: AppEntity {
 
 struct CurrentShortcutPlaceQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [CurrentShortcutPlace] {
-        identifiers.compactMap { StationItem.widgetItem(id: $0) }
+        identifiers.compactMap { StationItem.byId[StationSuccessors.resolve($0)] }
             .filter { ShortcutPlaceQuery.accepts($0, kind: .current) }.map(CurrentShortcutPlace.init)
     }
     func entities(matching string: String) async throws -> [CurrentShortcutPlace] {
