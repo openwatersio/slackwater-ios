@@ -320,9 +320,10 @@ struct TideDetailView: View {
         let months = standings.months
         let imperial = imperial, unit = unit, now = live
         return {
-            // Inside the closure, so the two Almanac searches run when the
-            // sheet opens and not on every tick of the timeline, which
-            // rebuilds this builder.
+            // Inside the closure, so the two Almanac searches run only while
+            // the sheet is shown (the host re-evaluates this as it redraws)
+            // and never on the timeline's ticks while it is closed, which
+            // rebuild this builder.
             let phases = swing.map { SwingFigure.moonPhases(in: $0.window) } ?? []
             let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: now, tz: record.tz), tz: record.tz)
             return AnyView(RangeDetailSheet(

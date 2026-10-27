@@ -46,17 +46,23 @@ struct MaxDetailSheet: View {
                         section(String(localized: "Is this beyond normal?",
                                        comment: "Current sheet section: how this maximum compares with the fortnight's.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                // The lit bar's label prints a speed the way
-                                // the tile does; the figure's own Text
-                                // carries the mono trait.
                                 SwingFigure(standing: standing, tz: tz, onJump: onJump,
-                                            format: { "\(formatSpeed($0, unit: speedUnit)) \(speedUnitLabel(speedUnit))" },
-                                            phases: phases)
+                                            format: swingLabel, phases: phases)
                                     .accessibilityIdentifier("max-section-peaks")
-                                Text("Each bar is one day's hardest \(direction.lowercased()). Springs follow the new and full moon.",
-                                     comment: "Explains the unit of the current figure's bars and why they beat with the moon. The value is 'flood' or 'ebb'.")
-                                    .font(.caption)
-                                    .foregroundStyle(SN.foam.opacity(0.5))
+                                // The moon sentence only where the bars bear
+                                // it out, as on the Range sheet.
+                                Group {
+                                    if SwingFigure.springsFollowThePhases(peaks: SwingFigure.dailyPeaks(standing, tz: tz),
+                                                                          phases: phases) {
+                                        Text("Each bar is one day's hardest \(direction.lowercased()). Springs follow the new and full moon.",
+                                             comment: "Explains the unit of the current figure's bars and why they beat with the moon. The value is 'flood' or 'ebb'.")
+                                    } else {
+                                        Text("Each bar is one day's hardest \(direction.lowercased()).",
+                                             comment: "Explains the unit of the current figure's bars. The value is 'flood' or 'ebb'.")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(SN.foam.opacity(0.5))
                             }
                         }
                         facts
@@ -96,6 +102,13 @@ struct MaxDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// The lit bar's label prints a speed the way the tile does. Its one
+    /// renderer is the figure's own Text, which carries the mono trait
+    /// (TypeScaleTests' known indirections records the pair).
+    private func swingLabel(_ knots: Double) -> String {
+        "\(formatSpeed(knots, unit: speedUnit)) \(speedUnitLabel(speedUnit))"
     }
 
     private var head: some View {

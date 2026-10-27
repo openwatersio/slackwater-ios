@@ -295,8 +295,8 @@ struct CurrentDetailView: View {
             ? String(localized: "Flood", comment: "Current direction, used in a sentence.")
             : String(localized: "Ebb", comment: "Current direction, used in a sentence.")
         return {
-            // Inside the closure: the Almanac searches run when the sheet
-            // opens, not on every tick of the timeline.
+            // Inside the closure: the Almanac searches run only while the
+            // sheet is shown, not on the timeline's ticks while it is closed.
             let phases = SwingFigure.moonPhases(in: standing.window)
             let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: now, tz: tz), tz: tz)
             return AnyView(MaxDetailSheet(value: value, direction: direction, place: place,
