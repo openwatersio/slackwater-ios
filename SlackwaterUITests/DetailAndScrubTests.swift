@@ -333,8 +333,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let name = try XCTUnwrap(row.label.components(separatedBy: ", ").first)
         row.tap()
         let title = app.descendants(matching: .any)["detail-title"].firstMatch
-        wait(for: [expectation(for: NSPredicate(format: "label BEGINSWITH %@", name),
-                               evaluatedWith: title)], timeout: 10)
+        XCTAssert(eventually(within: 10) { title.label.hasPrefix(name) },
+                  "the detail title did not change to \(name): \(title.label)")
 
         let map = nearby.descendants(matching: .any)["nearby-map"].firstMatch
         goBack(app, to: map)

@@ -93,8 +93,8 @@ final class RangeSheetTests: ScreenshotTestCase {
                           "this swing leads its fortnight, so there is no next bigger one")
         jump.tap()
 
-        XCTAssertFalse(app.navigationBars["Range"].waitForExistence(timeout: 2),
-                       "tapping a fact should close the sheet")
+        XCTAssert(app.navigationBars["Range"].disappears(within: 2),
+                  "tapping a fact should close the sheet")
         XCTAssert(lead.appears(within: 10), "the detail did not come back")
         XCTAssertNotEqual(lead.label, before, "the scrubber did not move to the tapped swing")
         save(app, "range-sheet-jumped.png")

@@ -153,11 +153,10 @@ final class AlertLineUITests: ScreenshotTestCase {
         line(app).tap()
         XCTAssert(sheet(app).appears(within: 5))
         let field = app.textFields["alert-sentence"]
-        try XCTSkipUnless(field.waitForExistence(timeout: 2), "no on-device model here")
+        try XCTSkipUnless(field.appears(within: 2), "no on-device model here")
         // Opened from Rest, the field is focused once the sheet has settled (§7.2).
-        let focused = XCTNSPredicateExpectation(predicate: NSPredicate { el, _ in
-            ((el as? XCUIElement)?.value(forKey: "hasKeyboardFocus") as? Bool) == true }, object: field)
-        XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 5), .completed, "the field did not take focus from the Rest tap")
+        XCTAssert(waitFor(field, "hasKeyboardFocus == true", timeout: 5),
+                  "the field did not take focus from the Rest tap")
 
         field.typeText("every high tide\n")
         let summary = app.staticTexts["alert-summary"]
@@ -165,9 +164,7 @@ final class AlertLineUITests: ScreenshotTestCase {
         // A parse takes a few seconds in the simulator. A note instead of a parse means the
         // model reads available but cannot answer — GitHub's macOS runners — which is the
         // sheet's failed path, not a wrong parse.
-        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            summary.label.contains("High tide") || note.exists }, object: app)
-        _ = XCTWaiter.wait(for: [settled], timeout: 30)
+        _ = eventually(within: 30) { summary.label.contains("High tide") || note.exists }
         if note.exists, !summary.label.contains("High tide") {
             throw XCTSkip("the model reads available here but cannot answer: \(note.label)")
         }
