@@ -993,6 +993,29 @@ private struct FoldPageTestHarness: View {
                        0, accuracy: 300, "the curve must finish under the same selected time")
     }
 
+    @MainActor func testTheCanvasLeavesTouchesToTheNativeScrollView() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now,
+                                      anchor: dayLocal(now, friday.tz))
+        let strip = TimelineScrubber(data: data, geo: TimelineGeo(data: data),
+                                     imperial: true, speedUnit: "kn", now: now,
+                                     scrubTime: .constant(now))
+        let host = UIHostingController(rootView: strip)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: strip.geo.height))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.layoutIfNeeded()
+        func scrollView(in view: UIView) -> UIScrollView? {
+            if let scroll = view as? TimelineScrubber.ScrubScrollView { return scroll }
+            return view.subviews.compactMap { scrollView(in: $0) }.first
+        }
+        let sv = try XCTUnwrap(scrollView(in: host.view))
+        let point = CGPoint(x: sv.bounds.midX, y: sv.bounds.midY)
+        XCTAssertTrue(sv.hitTest(point, with: nil) === sv,
+                      "the decorative canvas must not receive the scroll view's touches")
+    }
+
     /// The host's state, which the strip's own writes land in, as SwiftUI's would.
     private final class Selection {
         var time: Date

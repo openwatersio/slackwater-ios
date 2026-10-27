@@ -175,6 +175,8 @@ struct TimelineScrubber: UIViewRepresentable {
         // of it would allocate their textures for one throwaway frame.
         let host = UIHostingController(rootView: canvas(tiles: 0..<0))
         host.view.backgroundColor = .clear
+        // The canvas only draws; the scroll view owns pan, tap, and press recognition.
+        host.view.isUserInteractionEnabled = false
         host.view.frame = CGRect(x: 0, y: 0, width: data.totalWidth, height: geo.height)
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
