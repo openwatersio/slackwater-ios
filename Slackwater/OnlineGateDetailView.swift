@@ -28,7 +28,7 @@ struct OnlineGateDetailView: View {
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
     @State private var fetchState: ChsFitService.OnlineFetchState = .idle
-    @State private var downloadProgress: Double = 0
+    @State private var showDownloads = false
     /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
     /// discovery fallback when this gate carries no `tideReference`. Computed
     /// once on appear; the body re-evaluates on every scrub tick.
@@ -198,8 +198,7 @@ struct OnlineGateDetailView: View {
                     fetchState = state
                     if resumePending { fetchPending() }
                 }
-            .onReceive(ChsFitService.shared.$onlineProgress
-                .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
+            .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
             .onChange(of: live) { _, now in
                 if let tl = timeline, tl.today != dayLocal(now, tz) { rebuild() }
@@ -322,7 +321,7 @@ struct OnlineGateDetailView: View {
 
     /// The nod to the nerds (#170). The honest why-not — this gate's own
     /// measured fit error — sits in the honesty card only while there is no
-    /// window; once the numbers are fetched it has nowhere else to live.
+    /// window and no download running; otherwise it has nowhere else to live.
     private var stationDetails: some View {
         StationDetails {
             StationDetailRow("Gate", gate.id)
@@ -363,8 +362,8 @@ struct OnlineGateDetailView: View {
     private var honestyCard: some View {
         ChsAmberCard(title: downloadTitle, headline: gate.onlineNote ?? "",
                      expectation: expectation, action: downloadAction,
-                     identifier: "online-honesty-card", status: downloadStatus,
-                     downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
+                     identifier: "online-honesty-card", status: downloadStatus) {
+            if downloadStatus == .downloading { showDownloads = true; return }
             guard net.online, ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
             fetchNow(from: anchor)
         }
@@ -374,8 +373,8 @@ struct OnlineGateDetailView: View {
     private var extendingCard: some View {
         ChsAmberCard(title: downloadTitle,
                      headline: String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation."),
-                     action: downloadAction, identifier: "online-extending-card", status: downloadStatus,
-                     downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
+                     action: downloadAction, identifier: "online-extending-card", status: downloadStatus) {
+            if downloadStatus == .downloading { showDownloads = true; return }
             guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
             if landIfCovered(next, fetched: window) { return }
             guard ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
@@ -401,7 +400,7 @@ struct OnlineGateDetailView: View {
 
     private var downloadAction: String {
         switch downloadStatus {
-        case .downloading: String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
+        case .downloading: String(localized: "See all downloads", comment: "Open the offline-download manager.")
         case .retrying: String(localized: "Retry now", comment: "Offline-prediction action.")
         case .failed: String(localized: "Retry", comment: "Offline-prediction action.")
         case .expired: String(localized: "Download", comment: "Offline-prediction action.")

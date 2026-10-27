@@ -91,7 +91,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, token) = fixture("tide-preview-final", "chs-victoria", fix: ("48.4235", "-123.3705"))
         openSearch(app, "victoria")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
+        XCTAssert(app.staticTexts["Downloading"].appears(within: 10))
         save(app, "tide-waiting.png")
         releaseFixture(token, "chs-victoria-first-chunk")
         let preview = app.descendants(matching: .any)["chs-download-notice"].firstMatch
@@ -328,8 +328,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, token) = fixture("hold-first", "chs-halifax")
         openSearch(app, "halifax")
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
-        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
-        XCTAssert(app.progressIndicators["chs-waiting-warning"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Downloading"].appears(within: 10))
+        XCTAssert(app.activityIndicators["chs-waiting-warning"].firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chs-waiting-expectation"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'requests downloaded'"
         )).firstMatch.exists)

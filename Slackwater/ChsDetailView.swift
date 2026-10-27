@@ -97,8 +97,7 @@ struct ChsDetailView: View {
 
 /// The unfitted station page: the same name header the four scrub details
 /// wear (so it is recognisably this station, and back/favourite work), then
-/// the live status in place of the chart. Never an empty chart, never a
-/// spinner to nothing.
+/// the live status in place of the chart. Never an empty chart.
 struct ChsWaitingView: View {
     let jobID: String
     let name: String
@@ -158,7 +157,7 @@ struct ChsWaitingView: View {
 
     private var title: String {
         switch status {
-        case .downloading: String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
+        case .downloading: String(localized: "Downloading", comment: "Offline-prediction card title.")
         case .queued: String(localized: "Waiting", comment: "Station download-card title.")
         case .retrying: String(localized: "Retrying", comment: "Station download-card title.")
         case .offline: String(localized: "Waiting for signal", comment: "Prediction card title when the downloader is offline.")
@@ -173,8 +172,7 @@ struct ChsWaitingView: View {
                          action: status == .failed
                             ? String(localized: "Retry", comment: "Retry a failed station download.")
                             : String(localized: "See all downloads", comment: "Open the offline-download manager."),
-                         identifier: "chs-waiting-warning", status: status,
-                         downloadProgress: status == .downloading ? job?.downloadProgress ?? 0 : nil) {
+                         identifier: "chs-waiting-warning", status: status) {
                 if status == .failed { service.promote(jobID) }
                 else { showDownloads = true }
             }
@@ -206,10 +204,6 @@ struct ChsWaitingView: View {
             return referenceName.map {
                 String(localized: "\($0)'s tide predictions couldn't be downloaded.", comment: "Station download failure. The value is a reference-station name.")
             } ?? String(localized: "This station's predictions couldn't be downloaded.", comment: "Station download failure.")
-        case .downloading:
-            return isCurrent
-                ? String(localized: "Downloading Canadian current predictions…", comment: "Station download progress.")
-                : String(localized: "Downloading Canadian tidal predictions…", comment: "Station download progress.")
         default:
             if let referenceName {
                 return isCurrent
@@ -233,9 +227,6 @@ struct ChsWaitingView: View {
         }
         if status == .retrying {
             return String(localized: "Slackwater retries automatically when a connection is available.", comment: "Station download retry expectation.")
-        }
-        if job?.status == .downloading {
-            return String(localized: "This station stays available offline when finished.", comment: "Station download expectation.")
         }
         let queued = service.queue.position(jobID).map { at -> String in
             at <= 1
@@ -284,7 +275,6 @@ struct ChsAmberCard: View {
     /// screen.
     var iconLabel = String(localized: "Warning", comment: "VoiceOver label for a warning icon.")
     var status: CardStatus? = nil
-    var downloadProgress: Double? = nil
     let onAction: () -> Void
 
     /// Tracks the icon's own `.title3` so the tile keeps containing the
@@ -295,30 +285,8 @@ struct ChsAmberCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 13) {
-                Image(systemName: status?.icon ?? icon)
-                    .font(.title3)
-                    .foregroundStyle(status?.tint ?? accent)
-                    .frame(width: iconTileSize, height: iconTileSize)
-                    .background((status?.tint ?? accent).opacity(0.16),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .accessibilityLabel(status?.accessibilityLabel ?? iconLabel)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(SN.paper)
-                    Text(headline)
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.72))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if let downloadProgress {
-                StationDownloadProgress(value: downloadProgress)
-            }
-
-            if let expectation {
+            if status == .downloading { downloadingTitle } else { iconAndText }
+            if let expectation, status != .downloading {
                 Text(expectation)
                     .font(.footnote)
                     .lineSpacing(3)
@@ -326,22 +294,7 @@ struct ChsAmberCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("chs-waiting-expectation")
             }
-
-            Button(action: onAction) {
-                HStack(spacing: 4) {
-                    Text(action)
-                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(status?.tint ?? accent)
-                // 44pt tall: the text alone is an 18pt hit region, which the
-                // platform audit rejects (it was the one link on the CHS
-                // waiting page, and a finger's worth of card around it did
-                // nothing).
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            actionButton
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -352,6 +305,58 @@ struct ChsAmberCard: View {
             .strokeBorder(status == nil ? accent.opacity(0.35) : SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
         .accessibilityIdentifier(identifier)
+    }
+
+    /// A download in flight is the title and a spinner, nothing else: what is
+    /// downloading and for how long is Slackwater's problem, not the reader's.
+    /// The spinner replaces the status icon, which said the same thing twice.
+    private var downloadingTitle: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(SN.paper)
+            ProgressView()
+                .tint(SN.leaf)
+        }
+    }
+
+    private var iconAndText: some View {
+        HStack(spacing: 13) {
+            Image(systemName: status?.icon ?? icon)
+                .font(.title3)
+                .foregroundStyle(status?.tint ?? accent)
+                .frame(width: iconTileSize, height: iconTileSize)
+                .background((status?.tint ?? accent).opacity(0.16),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityLabel(status?.accessibilityLabel ?? iconLabel)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(SN.paper)
+                Text(headline)
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var actionButton: some View {
+        Button(action: onAction) {
+            HStack(spacing: 4) {
+                Text(action)
+                Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(status?.tint ?? accent)
+            // 44pt tall: the text alone is an 18pt hit region, which the
+            // platform audit rejects (it was the one link on the CHS
+            // waiting page, and a finger's worth of card around it did
+            // nothing).
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

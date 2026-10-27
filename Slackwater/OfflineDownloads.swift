@@ -43,6 +43,7 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
     case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
     case .failed: return String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
     case .downloading:
+        guard online else { return String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.") }
         return String(localized: "Downloading…", comment: "Prediction download in progress; also used for the action while downloading.")
     case .pending:
         guard online else { return String(localized: "Queued", comment: "Prediction or map download waiting to run. The connection indicator separately shows online/offline status.") }

@@ -42,7 +42,7 @@ Three rules hold across every kind:
 | Canadian tide port | Tide detail, including a finite downloaded preview | Waiting page (§12.1) |
 | Canadian fitted current gate | Current detail, with an additional-download notice (§12.2) | Waiting page |
 | Canadian online current gate | Online detail | Online honesty card (§12.3) |
-| Canadian derived gate | Derived-gate detail | Waiting page naming its reference port |
+| Canadian derived gate | Derived-gate detail | Waiting page for its reference port |
 | Station with no predictions | Unavailable page (§13) | — |
 
 Opening a Canadian station that needs a download moves its download to the front of the queue and clears an earlier failure. The page must replace itself with the real detail as soon as the data arrives, without the person navigating again. A refined model or a changed slack threshold rebuilds the open page while keeping the selected instant (scrubber §17, scenario 35).
@@ -358,12 +358,14 @@ A Canadian station that has not downloaded shows a short page: the header (shari
 | State | Title | Text | Expectation | Action |
 |---|---|---|---|---|
 | Queued | "Waiting" | "This station's predictions aren't on this device yet. Downloading Canadian tidal predictions…" | "It's 3rd in line — moved up because you opened it. Estimated wait: about 2 minutes. The station downloads once and stays available offline." | "See all downloads" |
-| Downloading | "Downloading…" | "Downloading Canadian tidal predictions…" | "This station stays available offline when finished." | "See all downloads" |
+| Downloading | "Downloading", followed by a spinner | None | None | "See all downloads" |
 | Retrying | "Retrying" | "This station's predictions didn't finish downloading. Slackwater will try again." | "Slackwater retries automatically when a connection is available." | "See all downloads" |
 | Offline | "Waiting for signal" | "This station's predictions need a connection before they can download." | "Connect once to download this station for permanent offline use." | "See all downloads" |
 | Failed | "Download failed" | "This station's predictions couldn't be downloaded." | "Retry this station. Once downloaded, it stays available offline." | "Retry", with "See all downloads" below the card |
 
-"Current" replaces "tidal" for a gate. A derived gate names its reference port: "<port>'s tide predictions aren't on this device yet." The first in line reads "It's first in line — moved to the front because you opened it." Wait estimates read "under a minute" below 90 seconds, then "about N minutes", "about an hour", or "about N hours".
+A downloading card shows no status icon and no text: what is downloading and how long it takes is the app's business, not the reader's. A download that loses its connection shows the Offline row, before the request times out.
+
+"Current" replaces "tidal" for a gate. A derived gate names its reference port, except while it downloads: "<port>'s tide predictions aren't on this device yet." The first in line reads "It's first in line — moved to the front because you opened it." Wait estimates read "under a minute" below 90 seconds, then "about N minutes", "about an hour", or "about N hours".
 
 Retries are automatic, backing off from 60 seconds and doubling to a 15-minute ceiling. "See all downloads" opens the Downloads sheet.
 
@@ -390,12 +392,12 @@ An online gate whose downloaded windows do not cover the week shows this card in
 | State | Title | Action |
 |---|---|---|
 | Never downloaded | "Download for offline use" | "Download" |
-| Downloading | "Downloading" | "Downloading…" |
+| Downloading | "Downloading", followed by a spinner | "See all downloads" |
 | Waiting to retry | "Waiting to retry" | "Retry now" |
 | Failed | "Download failed" | "Retry" |
 | Offline | "Waiting for signal" | "Connect to download" |
 
-The text is the gate's own note on why it has no on-device model. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity when there is one, and "Slackwater will try again automatically." while a retry is pending.
+While downloading, the card has no text and its action opens the Downloads sheet. In every other state, the text is the gate's own note on why it has no on-device model. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity when there is one, and "Slackwater will try again automatically." while a retry is pending.
 
 A download covers 30 days from the anchor's week, and downloaded windows are kept for 60 days. The page fetches on its own when it opens online without coverage and when the connection returns.
 

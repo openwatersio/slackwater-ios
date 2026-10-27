@@ -1418,16 +1418,20 @@ extension ChsModelStore {
 /// right now beats what is merely true. Replaces the five sentences
 /// `chsPendingMessage` used to build.
 @MainActor func cardStatus(id: String) -> CardStatus {
-    guard let job = ChsFitService.shared.queue.job(id) else {
-        return Connectivity.shared.online ? .notQueued : .notDownloaded
-    }
+    cardStatus(ChsFitService.shared.queue.job(id), online: Connectivity.shared.online)
+}
+
+func cardStatus(_ job: ChsJob?, online: Bool, now: Date = appNow()) -> CardStatus {
+    guard let job else { return online ? .notQueued : .notDownloaded }
     switch job.status {
-    case .downloading: return .downloading
+    // A job stays `.downloading` after the signal drops, until its request
+    // times out, so offline wins, as it does in `onlineGateStatus`.
+    case .downloading: return online ? .downloading : .offline
     case .failed: return .failed
     case .ready: return .queued
     case .pending:
-        guard Connectivity.shared.online else { return .offline }
-        if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
+        guard online else { return .offline }
+        if (job.retryAfter ?? .distantPast) > now { return .retrying }
         return .queued
     }
 }
