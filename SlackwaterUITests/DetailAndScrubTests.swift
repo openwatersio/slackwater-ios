@@ -861,12 +861,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
         XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
         let week = bar.label
-        // Case-insensitive, like the Range assertion elsewhere in this file:
-        // the tile's eyebrow combines an uppercasing MonoLabel with an
-        // accessibility label that does not.
-        let moon = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label ==[c] 'moon'")).firstMatch
+        let moon = app.buttons["tile-moon"].firstMatch
         XCTAssert(moon.appears(within: 10), "no Moon tile on the tide detail")
+        scrollTo(moon, in: app)
         moon.tap()
 
         XCTAssert(app.navigationBars["Moon"].appears(within: 5),
