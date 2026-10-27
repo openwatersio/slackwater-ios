@@ -455,8 +455,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssertEqual(pins.count, 4)
         let farPin = labelled(pins, "Cape Cod Canal, RR. Bridge")
         farPin.tap()
-        wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: farRow)],
-             timeout: 5)
+        XCTAssert(waitFor(farRow, "isSelected == true", timeout: 5),
+                  "tapping the chooser pin did not select its row")
         XCTAssert(farPin.isSelected)
         XCTAssertFalse(shownRow.isSelected, "selection must move, not add")
         // Opened from a station page, so a header is always under the sheet;

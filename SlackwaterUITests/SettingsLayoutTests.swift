@@ -89,9 +89,8 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         app.segmentedControls.buttons["Meters"].tap()
         app.segmentedControls.buttons["km/h"].tap()
         app.steppers.firstMatch.buttons["Increment"].tap()
-        let changed = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value != %@", baseline!), object: preview)
-        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
+        XCTAssert(eventually(within: 5) { preview.value as? String != baseline },
+                  "the slack-window preview stayed at \(baseline ?? "nil") after changing preferences")
         app.terminate()
 
         let relaunched = launch("-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
@@ -112,9 +111,8 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         let before = preview.value as? String
         let stepper = app.steppers.firstMatch
         stepper.buttons["Increment"].tap()
-        let changed = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value != %@", before ?? ""), object: preview)
-        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
+        XCTAssert(eventually(within: 5) { preview.value as? String != (before ?? "") },
+                  "the slack-window preview stayed at \(before ?? "nil") after increasing comfort current")
         save(app, "slack-window-settings-expanded.png")
     }
 

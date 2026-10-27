@@ -41,7 +41,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
     }
 
     private func assertStationDetail(_ app: XCUIApplication, _ message: String) {
-        XCTAssert(app.wait(for: .runningForeground, timeout: 20),
+        XCTAssert(eventually(within: 20) { app.state == .runningForeground },
                   "the deep link did not launch the app")
         XCTAssert(app.buttons["detail-back"].firstMatch.appears(within: 20), message)
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5),
@@ -70,7 +70,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
         app.terminate()
 
         openDeepLink(seattle)
-        XCTAssert(app.wait(for: .runningForeground, timeout: 20),
+        XCTAssert(eventually(within: 20) { app.state == .runningForeground },
                   "the deep link did not launch the app")
         XCTAssert(app.staticTexts["Seattle"].firstMatch.appears(within: 20),
                   "the tour station replaced the linked one")
@@ -82,7 +82,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
         let app = primeThenTerminate("-resetFavorites", "-resetRecents")
         openDeepLink(removedStation)
 
-        XCTAssert(app.wait(for: .runningForeground, timeout: 20),
+        XCTAssert(eventually(within: 20) { app.state == .runningForeground },
                   "the deep link did not launch the app")
         XCTAssert(app.descendants(matching: .any)["removed-station-card"].firstMatch
             .appears(within: 10), "the removed station deep link opened an unexplained list")
