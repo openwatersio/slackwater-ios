@@ -689,6 +689,16 @@ final class ChsQueueTests: XCTestCase {
                                         state: .deferred(t0.addingTimeInterval(60))), .retrying)
         XCTAssertEqual(onlineGateStatus(nil, online: true, state: .failed("no data")), .failed)
     }
+    func testADownloadThatLosesItsSignalSaysOffline() {
+        var q = ChsQueue([job("a", 48.4, -123.3)])
+        q.set("a", .downloading)
+        XCTAssertEqual(cardStatus(q.job("a"), online: true, now: t0), .downloading)
+        XCTAssertEqual(cardStatus(q.job("a"), online: false, now: t0), .offline)
+        XCTAssertEqual(rowStatus(q.job("a")!, online: false, at: t0), "Queued")
+        q.set("a", .failed)
+        XCTAssertEqual(cardStatus(q.job("a"), online: false, now: t0), .failed)
+    }
+
     private func job(_ id: String, _ lat: Double, _ lon: Double,
                      current: Bool = false, days: Double = 60) -> ChsJob {
         ChsJob(id: id, name: id, region: "test", isCurrent: current,

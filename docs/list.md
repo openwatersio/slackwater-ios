@@ -194,6 +194,8 @@ An online Canadian gate shows an ordinary current card while its downloaded wind
 | Not downloaded | "Not downloaded" | Strip below the identity |
 | Failed | "Failed", in attention amber | Strip below the identity |
 
+A download that loses its connection is Offline at once, before its request times out, here and on the station page; its Downloads row reads "Queued".
+
 A Canadian tide port first downloads a finite prediction preview. While its coverage includes now, its card shows a reading and the available portion of the mini curve alongside the remaining download status. A failed or interrupted full-model download must retain that usable preview. Other tide ports without readings get their previews before the queue completes existing previews, except that opening a place promotes its download. Derived gates still require the reference port’s fitted model.
 
 While a station has no usable predictions and is downloading, queued, retrying, not queued, or not downloaded, the curve area shows a data-free skeleton (a wave and three capsules) at full card height, so the list does not jump when data arrives. An unfitted Canadian card shows its identity at 82% opacity with no reading. A derived gate takes its status from its reference port.
