@@ -391,6 +391,19 @@ final class RenderedStripTests: XCTestCase {
         XCTAssertEqual(StationCardGraph.hangToward(dotY: 71, high: true, plotHeight: plot), -1, "a high whose value would reach the axis times hangs up")
     }
 
+    /// A strip max's reading hangs below a crest and above a trough, so a
+    /// relaxation extremum — the flow slackened without reversing, still
+    /// flood or ebb by sign — hangs off the opposite side from the true
+    /// maxima an hour either side of it instead of landing on their readings.
+    func testAMaxReadingHangsBelowACrestAndAboveATrough() {
+        XCTAssertEqual(maxHangToward(speed: 1.0, before: 0.8), 1, "a flood crest hangs down, toward the zero line")
+        XCTAssertEqual(maxHangToward(speed: -1.1, before: -0.9), -1, "an ebb trough hangs up, toward the zero line")
+        XCTAssertEqual(maxHangToward(speed: -0.85, before: -1.1), 1, "an ebb relaxation crest hangs down, off its neighbours' side")
+        XCTAssertEqual(maxHangToward(speed: 0.3, before: 0.5), -1, "a flood relaxation trough hangs up, off its neighbours' side")
+        XCTAssertEqual(maxHangToward(speed: 0.5, before: 0.5), 1, "a flat approach falls back to the flood side")
+        XCTAssertEqual(maxHangToward(speed: -0.5, before: -0.5), -1, "a flat approach falls back to the ebb side")
+    }
+
     /// The card's axis times stay 24pt in from each canvas edge and 48pt after the last time kept, in time order.
     func testCardAxisTimesKeepClearOfTheEdgesAndEachOther() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
