@@ -2187,192 +2187,192 @@
         }
       }
     },
-    "Each bar is one day's biggest swing." : {
-      "comment" : "Explains the unit of the swing figure's bars.",
+    "Each bar is one day's biggest swing. Springs follow the new and full moon." : {
+      "comment" : "Explains the unit of the swing figure's bars and why they beat with the moon.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hver søjle er en dags største udsving."
+            "value" : "Hver søjle er en dags største udsving. Springflod følger ny- og fuldmåne."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jeder Balken ist der größte Hub eines Tages."
+            "value" : "Jeder Balken ist der größte Hub eines Tages. Springtiden folgen Neu- und Vollmond."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra es la mayor oscilación de un día."
+            "value" : "Cada barra es la mayor oscilación de un día. Las mareas vivas siguen a la luna nueva y a la luna llena."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kukin palkki on yhden päivän suurin vaihtelu."
+            "value" : "Kukin palkki on yhden päivän suurin vaihtelu. Tulvavuoksi seuraa uuttakuuta ja täysikuuta."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chaque barre est le plus grand marnage d’une journée."
+            "value" : "Chaque barre est le plus grand marnage d’une journée. Les vives-eaux suivent la nouvelle et la pleine lune."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Taispeánann gach barra an luascadh is mó in aon lá amháin."
+            "value" : "Taispeánann gach barra an luascadh is mó in aon lá amháin. Leanann na rabhartaí an ghealach úr agus an ghealach lán."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gach bàr: an raon as motha ann an aon latha."
+            "value" : "Gach bàr: an raon as motha ann an aon latha. Leanaidh an reothart a’ ghealach ùr agus a’ ghealach làn."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ogni barra è la maggiore escursione di un giorno."
+            "value" : "Ogni barra è la maggiore escursione di un giorno. Le maree sizigiali seguono la luna nuova e la luna piena."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各バーはその日の最大の振れ幅です。"
+            "value" : "各バーはその日の最大の振れ幅です。 大潮は新月と満月に合わせて訪れます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "각 막대는 그날의 최대 조차입니다."
+            "value" : "각 막대는 그날의 최대 조차입니다. 사리는 삭과 보름달을 따릅니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hver søyle er én dags største utslag."
+            "value" : "Hver søyle er én dags største utslag. Springflo følger ny- og fullmåne."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elke balk is de grootste slag van één dag."
+            "value" : "Elke balk is de grootste slag van één dag. Springtij volgt op nieuwe en volle maan."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra é a maior variação de um dia."
+            "value" : "Cada barra é a maior variação de um dia. As marés de sizígia seguem a lua nova e a lua cheia."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra é a maior variação de um dia."
+            "value" : "Cada barra é a maior variação de um dia. As marés vivas seguem a lua nova e a lua cheia."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Varje stapel är en dags största svängning."
+            "value" : "Varje stapel är en dags största svängning. Springflod följer ny- och fullmåne."
           }
         }
       }
     },
-    "Each bar is one day's hardest %@." : {
-      "comment" : "Explains the unit of the current figure's bars. The value is 'flood' or 'ebb'.",
+    "Each bar is one day's hardest %@. Springs follow the new and full moon." : {
+      "comment" : "Explains the unit of the current figure's bars and why they beat with the moon. The value is 'flood' or 'ebb'.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hver søjle er en dags kraftigste %@."
+            "value" : "Hver søjle er en dags kraftigste %@. Springflod følger ny- og fuldmåne."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jeder Balken ist der stärkste %@ eines Tages."
+            "value" : "Jeder Balken ist der stärkste %@ eines Tages. Springtiden folgen Neu- und Vollmond."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra es la %@ más fuerte de un día."
+            "value" : "Cada barra es la %@ más fuerte de un día. Las mareas vivas siguen a la luna nueva y a la luna llena."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kukin palkki on yhden päivän voimakkain %@."
+            "value" : "Kukin palkki on yhden päivän voimakkain %@. Tulvavuoksi seuraa uuttakuuta ja täysikuuta."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chaque barre est le %@ le plus fort d’une journée."
+            "value" : "Chaque barre est le %@ le plus fort d’une journée. Les vives-eaux suivent la nouvelle et la pleine lune."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Taispeánann gach barra an %@ is láidre in aon lá amháin."
+            "value" : "Taispeánann gach barra an %@ is láidre in aon lá amháin. Leanann na rabhartaí an ghealach úr agus an ghealach lán."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gach bàr: an %@ as treasa ann an aon latha."
+            "value" : "Gach bàr: an %@ as treasa ann an aon latha. Leanaidh an reothart a’ ghealach ùr agus a’ ghealach làn."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ogni barra è la %@ più forte di un giorno."
+            "value" : "Ogni barra è la %@ più forte di un giorno. Le maree sizigiali seguono la luna nuova e la luna piena."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各バーはその日の最も強い%@です。"
+            "value" : "各バーはその日の最も強い%@です。 大潮は新月と満月に合わせて訪れます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "각 막대는 그날 가장 센 %@입니다."
+            "value" : "각 막대는 그날 가장 센 %@입니다. 사리는 삭과 보름달을 따릅니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hver søyle er én dags sterkeste %@."
+            "value" : "Hver søyle er én dags sterkeste %@. Springflo følger ny- og fullmåne."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elke balk is de sterkste %@ van één dag."
+            "value" : "Elke balk is de sterkste %@ van één dag. Springtij volgt op nieuwe en volle maan."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra é a %@ mais forte de um dia."
+            "value" : "Cada barra é a %@ mais forte de um dia. As marés de sizígia seguem a lua nova e a lua cheia."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada barra é a %@ mais forte de um dia."
+            "value" : "Cada barra é a %@ mais forte de um dia. As marés vivas seguem a lua nova e a lua cheia."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Varje stapel är en dags starkaste %@."
+            "value" : "Varje stapel är en dags starkaste %@. Springflod följer ny- och fullmåne."
           }
         }
       }
@@ -3574,6 +3574,196 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Starkast runt %@."
+          }
+        }
+      }
+    },
+    "Hardest around %@, near the equinox." : {
+      "comment" : "Caption under the year figure on a current. The value is a month name.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kraftigst omkring %@, nær jævndøgn."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am stärksten um %@, nahe der Tagundnachtgleiche."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más fuerte en torno a %@, cerca del equinoccio."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voimakkaimmillaan %@n tienoilla, lähellä päiväntasausta."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le plus fort autour de %@, près de l’équinoxe."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ag a láidre timpeall %@, gar don chónocht."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As treasa mu %@, faisg air a’ cho-fhad-thràth."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più forte intorno a %@, vicino all’equinozio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 頃が最も強く、春分・秋分の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@쯤 가장 세며, 춘분·추분 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sterkest rundt %@, nær jevndøgn."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het sterkst rond %@, nabij de equinox."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais forte por volta de %@, perto do equinócio."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais forte por volta de %@, perto do equinócio."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starkast runt %@, nära dagjämningen."
+          }
+        }
+      }
+    },
+    "Hardest around %@, near the solstice." : {
+      "comment" : "Caption under the year figure on a current. The value is a month name.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kraftigst omkring %@, nær solhverv."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am stärksten um %@, nahe der Sonnenwende."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más fuerte en torno a %@, cerca del solsticio."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voimakkaimmillaan %@n tienoilla, lähellä päivänseisausta."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le plus fort autour de %@, près du solstice."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ag a láidre timpeall %@, gar don ghrianstad."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As treasa mu %@, faisg air a’ ghrian-stad."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più forte intorno a %@, vicino al solstizio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 頃が最も強く、夏至・冬至の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@쯤 가장 세며, 하지·동지 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sterkest rundt %@, nær solverv."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het sterkst rond %@, nabij de zonnewende."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais forte por volta de %@, perto do solstício."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais forte por volta de %@, perto do solstício."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starkast runt %@, nära solståndet."
           }
         }
       }
@@ -9721,6 +9911,196 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Störst runt %@."
+          }
+        }
+      }
+    },
+    "Widest around %@, near the equinox." : {
+      "comment" : "Caption under the year figure. The value is a month name.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Størst omkring %@, nær jævndøgn."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am größten um %@, nahe der Tagundnachtgleiche."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mayor en torno a %@, cerca del equinoccio."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suurimmillaan %@n tienoilla, lähellä päiväntasausta."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximal autour de %@, près de l’équinoxe."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An raon is mó timpeall %@, gar don chónocht."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As fharsainge mu %@, faisg air a’ cho-fhad-thràth."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Massima intorno a %@, vicino all’equinozio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 頃が最大で、春分・秋分の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@쯤 가장 크며, 춘분·추분 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Størst rundt %@, nær jevndøgn."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het grootst rond %@, nabij de equinox."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maior por volta de %@, perto do equinócio."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maior por volta de %@, perto do equinócio."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Störst runt %@, nära dagjämningen."
+          }
+        }
+      }
+    },
+    "Widest around %@, near the solstice." : {
+      "comment" : "Caption under the year figure. The value is a month name.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Størst omkring %@, nær solhverv."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am größten um %@, nahe der Sonnenwende."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mayor en torno a %@, cerca del solsticio."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suurimmillaan %@n tienoilla, lähellä päivänseisausta."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximal autour de %@, près du solstice."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An raon is mó timpeall %@, gar don ghrianstad."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As fharsainge mu %@, faisg air a’ ghrian-stad."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Massima intorno a %@, vicino al solstizio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 頃が最大で、夏至・冬至の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@쯤 가장 크며, 하지·동지 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Størst rundt %@, nær solverv."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het grootst rond %@, nabij de zonnewende."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maior por volta de %@, perto do solstício."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maior por volta de %@, perto do solstício."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Störst runt %@, nära solståndet."
           }
         }
       }
@@ -28199,6 +28579,101 @@
         }
       }
     },
+    "First quarter on %@" : {
+      "comment" : "VoiceOver for a phase under the swing figure. The value is a date.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Første kvarter den %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erstes Viertel am %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuarto creciente el %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensimmäinen neljännes %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier quartier le %@"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An chéad cheathrú ar %@"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A’ chiad cheathramh air %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primo quarto il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は上弦の月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 상현달"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Første kvarter %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eerste kwartier op %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarto crescente em %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarto crescente a %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Första kvarteret den %@"
+          }
+        }
+      }
+    },
     "Flood" : {
       "comment" : "Current direction, used in a sentence.",
       "localizations" : {
@@ -28676,6 +29151,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fullmåne"
+          }
+        }
+      }
+    },
+    "Full moon on %@" : {
+      "comment" : "VoiceOver for a phase under the swing figure. The value is a date.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuldmåne den %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollmond am %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna llena el %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Täysikuu %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pleine lune le %@"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gealach lán ar %@"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gealach làn air %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna piena il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は満月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 보름달"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fullmåne %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volle maan op %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua cheia em %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua cheia a %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fullmåne den %@"
           }
         }
       }
@@ -31526,6 +32096,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sista kvarteret"
+          }
+        }
+      }
+    },
+    "Last quarter on %@" : {
+      "comment" : "VoiceOver for a phase under the swing figure. The value is a date.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sidste kvarter den %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letztes Viertel am %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuarto menguante el %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viimeinen neljännes %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier quartier le %@"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An ceathrú deireanach ar %@"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An ceathramh mu dheireadh air %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultimo quarto il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は下弦の月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 하현달"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siste kvarter %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laatste kwartier op %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarto minguante em %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarto minguante a %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sista kvarteret den %@"
           }
         }
       }
@@ -34961,6 +35626,196 @@
         }
       }
     },
+    "Near the equinoxes." : {
+      "comment" : "VoiceOver for the year figure.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nær jævndøgnene."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nahe den Tagundnachtgleichen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca de los equinoccios."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lähellä päiväntasauksia."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Près des équinoxes."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gar do na cónochtaí."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faisg air na co-fhad-thràthan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vicino agli equinozi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "春分・秋分の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "춘분·추분 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nær jevndøgnene."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nabij de equinoxen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perto dos equinócios."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perto dos equinócios."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nära dagjämningarna."
+          }
+        }
+      }
+    },
+    "Near the solstices." : {
+      "comment" : "VoiceOver for the year figure.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nær solhvervene."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nahe den Sonnenwenden."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca de los solsticios."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lähellä päivänseisauksia."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Près des solstices."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gar do na grianstadanna."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faisg air na grian-stadan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vicino ai solstizi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夏至・冬至の頃です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하지·동지 무렵입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nær solvervene."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nabij de zonnewendes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perto dos solstícios."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perto dos solstícios."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nära solstånden."
+          }
+        }
+      }
+    },
     "Nearby" : {
       "comment" : "Nearby-stations section heading.",
       "localizations" : {
@@ -35337,6 +36192,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nymåne"
+          }
+        }
+      }
+    },
+    "New moon on %@" : {
+      "comment" : "VoiceOver for a phase under the swing figure. The value is a date.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nymåne den %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neumond am %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna nueva el %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uusikuu %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle lune le %@"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gealach úr ar %@"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gealach ùr air %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna nuova il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は新月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 삭"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nymåne %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuwe maan op %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua nova em %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua nova a %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nymåne den %@"
           }
         }
       }
