@@ -7,6 +7,13 @@
 // Scrubber behavior here is specified in docs/scrubber.md: update the spec in the same change as any visible change.
 import SwiftUI
 
+/// A relaxation extremum keeps its flow's sign, so the curve's approach determines the reading's side.
+func maxHangToward(speed: Double, before: Double) -> CGFloat {
+    if speed > before { return 1 }
+    if speed < before { return -1 }
+    return speed >= 0 ? 1 : -1
+}
+
 /// The pointer under a hanging reading: the to-bar arrow for a tide turn
 /// (a plain ↑ says "rising", the one thing no longer true at a high), or
 /// the set arrow — ↑ rotated to the bearing, "the water goes this way" —

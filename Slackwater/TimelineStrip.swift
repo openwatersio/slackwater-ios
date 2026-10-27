@@ -1256,7 +1256,7 @@ struct TimelineCanvas: View {
             case .maxFlood, .maxEbb:
                 guard data.clearsLabelEdges(e.time) else { continue }
                 // Context, not the event (§5.1): no dot. The speed hangs off
-                // the peak inside its lobe, below a crest and above a trough,
+                // the peak, below a crest and above a trough,
                 // with the set arrow nearest the peak, in the reading's own
                 // ink — the fill and the line say nothing about direction,
                 // and neither does the arrow's colour. No unit: the lead
@@ -1276,16 +1276,6 @@ struct TimelineCanvas: View {
             drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.curY(data.velocityAt(now))))
         }
     }
-}
-
-/// Which way a max's reading hangs (+1 down, −1 up): below a crest and above a
-/// trough, read off the curve's approach. A relaxation extremum keeps its kind's
-/// sign but points the other way, so it hangs off the side opposite the true
-/// maxima beside it. A flat approach falls back to the kind's sign.
-func maxHangToward(speed: Double, before: Double) -> CGFloat {
-    if speed > before { return 1 }
-    if speed < before { return -1 }
-    return speed >= 0 ? 1 : -1
 }
 
 /// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype
