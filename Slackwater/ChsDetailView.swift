@@ -4,7 +4,7 @@
 // Fitted, this is a pass-through to the ordinary detail view (identical
 // surface, identical provenance footer). Unfitted, it is the status card that
 // used to be missing: what is happening, where the station sits in the queue,
-// roughly how long, and that it only ever happens once. Viewing a station also
+// and roughly how long. Viewing a station also
 // jumps it to the FRONT of the download queue — the thing you are looking at
 // downloads first — and the page fills in live the moment its fit lands.
 import SwiftUI
@@ -129,13 +129,14 @@ struct ChsWaitingView: View {
                 // inset the pill sits on — inside the tinted card, like the
                 // scrub card's interior 14 — so the seam doesn't double up.
                 VStack(spacing: 0) {
-                    // No map while a station downloads: the header names the
-                    // station and gets out of the way, so the status card is
-                    // the whole page.
                     DetailHeader(name: name, region: region, favoriteId: favoriteId,
                                  topSafeInset: geo.safeAreaInsets.top)
                     statusCard
                     footer
+                    if let item = StationItem.byId[favoriteId] {
+                        NearbySection(item: item)
+                            .padding(.top, 28)
+                    }
                 }
                 .padding(.bottom, 42)
             }
@@ -158,7 +159,12 @@ struct ChsWaitingView: View {
     private var title: String {
         switch status {
         case .downloading: String(localized: "Downloading", comment: "Offline-prediction card title.")
-        case .queued: String(localized: "Waiting", comment: "Station download-card title.")
+        case .queued:
+            if let job {
+                cardDownloadLabel(job, position: service.queue.position(jobID))
+            } else {
+                status.label
+            }
         case .retrying: String(localized: "Retrying", comment: "Station download-card title.")
         case .offline: String(localized: "Waiting for signal", comment: "Prediction card title when the downloader is offline.")
         case .failed: String(localized: "Download failed", comment: "Prediction download failed; already downloaded predictions remain usable.")
@@ -216,8 +222,6 @@ struct ChsWaitingView: View {
         }
     }
 
-    /// What to expect: where it sits in the queue, roughly how long, and that
-    /// it is once-and-for-all.
     private var expectation: String {
         guard net.online else {
             return String(localized: "Connect once to download this station for permanent offline use.", comment: "Station download expectation while offline.")
@@ -228,15 +232,8 @@ struct ChsWaitingView: View {
         if status == .retrying {
             return String(localized: "Slackwater retries automatically when a connection is available.", comment: "Station download retry expectation.")
         }
-        let queued = service.queue.position(jobID).map { at -> String in
-            at <= 1
-                ? String(localized: "It's first in line — moved to the front because you opened it.", comment: "Station download queue position.")
-                : String(localized: "It's \(ordinal(at)) in line — moved up because you opened it.", comment: "Station download queue position. The value is a locale-formatted ordinal.")
-        } ?? ""
         let wait = durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))
-        return queued.isEmpty
-            ? String(localized: "Estimated wait: \(wait). The station downloads once and stays available offline.", comment: "Station download expectation. The value is an approximate duration.")
-            : String(localized: "\(queued) Estimated wait: \(wait). The station downloads once and stays available offline.", comment: "Station download expectation. Values are a localized queue sentence and approximate duration.")
+        return String(localized: "Estimated wait: \(wait).", comment: "Station download wait estimate. The value is an approximate duration.")
     }
 
     private var footer: some View {
@@ -285,7 +282,7 @@ struct ChsAmberCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if status == .downloading { downloadingTitle } else { iconAndText }
+            if status == .downloading || status == .queued { compactTitle } else { iconAndText }
             if let expectation, status != .downloading {
                 Text(expectation)
                     .font(.footnote)
@@ -307,16 +304,16 @@ struct ChsAmberCard: View {
         .accessibilityIdentifier(identifier)
     }
 
-    /// A download in flight is the title and a spinner, nothing else: what is
-    /// downloading and for how long is Slackwater's problem, not the reader's.
-    /// The spinner replaces the status icon, which said the same thing twice.
-    private var downloadingTitle: some View {
+    private var compactTitle: some View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(SN.paper)
-            ProgressView()
-                .tint(SN.leaf)
+                .accessibilityValue(status == .queued ? (status?.accessibilityLabel ?? "") : "")
+            if status == .downloading {
+                ProgressView()
+                    .tint(SN.leaf)
+            }
         }
     }
 

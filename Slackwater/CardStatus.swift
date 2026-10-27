@@ -1,5 +1,4 @@
-// Slackwater — GPL v3. One download state model for list cards (#93). The explanation — what CHS is, why a gate has no offline model,
-// what "queued" means — stays on the detail views, which have room for it.
+// Slackwater — GPL v3. Shared download states for list cards and detail views.
 import SwiftUI
 
 /// What a station card is downloading, whether or not a reading is available.
