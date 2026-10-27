@@ -23,6 +23,8 @@ struct MaxDetailSheet: View {
     /// The loaded timeline's slack runs, for what this maximum costs.
     var slackRuns: [(slack: Date, start: Date, end: Date)] = []
     var maximumAt: Date = .now
+    /// The reader's speed unit, for the lit bar's label.
+    var speedUnit = "kn"
     var tz: TimeZone = .current
     var now: Date = .now
     var onJump: ((Date) -> Void)? = nil
@@ -38,7 +40,11 @@ struct MaxDetailSheet: View {
                         section(String(localized: "Is this beyond normal?",
                                        comment: "Current sheet section: how this maximum compares with the fortnight's.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                SwingFigure(standing: standing, tz: tz, onJump: onJump)
+                                // The lit bar's label prints a speed the way
+                                // the tile does; the figure's own Text
+                                // carries the mono trait.
+                                SwingFigure(standing: standing, tz: tz, onJump: onJump,
+                                            format: { "\(formatSpeed($0, unit: speedUnit)) \(speedUnitLabel(speedUnit))" })
                                     .accessibilityIdentifier("max-section-peaks")
                                 Text("Each bar is one day's hardest \(direction.lowercased()).",
                                      comment: "Explains the unit of the current figure's bars. The value is 'flood' or 'ebb'.")

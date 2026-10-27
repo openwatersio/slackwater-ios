@@ -212,4 +212,11 @@ import SlackwaterKit
         XCTAssertEqual(SwingFigure.barIndex(atX: 900, count: 30, width: 300), 29)
         XCTAssertNil(SwingFigure.barIndex(atX: 10, count: 0, width: 300))
     }
+
+    /// With nowhere to go, a finger on the bars does nothing: no lit bar and
+    /// no sheet closing under it.
+    func testWithoutAJumpTheBarsIgnoreTouches() {
+        XCTAssertFalse(SwingFigure(standing: standing(), tz: station.tz).respondsToTouch)
+        XCTAssertTrue(SwingFigure(standing: standing(), tz: station.tz, onJump: { _ in }).respondsToTouch)
+    }
 }

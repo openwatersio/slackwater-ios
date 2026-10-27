@@ -59,4 +59,30 @@ final class MaxSheetTests: ScreenshotTestCase {
         XCTAssertTrue(combined.range(of: #"\d{1,2}:\d{2}"#, options: .regularExpression) != nil,
                       "the caption lost its time: '\(combined)'")
     }
+
+    /// The shared figure: a finger on the bars lights the bar under it, and
+    /// lifting goes to that day's maximum and closes the sheet.
+    func testSlidingAlongThePeaksAndLiftingMovesTheTimeline() throws {
+        let app = launch()
+        openSearch(app, "deception pass (n")
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
+        XCTAssert(app.staticTexts["Today"].appears(within: 10), "current detail did not render")
+        let lead = leadReading(app)
+        XCTAssert(lead.appears(within: 10), "no lead reading")
+        let before = lead.label
+
+        let tile = nextMaxTile(app)
+        XCTAssert(tile.appears(within: 10), "no Next max tile")
+        tile.tap()
+        let figure = app.descendants(matching: .any)["max-section-peaks"].firstMatch
+        XCTAssert(figure.appears(within: 10), "no peaks figure")
+        figure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.2,
+                   thenDragTo: figure.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)))
+
+        XCTAssert(app.navigationBars["Next max"].disappears(within: 2), "lifting should close the sheet")
+        XCTAssert(lead.appears(within: 10), "the detail did not come back")
+        XCTAssertNotEqual(lead.label, before, "the timeline did not move to the bar's day")
+        save(app, "max-sheet-slid.png")
+    }
 }

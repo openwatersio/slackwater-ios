@@ -99,4 +99,31 @@ final class RangeSheetTests: ScreenshotTestCase {
         XCTAssertNotEqual(lead.label, before, "the scrubber did not move to the tapped swing")
         save(app, "range-sheet-jumped.png")
     }
+
+    /// A finger on the bars lights the bar under it; lifting goes to that
+    /// day's swing and closes the sheet.
+    func testSlidingAlongTheBarsAndLiftingMovesTheTimeline() throws {
+        let app = launch()
+        openFridayHarbor(app)
+        let lead = leadReading(app)
+        XCTAssert(lead.appears(within: 10), "no lead reading")
+        let before = lead.label
+
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Range,'")).firstMatch
+        XCTAssert(tile.appears(within: 10), "no Range tile")
+        tile.tap()
+        let figure = app.descendants(matching: .any)["range-section-swings"].firstMatch
+        XCTAssert(figure.appears(within: 10), "no swing figure")
+        // From the middle bar to the right-hand edge: a day other than the
+        // selected one, whichever day the fixture clock lands on.
+        figure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.2,
+                   thenDragTo: figure.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)))
+
+        XCTAssert(app.navigationBars["Range"].disappears(within: 2), "lifting should close the sheet")
+        XCTAssert(lead.appears(within: 10), "the detail did not come back")
+        XCTAssertNotEqual(lead.label, before, "the timeline did not move to the bar's day")
+        save(app, "range-sheet-slid.png")
+    }
 }
