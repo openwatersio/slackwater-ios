@@ -58,7 +58,8 @@ jobs:
     runs-on: macos-latest
     # Signing secrets live in this environment, which only main can deploy to.
     environment: testflight
-    timeout-minutes: 60
+    # Leave time for archiving/uploading before the processing and group waits.
+    timeout-minutes: 90
     permissions:
       contents: write
       actions: read

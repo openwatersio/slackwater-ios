@@ -283,6 +283,8 @@ Review every scrubber presentation change in `TideDetailView`, `CurrentDetailVie
 
 ## AI agents
 
+This is a public, open-source repository. Source code and changes intended for public pull requests may be sent to the contributor’s configured external code reviewers as part of routine review. Verify repository visibility and the review payload before raising a private-data transfer concern; credentials and other nonpublic local data are outside that permission.
+
 Agents work here under the same policy as everyone else, with one addition: an agent never merges its own PR. Docs-only work gets a PR like anything else — the `What changed` job keeps it off the macOS lane, and a docs PR that books one is a bug in that job, not a reason to skip review.
 
 A subagent's backgrounded job dies when its turn ends — a `./scripts/test.sh` started that way leaves a 0-byte log and a corrupt result bundle. Implementers write code and compile-check; the coordinator runs the suite and relays results. Ask subagents for what they _observed_, not what they believe.

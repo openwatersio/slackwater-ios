@@ -43,6 +43,7 @@ exit 1
 EOF
 cat > "$REPO/scripts/testflight.sh" <<'EOF'
 #!/bin/zsh
+set -euo pipefail
 print "upload:$BUILD_NUMBER" >> "$NIGHTLY_STATE/events"
 print "$BUILD_NUMBER" > "$NIGHTLY_STATE/asc-build"
 if [[ -f "$NIGHTLY_STATE/processing" ]]; then
@@ -52,15 +53,39 @@ if [[ -f "$NIGHTLY_STATE/group-pending" ]]; then
   mv "$NIGHTLY_STATE/group-pending" "$NIGHTLY_STATE/unassigned"
 fi
 git rev-parse HEAD > "$NIGHTLY_STATE/archive-sha"
+[[ ${NIGHTLY_LIST_ERROR:-} != yes ]] || touch "$NIGHTLY_STATE/list-error"
+if [[ -f "$NIGHTLY_STATE/list-errors-next" ]]; then
+  mv "$NIGHTLY_STATE/list-errors-next" "$NIGHTLY_STATE/list-errors"
+fi
+BUILD=$BUILD_NUMBER
+VERSION=1.13.0
 EOF
+# Exercise the real post-upload notes path as well as Nightly's caller.
+sed -n '/^# What to Test/,$p' "$ROOT/scripts/testflight.sh" >> "$REPO/scripts/testflight.sh"
+mkdir -p "$REPO/docs/release-notes"
+print 'Nightly notes' > "$REPO/docs/release-notes/1.13.0.md"
 chmod +x "$REPO/scripts/test.sh" "$REPO/scripts/testflight.sh"
 
 cat > "$FAKEBIN/node" <<'EOF'
 #!/bin/zsh
 set -eu
 if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
+  print 'listing' >> "$NIGHTLY_STATE/listings"
   build=$(< "$NIGHTLY_STATE/asc-build")
+  pending=$(cat "$NIGHTLY_STATE/list-errors" 2>/dev/null || print 0)
+  if (( pending > 0 )); then
+    print $(( pending - 1 )) > "$NIGHTLY_STATE/list-errors"
+    print -u2 "ASC API temporarily unavailable"
+    exit 1
+  fi
+  [[ ! -f "$NIGHTLY_STATE/list-error" ]] || { print -u2 "ASC API unavailable"; exit 1; }
   groups='[Nightly]'
+  processing=${NIGHTLY_PROCESSING_STATE:-VALID}
+  pending=$(cat "$NIGHTLY_STATE/processing-listed" 2>/dev/null || print 0)
+  if (( pending > 0 )); then
+    processing=PROCESSING
+    print $(( pending - 1 )) > "$NIGHTLY_STATE/processing-listed"
+  fi
   [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Beta]'
   pending=$(cat "$NIGHTLY_STATE/unlisted" 2>/dev/null || print 0)
   if (( pending > 0 )); then
@@ -73,7 +98,14 @@ if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
     groups='[]'
     print $(( pending - 1 )) > "$NIGHTLY_STATE/unassigned"
   fi
-  [[ -z $build ]] || print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
+  [[ -z $build ]] || print "11.13.0 ($build)  VALID  2026-09-15T09:00:00Z  [Beta]"
+  [[ -z $build ]] || print "1.13.0 ($build)  $processing  2026-09-15T09:00:00Z  $groups"
+elif [[ "$1 $2" == 'scripts/asc.mjs notes' ]]; then
+  for counter in unlisted processing-listed; do
+    pending=$(cat "$NIGHTLY_STATE/$counter" 2>/dev/null || print 0)
+    (( pending == 0 )) || { print -u2 'notes called before Nightly finished waiting'; exit 1; }
+  done
+  print "$3" >> "$NIGHTLY_STATE/notes"
 else
   print -u2 "unexpected node call: $*"
   exit 1
@@ -202,6 +234,45 @@ output=$(nightly 2>&1) && fail 'a build with no group passed'
 ! grep -Eq 'release:nightly-1.13.0-(43|44|45)' "$STATE/events" || fail 'a timed-out build was tagged'
 [[ $(< "$STATE/unassigned") == 88 ]] || fail 'group wait exceeded its budget'
 rm "$STATE/unassigned"
+
+# A listed build may still be processing even with its group already assigned.
+new_commit 'Listed but processing'
+print 35 > "$STATE/processing-listed"
+print 10 > "$STATE/group-pending"
+nightly
+[[ $(< "$STATE/processing-listed") == 0 ]] || fail 'did not wait for processing'
+
+# Processing keeps its 30-minute budget.
+new_commit 'Processing timeout'
+before=$(wc -l < "$STATE/listings")
+output=$(NIGHTLY_PROCESSING_STATE=PROCESSING nightly 2>&1) && fail 'a processing build passed'
+[[ $output == *'still processing after 30 minutes'* ]] || fail "$output"
+(( $(wc -l < "$STATE/listings") - before == 62 )) || fail 'processing wait exceeded its budget'
+
+# Terminal processing failures fail immediately.
+new_commit 'Invalid upload'
+output=$(NIGHTLY_PROCESSING_STATE=INVALID nightly 2>&1) && fail 'an invalid build passed'
+[[ $output == *'failed processing'* ]] || fail "$output"
+
+new_commit 'API unavailable'
+before=$(wc -l < "$STATE/listings")
+output=$(NIGHTLY_LIST_ERROR=yes nightly 2>&1) && fail 'an API failure passed'
+[[ $output == *'ASC API unavailable'* && $output == *'failed after 3 retries'* && $output != *'never listed'* ]] || fail 'API failure disguised as processing timeout'
+(( $(wc -l < "$STATE/listings") - before == 5 )) || fail 'API retry limit exceeded'
+! grep -q 'release:nightly-1.13.0-49' "$STATE/events" || fail 'API failure created a release'
+rm "$STATE/list-error"
+
+new_commit 'Transient API errors'
+print 3 > "$STATE/list-errors-next"
+nightly
+tail -2 "$STATE/events" | diff -u - <(printf 'upload:50\nrelease:nightly-1.13.0-50\n')
+
+# Notes target each VALID upload, including builds that fail the group gate.
+diff -u <(printf '39\n40\n41\n42\n44\n45\n46\n50\n') "$STATE/notes"
+
+# Manual uploads still attach notes through the real nondeferred tail.
+(cd "$REPO" && BUILD_NUMBER=51 ./scripts/testflight.sh)
+[[ $(tail -1 "$STATE/notes") == 51 ]] || fail 'manual upload did not attach notes'
 
 ! grep -q 'test-called' "$STATE/events" || fail 'nightly ran the test suite'
 print 'nightly release checks passed'

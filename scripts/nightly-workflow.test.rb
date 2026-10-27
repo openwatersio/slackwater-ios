@@ -11,4 +11,5 @@ raise "selection must export the commit to release" unless authorize.dig("output
 raise "no candidate must skip release" unless release.fetch("if").include?("needs.authorize.outputs.sha != ''")
 raise "nightly requires Actions read permission" unless release.dig("permissions", "actions") == "read"
 raise "nightly requires release write permission" unless release.dig("permissions", "contents") == "write"
+raise "release needs time for archive/upload plus processing, group waits and retries" unless release.fetch("timeout-minutes") >= 90
 puts "nightly workflow checks passed"

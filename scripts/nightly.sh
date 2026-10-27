@@ -45,32 +45,69 @@ NOTES=build/nightly-notes.md
   fi
 } > "$NOTES"
 
-BUILD_NUMBER=$NEXT_BUILD ./scripts/testflight.sh
+TESTFLIGHT_DEFER_NOTES=1 BUILD_NUMBER=$NEXT_BUILD ./scripts/testflight.sh
 
-# Processing and automatic group assignment have separate wait budgets.
+# An unlisted upload gets 15 minutes; total processing keeps its 30-minute
+# allowance. Automatic group assignment has a separate five-minute budget.
 UNLISTED_POLLS=0
+PROCESSING_POLLS=0
 UNGROUPED_POLLS=0
+NOTES_ATTACHED=0
+API_FAILURES=0
 while true; do
-  BUILD_ROW=$(node scripts/asc.mjs builds | grep -F -m1 "$VERSION ($NEXT_BUILD)" || true)
-  if [[ -z $BUILD_ROW ]]; then
-    if (( UNLISTED_POLLS >= 30 )); then
+  if ! ASC_BUILDS=$(node scripts/asc.mjs builds); then
+    if (( API_FAILURES >= 3 )); then
+      echo "App Store Connect build listing failed after 3 retries." >&2
+      exit 1
+    fi
+    API_FAILURES=$(( API_FAILURES + 1 ))
+    echo "App Store Connect build listing failed; retry $API_FAILURES/3." >&2
+    sleep ${NIGHTLY_POLL_SECONDS:-30}
+    continue
+  fi
+  BUILD_ROW=$(print -r -- "$ASC_BUILDS" | awk -v prefix="$VERSION ($NEXT_BUILD)  " 'index($0, prefix) == 1 { print; exit }')
+  if [[ $BUILD_ROW == *'  INVALID  '* || $BUILD_ROW == *'  FAILED  '* ]]; then
+    echo "Build failed processing: $BUILD_ROW" >&2
+    exit 1
+  fi
+  if [[ -z $BUILD_ROW || $BUILD_ROW == *'  PROCESSING  '* ]]; then
+    if [[ -z $BUILD_ROW ]] && (( UNLISTED_POLLS >= 30 )); then
       echo "Build $VERSION ($NEXT_BUILD) never listed on App Store Connect after 15 minutes." >&2
       exit 1
     fi
-    UNLISTED_POLLS=$(( UNLISTED_POLLS + 1 ))
-  elif [[ $BUILD_ROW == *'[]' ]]; then
+    if (( PROCESSING_POLLS >= 60 )); then
+      echo "Build still processing after 30 minutes: $BUILD_ROW" >&2
+      exit 1
+    fi
+    [[ -n $BUILD_ROW ]] || UNLISTED_POLLS=$(( UNLISTED_POLLS + 1 ))
+    PROCESSING_POLLS=$(( PROCESSING_POLLS + 1 ))
+  else
+    if [[ $BUILD_ROW != *'  VALID  '* ]]; then
+      echo "Build has unexpected processing state: $BUILD_ROW" >&2
+      exit 1
+    fi
+    if (( NOTES_ATTACHED == 0 )); then
+      RELEASE_NOTES=docs/release-notes/$VERSION.md
+      if [[ -f $RELEASE_NOTES ]]; then
+        node scripts/asc.mjs notes "$NEXT_BUILD" "$RELEASE_NOTES"
+      else
+        echo "no $RELEASE_NOTES — build $NEXT_BUILD ships with no release notes"
+      fi
+      NOTES_ATTACHED=1
+    fi
+    if [[ $BUILD_ROW != *'[]' ]]; then
+      break
+    fi
     if (( UNGROUPED_POLLS >= 10 )); then
       echo "Build listed without a group after 5 minutes: $BUILD_ROW" >&2
       exit 1
     fi
     UNGROUPED_POLLS=$(( UNGROUPED_POLLS + 1 ))
-  else
-    break
   fi
   sleep ${NIGHTLY_POLL_SECONDS:-30}
 done
 if ! print -r -- "$BUILD_ROW" | grep -Eq 'VALID.*\[Nightly\]$'; then
-  echo "Build listed in the wrong group or not VALID: $BUILD_ROW" >&2
+  echo "Build listed in the wrong group: $BUILD_ROW" >&2
   exit 1
 fi
 
