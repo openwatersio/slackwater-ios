@@ -23,7 +23,7 @@ Documentation here describes the current product, maintained operating procedure
 | [TestFlight](testflight.md) | Release setup and signing |
 | [App Store releases](appstore.md) | Pushing the listing, submitting for review, and releasing with `scripts/asc.mjs` |
 | [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
-| [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
+| [Release notes](release-notes/) | Versioned release copy consumed by `scripts/nightly.sh` and `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
 | [CHS tide validation](https://github.com/openwatersio/slackwater/blob/main/docs/validation/chs-tides.md) | In the engine repo: the tide fit bar, the window sweep, and where 60-day fits miss |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |

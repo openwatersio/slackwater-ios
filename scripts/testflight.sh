@@ -99,6 +99,11 @@ VERSION=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShort
 # What to Test, from the repo rather than the ASC UI — typed by hand it lands on
 # whatever build is selected, which is how builds 22 and 23 shipped with none and
 # build 21 ended up carrying 0.6.0's. Waits out processing, like promote does.
+# Nightly owns its processing deadline and attaches notes after that wait.
+if [[ ${TESTFLIGHT_DEFER_NOTES:-0} == 1 ]]; then
+  echo 'Release notes deferred to Nightly’s processing wait.'
+  exit 0
+fi
 NOTES=docs/release-notes/$VERSION.md
 if [[ -f $NOTES ]]; then
   node scripts/asc.mjs notes "$BUILD" "$NOTES"
