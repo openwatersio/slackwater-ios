@@ -2187,6 +2187,101 @@
         }
       }
     },
+    "Each bar is one day's biggest swing." : {
+      "comment" : "Explains the unit of the swing figure's bars.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hver søjle er en dags største udsving."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Balken ist der größte Hub eines Tages."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra es la mayor oscilación de un día."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kukin palkki on yhden päivän suurin vaihtelu."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque barre est le plus grand marnage d’une journée."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taispeánann gach barra an luascadh is mó in aon lá amháin."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gach bàr: an raon as motha ann an aon latha."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni barra è la maggiore escursione di un giorno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各バーはその日の最大の振れ幅です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각 막대는 그날의 최대 조차입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hver søyle er én dags største utslag."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elke balk is de grootste slag van één dag."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra é a maior variação de um dia."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra é a maior variação de um dia."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varje stapel är en dags största svängning."
+          }
+        }
+      }
+    },
     "Each bar is one day's biggest swing. Springs follow the new and full moon." : {
       "comment" : "Explains the unit of the swing figure's bars and why they beat with the moon.",
       "localizations" : {
@@ -2278,6 +2373,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Varje stapel är en dags största svängning. Springflod följer ny- och fullmåne."
+          }
+        }
+      }
+    },
+    "Each bar is one day's hardest %@." : {
+      "comment" : "Explains the unit of the current figure's bars. The value is 'flood' or 'ebb'.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hver søjle er en dags kraftigste %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Balken ist der stärkste %@ eines Tages."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra es la %@ más fuerte de un día."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kukin palkki on yhden päivän voimakkain %@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque barre est le %@ le plus fort d’une journée."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taispeánann gach barra an %@ is láidre in aon lá amháin."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gach bàr: an %@ as treasa ann an aon latha."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni barra è la %@ più forte di un giorno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各バーはその日の最も強い%@です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각 막대는 그날 가장 센 %@입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hver søyle er én dags sterkeste %@."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elke balk is de sterkste %@ van één dag."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra é a %@ mais forte de um dia."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada barra é a %@ mais forte de um dia."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varje stapel är en dags starkaste %@."
           }
         }
       }
@@ -7508,6 +7698,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Svep för att se mer"
+          }
+        }
+      }
+    },
+    "Swipe up or down to choose a day, then double-tap to go there." : {
+      "comment" : "VoiceOver hint on the swing figure.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stryg op eller ned for at vælge en dag, og dobbelttryk for at gå dertil."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach oben oder unten streichen, um einen Tag zu wählen, dann doppeltippen, um dorthin zu gehen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desliza hacia arriba o abajo para elegir un día y pulsa dos veces para ir a él."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valitse päivä pyyhkäisemällä ylös tai alas ja siirry siihen kaksoisnapauttamalla."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balayez vers le haut ou le bas pour choisir une journée, puis touchez deux fois pour y aller."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svaidhpeáil suas nó síos chun lá a roghnú, ansin tapáil faoi dhó chun dul ann."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suathaidh suas no sìos gus latha a thaghadh, an uair sin thoir gnogag dhùbailte gus a dhol ann."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scorri verso l’alto o il basso per scegliere un giorno, poi tocca due volte per andarci."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下にスワイプして日を選び、ダブルタップで移動します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위아래로 쓸어 날짜를 고른 다음 두 번 탭하여 이동합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sveip opp eller ned for å velge en dag, og dobbelttrykk for å gå dit."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veeg omhoog of omlaag om een dag te kiezen en dubbeltik om erheen te gaan."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deslize para cima ou para baixo para escolher um dia e toque duas vezes para ir até ele."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deslize para cima ou para baixo para escolher um dia e toque duas vezes para lá ir."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svep uppåt eller nedåt för att välja en dag och dubbeltryck för att gå dit."
           }
         }
       }
