@@ -11,8 +11,15 @@
 // one comes.
 import SwiftUI
 import SlackwaterKit
+import Almanac
 
 struct SwingFigure: View {
+    /// A quarter phase of the Moon, placed on the bar of the day it falls on.
+    struct PhaseMark: Equatable {
+        let index: Int
+        let phase: MoonPhaseName
+    }
+
     struct Bar: Equatable {
         /// Centre of the bar, points from the left edge.
         let x: CGFloat
@@ -35,6 +42,11 @@ struct SwingFigure: View {
     /// "3.2 kn"). The figure ranks sizes without knowing what they measure,
     /// so the sheet that does supplies the words. Nil draws no label.
     var format: ((Double) -> String)? = nil
+    /// The quarter phases inside the window. The beat the bars show is the
+    /// Moon's — springs under new and full, neaps under the quarters — and
+    /// drawing the phases under the days they fall on says so without a
+    /// sentence, the way NOAA's own tide plots do.
+    var phases: [MoonPhaseEvent] = []
 
     /// The bar under the finger, by index into `bars`, while a finger is down.
     @State private var lit: Int? = nil
@@ -100,6 +112,23 @@ struct SwingFigure: View {
         }
     }
 
+    /// The quarter phases in a window, or none where Almanac cannot say.
+    static func moonPhases(in window: (start: Date, end: Date)) -> [MoonPhaseEvent] {
+        (try? searchMoonPhases(from: window.start, to: window.end)) ?? []
+    }
+
+    /// Each phase on the bar of the station-local day it falls on, in time
+    /// order. A phase on a day without a bar — the dropped fragment at the
+    /// window's end — is left out rather than put on a neighbour.
+    static func phaseMarks(_ phases: [MoonPhaseEvent], peaks: [Peak], tz: TimeZone) -> [PhaseMark] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let days = peaks.map { cal.startOfDay(for: $0.time) }
+        return phases.sorted { $0.time < $1.time }.compactMap { phase in
+            days.firstIndex(of: cal.startOfDay(for: phase.time)).map { PhaseMark(index: $0, phase: phase.phase) }
+        }
+    }
+
     /// The bar under an x, by the same layout `bars` uses. Clamped, so a drag
     /// that leaves the canvas still holds the nearest edge bar.
     static func barIndex(atX x: CGFloat, count: Int, width: CGFloat) -> Int? {
@@ -111,17 +140,23 @@ struct SwingFigure: View {
     /// Room above the tallest bar for the lit bar's label, which sits on top
     /// of a bar that may already fill the box.
     private let headroom: CGFloat = 28
-    private let boxHeight: CGFloat = 124
+    /// Room under the baseline for the moon strip.
+    private let strip: CGFloat = 16
+    private let boxHeight: CGFloat = 140
 
     private var bars: [Bar] {
-        Self.bars(standing, tz: tz, size: CGSize(width: width, height: boxHeight - headroom))
+        Self.bars(standing, tz: tz, size: CGSize(width: width, height: boxHeight - headroom - strip))
     }
 
     var body: some View {
         Canvas { ctx, size in
-            let baseline = size.height
+            let baseline = size.height - strip
             let bars = Self.bars(standing, tz: tz,
-                                 size: CGSize(width: size.width, height: size.height - headroom))
+                                 size: CGSize(width: size.width, height: size.height - headroom - strip))
+            let peaks = Self.dailyPeaks(standing, tz: tz)
+            for mark in Self.phaseMarks(phases, peaks: peaks, tz: tz) where bars.indices.contains(mark.index) {
+                Self.drawPhase(ctx, mark.phase, at: CGPoint(x: bars[mark.index].x, y: baseline + 8))
+            }
             for (i, bar) in bars.enumerated() {
                 let isLit = i == lit
                 var path = Path()
@@ -160,6 +195,28 @@ struct SwingFigure: View {
         .accessibilityLabel(spoken)
     }
 
+    /// The calendar convention rather than the Moon sheet's observer
+    /// orientation: a disc filled for full, empty for new, and half-lit for
+    /// the quarters with the lit side on the right while waxing.
+    private static func drawPhase(_ ctx: GraphicsContext, _ phase: MoonPhaseName, at c: CGPoint) {
+        let r: CGFloat = 4.5
+        let disc = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        let ink = SN.foam.opacity(0.35)
+        switch phase {
+        case .full:
+            ctx.fill(disc, with: .color(ink))
+        case .new:
+            ctx.stroke(disc, with: .color(ink), lineWidth: 1)
+        case .firstQuarter, .lastQuarter:
+            var half = Path()
+            half.addArc(center: c, radius: r, startAngle: .degrees(-90), endAngle: .degrees(90),
+                        clockwise: phase == .lastQuarter)
+            half.closeSubpath()
+            ctx.fill(half, with: .color(ink))
+            ctx.stroke(disc, with: .color(ink), lineWidth: 1)
+        }
+    }
+
     /// A finger on the bars lights the one under it; lifting goes there and
     /// closes the sheet. Zero distance so the first touch already lights,
     /// and a tick each time the lit bar changes so a slide reads as steps.
@@ -180,13 +237,25 @@ struct SwingFigure: View {
             }
     }
 
-    /// The shape is unavailable to VoiceOver, so the ranking is said outright.
+    /// The shape is unavailable to VoiceOver, so the ranking is said outright,
+    /// and the phases are named with their days.
     private var spoken: String {
         let bigger = standing.all.filter { $0.magnitude > standing.selected.magnitude }.count
-        return bigger == 0
+        let ranking = bigger == 0
             ? String(localized: "The biggest swing of the fortnight.",
                      comment: "VoiceOver for the swing figure.")
             : String(localized: "Bigger than all but \(bigger) of this fortnight's \(standing.all.count) swings.",
                      comment: "VoiceOver for the swing figure. Both values are counts of tide swings.")
+        let peaks = Self.dailyPeaks(standing, tz: tz)
+        let named = Self.phaseMarks(phases, peaks: peaks, tz: tz).map { mark in
+            let day = monthDay(peaks[mark.index].time, tz)
+            return switch mark.phase {
+            case .new: String(localized: "New moon on \(day)", comment: "VoiceOver for a phase under the swing figure. The value is a date.")
+            case .firstQuarter: String(localized: "First quarter on \(day)", comment: "VoiceOver for a phase under the swing figure. The value is a date.")
+            case .full: String(localized: "Full moon on \(day)", comment: "VoiceOver for a phase under the swing figure. The value is a date.")
+            case .lastQuarter: String(localized: "Last quarter on \(day)", comment: "VoiceOver for a phase under the swing figure. The value is a date.")
+            }
+        }
+        return named.isEmpty ? ranking : ranking + " " + named.joined(separator: ", ") + "."
     }
 }
