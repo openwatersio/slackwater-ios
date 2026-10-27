@@ -28,7 +28,22 @@ struct SwingFigure: View {
     /// The station's own zone: the days this aggregates are the station's,
     /// never the device's.
     var tz: TimeZone = .current
+    /// Where a finger lifted on a bar goes: that bar's own peak, the same
+    /// contract as the "next bigger" caption. Nil leaves the bars inert.
     var onJump: ((Date) -> Void)? = nil
+    /// A bar's magnitude as the sheet prints it, unit included ("10.6 ft",
+    /// "3.2 kn"). The figure ranks sizes without knowing what they measure,
+    /// so the sheet that does supplies the words. Nil draws no label.
+    var format: ((Double) -> String)? = nil
+
+    /// The bar under the finger, by index into `bars`, while a finger is down.
+    @State private var lit: Int? = nil
+    /// The canvas width, for finding the bar under an x outside the draw call.
+    @State private var width: CGFloat = 0
+    @Environment(\.dismiss) private var dismiss
+
+    /// Touch means "go there", so with nowhere to go there is nothing to touch.
+    var respondsToTouch: Bool { onJump != nil }
 
     /// One bar per whole station-local day, carrying that day's biggest swing.
     ///
@@ -93,21 +108,30 @@ struct SwingFigure: View {
         return min(max(Int(floor(x / step)), 0), count - 1)
     }
 
-    private let boxHeight: CGFloat = 108
+    /// Room above the tallest bar for the lit bar's label, which sits on top
+    /// of a bar that may already fill the box.
+    private let headroom: CGFloat = 28
+    private let boxHeight: CGFloat = 124
+
+    private var bars: [Bar] {
+        Self.bars(standing, tz: tz, size: CGSize(width: width, height: boxHeight - headroom))
+    }
 
     var body: some View {
         Canvas { ctx, size in
             let baseline = size.height
-            for bar in Self.bars(standing, tz: tz,
-                                 size: CGSize(width: size.width, height: size.height - 12)) {
+            let bars = Self.bars(standing, tz: tz,
+                                 size: CGSize(width: size.width, height: size.height - headroom))
+            for (i, bar) in bars.enumerated() {
+                let isLit = i == lit
                 var path = Path()
                 path.move(to: CGPoint(x: bar.x, y: baseline))
                 path.addLine(to: CGPoint(x: bar.x, y: baseline - bar.height))
                 // The beat is the message, so the crowd is drawn as texture and
-                // only the two bars a reader acts on carry full weight.
-                ctx.stroke(path, with: .color(SN.graphLine.opacity(bar.isSelected ? 1 : 0.34)),
-                           lineWidth: bar.isSelected ? 3.2 : 2)
-                if bar.isSelected {
+                // only the bars a reader acts on carry full weight.
+                ctx.stroke(path, with: .color(SN.graphLine.opacity(bar.isSelected || isLit ? 1 : 0.34)),
+                           lineWidth: bar.isSelected || isLit ? 3.2 : 2)
+                if bar.isSelected || isLit {
                     CurveDrawing.dot(ctx, at: CGPoint(x: bar.x, y: baseline - bar.height), color: SN.graphLine)
                 }
                 if bar.isNextBigger {
@@ -116,11 +140,44 @@ struct SwingFigure: View {
                     tick.addLine(to: CGPoint(x: bar.x, y: baseline - bar.height - 3))
                     ctx.stroke(tick, with: .color(SN.foam.opacity(0.5)))
                 }
+                if isLit, let format {
+                    // The day and its size, over the finger. Kept inside the
+                    // canvas at either edge rather than centred and clipped.
+                    var label = ctx.resolve(
+                        Text("\(monthDay(bar.peak.time, tz)) · \(format(bar.peak.magnitude))")
+                            .font(.caption2.monospacedDigit()))
+                    label.shading = .color(SN.foam)
+                    let half = label.measure(in: size).width / 2
+                    let x = min(max(bar.x, half), size.width - half)
+                    ctx.draw(label, at: CGPoint(x: x, y: baseline - bar.height - 12), anchor: .bottom)
+                }
             }
         }
         .frame(height: boxHeight)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .gesture(slide, including: respondsToTouch ? .all : .none)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
+    }
+
+    /// A finger on the bars lights the one under it; lifting goes there and
+    /// closes the sheet. Zero distance so the first touch already lights,
+    /// and a tick each time the lit bar changes so a slide reads as steps.
+    private var slide: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { value in
+                let i = Self.barIndex(atX: value.location.x, count: bars.count, width: width)
+                guard i != lit else { return }
+                lit = i
+                UISelectionFeedbackGenerator().selectionChanged()
+            }
+            .onEnded { _ in
+                if let i = lit, bars.indices.contains(i) {
+                    onJump?(bars[i].peak.time)
+                    dismiss()
+                }
+                lit = nil
+            }
     }
 
     /// The shape is unavailable to VoiceOver, so the ranking is said outright.

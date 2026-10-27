@@ -66,7 +66,11 @@ struct RangeDetailSheet: View {
                         section(String(localized: "Is this beyond normal?",
                                        comment: "Range sheet section: how this swing compares with the fortnight's.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                SwingFigure(standing: swing, tz: tz, onJump: onJump)
+                                // The lit bar's label prints a height the way
+                                // the captions do; the figure's own Text
+                                // carries the mono trait.
+                                SwingFigure(standing: swing, tz: tz, onJump: onJump,
+                                            format: { "\(formatHeight($0, imperial: imperial)) \(unit)" })
                                     .accessibilityIdentifier("range-section-swings")
                                 // The bars are days and the caption counts
                                 // swings, so the series has to say which it is

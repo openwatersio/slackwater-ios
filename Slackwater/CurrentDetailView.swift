@@ -288,6 +288,7 @@ struct CurrentDetailView: View {
         guard let standing = l.standing, let e = l.nextMaxEvent, let value = l.nextMax?.value
         else { return nil }
         let place = record.name, months = standings.months(e.kind), tz = tz, now = live
+        let speedUnit = speedUnit
         // Slack itself, which the sentence names and which survives the window being off.
         let slackRuns = tl.slackCores
         let direction = e.kind == .maxFlood
@@ -297,7 +298,7 @@ struct CurrentDetailView: View {
             AnyView(MaxDetailSheet(value: value, direction: direction, place: place,
                                    standing: standing, months: months,
                                    slackRuns: slackRuns, maximumAt: e.time,
-                                   tz: tz, now: now, onJump: jump))
+                                   speedUnit: speedUnit, tz: tz, now: now, onJump: jump))
         }
     }
 
