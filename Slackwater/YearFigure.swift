@@ -96,10 +96,16 @@ struct YearFigure: View {
             return seasons.filter { kinds.contains($0.kind) }
                 .map { abs($0.time.timeIntervalSince(mid)) / 86_400 }.min() ?? .infinity
         }
-        let solstices = marked.map { nearest($0, [.juneSolstice, .decemberSolstice]) }.reduce(0, +)
-        let equinoxes = marked.map { nearest($0, [.marchEquinox, .septemberEquinox]) }.reduce(0, +)
+        let toSolstice = marked.map { nearest($0, [.juneSolstice, .decemberSolstice]) }
+        let toEquinox = marked.map { nearest($0, [.marchEquinox, .septemberEquinox]) }
+        let solstices = toSolstice.reduce(0, +), equinoxes = toEquinox.reduce(0, +)
         guard solstices.isFinite, equinoxes.isFinite, abs(solstices - equinoxes) > 45 else { return nil }
-        return solstices < equinoxes ? .solstices : .equinoxes
+        // The caption names the widest month alone, so that month must itself
+        // sit nearer the winning kind: August and December sum to solstices,
+        // but "Widest around August, near the solstice" would be false.
+        let pair: SeasonPair = solstices < equinoxes ? .solstices : .equinoxes
+        let namedFollows = pair == .solstices ? toSolstice[0] < toEquinox[0] : toEquinox[0] < toSolstice[0]
+        return namedFollows ? pair : nil
     }
 
     /// Where a season falls on the month axis: inside its month's cell, the

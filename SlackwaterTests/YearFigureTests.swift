@@ -161,6 +161,16 @@ import Almanac
         XCTAssertEqual(YearFigure.follows(months: july.months, seasons: july.seasons, tz: station.tz), .solstices)
     }
 
+    /// The caption names one month, so that month must itself sit nearer the
+    /// winning kind. August and December sum to solstices (55 + 6 against
+    /// 38 + 84), but August is nearer the September equinox: saying "Widest
+    /// around August, near the solstice" would be false, so no claim.
+    func testTheNamedMonthMustFollowTheSameKindAsThePair() {
+        let y = year(spans: (1...12).map { $0 == 8 ? 3.2 : $0 == 12 ? 3 : 2 })
+        XCTAssertEqual(YearFigure.standout(y.months).first?.start, y.months[7].start, "August is the widest")
+        XCTAssertNil(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz))
+    }
+
     func testFollowsNeedsTwoStandoutMonths() {
         let y = year(spans: [3])
         XCTAssertNil(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz))

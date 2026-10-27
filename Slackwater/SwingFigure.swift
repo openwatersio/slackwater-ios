@@ -49,7 +49,9 @@ struct SwingFigure: View {
     var phases: [MoonPhaseEvent] = []
 
     /// The bar under the finger, by index into `bars`, while a finger is down.
-    @State private var lit: Int? = nil
+    /// Gesture state rather than plain state so a touch the system takes
+    /// away — the sheet's scroll, an interruption — leaves no bar lit.
+    @GestureState private var lit: Int? = nil
     /// The canvas width, for finding the bar under an x outside the draw call.
     @State private var width: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
@@ -132,7 +134,7 @@ struct SwingFigure: View {
     /// The bar under an x, by the same layout `bars` uses. Clamped, so a drag
     /// that leaves the canvas still holds the nearest edge bar.
     static func barIndex(atX x: CGFloat, count: Int, width: CGFloat) -> Int? {
-        guard count > 0 else { return nil }
+        guard count > 0, width > 0 else { return nil }
         let step = width / CGFloat(count)
         return min(max(Int(floor(x / step)), 0), count - 1)
     }
@@ -217,23 +219,32 @@ struct SwingFigure: View {
         }
     }
 
+    /// Whether lifting after this movement goes to the lit bar. The figure
+    /// sits inside a sheet that scrolls, so a finger that went up or down
+    /// more than it went along the bars was scrolling, and lifting then must
+    /// not close the sheet and move the timeline under the reader.
+    static func slideJumps(_ translation: CGSize) -> Bool {
+        let w = abs(translation.width), h = abs(translation.height)
+        return !(h > 20 && h > 2 * w)
+    }
+
     /// A finger on the bars lights the one under it; lifting goes there and
     /// closes the sheet. Zero distance so the first touch already lights,
     /// and a tick each time the lit bar changes so a slide reads as steps.
     private var slide: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
-            .onChanged { value in
+            .updating($lit) { value, lit, _ in
                 let i = Self.barIndex(atX: value.location.x, count: bars.count, width: width)
                 guard i != lit else { return }
                 lit = i
                 UISelectionFeedbackGenerator().selectionChanged()
             }
-            .onEnded { _ in
-                if let i = lit, bars.indices.contains(i) {
-                    onJump?(bars[i].peak.time)
-                    dismiss()
-                }
-                lit = nil
+            .onEnded { value in
+                guard Self.slideJumps(value.translation),
+                      let i = Self.barIndex(atX: value.location.x, count: bars.count, width: width),
+                      bars.indices.contains(i) else { return }
+                onJump?(bars[i].peak.time)
+                dismiss()
             }
     }
 
