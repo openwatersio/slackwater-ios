@@ -29,6 +29,12 @@ final class RangeSheetTests: ScreenshotTestCase {
             XCTAssert(app.descendants(matching: .any)[id].appears(within: 10),
                       "\(id) missing from the Range sheet")
         }
+        // Friday Harbor's daily tides are unequal, so its widest months sit
+        // at the solstices, and the caption says so.
+        let caption = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Widest around'")).firstMatch
+        XCTAssert(caption.appears(within: 5), "no year caption")
+        XCTAssert(caption.label.hasSuffix("near the solstice."), "unexpected year caption: '\(caption.label)'")
         save(app, "range-sheet-sections.png")
     }
 

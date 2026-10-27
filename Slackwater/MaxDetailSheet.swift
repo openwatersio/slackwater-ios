@@ -24,6 +24,8 @@ struct MaxDetailSheet: View {
     var phases: [MoonPhaseEvent] = []
     /// Twelve months of signed monthly extremes: flood above, ebb below.
     var months: [YearFigure.Month] = []
+    /// The solstices and equinoxes around those months.
+    var seasons: [SeasonEvent] = []
     /// The loaded timeline's slack runs, for what this maximum costs.
     var slackRuns: [(slack: Date, start: Date, end: Date)] = []
     var maximumAt: Date = .now
@@ -63,11 +65,22 @@ struct MaxDetailSheet: View {
                         section(String(localized: "When this gate runs hardest",
                                        comment: "Current sheet section: the months this gate sees its strongest water.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                YearFigure(months: months, now: now, tz: tz)
+                                YearFigure(months: months, now: now, tz: tz, seasons: seasons)
                                     .accessibilityIdentifier("max-section-year")
                                 if let widest = YearFigure.standout(months).first {
-                                    Text("Hardest around \(monthName(widest.start, tz: tz)).",
-                                         comment: "Caption under the year figure on a current. The value is a month name.")
+                                    Group {
+                                        switch YearFigure.follows(months: months, seasons: seasons, tz: tz) {
+                                        case .solstices:
+                                            Text("Hardest around \(monthName(widest.start, tz: tz)), near the solstice.",
+                                                 comment: "Caption under the year figure on a current. The value is a month name.")
+                                        case .equinoxes:
+                                            Text("Hardest around \(monthName(widest.start, tz: tz)), near the equinox.",
+                                                 comment: "Caption under the year figure on a current. The value is a month name.")
+                                        case nil:
+                                            Text("Hardest around \(monthName(widest.start, tz: tz)).",
+                                                 comment: "Caption under the year figure on a current. The value is a month name.")
+                                        }
+                                    }
                                         .font(.caption)
                                         .foregroundStyle(SN.foam.opacity(0.5))
                                 }
