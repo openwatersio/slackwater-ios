@@ -12151,107 +12151,6 @@
         }
       }
     },
-    "%@ Estimated wait: %@. The station downloads once and stays available offline." : {
-      "comment" : "Station download expectation. Values are a localized queue sentence and approximate duration.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ Anslået ventetid: %@. Stationen hentes én gang og forbliver tilgængelig offline."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Geschätzte Wartezeit: %2$@. Die Station wird einmal geladen und bleibt offline verfügbar."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ Estimated wait: %2$@. The station downloads once and stays available offline."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Tiempo de espera estimado: %2$@. La estación se descarga una vez y queda disponible sin conexión."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ Arvioitu odotusaika: %@. Asema ladataan kerran ja pysyy käytettävissä ilman verkkoyhteyttä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Temps d’attente estimé : %2$@. La station est téléchargée une seule fois et reste disponible hors ligne."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Am feithimh measta: %2$@. Íoslódáiltear an stáisiún uair amháin agus fanann sé ar fáil as líne."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Ùine feitheimh mu thuaiream: %2$@. Thèid an stèisean a luchdadh a-nuas aon turas agus bidh e ri làimh far loidhne."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Attesa stimata: %2$@. La stazione si scarica una volta e resta disponibile offline."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 推定待ち時間：%2$@。一度ダウンロードすると、この観測所はオフラインでも利用できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 예상 대기 시간: %@. 한 번 다운로드하면 오프라인에서도 계속 사용할 수 있습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Anslått ventetid: %2$@. Stasjonen lastes ned én gang og forblir tilgjengelig frakoblet."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Geschatte wachttijd: %2$@. De stationgegevens worden één keer gedownload en blijven offline beschikbaar."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Espera estimada: %2$@. A estação é baixada uma vez e fica disponível offline."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ Espera estimada: %2$@. A estação é descarregada uma vez e fica disponível sem ligação."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ Beräknad väntetid: %@. Stationen hämtas en gång och förblir tillgänglig offline."
-          }
-        }
-      }
-    },
     "%@ from %@" : {
       "comment" : "Station distance. Values are a localized nautical-mile distance and its origin.",
       "localizations" : {
@@ -25594,97 +25493,97 @@
         }
       }
     },
-    "Estimated wait: %@. The station downloads once and stays available offline." : {
-      "comment" : "Station download expectation. The value is an approximate duration.",
+    "Estimated wait: %@." : {
+      "comment" : "Station download wait estimate. The value is an approximate duration.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anslået ventetid: %@. Stationen hentes én gang og forbliver tilgængelig offline."
+            "value" : "Anslået ventetid: %@."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geschätzte Wartezeit: %@. Die Station wird einmal geladen und bleibt offline verfügbar."
+            "value" : "Geschätzte Wartezeit: %@."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tiempo de espera estimado: %@. La estación se descarga una vez y queda disponible sin conexión."
+            "value" : "Tiempo de espera estimado: %@."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arvioitu odotusaika: %@. Asema ladataan kerran ja pysyy käytettävissä ilman verkkoyhteyttä."
+            "value" : "Arvioitu odotusaika: %@."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Temps d’attente estimé : %@. La station est téléchargée une fois et reste disponible hors ligne."
+            "value" : "Temps d’attente estimé : %@."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Am feithimh measta: %@. Íoslódáiltear an stáisiún uair amháin agus fanann sé ar fáil as líne."
+            "value" : "Am feithimh measta: %@."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ùine feitheimh mu thuaiream: %@. Thèid an stèisean a luchdadh a-nuas aon turas agus bidh e ri làimh far loidhne."
+            "value" : "Ùine feitheimh mu thuaiream: %@."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Attesa stimata: %@. La stazione si scarica una volta e resta disponibile offline."
+            "value" : "Attesa stimata: %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "推定待ち時間：%@。一度ダウンロードすると、この観測所はオフラインでも利用できます。"
+            "value" : "推定待ち時間：%@。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "예상 대기 시간: %@. 한 번 다운로드하면 오프라인에서도 계속 사용할 수 있습니다."
+            "value" : "예상 대기 시간: %@."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anslått ventetid: %@. Stasjonen lastes ned én gang og forblir tilgjengelig frakoblet."
+            "value" : "Anslått ventetid: %@."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geschatte wachttijd: %@. De stationgegevens worden één keer gedownload en blijven offline beschikbaar."
+            "value" : "Geschatte wachttijd: %@."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Espera estimada: %@. A estação é baixada uma vez e fica disponível offline."
+            "value" : "Espera estimada: %@."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Espera estimada: %@. A estação é descarregada uma vez e fica disponível sem ligação."
+            "value" : "Espera estimada: %@."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beräknad väntetid: %@. Stationen hämtas en gång och förblir tillgänglig offline."
+            "value" : "Beräknad väntetid: %@."
           }
         }
       }
@@ -30766,196 +30665,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Den har tagits bort från den hydrografiska tjänsten och har därför inga värden att visa. Svep för att ta bort den."
-          }
-        }
-      }
-    },
-    "It's %@ in line — moved up because you opened it." : {
-      "comment" : "Station download queue position. The value is a locale-formatted ordinal.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den er %@ i køen — rykket frem, fordi du åbnede den."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie ist %@ in der Warteschlange — vorgezogen, weil du sie geöffnet hast."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Está en el puesto %@ de la cola; ha avanzado porque la abriste."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jonosija on %@ — asemaa siirrettiin eteenpäin, koska avasit sen."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elle est %@ dans la file — déplacée vers le haut car vous l’avez ouverte."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tá sé %@ sa scuaine — bogadh suas é toisc gur oscail tú é."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tha e %@ sa chiutha — air a ghluasad suas on a dh'fhosgail thu e."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È %@ in coda: è avanzata perché l’hai aperta."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "待ち順は%@です。開いたため優先順位が上がりました。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "대기 순서는 %@입니다. 열었기 때문에 순서가 앞당겨졌습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den er %@ i køen — flyttet frem fordi du åpnet den."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Het staat %@ in de wachtrij — naar voren gehaald omdat je het hebt geopend."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "É %@ na fila — avançou porque você a abriu."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Está em %@ na fila — avançou porque a abriu."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den är %@ i kön — flyttades fram eftersom du öppnade den."
-          }
-        }
-      }
-    },
-    "It's first in line — moved to the front because you opened it." : {
-      "comment" : "Station download queue position.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den er først i køen — rykket forrest, fordi du åbnede den."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie ist zuerst an der Reihe — vorgezogen, weil du sie geöffnet hast."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Es la primera de la cola; ha avanzado al principio porque la abriste."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Asema on jonossa ensimmäisenä — se siirrettiin alkuun, koska avasit sen."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elle est en première position — déplacée au premier rang car vous l’avez ouverte."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tá sé ar dtús sa scuaine — bogadh chun tosaigh é toisc gur oscail tú é."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tha e an toiseach sa chiutha — air a ghluasad gun toiseach on a dh'fhosgail thu e."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È la prima in coda: è passata davanti perché l’hai aperta."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "待ち順は先頭です。開いたため最優先になりました。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "대기 순서는 첫 번째입니다. 열었기 때문에 맨 앞으로 이동했습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den er først i køen — flyttet fremst fordi du åpnet den."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Het staat vooraan in de wachtrij — naar voren gehaald omdat je het hebt geopend."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "É a primeira na fila — passou à frente porque você a abriu."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Está em primeiro na fila — passou à frente porque a abriu."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den är först i kön — flyttades längst fram eftersom du öppnade den."
           }
         }
       }
@@ -57418,7 +57127,7 @@
       }
     },
     "Waiting" : {
-      "comment" : "Download status.\nStation download-card title.",
+      "comment" : "Download status.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

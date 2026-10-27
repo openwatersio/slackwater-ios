@@ -353,19 +353,19 @@ A "Nearby" heading with the series filter shared with the list (list §5.2), the
 
 ### 12.1 Waiting page
 
-A Canadian station that has not downloaded shows a short page: the header (sharing the bare station link), a status card, and "Predictions — not for navigation". It has no Nearby section and no map.
+A Canadian station that has not downloaded shows the header (sharing the bare station link), a status card, "Predictions — not for navigation", and the shared Nearby section with its station rows, series filter, and map (§11). Nearby is available in every download state.
 
 | State | Title | Text | Expectation | Action |
 |---|---|---|---|---|
-| Queued | "Waiting" | "This station's predictions aren't on this device yet. Downloading Canadian tidal predictions…" | "It's 3rd in line — moved up because you opened it. Estimated wait: about 2 minutes. The station downloads once and stays available offline." | "See all downloads" |
+| Queued | "Next" or "3rd in line", using the list card's queue label | None | "Estimated wait: about 2 minutes." | "See all downloads" |
 | Downloading | "Downloading", followed by a spinner | None | None | "See all downloads" |
 | Retrying | "Retrying" | "This station's predictions didn't finish downloading. Slackwater will try again." | "Slackwater retries automatically when a connection is available." | "See all downloads" |
 | Offline | "Waiting for signal" | "This station's predictions need a connection before they can download." | "Connect once to download this station for permanent offline use." | "See all downloads" |
 | Failed | "Download failed" | "This station's predictions couldn't be downloaded." | "Retry this station. Once downloaded, it stays available offline." | "Retry", with "See all downloads" below the card |
 
-A downloading card shows no status icon and no text: what is downloading and how long it takes is the app's business, not the reader's. A download that loses its connection shows the Offline row, before the request times out.
+Queued and downloading cards use a compact title without a status icon or explanatory headline. VoiceOver reads the queued status alongside the queue label. A downloading card shows a spinner and no estimate. A download that loses its connection shows the Offline row, before the request times out.
 
-"Current" replaces "tidal" for a gate. A derived gate names its reference port, except while it downloads: "<port>'s tide predictions aren't on this device yet." The first in line reads "It's first in line — moved to the front because you opened it." Wait estimates read "under a minute" below 90 seconds, then "about N minutes", "about an hour", or "about N hours".
+A derived gate uses its reference port's queue position and wait estimate. Its offline, retry, and failure messages name that port. Wait estimates read "under a minute" below 90 seconds, then "about N minutes", "about an hour", or "about N hours".
 
 Retries are automatic, backing off from 60 seconds and doubling to a 15-minute ceiling. "See all downloads" opens the Downloads sheet.
 

@@ -312,9 +312,15 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.buttons["Done"].tap()
         openSearch(app, "weynton")
         pickSearchResult(app, app.staticTexts["Weynton Passage"].firstMatch)
-        XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'first in line'"
-        )).firstMatch.appears(within: 5))
+        let next = app.staticTexts.matching(identifier: "chs-waiting-warning")
+            .matching(NSPredicate(format: "label == 'Next'")).firstMatch
+        XCTAssert(next.appears(within: 5))
+        XCTAssertEqual(next.value as? String, "Queued — Canadian predictions download once, then work offline.")
+        save(app, "waiting-detail.png")
+        let nearby = app.descendants(matching: .any)["nearby"].firstMatch
+        scrollTo(nearby.descendants(matching: .any)["nearby-station"].firstMatch, in: app)
+        XCTAssert(nearby.appears(within: 5))
+        XCTAssert(nearby.descendants(matching: .any)["nearby-station"].firstMatch.exists)
         goBack(app)
         openDownloads(app)
         let promoted = rows["download-row-chs-weynton-passage"].firstMatch
@@ -334,6 +340,12 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'requests downloaded'"
         )).firstMatch.exists)
+        save(app, "downloading-detail.png")
+        let nearby = app.descendants(matching: .any)["nearby"].firstMatch
+        scrollTo(nearby.descendants(matching: .any)["nearby-station"].firstMatch, in: app)
+        XCTAssert(nearby.appears(within: 5))
+        XCTAssert(nearby.descendants(matching: .any)["nearby-station"].firstMatch.exists)
+        app.swipeDown(velocity: .fast)
         releaseFixture(token, "chs-halifax-first-chunk")
         XCTAssert(app.staticTexts["Today"].appears(within: 30))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
