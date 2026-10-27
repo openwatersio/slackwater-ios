@@ -11,7 +11,8 @@
               "Hvornår er næste højvande i ${applicationName}",
               "Hvad tid er næste højvande i ${applicationName}",
               "Hvornår er der højvande i ${applicationName}",
-              "Hvornår er der højvande ved ${place} i ${applicationName}"
+              "Hvornår er der højvande ved ${place} i ${applicationName}",
+              "Hvornår er der højvande i ${place} i ${applicationName}"
             ]
           }
         },
@@ -22,7 +23,8 @@
               "Wann ist das nächste Hochwasser in ${applicationName}",
               "Um wie viel Uhr ist das nächste Hochwasser in ${applicationName}",
               "Wann ist Hochwasser in ${applicationName}",
-              "Wann ist Hochwasser bei ${place} in ${applicationName}"
+              "Wann ist Hochwasser bei ${place} in ${applicationName}",
+              "Wann ist Hochwasser in ${place} in ${applicationName}"
             ]
           }
         },
@@ -33,7 +35,8 @@
               "When is the next high tide in ${applicationName}",
               "What time is the next high tide in ${applicationName}",
               "When is high tide in ${applicationName}",
-              "When is high tide at ${place} in ${applicationName}"
+              "When is high tide at ${place} in ${applicationName}",
+              "When is high tide in ${place} in ${applicationName}"
             ]
           }
         },
@@ -66,7 +69,8 @@
               "Quand est la prochaine marée haute dans ${applicationName}",
               "À quelle heure est la prochaine marée haute dans ${applicationName}",
               "Quand est la marée haute dans ${applicationName}",
-              "Quand est la marée haute à ${place} dans ${applicationName}"
+              "Quand est la marée haute à ${place} dans ${applicationName}",
+              "Quand est la marée haute dans ${place} dans ${applicationName}"
             ]
           }
         },
@@ -77,7 +81,8 @@
               "Cathain a bheidh an chéad lán mara eile in ${applicationName}",
               "Cén t-am a bheidh an chéad lán mara eile in ${applicationName}",
               "Cathain a bheidh lán mara in ${applicationName}",
-              "Cathain a bheidh lán mara ag ${place} in ${applicationName}"
+              "Cathain a bheidh lán mara ag ${place} in ${applicationName}",
+              "Cathain a bheidh lán mara i ${place} in ${applicationName}"
             ]
           }
         },
@@ -88,7 +93,8 @@
               "Cuin a bhios an ath mhuir-làn ann an ${applicationName}",
               "Dè an uair a bhios an ath mhuir-làn ann an ${applicationName}",
               "Cuin a bhios muir-làn ann an ${applicationName}",
-              "Cuin a bhios làn aig ${place} ann an ${applicationName}"
+              "Cuin a bhios làn aig ${place} ann an ${applicationName}",
+              "Cuin a bhios làn ann an ${place} ann an ${applicationName}"
             ]
           }
         },
@@ -99,7 +105,8 @@
               "Quando è la prossima alta marea in ${applicationName}",
               "A che ora è la prossima alta marea in ${applicationName}",
               "Quando è l’alta marea in ${applicationName}",
-              "Quando è alta marea a ${place} in ${applicationName}"
+              "Quando è alta marea a ${place} in ${applicationName}",
+              "Quando è alta marea in ${place} in ${applicationName}"
             ]
           }
         },
@@ -132,7 +139,8 @@
               "Når er neste høyvann i ${applicationName}",
               "Hva er klokken ved neste høyvann i ${applicationName}",
               "Når er det høyvann i ${applicationName}",
-              "Når er det høyvann ved ${place} i ${applicationName}"
+              "Når er det høyvann ved ${place} i ${applicationName}",
+              "Når er det høyvann i ${place} i ${applicationName}"
             ]
           }
         },
@@ -143,7 +151,8 @@
               "Wanneer is het volgende hoogwater in ${applicationName}",
               "Hoe laat is het volgende hoogwater in ${applicationName}",
               "Wanneer is het hoogwater in ${applicationName}",
-              "Wanneer is het hoogwater bij ${place} in ${applicationName}"
+              "Wanneer is het hoogwater bij ${place} in ${applicationName}",
+              "Wanneer is het hoogwater in ${place} in ${applicationName}"
             ]
           }
         },
@@ -176,7 +185,8 @@
               "När är nästa högvatten i ${applicationName}",
               "Vilken tid är nästa högvatten i ${applicationName}",
               "När är det högvatten i ${applicationName}",
-              "När är det högvatten vid ${place} i ${applicationName}"
+              "När är det högvatten vid ${place} i ${applicationName}",
+              "När är det högvatten i ${place} i ${applicationName}"
             ]
           }
         }
@@ -193,7 +203,8 @@
               "Hvornår er næste lavvande i ${applicationName}",
               "Hvad tid er næste lavvande i ${applicationName}",
               "Hvornår er der lavvande i ${applicationName}",
-              "Hvornår er der lavvande ved ${place} i ${applicationName}"
+              "Hvornår er der lavvande ved ${place} i ${applicationName}",
+              "Hvornår er der lavvande i ${place} i ${applicationName}"
             ]
           }
         },
@@ -204,7 +215,8 @@
               "Wann ist das nächste Niedrigwasser in ${applicationName}",
               "Um wie viel Uhr ist das nächste Niedrigwasser in ${applicationName}",
               "Wann ist Niedrigwasser in ${applicationName}",
-              "Wann ist Niedrigwasser bei ${place} in ${applicationName}"
+              "Wann ist Niedrigwasser bei ${place} in ${applicationName}",
+              "Wann ist Niedrigwasser in ${place} in ${applicationName}"
             ]
           }
         },
@@ -215,7 +227,8 @@
               "When is the next low tide in ${applicationName}",
               "What time is the next low tide in ${applicationName}",
               "When is low tide in ${applicationName}",
-              "When is low tide at ${place} in ${applicationName}"
+              "When is low tide at ${place} in ${applicationName}",
+              "When is low tide in ${place} in ${applicationName}"
             ]
           }
         },
@@ -248,7 +261,8 @@
               "Quand est la prochaine marée basse dans ${applicationName}",
               "À quelle heure est la prochaine marée basse dans ${applicationName}",
               "Quand est la marée basse dans ${applicationName}",
-              "Quand est la marée basse à ${place} dans ${applicationName}"
+              "Quand est la marée basse à ${place} dans ${applicationName}",
+              "Quand est la marée basse dans ${place} dans ${applicationName}"
             ]
           }
         },
@@ -259,7 +273,8 @@
               "Cathain a bheidh an chéad lag trá eile in ${applicationName}",
               "Cén t-am a bheidh an chéad lag trá eile in ${applicationName}",
               "Cathain a bheidh lag trá in ${applicationName}",
-              "Cathain a bheidh lag trá ag ${place} in ${applicationName}"
+              "Cathain a bheidh lag trá ag ${place} in ${applicationName}",
+              "Cathain a bheidh lag trá i ${place} in ${applicationName}"
             ]
           }
         },
@@ -270,7 +285,8 @@
               "Cuin a bhios an ath mhuir-tràigh ann an ${applicationName}",
               "Dè an uair a bhios an ath mhuir-tràigh ann an ${applicationName}",
               "Cuin a bhios muir-tràigh ann an ${applicationName}",
-              "Cuin a bhios tràigh aig ${place} ann an ${applicationName}"
+              "Cuin a bhios tràigh aig ${place} ann an ${applicationName}",
+              "Cuin a bhios tràigh ann an ${place} ann an ${applicationName}"
             ]
           }
         },
@@ -281,7 +297,8 @@
               "Quando è la prossima bassa marea in ${applicationName}",
               "A che ora è la prossima bassa marea in ${applicationName}",
               "Quando è la bassa marea in ${applicationName}",
-              "Quando è bassa marea a ${place} in ${applicationName}"
+              "Quando è bassa marea a ${place} in ${applicationName}",
+              "Quando è bassa marea in ${place} in ${applicationName}"
             ]
           }
         },
@@ -314,7 +331,8 @@
               "Når er neste lavvann i ${applicationName}",
               "Hva er klokken ved neste lavvann i ${applicationName}",
               "Når er det lavvann i ${applicationName}",
-              "Når er det lavvann ved ${place} i ${applicationName}"
+              "Når er det lavvann ved ${place} i ${applicationName}",
+              "Når er det lavvann i ${place} i ${applicationName}"
             ]
           }
         },
@@ -325,7 +343,8 @@
               "Wanneer is het volgende laagwater in ${applicationName}",
               "Hoe laat is het volgende laagwater in ${applicationName}",
               "Wanneer is het laagwater in ${applicationName}",
-              "Wanneer is het laagwater bij ${place} in ${applicationName}"
+              "Wanneer is het laagwater bij ${place} in ${applicationName}",
+              "Wanneer is het laagwater in ${place} in ${applicationName}"
             ]
           }
         },
@@ -358,7 +377,8 @@
               "När är nästa lågvatten i ${applicationName}",
               "Vilken tid är nästa lågvatten i ${applicationName}",
               "När är det lågvatten i ${applicationName}",
-              "När är det lågvatten vid ${place} i ${applicationName}"
+              "När är det lågvatten vid ${place} i ${applicationName}",
+              "När är det lågvatten i ${place} i ${applicationName}"
             ]
           }
         }
@@ -373,7 +393,8 @@
             "state" : "translated",
             "values" : [
               "Hvornår er næste strømstille periode i ${applicationName}",
-              "Hvornår er næste strømstille vindue ved ${place} i ${applicationName}"
+              "Hvornår er næste strømstille vindue ved ${place} i ${applicationName}",
+              "Hvornår er næste strømstille vindue i ${place} i ${applicationName}"
             ]
           }
         },
@@ -382,7 +403,8 @@
             "state" : "translated",
             "values" : [
               "Wann ist das nächste Stauwasserfenster in ${applicationName}",
-              "Wann ist das nächste Stillwasserfenster bei ${place} in ${applicationName}"
+              "Wann ist das nächste Stillwasserfenster bei ${place} in ${applicationName}",
+              "Wann ist das nächste Stillwasserfenster in ${place} in ${applicationName}"
             ]
           }
         },
@@ -391,7 +413,8 @@
             "state" : "new",
             "values" : [
               "When is the next slack window in ${applicationName}",
-              "When is the next slack window at ${place} in ${applicationName}"
+              "When is the next slack window at ${place} in ${applicationName}",
+              "When is the next slack window in ${place} in ${applicationName}"
             ]
           }
         },
@@ -418,7 +441,8 @@
             "state" : "translated",
             "values" : [
               "Quand est la prochaine fenêtre d’étale dans ${applicationName}",
-              "Quand est la prochaine fenêtre d’étale à ${place} dans ${applicationName}"
+              "Quand est la prochaine fenêtre d’étale à ${place} dans ${applicationName}",
+              "Quand est la prochaine fenêtre d’étale dans ${place} dans ${applicationName}"
             ]
           }
         },
@@ -427,7 +451,8 @@
             "state" : "translated",
             "values" : [
               "Cathain a bheidh an chéad tréimhse fáfaill eile in ${applicationName}",
-              "Cathain a bheidh an chéad tréimhse fáfaill eile ag ${place} in ${applicationName}"
+              "Cathain a bheidh an chéad tréimhse fáfaill eile ag ${place} in ${applicationName}",
+              "Cathain a bheidh an chéad tréimhse fáfaill eile i ${place} in ${applicationName}"
             ]
           }
         },
@@ -436,7 +461,8 @@
             "state" : "translated",
             "values" : [
               "Cuin a bhios an ath thràth marbh-shruth ann an ${applicationName}",
-              "Cuin a bhios an ath thràth marbh-shruth aig ${place} ann an ${applicationName}"
+              "Cuin a bhios an ath thràth marbh-shruth aig ${place} ann an ${applicationName}",
+              "Cuin a bhios an ath thràth marbh-shruth ann an ${place} ann an ${applicationName}"
             ]
           }
         },
@@ -445,7 +471,8 @@
             "state" : "translated",
             "values" : [
               "Quando è la prossima finestra di stanca in ${applicationName}",
-              "Quando è la prossima finestra di stanca a ${place} in ${applicationName}"
+              "Quando è la prossima finestra di stanca a ${place} in ${applicationName}",
+              "Quando è la prossima finestra di stanca in ${place} in ${applicationName}"
             ]
           }
         },
@@ -472,7 +499,8 @@
             "state" : "translated",
             "values" : [
               "Når er neste strømstillevindu i ${applicationName}",
-              "Når er neste strømstillevindu ved ${place} i ${applicationName}"
+              "Når er neste strømstillevindu ved ${place} i ${applicationName}",
+              "Når er neste strømstillevindu i ${place} i ${applicationName}"
             ]
           }
         },
@@ -481,7 +509,8 @@
             "state" : "translated",
             "values" : [
               "Wanneer is het volgende kenteringsvenster in ${applicationName}",
-              "Wanneer is het volgende kenteringsvenster bij ${place} in ${applicationName}"
+              "Wanneer is het volgende kenteringsvenster bij ${place} in ${applicationName}",
+              "Wanneer is het volgende kenteringsvenster in ${place} in ${applicationName}"
             ]
           }
         },
@@ -508,7 +537,8 @@
             "state" : "translated",
             "values" : [
               "När är nästa strömstilla period i ${applicationName}",
-              "När är nästa strömstilla period vid ${place} i ${applicationName}"
+              "När är nästa strömstilla period vid ${place} i ${applicationName}",
+              "När är nästa strömstilla period i ${place} i ${applicationName}"
             ]
           }
         }

@@ -28,8 +28,8 @@ import CoreLocation
         XCTAssertEqual(tides.map(\.id), [savannah])
         XCTAssertEqual(currents.map(\.id), ["current:noaa/PUG1701"])
         XCTAssertTrue(currents.allSatisfy { $0.series == .current })
-        // Each tide place expands both high and low phrases; seven phrases have no place.
-        XCTAssertLessThanOrEqual(2 * tides.count + currents.count + 7, 1_000)
+        // Each named action has both “at” and “in” phrases; seven phrases have no place.
+        XCTAssertLessThanOrEqual(4 * tides.count + 2 * currents.count + 7, 1_000)
         let tideIDs = StationItem.all.filter { ShortcutPlaceQuery.accepts($0, kind: .tide) }.prefix(150).map(\.id)
         defaults.set(Array(tideIDs), forKey: AppGroup.favoritesKey)
         let many = ShortcutPlaceQuery.suggestions(kind: .tide)
