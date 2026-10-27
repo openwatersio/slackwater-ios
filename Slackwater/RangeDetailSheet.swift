@@ -34,6 +34,8 @@ struct RangeDetailSheet: View {
     /// Twelve months of monthly extremes — section 3. Empty until the sheet's
     /// own scan lands, and empty for good where the station has no bounds.
     var months: [YearFigure.Month] = []
+    /// The solstices and equinoxes around those months — section 3's rules.
+    var seasons: [SeasonEvent] = []
     var latDatum: Double? = nil
     var hatDatum: Double? = nil
     var imperial = false
@@ -103,13 +105,28 @@ struct RangeDetailSheet: View {
                         section(String(localized: "When this station runs biggest",
                                        comment: "Range sheet section: the months this station sees its extremes.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                YearFigure(months: months, now: now, tz: tz, imperial: imperial)
+                                YearFigure(months: months, now: now, tz: tz, imperial: imperial, seasons: seasons)
                                     .accessibilityIdentifier("range-section-year")
                                 if let widest = YearFigure.standout(months).first {
-                                    Text("Widest around \(monthName(widest.start, tz: tz)).",
-                                         comment: "Caption under the year figure. The value is a month name.")
-                                        .font(.caption)
-                                        .foregroundStyle(SN.foam.opacity(0.5))
+                                    // Names the turning point the widest
+                                    // months follow only when the data
+                                    // decides it; a station between kinds
+                                    // keeps the plain month.
+                                    Group {
+                                        switch YearFigure.follows(months: months, seasons: seasons, tz: tz) {
+                                        case .solstices:
+                                            Text("Widest around \(monthName(widest.start, tz: tz)), near the solstice.",
+                                                 comment: "Caption under the year figure. The value is a month name.")
+                                        case .equinoxes:
+                                            Text("Widest around \(monthName(widest.start, tz: tz)), near the equinox.",
+                                                 comment: "Caption under the year figure. The value is a month name.")
+                                        case nil:
+                                            Text("Widest around \(monthName(widest.start, tz: tz)).",
+                                                 comment: "Caption under the year figure. The value is a month name.")
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(SN.foam.opacity(0.5))
                                 }
                             }
                         }

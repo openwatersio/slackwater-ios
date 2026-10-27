@@ -290,6 +290,7 @@ struct CurrentDetailView: View {
         let place = record.name, months = standings.months(e.kind), tz = tz, now = live
         let speedUnit = speedUnit
         let phases = SwingFigure.moonPhases(in: standing.window)
+        let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: live, tz: tz), tz: tz)
         // Slack itself, which the sentence names and which survives the window being off.
         let slackRuns = tl.slackCores
         let direction = e.kind == .maxFlood
@@ -297,7 +298,7 @@ struct CurrentDetailView: View {
             : String(localized: "Ebb", comment: "Current direction, used in a sentence.")
         return {
             AnyView(MaxDetailSheet(value: value, direction: direction, place: place,
-                                   standing: standing, phases: phases, months: months,
+                                   standing: standing, phases: phases, months: months, seasons: seasons,
                                    slackRuns: slackRuns, maximumAt: e.time,
                                    speedUnit: speedUnit, tz: tz, now: now, onJump: jump))
         }

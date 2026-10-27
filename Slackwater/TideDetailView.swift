@@ -319,12 +319,13 @@ struct TideDetailView: View {
         let standing = standing, swing = swingStanding, record = record
         let months = standings.months
         let phases = swing.map { SwingFigure.moonPhases(in: $0.window) } ?? []
+        let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: live, tz: record.tz), tz: record.tz)
         let imperial = imperial, unit = unit, now = live
         return {
             AnyView(RangeDetailSheet(
                 value: range.value, direction: self.rangeDirection,
                 seasonalRatio: ratio, place: place,
-                standing: standing, swing: swing, phases: phases, months: months,
+                standing: standing, swing: swing, phases: phases, months: months, seasons: seasons,
                 latDatum: record.latDatum, hatDatum: record.hatDatum,
                 imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
         }

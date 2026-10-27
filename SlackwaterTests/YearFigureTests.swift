@@ -1,5 +1,6 @@
 import XCTest
 import SlackwaterKit
+import Almanac
 @testable import Slackwater
 
 /// Section 3's figure: when this station sees its extremes, across the year.
@@ -107,5 +108,95 @@ import SlackwaterKit
         XCTAssertEqual(cal.component(.day, from: w.start), 1)
         XCTAssertEqual(cal.component(.day, from: w.end), 1)
         XCTAssertEqual(cal.dateComponents([.month], from: w.start, to: w.end).month, 12)
+    }
+
+    // MARK: Solstices and equinoxes
+
+    /// Twelve synthetic months from `from`, each spanning what `spans` says,
+    /// with real season dates around the same window.
+    private func year(spans: [Double], from: Date = Date(timeIntervalSince1970: 1_768_435_200)) // 2026-01-15 UTC
+        -> (months: [YearFigure.Month], seasons: [SeasonEvent]) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let first = cal.date(from: cal.dateComponents([.year, .month], from: from))!
+        let months = spans.enumerated().map { i, span in
+            YearFigure.Month(start: cal.date(byAdding: .month, value: i, to: first)!, highest: span, lowest: 0)
+        }
+        let end = cal.date(byAdding: .month, value: spans.count, to: first)!
+        return (months, YearFigure.seasonsAround((first, end), tz: station.tz))
+    }
+
+    /// Jan-start spans peaking in the given 1-based months.
+    private func spans(peaking a: Int, _ b: Int) -> [Double] {
+        (1...12).map { $0 == a || $0 == b ? 3 : 2 }
+    }
+
+    func testAStationPeakingAtTheSolsticesFollowsThem() {
+        let y = year(spans: spans(peaking: 6, 12))
+        XCTAssertEqual(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz), .solstices)
+    }
+
+    func testAStationPeakingAtTheEquinoxesFollowsThem() {
+        let y = year(spans: spans(peaking: 3, 9))
+        XCTAssertEqual(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz), .equinoxes)
+    }
+
+    /// Midway between the two pairs the caption makes no claim. May/November
+    /// sits 71 days from the solstices against 112 from the equinoxes, and
+    /// February/August 69 against 113: inside the 45-day band both ways.
+    func testAStationPeakingBetweenMakesNoClaim() {
+        let may = year(spans: spans(peaking: 5, 11))
+        XCTAssertNil(YearFigure.follows(months: may.months, seasons: may.seasons, tz: station.tz))
+        let feb = year(spans: spans(peaking: 2, 8))
+        XCTAssertNil(YearFigure.follows(months: feb.months, seasons: feb.seasons, tz: station.tz))
+    }
+
+    /// A month either side of a turning point still follows it: April and
+    /// October are under four weeks from the equinoxes and nine from the
+    /// solstices.
+    func testAMonthBesideATurningPointStillFollowsIt() {
+        let april = year(spans: spans(peaking: 4, 10))
+        XCTAssertEqual(YearFigure.follows(months: april.months, seasons: april.seasons, tz: station.tz), .equinoxes)
+        let july = year(spans: spans(peaking: 1, 7))
+        XCTAssertEqual(YearFigure.follows(months: july.months, seasons: july.seasons, tz: station.tz), .solstices)
+    }
+
+    func testFollowsNeedsTwoStandoutMonths() {
+        let y = year(spans: [3])
+        XCTAssertNil(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz))
+    }
+
+    /// A window starting in April: April's nearest equinox is the March one
+    /// just outside it. Scored against September instead (159 days), the
+    /// sums would be 183 against 132 and April/October would read as
+    /// solstices; scored truly they follow the equinoxes.
+    func testAnEdgeMonthIsScoredAgainstTheSeasonOutsideTheWindow() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let april = cal.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        // April, …, October peak: indices 0 and 6 from an April start.
+        let y = year(spans: (0..<12).map { $0 == 0 || $0 == 6 ? 3 : 2 }, from: april)
+        XCTAssertEqual(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz), .equinoxes)
+    }
+
+    func testTheWindowHoldsFourSeasonsAndTheClassifierSeesMore() {
+        let y = year(spans: spans(peaking: 6, 12))
+        XCTAssertEqual(y.seasons.count, 8)
+        let inside = y.seasons.filter { $0.time >= y.months.first!.start && $0.time < y.months.last!.start.addingTimeInterval(32 * 86_400) }
+        XCTAssertEqual(inside.count, 4)
+    }
+
+    func testTheJuneSolsticeSitsTwoThirdsAcrossJune() throws {
+        let y = year(spans: spans(peaking: 6, 12))
+        let solstice = try XCTUnwrap(y.seasons.first { $0.kind == .juneSolstice && $0.time > y.months[0].start })
+        let x = try XCTUnwrap(YearFigure.seasonX(solstice, months: y.months, tz: station.tz, step: 30))
+        // June is index 5; 21 June at 01:24 PDT is 20.06 days into a 30-day month.
+        XCTAssertEqual(x, 30 * (5 + 20.06 / 30), accuracy: 1)
+    }
+
+    func testASeasonOutsideTheMonthsHasNoX() {
+        let y = year(spans: spans(peaking: 6, 12))
+        let before = y.seasons.first { $0.time < y.months[0].start }!
+        XCTAssertNil(YearFigure.seasonX(before, months: y.months, tz: station.tz, step: 30))
     }
 }

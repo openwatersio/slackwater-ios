@@ -12,6 +12,7 @@
 // the monthly extremes trace, and the months worth planning around.
 import SwiftUI
 import SlackwaterKit
+import Almanac
 
 struct YearFigure: View {
     struct Month: Equatable {
@@ -22,10 +23,20 @@ struct YearFigure: View {
         var span: Double { highest - lowest }
     }
 
+    /// Which pair of the year's turning points a station's widest months sit
+    /// nearer: the solstices, where the day's two tides are most unequal, or
+    /// the equinoxes, where a semidiurnal tide runs biggest.
+    enum SeasonPair { case solstices, equinoxes }
+
     let months: [Month]
     let now: Date
     var tz: TimeZone = .current
     var imperial = false
+    /// The solstices and equinoxes around the window: the sun's declination
+    /// is what shapes the year, so they are ruled where they fall. Searched
+    /// wider than the window so `follows` scores an edge month against its
+    /// true nearest; only those inside the months are drawn.
+    var seasons: [SeasonEvent] = []
 
     /// One entry per whole calendar month inside `window`, carrying the
     /// highest high and lowest low that month reaches.
@@ -54,9 +65,53 @@ struct YearFigure: View {
 
     /// The months a reader would plan around: where the water runs widest.
     /// Two of them, because the tide's seasonal structure is semi-annual at
-    /// most stations — the equinoxes, not one peak.
+    /// most stations — a pair of peaks, not one.
     nonisolated static func standout(_ months: [Month]) -> [Month] {
         Array(months.sorted { $0.span > $1.span }.prefix(2))
+    }
+
+    /// The solstices and equinoxes six months either side of a window, or
+    /// none where Almanac cannot say.
+    nonisolated static func seasonsAround(_ window: (start: Date, end: Date), tz: TimeZone) -> [SeasonEvent] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        guard let from = cal.date(byAdding: .month, value: -6, to: window.start),
+              let to = cal.date(byAdding: .month, value: 6, to: window.end) else { return [] }
+        return (try? Almanac.seasons(from: from, to: to)) ?? []
+    }
+
+    /// How many days the two standout months' midpoints sit from the nearest
+    /// solstice, summed, against the same for the equinoxes. Months resolve
+    /// only to their midpoint, so the sums step in month-sized jumps; a 45-day
+    /// band is what lets a station between kinds (May/November at 71 against
+    /// 112, February/August at 69 against 113) make no claim while the months
+    /// beside a turning point (April/October at 51 against 132) still decide.
+    nonisolated static func follows(months: [Month], seasons: [SeasonEvent], tz: TimeZone) -> SeasonPair? {
+        let marked = standout(months)
+        guard marked.count == 2, !seasons.isEmpty else { return nil }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        func nearest(_ month: Month, _ kinds: Set<SeasonKind>) -> Double {
+            let mid = cal.date(byAdding: DateComponents(day: 15, hour: 12), to: month.start) ?? month.start
+            return seasons.filter { kinds.contains($0.kind) }
+                .map { abs($0.time.timeIntervalSince(mid)) / 86_400 }.min() ?? .infinity
+        }
+        let solstices = marked.map { nearest($0, [.juneSolstice, .decemberSolstice]) }.reduce(0, +)
+        let equinoxes = marked.map { nearest($0, [.marchEquinox, .septemberEquinox]) }.reduce(0, +)
+        guard solstices.isFinite, equinoxes.isFinite, abs(solstices - equinoxes) > 45 else { return nil }
+        return solstices < equinoxes ? .solstices : .equinoxes
+    }
+
+    /// Where a season falls on the month axis: inside its month's cell, the
+    /// fraction of the month elapsed. Nil when its month is not drawn.
+    nonisolated static func seasonX(_ event: SeasonEvent, months: [Month], tz: TimeZone, step: CGFloat) -> CGFloat? {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        guard let i = months.lastIndex(where: { $0.start <= event.time }),
+              let next = cal.date(byAdding: .month, value: 1, to: months[i].start),
+              event.time < next else { return nil }
+        let fraction = event.time.timeIntervalSince(months[i].start) / next.timeIntervalSince(months[i].start)
+        return step * (CGFloat(i) + CGFloat(fraction))
     }
 
     private let boxHeight: CGFloat = 120
@@ -86,15 +141,15 @@ struct YearFigure: View {
             ctx.stroke(upper, with: .color(SN.graphHigh), lineWidth: 1.8)
             ctx.stroke(lower, with: .color(SN.graphLow), lineWidth: 1.8)
 
-            // The months worth planning around, named where they stand.
-            let marked = Self.standout(months)
-            var cal = Calendar(identifier: .gregorian)
-            cal.timeZone = tz
-            for m in marked {
-                guard let i = months.firstIndex(where: { $0.start == m.start }) else { continue }
+            // The year's turning points, ruled where they fall inside their
+            // months, so the envelope's peaks can be read against them.
+            for event in seasons {
+                guard let sx = Self.seasonX(event, months: months, tz: tz, step: step),
+                      let i = months.lastIndex(where: { $0.start <= event.time }) else { continue }
+                let m = months[i]
                 var rule = Path()
-                rule.move(to: CGPoint(x: x(i), y: y(m.highest) - 6))
-                rule.addLine(to: CGPoint(x: x(i), y: y(m.lowest) + 6))
+                rule.move(to: CGPoint(x: sx, y: y(m.highest) - 6))
+                rule.addLine(to: CGPoint(x: sx, y: y(m.lowest) + 6))
                 ctx.stroke(rule, with: .color(SN.foam.opacity(0.28)),
                            style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
             }
@@ -121,12 +176,19 @@ struct YearFigure: View {
     private var spoken: String {
         let names = Self.standout(months).map { monthName($0.start, tz: tz) }
         guard let first = names.first else { return "" }
-        if names.count < 2 {
-            return String(localized: "The water here runs widest in \(first).",
-                          comment: "VoiceOver for the year figure. The value is a month name.")
+        let widest = names.count < 2
+            ? String(localized: "The water here runs widest in \(first).",
+                     comment: "VoiceOver for the year figure. The value is a month name.")
+            : String(localized: "The water here runs widest in \(first) and \(names[1]).",
+                     comment: "VoiceOver for the year figure. Both values are month names.")
+        switch Self.follows(months: months, seasons: seasons, tz: tz) {
+        case .solstices:
+            return widest + " " + String(localized: "Near the solstices.", comment: "VoiceOver for the year figure.")
+        case .equinoxes:
+            return widest + " " + String(localized: "Near the equinoxes.", comment: "VoiceOver for the year figure.")
+        case nil:
+            return widest
         }
-        return String(localized: "The water here runs widest in \(first) and \(names[1]).",
-                      comment: "VoiceOver for the year figure. Both values are month names.")
     }
 }
 
