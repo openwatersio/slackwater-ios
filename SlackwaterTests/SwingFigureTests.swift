@@ -248,6 +248,18 @@ import Almanac
         XCTAssertEqual(SwingFigure.phaseMarks([phase], peaks: without, tz: station.tz), [])
     }
 
+    /// A finger that goes up or down the sheet is scrolling it, not sliding
+    /// along the bars, so lifting after a vertical swipe does not jump. A
+    /// slide that drifts upward still does.
+    func testAVerticalSwipeIsAScrollNotASlide() {
+        XCTAssertTrue(SwingFigure.slideJumps(CGSize(width: 0, height: 0)), "a tap")
+        XCTAssertTrue(SwingFigure.slideJumps(CGSize(width: 80, height: 0)), "a slide")
+        XCTAssertTrue(SwingFigure.slideJumps(CGSize(width: 60, height: -40)), "a slide that drifts up")
+        XCTAssertTrue(SwingFigure.slideJumps(CGSize(width: 0, height: -12)), "a wobble under the threshold")
+        XCTAssertFalse(SwingFigure.slideJumps(CGSize(width: 4, height: -60)), "a swipe up")
+        XCTAssertFalse(SwingFigure.slideJumps(CGSize(width: -10, height: 90)), "a swipe down")
+    }
+
     func testWithoutAJumpTheBarsIgnoreTouches() {
         XCTAssertFalse(SwingFigure(standing: standing(), tz: station.tz).respondsToTouch)
         XCTAssertTrue(SwingFigure(standing: standing(), tz: station.tz, onJump: { _ in }).respondsToTouch)

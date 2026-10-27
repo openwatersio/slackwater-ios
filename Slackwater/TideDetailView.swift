@@ -318,11 +318,14 @@ struct TideDetailView: View {
         let place = record.name, ratio = record.seasonalRatio
         let standing = standing, swing = swingStanding, record = record
         let months = standings.months
-        let phases = swing.map { SwingFigure.moonPhases(in: $0.window) } ?? []
-        let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: live, tz: record.tz), tz: record.tz)
         let imperial = imperial, unit = unit, now = live
         return {
-            AnyView(RangeDetailSheet(
+            // Inside the closure, so the two Almanac searches run when the
+            // sheet opens and not on every tick of the timeline, which
+            // rebuilds this builder.
+            let phases = swing.map { SwingFigure.moonPhases(in: $0.window) } ?? []
+            let seasons = YearFigure.seasonsAround(TideStanding.yearWindow(around: now, tz: record.tz), tz: record.tz)
+            return AnyView(RangeDetailSheet(
                 value: range.value, direction: self.rangeDirection,
                 seasonalRatio: ratio, place: place,
                 standing: standing, swing: swing, phases: phases, months: months, seasons: seasons,
