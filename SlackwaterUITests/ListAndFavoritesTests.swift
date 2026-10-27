@@ -359,7 +359,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Scroll to the ROW, not to the group label: how many rows Recents has
         // depends on what this simulator has downloaded, so the label can land
         // on the last visible line with the row below the fold.
-        let refiled = app.staticTexts["Friday Harbor"].firstMatch
+        let refiled = listContainer(app).cells.containing(
+            .staticText, identifier: "Friday Harbor").firstMatch
         scrollTo(refiled, in: app)
         XCTAssert(refiled.exists, "unfavorited station did not re-file to Recents")
         // The device is left as found: the unfavorite above — an assertion in
