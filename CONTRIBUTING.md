@@ -148,6 +148,8 @@ gh pr create --fill
 
 Before you open it, run the relevant tests with `./scripts/test.sh` and say in the description what you changed and why. Small PRs get reviewed faster. Rebase or squash rather than merge-commit, and never force-push `main` — your own branches, freely.
 
+When a change answers TestFlight feedback, link its issue in [openwatersio/slackwater-feedback](https://github.com/openwatersio/slackwater-feedback) in the PR description. That repository is private because its issues and screenshots can identify testers, not to hide that the feedback exists, and a public link shows that feedback is read and acted on. Describe the problem in your own words: copy no feedback text, screenshots or crash logs into this repository.
+
 ## License and CLA
 
 Slackwater is licensed under [GPL-3.0](LICENSE.md). All contributors must sign the [Contributor License Agreement](CLA.md) before their pull request can be merged. The CLA grants Open Water Software, LLC the rights needed to distribute your contributions (including through the iOS App Store) while you retain full copyright ownership of your work — [docs/licensing.md](docs/licensing.md) explains why a GPL app on the App Store needs this.
