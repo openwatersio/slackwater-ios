@@ -42,7 +42,8 @@ struct SwingFigure: View {
     /// "3.2 kn"). The figure ranks sizes without knowing what they measure,
     /// so the sheet that does supplies the words. Nil draws no label.
     var format: ((Double) -> String)? = nil
-    /// The quarter phases inside the window. The beat the bars show is the
+    /// The quarter phases across the window and a little past it (see
+    /// `moonPhases`); only those on drawn days are drawn. The beat the bars show is the
     /// Moon's — springs under new and full, neaps under the quarters — and
     /// drawing the phases under the days they fall on says so without a
     /// sentence, the way NOAA's own tide plots do.
@@ -52,6 +53,9 @@ struct SwingFigure: View {
     /// Gesture state rather than plain state so a touch the system takes
     /// away — the sheet's scroll, an interruption — leaves no bar lit.
     @GestureState private var lit: Int? = nil
+    /// The bar VoiceOver has stepped to, by index into `bars`: the sighted
+    /// slide's equivalent, chosen with swipes and gone to with a double-tap.
+    @State private var chosen: Int? = nil
     /// The canvas width, for finding the bar under an x outside the draw call.
     @State private var width: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
@@ -114,9 +118,16 @@ struct SwingFigure: View {
         }
     }
 
-    /// The quarter phases in a window, or none where Almanac cannot say.
+    /// The quarter phases in a window and eight days either side, or none where
+    /// Almanac cannot say. Wider than the window because the days at its
+    /// edges are nearest a phase just outside it: scored only against the
+    /// phases inside, the last days before a new moon counted as quarter
+    /// days and the caption lost its sentence at Friday Harbor. Only phases
+    /// on drawn days are drawn (`phaseMarks`).
     static func moonPhases(in window: (start: Date, end: Date)) -> [MoonPhaseEvent] {
-        (try? searchMoonPhases(from: window.start, to: window.end)) ?? []
+        let margin: TimeInterval = 8 * 86_400
+        return (try? searchMoonPhases(from: window.start.addingTimeInterval(-margin),
+                                      to: window.end.addingTimeInterval(margin))) ?? []
     }
 
     /// Each phase on the bar of the station-local day it falls on, in time
@@ -129,6 +140,33 @@ struct SwingFigure: View {
         return phases.sorted { $0.time < $1.time }.compactMap { phase in
             days.firstIndex(of: cal.startOfDay(for: phase.time)).map { PhaseMark(index: $0, phase: phase.phase) }
         }
+    }
+
+    /// Whether the bars actually beat with the Moon's phases here: the mean of
+    /// the days nearer a new or full moon against the mean of the days nearer
+    /// a quarter. At a semidiurnal or mixed station the first is plainly the
+    /// larger; at a diurnal station the fortnightly beat follows the Moon's
+    /// declination instead and the phases drift across it, so the caption
+    /// must not say "springs follow the new and full moon" there.
+    static func springsFollowThePhases(peaks: [Peak], phases: [MoonPhaseEvent]) -> Bool {
+        let syzygy = phases.filter { $0.phase == .new || $0.phase == .full }.map(\.time)
+        let quadrature = phases.filter { $0.phase == .firstQuarter || $0.phase == .lastQuarter }.map(\.time)
+        guard !syzygy.isEmpty, !quadrature.isEmpty else { return false }
+        func nearest(_ t: Date, _ events: [Date]) -> TimeInterval {
+            events.map { abs($0.timeIntervalSince(t)) }.min() ?? .infinity
+        }
+        var near: [Double] = [], far: [Double] = []
+        for p in peaks {
+            if nearest(p.time, syzygy) < nearest(p.time, quadrature) { near.append(p.magnitude) } else { far.append(p.magnitude) }
+        }
+        guard !near.isEmpty, !far.isEmpty else { return false }
+        return near.reduce(0, +) / Double(near.count) > 1.05 * far.reduce(0, +) / Double(far.count)
+    }
+
+    /// VoiceOver's step along the bars: one bar either way from the chosen
+    /// one, starting at the selected day, never past either end.
+    static func step(_ chosen: Int?, from selected: Int, by delta: Int, count: Int) -> Int {
+        min(max((chosen ?? selected) + delta, 0), max(count - 1, 0))
     }
 
     /// The bar under an x, by the same layout `bars` uses. Clamped, so a drag
@@ -177,16 +215,18 @@ struct SwingFigure: View {
                     tick.addLine(to: CGPoint(x: bar.x, y: baseline - bar.height - 3))
                     ctx.stroke(tick, with: .color(SN.foam.opacity(0.5)))
                 }
-                if isLit, let format {
-                    // The day and its size, over the finger. Kept inside the
-                    // canvas at either edge rather than centred and clipped.
-                    var label = ctx.resolve(
-                        Text("\(monthDay(bar.peak.time, tz)) · \(format(bar.peak.magnitude))")
-                            .font(.caption2.monospacedDigit()))
+                if isLit, format != nil {
+                    // The day and its size, above the bar. Kept inside the
+                    // canvas: centred when wider than it (large text, a long
+                    // locale), held at either edge otherwise, and never
+                    // above the top at accessibility sizes.
+                    var label = ctx.resolve(Text(verbatim: self.label(for: bar)).font(.caption2.monospacedDigit()))
                     label.shading = .color(SN.foam)
-                    let half = label.measure(in: size).width / 2
-                    let x = min(max(bar.x, half), size.width - half)
-                    ctx.draw(label, at: CGPoint(x: x, y: baseline - bar.height - 12), anchor: .bottom)
+                    let measured = label.measure(in: size)
+                    let half = measured.width / 2
+                    let x = measured.width >= size.width ? size.width / 2 : min(max(bar.x, half), size.width - half)
+                    let y = max(baseline - bar.height - 12, measured.height)
+                    ctx.draw(label, at: CGPoint(x: x, y: y), anchor: .bottom)
                 }
             }
         }
@@ -195,6 +235,31 @@ struct SwingFigure: View {
         .gesture(slide, including: respondsToTouch ? .all : .none)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
+        .accessibilityValue(chosen.flatMap { bars.indices.contains($0) ? label(for: bars[$0]) : nil } ?? "")
+        .accessibilityHint(respondsToTouch
+            ? String(localized: "Swipe up or down to choose a day, then double-tap to go there.",
+                     comment: "VoiceOver hint on the swing figure.")
+            : "")
+        // The sighted slide's equivalent: step to a day, then go. Without an
+        // action VoiceOver's double-tap would land a simulated touch on the
+        // middle bar and jump there unannounced.
+        .accessibilityAdjustableAction { direction in
+            guard respondsToTouch else { return }
+            let selected = bars.firstIndex(where: \.isSelected) ?? 0
+            chosen = Self.step(chosen, from: selected, by: direction == .increment ? 1 : -1, count: bars.count)
+        }
+        .accessibilityAction {
+            guard let i = chosen, bars.indices.contains(i) else { return }
+            onJump?(bars[i].peak.time)
+            dismiss()
+        }
+    }
+
+    /// "Oct 6 · 10.6 ft": the bar's day and, where the sheet gave the figure
+    /// words for it, its size.
+    private func label(for bar: Bar) -> String {
+        let day = monthDay(bar.peak.time, tz)
+        return format.map { "\(day) · \($0(bar.peak.magnitude))" } ?? day
     }
 
     /// The calendar convention rather than the Moon sheet's observer
@@ -219,29 +284,37 @@ struct SwingFigure: View {
         }
     }
 
-    /// Whether lifting after this movement goes to the lit bar. The figure
-    /// sits inside a sheet that scrolls, so a finger that went up or down
-    /// more than it went along the bars was scrolling, and lifting then must
-    /// not close the sheet and move the timeline under the reader.
+    /// Whether this movement is a slide along the bars rather than the
+    /// sheet's scroll. The figure sits inside a sheet that scrolls, so a
+    /// finger that went up or down more than it went along the bars was
+    /// scrolling: lifting then must not close the sheet and move the timeline
+    /// under the reader, and the light goes out while it scrolls.
     static func slideJumps(_ translation: CGSize) -> Bool {
         let w = abs(translation.width), h = abs(translation.height)
-        return !(h > 20 && h > 2 * w)
+        return !(h > 20 && h > w)
     }
 
-    /// A finger on the bars lights the one under it; lifting goes there and
-    /// closes the sheet. Zero distance so the first touch already lights,
-    /// and a tick each time the lit bar changes so a slide reads as steps.
+    /// A finger held on the bars lights the one under it; sliding moves the
+    /// light with a tick at each bar, and lifting goes there and closes the
+    /// sheet. The short hold first is what gives the sheet its scroll: a
+    /// finger that moves before the hold completes fails the press and the
+    /// scroll view takes the touch, the way the timeline's own long-press
+    /// works. A plain drag, even a simultaneous one, kept the touch and the
+    /// sheet never moved under a swipe that began on the bars.
     private var slide: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+        LongPressGesture(minimumDuration: 0.12, maximumDistance: 8)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
             .updating($lit) { value, lit, _ in
-                let i = Self.barIndex(atX: value.location.x, count: bars.count, width: width)
+                guard case .second(true, let drag?) = value else { return }
+                let i = Self.slideJumps(drag.translation)
+                    ? Self.barIndex(atX: drag.location.x, count: bars.count, width: width) : nil
                 guard i != lit else { return }
                 lit = i
-                UISelectionFeedbackGenerator().selectionChanged()
+                if i != nil { UISelectionFeedbackGenerator().selectionChanged() }
             }
             .onEnded { value in
-                guard Self.slideJumps(value.translation),
-                      let i = Self.barIndex(atX: value.location.x, count: bars.count, width: width),
+                guard case .second(true, let drag?) = value, Self.slideJumps(drag.translation),
+                      let i = Self.barIndex(atX: drag.location.x, count: bars.count, width: width),
                       bars.indices.contains(i) else { return }
                 onJump?(bars[i].peak.time)
                 dismiss()

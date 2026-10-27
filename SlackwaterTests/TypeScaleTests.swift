@@ -103,11 +103,11 @@ extension TypeScaleTests {
             // to the nearest one above it — previewGraph.
             "StationCard.swift:previewGraph",
             "TideDetailView.swift:scheduleEntries",
-            // The swing figure's lit-bar label: each sheet hands SwingFigure a
-            // `format:` closure, and the figure's one consuming Text
+            // The swing figure's lit-bar label: each sheet hands SwingFigure
+            // its `swingLabel`, and the figure's one consuming Text
             // (SwingFigure.swift) carries `.caption2.monospacedDigit()`.
-            "RangeDetailSheet.swift:body",
-            "MaxDetailSheet.swift:body",
+            "RangeDetailSheet.swift:swingLabel",
+            "MaxDetailSheet.swift:swingLabel",
             // The summary tile's number: a tide's range and a current's next
             // max are formatted where they are known and consumed by
             // `SummaryTiles`' `Text(primary.value)`, which carries the mono

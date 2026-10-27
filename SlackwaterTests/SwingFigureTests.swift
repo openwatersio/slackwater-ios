@@ -214,24 +214,58 @@ import Almanac
         XCTAssertNil(SwingFigure.barIndex(atX: 10, count: 0, width: 300))
     }
 
-    /// With nowhere to go, a finger on the bars does nothing: no lit bar and
-    /// no sheet closing under it.
     /// The beat the bars show is the moon's, so each phase in the window is
     /// drawn under the bar of the station-local day it falls on.
     func testEachPhaseLandsOnItsDaysBar() throws {
         let s = standing()
         let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
-        let phases = SwingFigure.moonPhases(in: s.window)
-        XCTAssertGreaterThanOrEqual(phases.count, 3, "a 30-day window holds four phases, three at the least")
-        let marks = SwingFigure.phaseMarks(phases, peaks: peaks, tz: station.tz)
-        XCTAssertEqual(marks.count, phases.count, "every phase inside the whole days has a bar")
+        let all = SwingFigure.moonPhases(in: s.window).sorted { $0.time < $1.time }
+        XCTAssertTrue(all.contains { $0.time < s.window.start } && all.contains { $0.time >= s.window.end },
+                      "the search reaches past the window, for the edge days' nearest phase")
+        let phases = all.filter { $0.time >= s.window.start && $0.time < s.window.end }
+        XCTAssertGreaterThanOrEqual(phases.count, 3, "a 30-day window holds four or five phases, three at the least")
+        let marks = SwingFigure.phaseMarks(all, peaks: peaks, tz: station.tz)
+        XCTAssertEqual(marks.count, phases.count, "every phase inside the whole days has a bar, and none outside does")
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = station.tz
-        for mark in marks {
-            let phase = try XCTUnwrap(phases.first { $0.phase == mark.phase })
+        // Marks come back in time order, so the i-th mark is the i-th phase —
+        // matching by kind would pair the wrong instants in a window holding
+        // the same phase twice.
+        for (mark, phase) in zip(marks, phases) {
+            XCTAssertEqual(mark.phase, phase.phase)
             XCTAssertEqual(cal.startOfDay(for: peaks[mark.index].time), cal.startOfDay(for: phase.time))
         }
         XCTAssertEqual(marks.map(\.index), marks.map(\.index).sorted(), "in time order")
+    }
+
+    /// The caption claims springs follow the new and full moon only where the
+    /// bars bear it out. Friday Harbor's do; a series that peaks at the
+    /// quarters instead — the shape of a diurnal station's declinational
+    /// beat — does not get the sentence.
+    func testTheMoonSentenceIsEarnedByTheBars() {
+        let s = standing()
+        let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
+        let phases = SwingFigure.moonPhases(in: s.window)
+        XCTAssertTrue(SwingFigure.springsFollowThePhases(peaks: peaks, phases: phases))
+        let quarters = phases.filter { $0.phase == .firstQuarter || $0.phase == .lastQuarter }.map(\.time)
+        let syzygies = phases.filter { $0.phase == .new || $0.phase == .full }.map(\.time)
+        func nearest(_ t: Date, _ e: [Date]) -> TimeInterval { e.map { abs($0.timeIntervalSince(t)) }.min()! }
+        let inverted = peaks.map {
+            Peak(time: $0.time, magnitude: nearest($0.time, quarters) < nearest($0.time, syzygies) ? 3 : 1)
+        }
+        XCTAssertFalse(SwingFigure.springsFollowThePhases(peaks: inverted, phases: phases))
+        XCTAssertFalse(SwingFigure.springsFollowThePhases(peaks: peaks, phases: []), "no phases, no claim")
+    }
+
+    /// VoiceOver steps one bar at a time from the selected day, never past
+    /// either end.
+    func testVoiceOverStepsAlongTheBarsFromTheSelection() {
+        XCTAssertEqual(SwingFigure.step(nil, from: 12, by: 1, count: 30), 13)
+        XCTAssertEqual(SwingFigure.step(nil, from: 12, by: -1, count: 30), 11)
+        XCTAssertEqual(SwingFigure.step(13, from: 12, by: 1, count: 30), 14)
+        XCTAssertEqual(SwingFigure.step(29, from: 12, by: 1, count: 30), 29)
+        XCTAssertEqual(SwingFigure.step(0, from: 12, by: -1, count: 30), 0)
+        XCTAssertEqual(SwingFigure.step(nil, from: 0, by: -1, count: 0), 0)
     }
 
     /// A phase on a day with no bar — the window's dropped fragment — draws
@@ -239,7 +273,7 @@ import Almanac
     func testAPhaseOnADayWithoutABarDrawsNothing() throws {
         let s = standing()
         let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
-        let phase = try XCTUnwrap(SwingFigure.moonPhases(in: s.window).first)
+        let phase = try XCTUnwrap(SwingFigure.moonPhases(in: s.window).first { $0.time >= s.window.start })
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = station.tz
         let day = cal.startOfDay(for: phase.time)
@@ -258,8 +292,11 @@ import Almanac
         XCTAssertTrue(SwingFigure.slideJumps(CGSize(width: 0, height: -12)), "a wobble under the threshold")
         XCTAssertFalse(SwingFigure.slideJumps(CGSize(width: 4, height: -60)), "a swipe up")
         XCTAssertFalse(SwingFigure.slideJumps(CGSize(width: -10, height: 90)), "a swipe down")
+        XCTAssertFalse(SwingFigure.slideJumps(CGSize(width: 30, height: 50)), "a diagonal scroll")
     }
 
+    /// With nowhere to go, a finger on the bars does nothing: no lit bar and
+    /// no sheet closing under it.
     func testWithoutAJumpTheBarsIgnoreTouches() {
         XCTAssertFalse(SwingFigure(standing: standing(), tz: station.tz).respondsToTouch)
         XCTAssertTrue(SwingFigure(standing: standing(), tz: station.tz, onJump: { _ in }).respondsToTouch)

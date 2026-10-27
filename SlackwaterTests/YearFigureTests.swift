@@ -169,6 +169,28 @@ import Almanac
         let y = year(spans: (1...12).map { $0 == 8 ? 3.2 : $0 == 12 ? 3 : 2 })
         XCTAssertEqual(YearFigure.standout(y.months).first?.start, y.months[7].start, "August is the widest")
         XCTAssertNil(YearFigure.follows(months: y.months, seasons: y.seasons, tz: station.tz))
+        // And the other way round: VoiceOver names both months, so December
+        // first does not rescue an August that is nearer the equinox.
+        let d = year(spans: (1...12).map { $0 == 12 ? 3.2 : $0 == 8 ? 3 : 2 })
+        XCTAssertEqual(YearFigure.standout(d.months).first?.start, d.months[11].start, "December is the widest")
+        XCTAssertNil(YearFigure.follows(months: d.months, seasons: d.seasons, tz: station.tz))
+    }
+
+    /// The band is clear of the pairs it withholds: February/August sits
+    /// 44.65 days apart at this station in 2026, and a station three hours
+    /// east would have crossed a 45-day band. Checked here in Honolulu's zone.
+    func testTheBandHoldsAcrossZones() {
+        let tz = TimeZone(identifier: "Pacific/Honolulu")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let jan = cal.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let months = (0..<12).map { i in
+            YearFigure.Month(start: cal.date(byAdding: .month, value: i, to: jan)!,
+                             highest: i == 1 || i == 7 ? 3 : 2, lowest: 0)
+        }
+        let end = cal.date(byAdding: .month, value: 12, to: jan)!
+        let seasons = YearFigure.seasonsAround((jan, end), tz: tz)
+        XCTAssertNil(YearFigure.follows(months: months, seasons: seasons, tz: tz))
     }
 
     func testFollowsNeedsTwoStandoutMonths() {

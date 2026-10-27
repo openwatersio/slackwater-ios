@@ -71,23 +71,29 @@ struct RangeDetailSheet: View {
                         section(String(localized: "Is this beyond normal?",
                                        comment: "Range sheet section: how this swing compares with the fortnight's.")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                // The lit bar's label prints a height the way
-                                // the captions do; the figure's own Text
-                                // carries the mono trait.
                                 SwingFigure(standing: swing, tz: tz, onJump: onJump,
-                                            format: { "\(formatHeight($0, imperial: imperial)) \(unit)" },
-                                            phases: phases)
+                                            format: swingLabel, phases: phases)
                                     .accessibilityIdentifier("range-section-swings")
                                 // The bars are days and the caption counts
                                 // swings, so the series has to say which it is
                                 // — at a mixed station the marked day's
                                 // biggest swing is often not the selected one.
-                                // And the phases under them are why the bars
-                                // beat at all.
-                                Text("Each bar is one day's biggest swing. Springs follow the new and full moon.",
-                                     comment: "Explains the unit of the swing figure's bars and why they beat with the moon.")
-                                    .font(.caption)
-                                    .foregroundStyle(SN.foam.opacity(0.5))
+                                // The phases under them are why the bars beat,
+                                // said only where the bars bear it out: at a
+                                // diurnal station the beat is the Moon's
+                                // declination and the phases drift across it.
+                                Group {
+                                    if SwingFigure.springsFollowThePhases(peaks: SwingFigure.dailyPeaks(swing, tz: tz),
+                                                                          phases: phases) {
+                                        Text("Each bar is one day's biggest swing. Springs follow the new and full moon.",
+                                             comment: "Explains the unit of the swing figure's bars and why they beat with the moon.")
+                                    } else {
+                                        Text("Each bar is one day's biggest swing.",
+                                             comment: "Explains the unit of the swing figure's bars.")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(SN.foam.opacity(0.5))
                             }
                         }
                         factRow(swingFact)
@@ -156,6 +162,13 @@ struct RangeDetailSheet: View {
             MonoLabel(text: title, color: SN.foam.opacity(0.55), isHeader: true)
             group { content().padding(14) }
         }
+    }
+
+    /// The lit bar's label prints a height the way the captions do. Its one
+    /// renderer is the figure's own Text, which carries the mono trait
+    /// (TypeScaleTests' known indirections records the pair).
+    private func swingLabel(_ metres: Double) -> String {
+        "\(formatHeight(metres, imperial: imperial)) \(unit)"
     }
 
     /// Section 1's caption. Counts rather than a percentile: "all but three of

@@ -82,10 +82,13 @@ struct YearFigure: View {
 
     /// How many days the two standout months' midpoints sit from the nearest
     /// solstice, summed, against the same for the equinoxes. Months resolve
-    /// only to their midpoint, so the sums step in month-sized jumps; a 45-day
+    /// only to their midpoint, so the sums step in month-sized jumps; a 50-day
     /// band is what lets a station between kinds (May/November at 71 against
-    /// 112, February/August at 69 against 113) make no claim while the months
+    /// 112, February/August at 69 against 114) make no claim while the months
     /// beside a turning point (April/October at 51 against 132) still decide.
+    /// 50 rather than 45 because February/August sits 44.65 apart at Friday
+    /// Harbor in 2026 and a station three hours east, or another year, would
+    /// have tipped it over.
     nonisolated static func follows(months: [Month], seasons: [SeasonEvent], tz: TimeZone) -> SeasonPair? {
         let marked = standout(months)
         guard marked.count == 2, !seasons.isEmpty else { return nil }
@@ -99,13 +102,14 @@ struct YearFigure: View {
         let toSolstice = marked.map { nearest($0, [.juneSolstice, .decemberSolstice]) }
         let toEquinox = marked.map { nearest($0, [.marchEquinox, .septemberEquinox]) }
         let solstices = toSolstice.reduce(0, +), equinoxes = toEquinox.reduce(0, +)
-        guard solstices.isFinite, equinoxes.isFinite, abs(solstices - equinoxes) > 45 else { return nil }
-        // The caption names the widest month alone, so that month must itself
-        // sit nearer the winning kind: August and December sum to solstices,
-        // but "Widest around August, near the solstice" would be false.
+        guard solstices.isFinite, equinoxes.isFinite, abs(solstices - equinoxes) > 50 else { return nil }
+        // Each month must itself sit nearer the winning kind: August and
+        // December sum to solstices, but "Widest around August, near the
+        // solstice" would be false, and so would VoiceOver's "widest in
+        // December and August, near the solstices".
         let pair: SeasonPair = solstices < equinoxes ? .solstices : .equinoxes
-        let namedFollows = pair == .solstices ? toSolstice[0] < toEquinox[0] : toEquinox[0] < toSolstice[0]
-        return namedFollows ? pair : nil
+        let agree = zip(toSolstice, toEquinox).allSatisfy { s, e in pair == .solstices ? s < e : e < s }
+        return agree ? pair : nil
     }
 
     /// Where a season falls on the month axis: inside its month's cell, the
