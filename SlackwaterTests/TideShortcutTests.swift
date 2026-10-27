@@ -6,6 +6,37 @@ import CoreLocation
 @testable import Slackwater
 
 @MainActor final class TideShortcutTests: XCTestCase {
+    func testSuggestedPlacesStayWithinSirisExpandedPhraseBudget() throws {
+        let service = LocationService.shared
+        let savedStatus = service.status
+        let defaults = AppGroup.defaults
+        let favorites = defaults.object(forKey: AppGroup.favoritesKey)
+        let recents = defaults.object(forKey: AppGroup.recentsKey)
+        defer {
+            service.status = savedStatus
+            defaults.set(favorites, forKey: AppGroup.favoritesKey)
+            defaults.set(recents, forKey: AppGroup.recentsKey)
+        }
+        service.status = .denied
+        let savannah = "noaa/8670870"
+        defaults.set([savannah, savannah, "current:noaa/PUG1701"], forKey: AppGroup.favoritesKey)
+        defaults.set([savannah], forKey: AppGroup.recentsKey)
+        let tides = ShortcutPlaceQuery.suggestions(kind: .tide)
+        let currents = ShortcutPlaceQuery.suggestions(kind: .current)
+        XCTAssertEqual(tides.first?.id, savannah)
+        XCTAssertEqual(tides.filter { $0.id == savannah }.count, 1)
+        XCTAssertEqual(tides.map(\.id), [savannah])
+        XCTAssertEqual(currents.map(\.id), ["current:noaa/PUG1701"])
+        XCTAssertTrue(currents.allSatisfy { $0.series == .current })
+        // Each tide place expands both high and low phrases; seven phrases have no place.
+        XCTAssertLessThanOrEqual(2 * tides.count + currents.count + 7, 1_000)
+        let tideIDs = StationItem.all.filter { ShortcutPlaceQuery.accepts($0, kind: .tide) }.prefix(150).map(\.id)
+        defaults.set(Array(tideIDs), forKey: AppGroup.favoritesKey)
+        let many = ShortcutPlaceQuery.suggestions(kind: .tide)
+        XCTAssertEqual(many.map(\.id), Array(tideIDs.prefix(100)))
+        XCTAssertFalse(ShortcutPlaceQuery.matches("Savannah", kind: .tide).isEmpty)
+    }
+
     func testNamedPlaceUsesLocalThenFavoritesThenRecentsBeforeTheCatalog() throws {
         let choices = ShortcutPlaceQuery.matches("Savannah", kind: .tide)
         XCTAssertGreaterThanOrEqual(choices.count, 4)
