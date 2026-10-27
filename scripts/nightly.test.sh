@@ -45,6 +45,12 @@ cat > "$REPO/scripts/testflight.sh" <<'EOF'
 #!/bin/zsh
 print "upload:$BUILD_NUMBER" >> "$NIGHTLY_STATE/events"
 print "$BUILD_NUMBER" > "$NIGHTLY_STATE/asc-build"
+if [[ -f "$NIGHTLY_STATE/processing" ]]; then
+  mv "$NIGHTLY_STATE/processing" "$NIGHTLY_STATE/unlisted"
+fi
+if [[ -f "$NIGHTLY_STATE/group-pending" ]]; then
+  mv "$NIGHTLY_STATE/group-pending" "$NIGHTLY_STATE/unassigned"
+fi
 git rev-parse HEAD > "$NIGHTLY_STATE/archive-sha"
 EOF
 chmod +x "$REPO/scripts/test.sh" "$REPO/scripts/testflight.sh"
@@ -56,6 +62,11 @@ if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
   build=$(< "$NIGHTLY_STATE/asc-build")
   groups='[Nightly]'
   [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Beta]'
+  pending=$(cat "$NIGHTLY_STATE/unlisted" 2>/dev/null || print 0)
+  if (( pending > 0 )); then
+    print $(( pending - 1 )) > "$NIGHTLY_STATE/unlisted"
+    exit 0
+  fi
   # The first N listings show the build before its group assignment.
   pending=$(cat "$NIGHTLY_STATE/unassigned" 2>/dev/null || print 0)
   if (( pending > 0 )); then
@@ -158,19 +169,38 @@ grep -q 'Another feature' "$REPO/build/nightly-notes.md"
 
 # A build listed before its group assignment is waited for, then tagged.
 new_commit 'Late group'
-print 3 > "$STATE/unassigned"
+print 3 > "$STATE/group-pending"
 nightly
 tail -2 "$STATE/events" | diff -u - <(printf 'upload:41\nrelease:nightly-1.13.0-41\n')
 
+# Listing can take the full 15 minutes, with a separate group wait afterward.
+new_commit 'Slow processing'
+print 30 > "$STATE/processing"
+print 10 > "$STATE/group-pending"
+nightly
+tail -2 "$STATE/events" | diff -u - <(printf 'upload:42\nrelease:nightly-1.13.0-42\n')
+
+# An upload never listed has its own timeout and creates no release.
+new_commit 'Never listed'
+print 99 > "$STATE/processing"
+output=$(nightly 2>&1) && fail 'an unlisted build passed'
+[[ $output == *'never listed on App Store Connect after 15 minutes'* ]] || fail "$output"
+[[ $(< "$STATE/unlisted") == 68 ]] || fail 'listing wait exceeded its budget'
+rm "$STATE/unlisted"
+
 # A build that reaches an external group is not tagged.
 new_commit 'Third feature'
-! NIGHTLY_WRONG_GROUP=yes nightly || fail 'a build in an external group passed'
-! grep -q 'release:nightly-1.13.0-42' "$STATE/events" || fail 'a build in an external group was tagged'
+output=$(NIGHTLY_WRONG_GROUP=yes nightly 2>&1) && fail 'a build in an external group passed'
+[[ $output == *'wrong group'* ]] || fail "$output"
+! grep -q 'release:nightly-1.13.0-44' "$STATE/events" || fail 'a build in an external group was tagged'
 
 # A group that never shows still fails.
 new_commit 'Never assigned'
-print 99 > "$STATE/unassigned"
-! nightly || fail 'a build with no group passed'
+print 99 > "$STATE/group-pending"
+output=$(nightly 2>&1) && fail 'a build with no group passed'
+[[ $output == *'listed without a group after 5 minutes'* ]] || fail "$output"
+! grep -Eq 'release:nightly-1.13.0-(43|44|45)' "$STATE/events" || fail 'a timed-out build was tagged'
+[[ $(< "$STATE/unassigned") == 88 ]] || fail 'group wait exceeded its budget'
 rm "$STATE/unassigned"
 
 ! grep -q 'test-called' "$STATE/events" || fail 'nightly ran the test suite'

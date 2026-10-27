@@ -47,16 +47,30 @@ NOTES=build/nightly-notes.md
 
 BUILD_NUMBER=$NEXT_BUILD ./scripts/testflight.sh
 
-# ASC can list a processed build before its automatic Nightly assignment shows;
-# an empty group column there means not yet, so poll it before judging.
-# ponytail: 5 min budget; raise it if [] still outlasts it.
-for _ in {1..10}; do
+# Processing and automatic group assignment have separate wait budgets.
+UNLISTED_POLLS=0
+UNGROUPED_POLLS=0
+while true; do
   BUILD_ROW=$(node scripts/asc.mjs builds | grep -F -m1 "$VERSION ($NEXT_BUILD)" || true)
-  [[ -z $BUILD_ROW || $BUILD_ROW == *'[]' ]] || break
+  if [[ -z $BUILD_ROW ]]; then
+    if (( UNLISTED_POLLS >= 30 )); then
+      echo "Build $VERSION ($NEXT_BUILD) never listed on App Store Connect after 15 minutes." >&2
+      exit 1
+    fi
+    UNLISTED_POLLS=$(( UNLISTED_POLLS + 1 ))
+  elif [[ $BUILD_ROW == *'[]' ]]; then
+    if (( UNGROUPED_POLLS >= 10 )); then
+      echo "Build listed without a group after 5 minutes: $BUILD_ROW" >&2
+      exit 1
+    fi
+    UNGROUPED_POLLS=$(( UNGROUPED_POLLS + 1 ))
+  else
+    break
+  fi
   sleep ${NIGHTLY_POLL_SECONDS:-30}
 done
 if ! print -r -- "$BUILD_ROW" | grep -Eq 'VALID.*\[Nightly\]$'; then
-  echo "Build did not land exclusively in Nightly: $BUILD_ROW" >&2
+  echo "Build listed in the wrong group or not VALID: $BUILD_ROW" >&2
   exit 1
 fi
 
