@@ -18,6 +18,8 @@ struct SwingFigure: View {
         let x: CGFloat
         /// Points, measured up from the baseline.
         let height: CGFloat
+        /// The day's biggest peak: what a finger lifted on this bar goes to.
+        let peak: Peak
         let isSelected: Bool
         let isNextBigger: Bool
     }
@@ -77,9 +79,18 @@ struct SwingFigure: View {
         return days.enumerated().map { i, day in
             Bar(x: step * (CGFloat(i) + 0.5),
                 height: size.height * CGFloat(peaks[i].magnitude / biggest),
+                peak: peaks[i],
                 isSelected: day == selectedDay,
                 isNextBigger: day == nextDay && day != selectedDay)
         }
+    }
+
+    /// The bar under an x, by the same layout `bars` uses. Clamped, so a drag
+    /// that leaves the canvas still holds the nearest edge bar.
+    static func barIndex(atX x: CGFloat, count: Int, width: CGFloat) -> Int? {
+        guard count > 0 else { return nil }
+        let step = width / CGFloat(count)
+        return min(max(Int(floor(x / step)), 0), count - 1)
     }
 
     private let boxHeight: CGFloat = 108

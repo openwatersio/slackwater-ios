@@ -193,4 +193,23 @@ import SlackwaterKit
         XCTAssertLessThan(bars.first!.x, size.width * 0.1)
         XCTAssertGreaterThan(bars.last!.x, size.width * 0.9)
     }
+
+    /// A finger lifted on a bar goes to that bar's own swing, so each bar
+    /// carries its peak rather than only its day.
+    func testEachBarCarriesItsDaysBiggestSwing() {
+        let s = standing()
+        let bars = SwingFigure.bars(s, tz: station.tz, size: size)
+        let peaks = SwingFigure.dailyPeaks(s, tz: station.tz)
+        XCTAssertEqual(bars.map(\.peak), peaks)
+    }
+
+    /// A drag that leaves the canvas still lands on the nearest edge bar.
+    func testTheBarUnderAnXIsFoundAndClampedAtBothEdges() {
+        XCTAssertEqual(SwingFigure.barIndex(atX: 0, count: 30, width: 300), 0)
+        XCTAssertEqual(SwingFigure.barIndex(atX: 15, count: 30, width: 300), 1)
+        XCTAssertEqual(SwingFigure.barIndex(atX: 299, count: 30, width: 300), 29)
+        XCTAssertEqual(SwingFigure.barIndex(atX: -40, count: 30, width: 300), 0)
+        XCTAssertEqual(SwingFigure.barIndex(atX: 900, count: 30, width: 300), 29)
+        XCTAssertNil(SwingFigure.barIndex(atX: 10, count: 0, width: 300))
+    }
 }
