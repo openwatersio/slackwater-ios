@@ -409,17 +409,20 @@ struct SlackwaterShortcuts: AppShortcutsProvider {
             "When is the next low tide in \(.applicationName)",
             "What time is the next low tide in \(.applicationName)",
             "When is low tide in \(.applicationName)",
-            "When is low tide at \(\.$place) in \(.applicationName)"
+            "When is low tide at \(\.$place) in \(.applicationName)",
+            "When is low tide in \(\.$place) in \(.applicationName)"
         ], shortTitle: "Next Low Tide", systemImageName: "arrow.down.to.line")
         AppShortcut(intent: NextHighTideIntent(), phrases: [
             "When is the next high tide in \(.applicationName)",
             "What time is the next high tide in \(.applicationName)",
             "When is high tide in \(.applicationName)",
-            "When is high tide at \(\.$place) in \(.applicationName)"
+            "When is high tide at \(\.$place) in \(.applicationName)",
+            "When is high tide in \(\.$place) in \(.applicationName)"
         ], shortTitle: "Next High Tide", systemImageName: "arrow.up.to.line")
         AppShortcut(intent: NextSlackWindowIntent(), phrases: [
             "When is the next slack window in \(.applicationName)",
-            "When is the next slack window at \(\.$place) in \(.applicationName)"
+            "When is the next slack window at \(\.$place) in \(.applicationName)",
+            "When is the next slack window in \(\.$place) in \(.applicationName)"
         ], shortTitle: "Next Slack Window", systemImageName: "water.waves")
     }
 }
