@@ -130,7 +130,7 @@ The window is the subject. Every rule here exists to keep it from over-claiming.
 2. **A run counts only if the sign reverses inside it** (§2). Test this on the
    entry and exit steps too, not only steps wholly inside: at a violent gate the
    reversal and the band edge land in the same sample.
-3. **Touching or overlapping windows are one run**, and carry one label.
+3. **Touching or overlapping windows are one run.** A run containing one slack labels its opening; a continuous run containing several slacks labels each exact slack instead.
 4. **A window narrower than the sample step is not a window.** Draw the slack
    instant instead (§5.3).
 5. **Show the time remaining, not the original length.** An already-open window
@@ -267,8 +267,7 @@ the peak already sits on, which is a channel spent on nothing (§6.4).
 ### 5.4.1 The window's edges are the points of interest
 
 The **opening** of a slack window is the major point of interest: the moment
-a planner is aiming at (§4 rule 7). It gets the dot, and its time on the
-axis. The **closing** is the minor point — a lesser mark — until the reader
+a planner is aiming at (§4 rule 7). Its time appears on the axis for a window around one slack. A continuous merged window spanning several slacks labels each exact slack instead, even when its opening is visible. The **closing** is the minor point — a lesser mark — until the reader
 is inside the window, when it becomes the one that matters: the question has
 changed from *when can I be there* to *how long do I have*. A surface that
 can count (the widget, the readout) counts down to the closing while inside
@@ -678,9 +677,7 @@ every mark that only earns its place at scale. The card and the widget are
   rows or its axis times. Values near the curve never carry a unit — the
   reading in the top-right corner states the unit once.
 - **Absolute times have one home** (§5.5): a single row under the curve,
-  one time per drawn window at its opening, and one per slack mark outside
-  every drawn window: each zero instant at its own time,
-  a slack with no run at its instant (§5.3). Peak times are not
+  one time per drawn window at its opening, or each exact slack for a continuous window spanning several slacks, and one per slack mark outside every drawn window (§5.3). These axis times use go green. Peak times are not
   shown; they are in the schedule behind the detail. The row keeps 24 pt
   clear of each canvas edge, and in time order drops a time less than
   48 pt after the last one kept, so two marks close together print one

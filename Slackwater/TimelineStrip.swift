@@ -392,7 +392,7 @@ struct TimelineData {
         readsSlack(at: time, runs: coreRuns, slacks: slackTimes)
     }
 
-    /// One event time per mark: each drawn window's opening, and each slack mark outside one.
+    /// Window openings, zeros in continuous windows, and uncovered slack marks.
     var slackAxisTimes: [Date] {
         slackAxisMoments(windows: windowRuns, cores: coreRuns, slacks: slackTimes, pointsPerHour: Timeline.pph)
     }
@@ -1240,7 +1240,7 @@ struct TimelineCanvas: View {
         CurveDrawing.windows(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
         CurveDrawing.runs(ctx, coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
-        axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1)
+        axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1, tint: { _ in SN.go })
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.

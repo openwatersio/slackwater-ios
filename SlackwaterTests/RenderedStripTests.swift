@@ -466,14 +466,89 @@ final class RenderedStripTests: XCTestCase {
                        "a turn 22pt from the canvas edge printed a time the card clips")
     }
 
-    private func flatCurrent(start: Date, end: Date, tz: TimeZone, slack: Date?, schematic: Bool) -> TimelineData {
+    @MainActor
+    func testSlackAxisTimesUseTheGreenOfSlack() throws {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let slack = start.addingTimeInterval(12 * 3600)
+        for windows in [[], [(slack: slack, start: slack.addingTimeInterval(-3600), end: slack.addingTimeInterval(3600))]] {
+            let data = flatCurrent(start: start, end: end, tz: .gmt, slack: slack, schematic: false, windows: windows)
+            let geo = TimelineGeo(data: data)
+            let p = try pixels(XCTUnwrap(stripImage(data, now: start.addingTimeInterval(-3600))))
+            let hasGreen = (Int(geo.timeY) - 8...Int(geo.timeY) + 8).contains { y in
+                (0..<p.width).contains { x in
+                    let i = (y * p.width + x) * 4
+                    return Int(p.bytes[i + 1]) > Int(p.bytes[i]) + 25 && Int(p.bytes[i + 1]) > Int(p.bytes[i + 2]) + 25
+                }
+            }
+            XCTAssertTrue(hasGreen, "the slack time is not green; window count: \(windows.count)")
+        }
+    }
+
+    @MainActor
+    func testAContinuousWindowWithAVisibleOpeningNamesItsSlacks() {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let h = { (hours: Double) in start.addingTimeInterval(hours * 3600) }
+        let slacks = [h(6), h(12)]
+        let data = TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: h(24), days: [],
+                                tidePoints: [], tideRates: [], tideExtremes: [],
+                                currentPoints: [CurrentPoint(time: start, speed: 0), CurrentPoint(time: h(24), speed: 0)],
+                                currentEvents: slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }, snapTimes: [],
+                                slackWindows: slacks.map { (slack: $0, start: h(3), end: h(15)) })
+        XCTAssertTrue(data.clearsLabelEdges(h(3)))
+        XCTAssertEqual(data.slackAxisTimes, slacks)
+        XCTAssertEqual(StationCardGraph.axisMoments(data.windowRuns, cores: [], slacks: slacks, pointsPerHour: 14), slacks)
+    }
+
+    @MainActor
+    func testAContinuousSlackWindowKeepsItsSlackTimes() throws {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let slacks = [6.0, 12, 18].map { start.addingTimeInterval($0 * 3600) }
+        let points = stride(from: 0.0, through: 24 * 3600, by: 600).map {
+            CurrentPoint(time: start.addingTimeInterval($0), speed: 0.2)
+        }
+        func data(_ events: [CurrentEvent]) -> TimelineData {
+            TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: end, days: [],
+                         tidePoints: [], tideRates: [], tideExtremes: [], currentPoints: points,
+                         currentEvents: events, snapTimes: [],
+                         slackWindows: slacks.map { (slack: $0, start: start, end: end) })
+        }
+        let marked = data(slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) })
+        XCTAssertEqual(marked.slackAxisTimes, slacks)
+        let geo = TimelineGeo(data: marked)
+        let before = start.addingTimeInterval(-3600)
+        XCTAssertGreaterThan(try differing(XCTUnwrap(stripImage(data([]), now: before)),
+                                          XCTUnwrap(stripImage(marked, now: before)),
+                                          rows: Int(geo.timeY) - 8...Int(geo.timeY) + 8), 0,
+                             "a continuous window lost every visible time")
+    }
+
+    @MainActor
+    func testSlackWindowOpeningDrawsAnAxisTime() throws {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let end = start.addingTimeInterval(24 * 3600)
+        let slack = start.addingTimeInterval(12 * 3600)
+        let plain = flatCurrent(start: start, end: end, tz: .gmt, slack: nil, schematic: false)
+        let marked = flatCurrent(start: start, end: end, tz: .gmt, slack: slack, schematic: false,
+                                 windows: [(slack: slack, start: slack.addingTimeInterval(-3600), end: slack.addingTimeInterval(3600))])
+        let geo = TimelineGeo(data: marked)
+        let before = start.addingTimeInterval(-3600)
+        XCTAssertFalse(marked.slackAxisTimes.isEmpty)
+        XCTAssertGreaterThan(try differing(XCTUnwrap(stripImage(plain, now: before)),
+                                          XCTUnwrap(stripImage(marked, now: before)),
+                                          rows: Int(geo.timeY) - 8...Int(geo.timeY) + 8), 0)
+    }
+
+    private func flatCurrent(start: Date, end: Date, tz: TimeZone, slack: Date?, schematic: Bool,
+                             windows: [(slack: Date, start: Date, end: Date)] = []) -> TimelineData {
         let count = Int(end.timeIntervalSince(start) / 600)
         let times = (0...count).map { start.addingTimeInterval(Double($0) * 600) }
         return TimelineData(tz: tz, anchor: start, today: start, start: start, end: end, days: [],
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: times.map { CurrentPoint(time: $0, speed: 1) },
                             currentEvents: slack.map { [CurrentEvent(time: $0, speed: 0, kind: .slack)] } ?? [],
-                            snapTimes: [], slackWindows: [], speedsAreSchematic: schematic)
+                            snapTimes: [], slackWindows: windows, speedsAreSchematic: schematic)
     }
 
     /// Pixels that differ between two same-size renders, within a band of rows.

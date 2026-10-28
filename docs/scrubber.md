@@ -514,7 +514,7 @@ The base curve is 2.5 units wide with round caps and joins. Dashed reference lin
 
 A tide high's reading hangs below its dot and a low's above it, whatever the turn's height; a current max's reading hangs below a velocity crest and above a velocity trough — toward the zero line for a true flood or ebb maximum. A relaxation extremum, where the flow slackens without reversing, is still a max flood or max ebb by the sign convention, but its crest or trough points the other way, and hanging its reading by shape rather than kind keeps it off the readings of the true maxima that can sit under an hour away on either side. A flat approach falls back to the kind's side. Each is centred on the event's x. The glyph sits nearest the curve and the value beyond it: the glyph's centre is 15 units from the turn or peak (23 − 8) and the value's centre 30 units (23 + 7). The glyph is 12 units, semibold for a to-bar glyph and bold for a set arrow; the value is 18 units semibold with tabular digits.
 
-Absolute event times have one home: the event-time row beneath the plot, in foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
+Absolute event times have one home: the event-time row beneath the plot. On detail strips, current slack and window-opening times use go green at 14 units, regular weight, matching the slack marks. Cards retain their compact time typography. Tide high and low times use their respective curve colors at the same size and weight. Untinted event times use foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
 
 Do not draw any event mark, hanging reading, or event time within 1.5 hours (27 units) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and every event time. The margin is half the widest of those labels, so an event near an edge is left out whole rather than cut by the edge; edge clipping makes a valid event look broken. The event still exists and remains magnetic. Slack windows, slack runs, including a short run's mark and the mark of a slack no run covers, the curve, and the now dot draw to the edge.
 
@@ -599,7 +599,7 @@ Draw in this order:
 5. the base curve and its magnitude thread;
 6. measured slack windows: each window drawn as a stroke, and none shorter than a turn dot;
 7. measured slack marks over them: the shortest slack stroke centred on each zero instant;
-8. drawn window openings, and the time of each slack mark outside every drawn window;
+8. drawn window openings, exact slack times in continuous windows spanning several slacks, and the time of each slack mark outside every drawn window;
 9. derived-gate slack dots and peak readings; and
 10. the absolute-now dot.
 
@@ -625,7 +625,7 @@ Current maxima are drawn as context rather than as marks:
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The event-time row contains each drawn window's opening and each zero instant outside every drawn window. It does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
+The event-time row contains each drawn window's opening and each zero instant outside every drawn window. When a merged window contains multiple zero instants, print those exact slack times instead of its opening, so a continuous window whose opening is off-screen still has useful times. These times use go green, with the usual past fade. The same selection applies to station cards at their own scale. The row does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
 
 ### 13.3 Schematic derived current
 

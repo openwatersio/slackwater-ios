@@ -137,7 +137,7 @@ nonisolated struct StationCardGraph: View {
         readsSlack(at: t, runs: cores, slacks: slacks)
     }
 
-    /// One time per mark, under the mark at the card's own scale: each drawn window's opening, and each slack mark outside one.
+    /// The card uses the shared opening-or-slack rule at its own drawing scale.
     static func axisMoments(_ windows: [WindowRun], cores: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
         slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour)
     }
@@ -254,10 +254,7 @@ nonisolated struct StationCardGraph: View {
                                       nowX: nowX, width: size.width, height: size.height)
             }
 
-            // The axis row: each tide turn's time under its dot, and for a
-            // current each drawn window's opening, or a slack mark only where
-            // no drawn window covers it — the same moments the detail strip
-            // prints. One edge rule for all of them.
+            // Cards and detail strips share their current-axis moments, including zeros in continuous windows.
             // A tide turn arrives with its time already formatted.
             var axisMoments: [(time: Date, text: String?)] = []
             if showsTimes {
@@ -275,7 +272,7 @@ nonisolated struct StationCardGraph: View {
                     let text = context.resolve(Text(moment.text ?? cardTime(moment.time, tz))
                         .font(.system(size: Self.timeFontSize).monospacedDigit())
                         .fontWeight(.medium)
-                        .foregroundStyle(SN.foam.opacity(fade)))
+                        .foregroundStyle((includesZero ? SN.go : SN.foam).opacity(fade)))
                     let at = CGPoint(x: x(moment.time), y: size.height - Self.timeBaseline)
                     return (text: text, at: at,
                             ink: Self.axisTimeInk(at: at.x, width: text.measure(in: size).width, height: size.height))
