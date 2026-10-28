@@ -298,11 +298,14 @@ struct SwingFigure: View {
     /// light with a tick at each bar, and lifting goes there and closes the
     /// sheet. The short hold first is what gives the sheet its scroll: a
     /// finger that moves before the hold completes fails the press and the
-    /// scroll view takes the touch, the way the timeline's own long-press
-    /// works. A plain drag, even a simultaneous one, kept the touch and the
-    /// sheet never moved under a swipe that began on the bars.
+    /// scroll view takes the touch. A quarter second: shorter than the
+    /// timeline's half-second press so it feels immediate when meant, and
+    /// longer than the pause an unhurried scroll starts with, which at an
+    /// eighth of a second was being taken for a hold on a loaded device. A
+    /// plain drag, even a simultaneous one, kept the touch and the sheet
+    /// never moved under a swipe that began on the bars.
     private var slide: some Gesture {
-        LongPressGesture(minimumDuration: 0.12, maximumDistance: 8)
+        LongPressGesture(minimumDuration: 0.25, maximumDistance: 8)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
             .updating($lit) { value, lit, _ in
                 guard case .second(true, let drag?) = value else { return }

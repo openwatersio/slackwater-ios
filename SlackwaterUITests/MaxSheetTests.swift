@@ -77,7 +77,7 @@ final class MaxSheetTests: ScreenshotTestCase {
         let figure = app.descendants(matching: .any)["max-section-peaks"].firstMatch
         XCTAssert(figure.appears(within: 10), "no peaks figure")
         figure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.2,
+            .press(forDuration: 0.4,
                    thenDragTo: figure.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)))
 
         XCTAssert(app.navigationBars["Next max"].disappears(within: 2), "lifting should close the sheet")
