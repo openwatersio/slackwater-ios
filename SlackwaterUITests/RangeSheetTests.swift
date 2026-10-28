@@ -124,7 +124,7 @@ final class RangeSheetTests: ScreenshotTestCase {
         // From the middle bar to the right-hand edge: a day other than the
         // selected one, whichever day the fixture clock lands on.
         figure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.2,
+            .press(forDuration: 0.4,
                    thenDragTo: figure.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)))
 
         XCTAssert(app.navigationBars["Range"].disappears(within: 2), "lifting should close the sheet")
@@ -134,15 +134,14 @@ final class RangeSheetTests: ScreenshotTestCase {
     }
 
     /// The figure sits at the top of a sheet that scrolls. A finger that
-    /// swipes up from the bars is scrolling the sheet, so the swipe must do
-    /// exactly what the same swipe does on the caption beside the bars, which
-    /// has no gesture of its own: the sheet stays open, the timeline stays
-    /// put, and the sheet moves by the same amount. With a plain drag
-    /// gesture on the bars the swipe closed the sheet and jumped the
-    /// timeline; that is what this pins. (The simulator's synthetic flick
-    /// does not always move a medium-detent sheet, so the movement half of
-    /// the check is a comparison, not an absolute.)
-    func testSwipingUpFromTheBarsDoesWhatItDoesOnTheCaption() throws {
+    /// swipes up from the bars is scrolling the sheet, so the sheet must stay
+    /// open and the timeline must stay put. With a plain drag gesture on the
+    /// bars the swipe closed the sheet and jumped the timeline; that is what
+    /// this pins. Whether the sheet then scrolls under the swipe cannot be
+    /// seen here: the simulator's synthetic flick does not move this sheet
+    /// on either reference device, so a gesture that swallowed the scroll
+    /// without closing anything would pass. That half needs a device.
+    func testSwipingUpFromTheBarsNeitherClosesTheSheetNorMovesTheTimeline() throws {
         let app = launch()
         openFridayHarbor(app)
         let lead = leadReading(app)
@@ -155,25 +154,21 @@ final class RangeSheetTests: ScreenshotTestCase {
         tile.tap()
         let figure = app.descendants(matching: .any)["range-section-swings"].firstMatch
         XCTAssert(figure.appears(within: 10), "no swing figure")
-        let caption = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Each bar'")).firstMatch
-        XCTAssert(caption.appears(within: 10), "no bars caption")
-        let year = app.descendants(matching: .any)["range-section-year"].firstMatch
-        XCTAssert(year.appears(within: 10), "no year figure")
-
-        let yearWas = year.frame.minY
-        figure.swipeUp()
+        // The sheet grows as its sections land, and on the iPad's form sheet
+        // a flick during that growth lands on a layout that then changes
+        // under it (seen on CI). The year figure is the last section drawn.
+        XCTAssert(app.descendants(matching: .any)["range-section-year"].firstMatch.appears(within: 10),
+                  "the sheet did not finish loading")
         sleep(1)
-        XCTAssert(app.navigationBars["Range"].waitForExistence(timeout: 2), "the swipe on the bars closed the sheet")
-        XCTAssertEqual(lead.label, before, "the swipe on the bars moved the timeline")
-        let afterBars = year.frame.minY
+
+        // From a fifth of the way along the bars, 300 pt straight up, fast,
+        // with no hold: a scroll, not a slide.
+        let start = figure.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.6))
+        start.press(forDuration: 0, thenDragTo: start.withOffset(CGVector(dx: 4, dy: -300)),
+                    withVelocity: .fast, thenHoldForDuration: 0)
+        sleep(2)
         save(app, "range-sheet-scrolled.png")
-
-        caption.swipeUp()
-        sleep(1)
-        XCTAssert(app.navigationBars["Range"].waitForExistence(timeout: 2), "the control swipe closed the sheet")
-        let afterCaption = year.frame.minY
-        XCTAssertEqual(yearWas - afterBars, afterBars - afterCaption, accuracy: 4,
-                       "the bars did not pass the swipe to the sheet the way the caption does")
+        XCTAssert(app.navigationBars["Range"].waitForExistence(timeout: 3), "the swipe on the bars closed the sheet")
+        XCTAssertEqual(lead.label, before, "the swipe on the bars moved the timeline")
     }
 }
