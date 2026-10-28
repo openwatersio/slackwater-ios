@@ -114,9 +114,7 @@ func measureSlacks(_ points: [CurrentPoint], slacks: [Date], threshold: Double)
     return (measure(threshold), measure(core))
 }
 
-/// One usable run of slack water. Touching or overlapping windows merge into
-/// one run and carry one label (current-charts spec §4 rule 3); the predicate that
-/// produced each window is unchanged, only the drawing joins them.
+/// Touching windows share a drawn run; a run spanning several slacks names their exact times (current-charts §4).
 struct WindowRun: Equatable {
     let start: Date
     let end: Date
@@ -173,15 +171,16 @@ func readsSlack(at t: Date, runs cores: [WindowRun], slacks: [Date]) -> Bool {
         || bareSlacks(slacks, runs: cores).contains { abs($0.timeIntervalSince(t)) < 1 }
 }
 
-/// One time per mark at a surface's scale: each drawn window's opening, and
-/// each slack mark outside every drawn window — a core at its axis moment, a
-/// slack no core holds at its instant. A window too short to draw gives way to
-/// the slack mark inside it.
+/// A continuous window spanning several slacks names each zero, so its off-screen opening cannot hide all the times.
 func slackAxisMoments(windows: [WindowRun], cores: [WindowRun], slacks: [Date],
                       pointsPerHour: CGFloat) -> [Date] {
     let drawn = windows.filter { !$0.drawsAsDot(pointsPerHour: pointsPerHour) }
     let marks = cores.map { $0.axisMoment(pointsPerHour: pointsPerHour) } + bareSlacks(slacks, runs: cores)
-    return (drawn.map(\.start) + marks.filter { t in !drawn.contains { $0.contains(t) } }).sorted()
+    let windowTimes = drawn.flatMap { run -> [Date] in
+        let zeros = slacks.filter { run.contains($0) }
+        return zeros.count > 1 ? zeros : [run.start]
+    }
+    return (windowTimes + marks.filter { t in !drawn.contains { $0.contains(t) } }).sorted()
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

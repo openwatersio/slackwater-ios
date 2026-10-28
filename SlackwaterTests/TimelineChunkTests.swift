@@ -35,6 +35,23 @@ import SlackwaterKit
 
     // MARK: - Golden equivalence with the monolithic builders
 
+    func testHasteShoalKeepsTimesWhenTheComfortWindowSpansSeveralSlacks() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.all.first { $0.name.hasPrefix("Haste Shoal") })
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = station.tz
+        let anchor = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 10, day: 27)))
+        let data = merged(.current(station, threshold: 1), origin: anchor, indices: -1...1,
+                          anchor: anchor, today: anchor)
+        let tomorrow = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: anchor))
+        let slacks = data.currentEvents.filter { $0.kind == .slack && $0.time >= anchor && $0.time < tomorrow }.map(\.time)
+        XCTAssertGreaterThan(slacks.count, 1)
+        let run = try XCTUnwrap(data.windowRuns.first { run in slacks.allSatisfy(run.contains) })
+        XCTAssertLessThan(run.start, anchor, "the regression needs a continuous window whose opening is off-screen")
+        XCTAssertTrue(data.slackCores.isEmpty, "zero instants have no duration cores")
+        XCTAssertEqual(data.slackAxisTimes.filter { $0 >= anchor && $0 < tomorrow }, slacks)
+        for slack in slacks { XCTAssertTrue(data.snapTimes.contains(slack), "a printed slack must remain a snap target") }
+    }
+
     /// The chunked path is a second implementation of the same prediction
     /// window; over the overlap of their spans the two must agree — samples
     /// exactly (the engine grid is epoch-aligned, so both sample the same
