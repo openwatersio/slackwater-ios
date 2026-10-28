@@ -24,7 +24,7 @@ Documentation here describes the current product, maintained operating procedure
 | [App Store releases](appstore.md) | Pushing the listing, submitting for review, and releasing with `scripts/asc.mjs` |
 | [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/nightly.sh` and `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
-| [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
+| [CHS current validation](validation/chs-currents.md) | Engine validation record, evidence releases, and app recipe compatibility |
 | [CHS tide validation](https://github.com/openwatersio/slackwater/blob/main/docs/validation/chs-tides.md) | In the engine repo: the tide fit bar, the window sweep, and where 60-day fits miss |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
 | [Generated resources](../Slackwater/Resources/README.md) | Bundle inputs, generation order, and provenance |
@@ -50,4 +50,4 @@ Bare `chs-online-design` citations in `Slackwater/ChsStation.swift`, `tools/gen-
 | `chs-online-design` §2 | [Archived CHS online design](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#2-the-licence-architecture) | The per-user fetch and local-storage rationale |
 | `chs-online-design` §6a | [Archived current-station selection rule](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#6a-currents-the-rule-already-in-the-data) | Which current stations belong in the registry; this section does not specify a maxima-timing tolerance |
 
-The current-fit acceptance criteria and measurements are in [CHS current validation](validation/chs-currents.md).
+[CHS current validation](validation/chs-currents.md) links the engine acceptance criteria and results releases and describes the app recipe guard.

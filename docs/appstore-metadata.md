@@ -8,11 +8,11 @@ Tides are worldwide. Currents are the United States and Canada. Any copy that de
 
 | What ships               | Count | Where it comes from                                                         |
 | ------------------------ | ----- | --------------------------------------------------------------------------- |
-| Bundled tide stations    | 4,828 | 3,260 NOAA, 1,479 TICON across 104 countries and territories, 56 LINZ, 33 Kartverket |
-| Bundled current stations | 2,534 | NOAA, not every NOAA station (`tools/gen-noaa-currents.mjs` lists the filters) |
+| Bundled tide stations    | 5,027 | 3,260 NOAA, 1,453 TICON, 205 DMI, 20 Japan Coast Guard, 56 LINZ, 33 Kartverket |
+| Bundled current stations | 2,556 | NOAA, not every NOAA station (`tools/gen-noaa-currents.mjs` lists the filters) |
 | Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good                        |
-| Canadian current passes  | 22    | CHS: 13 fetch once, then offline; 9 fetch a month at a time when online     |
-| Listed but blank         | 136   | Stations we cannot publish numbers for                                      |
+| Canadian current passes  | 23    | CHS: seven fitted models, sixteen downloaded prediction windows; Malibu is an additional derived gate |
+| Listed but blank         | 109   | Stations we cannot publish numbers for                                      |
 
 Refresh the counts before submitting, and any time coverage changes:
 

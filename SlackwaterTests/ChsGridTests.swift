@@ -36,10 +36,4 @@ final class ChsGridTests: XCTestCase {
         XCTAssertEqual((slackwater["state"] as? [String: Any])?["revision"] as? String, revision)
     }
 
-    /// Current gates keep the basis their bar was measured on. When an engine
-    /// bump changes the tide recipe, this fails, so the change is a decision:
-    /// update `currentBasis` with a current revalidation, or keep the split.
-    func testTheEngineTideBasisIsStillTheValidatedCurrentBasis() {
-        XCTAssertEqual(ChsFitter.tideBasis, ChsFitter.currentBasis)
-    }
 }

@@ -322,7 +322,7 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 |---|---|
 | NOAA tide | "<datum> chart datum. NOAA harmonic prediction." |
 | NOAA subordinate tide | "<datum> chart datum. Based on <reference> tides and NOAA's published offsets; computed on this device." |
-| Other tide (TICON-4, Kartverket, LINZ) | "<datum> chart datum. Harmonic constants from <publisher>." The publisher is the station database's `source.name`, so a new publisher is named rather than credited as another. |
+| Other tide (TICON-4, Kartverket, LINZ, DMI, Japan Coast Guard) | "<datum> chart datum. Harmonic constants from <publisher>." DMI and Japan Coast Guard use their full source and editing notices. The publisher comes from the station database's `source.name`. |
 | Canadian tide | "<datum> chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." |
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |
@@ -380,10 +380,12 @@ The preview scrubber stops at the actual downloaded bounds. Date picking and tid
 A Canadian gate with a usable 60-day model keeps its scrubber visible while the remaining data downloads toward its validated full model. The centered notice sits below the scrubber and above the summary cards, matching the tide preview notice:
 
 - “Additional data is required to improve accuracy” above the station’s retained download progress meter;
-- the station’s measured timing uncertainty: “Slack at <gate> can be off by N min.”; and
+- the station’s measured timing uncertainty: “Slack at <gate> can differ from CHS's prediction by up to N min.”; and
 - offline, retry, or failure copy when applicable.
 
 There is no separate “Refining” or “Fast answer” UI state. The station remains in the ordinary download queue until its full model meets the quality bar. Readings remain usable during queued, interrupted, or failed additional downloads. The notice disappears when the full model lands. Until then, numeric readings retain “~” (scrubber §9.2).
+
+A bounded full model keeps the same bound sentence after downloading completes, using its year-round bound. Its readings keep the approximate mark and attention colour, while the notice contains no download status or progress. Downloads lists it as downloaded. The watch shows the bound sentence without download wording.
 
 ### 12.3 Online honesty card
 
@@ -397,7 +399,7 @@ An online gate whose downloaded windows do not cover the week shows this card in
 | Failed | "Download failed" | "Retry" |
 | Offline | "Waiting for signal" | "Connect to download" |
 
-While downloading, the card has no text and its action opens the Downloads sheet. In every other state, the text is the gate's own note on why it has no on-device model. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity when there is one, and "Slackwater will try again automatically." while a retry is pending.
+While downloading, the card has no text and its action opens the Downloads sheet. In every other state, the text combines an optional translated water-context sentence with its measured failing clause. A near-bar gate says it is close to the validation bar; a missing measurement does not quote a failure number. Peak-speed differences use the person's selected speed unit. The expectation is "Downloads cover about a month and can be refreshed at any time." (offline: "Connect for a moment to download about a month of predictions."), followed by the stored window's validity when there is one, and "Slackwater will try again automatically." while a retry is pending.
 
 A download covers 30 days from the anchor's week, and downloaded windows are kept for 60 days. The page fetches on its own when it opens online without coverage and when the connection returns.
 
@@ -482,7 +484,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 
 ### Tiles and links
 
-14. **Provisional current:** the Next max value has a "~" and attention amber ink until the model is final.
+14. **Provisional current:** the Next max value has a "~" and attention amber ink while the model is provisional. A bounded final model retains the mark and attention ink.
 15. **Range follows the scrub:** moving across an extreme flips the caption between "low to high" and "high to low", at a station whose swing is not marked.
 16. **Seasonal station:** a seasonally dominated station's Range tile reads "mostly seasonal" or "partly seasonal" and carries a calendar glyph, whatever its swing ranks.
 17. **A marked swing:** a swing in the top tenth of its fortnight captions "beyond normal here", or "the fortnight's biggest" when nothing in the window goes further, and carries the span glyph. An ordinary swing carries neither.

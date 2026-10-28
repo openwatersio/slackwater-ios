@@ -1,6 +1,38 @@
 // Slackwater — GPL v3. Which stations publish a calendar of their own, and what goes in one (docs/alerts.md §5.1).
 import Foundation
 
+/// Only generated events that have not started are invalidated; personal events remain untouched.
+func calendarInvalidationRemovals(_ events: [(start: Date, url: URL?)], stationID: String, now: Date) -> [Int] {
+    events.indices.filter {
+        events[$0].start > now && events[$0].url.map { AlertCalendar.urlNames(stationID, url: $0) } == true
+    }
+}
+
+/// A rejected model can disappear before Calendar access is granted, so the cleanup survives launch.
+enum CurrentCalendarInvalidations {
+    private static let key = "slackwater.invalidatedCurrentCalendars"
+
+    static func pending(in defaults: UserDefaults = AppGroup.defaults) -> Set<String> {
+        Set(defaults.stringArray(forKey: key) ?? [])
+    }
+
+    static func reset(in defaults: UserDefaults = AppGroup.defaults) {
+        defaults.removeObject(forKey: key)
+    }
+
+    static func record(_ ids: Set<String>, in defaults: UserDefaults = AppGroup.defaults) {
+        guard !ids.isEmpty else { return }
+        defaults.set(pending(in: defaults).union(ids).sorted(), forKey: key)
+    }
+
+    @MainActor static func retry(in defaults: UserDefaults = AppGroup.defaults,
+                                 clear: (String) -> Bool) {
+        for id in pending(in: defaults).sorted() where clear(id) {
+            defaults.set(pending(in: defaults).subtracting([id]).sorted(), forKey: key)
+        }
+    }
+}
+
 /// One station's calendar. `calendarID` is empty until EventKit has made or adopted it.
 struct StationCalendar: Codable, Equatable, Identifiable {
     var stationID: String

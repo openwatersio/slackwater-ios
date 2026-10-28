@@ -138,7 +138,7 @@ private func seedCurrentModel(stationID: String, provisional: Bool) {
     let model = ChsModel(
         stationID: stationID, iwlsID: "seeded", iwlsName: "\(gate.name) (seeded)",
         fittedAt: now, fitStartMs: (now.timeIntervalSince1970 - days * 86_400) * 1000,
-        fitEndMs: now.timeIntervalSince1970 * 1000, fitDays: days,
+        fitEndMs: now.timeIntervalSince1970 * 1000, fitDays: days, recipe: gate.recipe,
         floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0.08,
         constituents: [Con(name: "M2", amplitude: 2.0, phase: 0),
                        Con(name: "K1", amplitude: 0.5, phase: 90)])

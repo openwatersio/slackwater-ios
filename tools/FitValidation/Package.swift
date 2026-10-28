@@ -1,8 +1,7 @@
 // swift-tools-version: 6.0
-// Reference harness: fit a CHS current gate with the frozen JS artifacts
-// (tools/chs-reference in JavaScriptCore), predict the held-out validation
-// window with SlackwaterKit (the app's shipping predictor), and score against
-// live IWLS. Pinned to the same slackwater revision as project.yml.
+// File-input reference harness for the fill and patch pipelines. The frozen
+// JavaScript oracle remains their fitter; SlackwaterKit predicts the holdout.
+// Pinned to the same slackwater revision as project.yml.
 import PackageDescription
 
 let package = Package(
@@ -13,7 +12,7 @@ let package = Package(
         // 4), so no post-rename semver tag exists yet. Becomes `from:` at the
         // deliberate 1.0.0 release.
         .package(url: "https://github.com/openwatersio/slackwater",
-                 revision: "44c39dac9e0656b6b611966374f84019dbe6a8d0"),
+                 revision: "05864b449f37e9d9e81c749aa3c0bd832b136a33"),
     ],
     targets: [
         .executableTarget(

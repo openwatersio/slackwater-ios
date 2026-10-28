@@ -122,6 +122,7 @@ struct AlertStatusSnapshot: Equatable {
     }
 
     private func runPass(now: Date) async {
+        _ = ChsFitService.shared
         for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
             AlertRuleStore.shared.remove(id)
         }

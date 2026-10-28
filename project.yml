@@ -45,12 +45,12 @@ packages:
     # slackwater#448) and a turn on UTC midnight kept (slackwater#449).
     # Includes the IWLS recipe grids and client-owned persistent chunk cache in slackwater#460.
     url: https://github.com/openwatersio/slackwater
-    revision: 44c39dac9e0656b6b611966374f84019dbe6a8d0
+    revision: 05864b449f37e9d9e81c749aa3c0bd832b136a33
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.
     url: https://github.com/openwatersio/slackwater-database
-    exactVersion: 1.0.0-beta.20261017
+    exactVersion: 1.0.0-beta.20261028
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
@@ -115,6 +115,7 @@ targetTemplates:
       - Slackwater/ChsTidePreview.swift
       - Slackwater/ChsGate.swift
       - Slackwater/ChsCurrentGate.swift
+      - Slackwater/ChsCurrentCopy.swift
     dependencies:
       - package: slackwater
         product: SlackwaterKit

@@ -12,22 +12,20 @@ struct StationMapFlow {
     let bearingDeg: Double
 }
 
-/// The fitted Dodd model, reduced to one local map-flow reading.
+/// Dodd predictions reduced to one local map-flow reading.
 final class DoddMapFlowProvider: Sendable {
     private let flowAtDate: @Sendable (Date) -> StationMapFlow?
 
-    /// Production reads only the fitted Dodd model. A missing model stays
-    /// absent rather than inventing a map flow.
+    /// Missing predictions stay absent rather than inventing a map flow.
     init() {
         flowAtDate = { date in
             guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == "chs-dodd-narrows" }),
-                  let model = ChsModelStore.loadCurrent(gate.id)
-            else { return nil }
-            let record = gate.record(with: model)
-            guard let signedKn = record.engineStation
-                .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed
-            else { return nil }
-            return Self.flow(gate: record, signedKn: signedKn)
+                  let reading = gate.cachedReading(at: date) else { return nil }
+            return StationMapFlow(
+                center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
+                speedKn: abs(reading.signedKn),
+                bearingDeg: reading.signedKn >= 0 ? reading.floodDirection
+                    : (reading.floodDirection + 180).truncatingRemainder(dividingBy: 360))
         }
     }
 

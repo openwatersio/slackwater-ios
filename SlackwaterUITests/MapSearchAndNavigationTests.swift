@@ -386,13 +386,14 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                   "an offline station must headline what it is waiting for")
         XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
 
-        // Offline: the established honest register, and no bogus ETA.
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'need a connection'")).firstMatch.exists,
-                  "offline warning must explain that a connection is required")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'permanent offline use'"))
-            .firstMatch.exists)
+        let card = app.descendants(matching: .any)["online-honesty-card"].firstMatch
+        XCTAssert(card.exists, "an unfetched online gate must explain its download coverage")
+        let expectation = app.staticTexts.matching(NSPredicate(
+            format: "label == %@", "Connect for a moment to download about a month of predictions."
+        )).firstMatch
+        XCTAssert(expectation.appears(within: 5), "the offline gate must explain its downloaded prediction window")
+        XCTAssertFalse(app.descendants(matching: .any)["timeline-strip"].firstMatch.exists,
+                       "an unfetched offline gate must not show predictions")
     }
 
     /// The nav bar is hidden app-wide for the map-hero chrome, and UIKit

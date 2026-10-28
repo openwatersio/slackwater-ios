@@ -106,10 +106,9 @@ struct ChsModel: Codable {
     let fittedAt: Date
     let fitStartMs: Double
     let fitEndMs: Double
-    /// Days of data behind a gate fit. Less than the gate's `fitDays` means
-    /// this is the PROVISIONAL fast answer, not the final model. Optional so a
-    /// model stored by build ≤14 (always the full window) still decodes.
+    /// Optional for decoding older files; current models without a recorded window must refit.
     var fitDays: Double? = nil
+    var recipe: String? = nil
     /// The flood/ebb axis — IWLS station metadata, fetched by this user, kept
     /// local, never re-served. Gate models only.
     var floodDirection: Double? = nil
@@ -185,11 +184,20 @@ enum ChsModelStore {
 }
 
 extension ChsModelStore {
-    /// Every model on this device, by file stem: one directory listing, so a
-    /// list can ask about thousands of stations without decoding a model.
+    /// Current models must pass the same recipe/window check as the detail loader.
     static func fittedIDs(in directory: URL = dir) -> Set<String> {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        return Set(names.filter { $0.hasSuffix(".json") }.map { String($0.dropLast(5)) })
+        return Set(names.compactMap { name in
+            guard name.hasSuffix(".json") else { return nil }
+            let stem = String(name.dropLast(5))
+            guard stem.hasSuffix("-current") else { return stem }
+            let id = String(stem.dropLast("-current".count))
+            guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == id }),
+                  let data = try? Data(contentsOf: directory.appendingPathComponent(name)),
+                  let model = try? JSONDecoder().decode(ChsModel.self, from: data),
+                  gate.usableModel(model) != nil else { return nil }
+            return stem
+        })
     }
 }
 

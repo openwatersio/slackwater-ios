@@ -82,7 +82,29 @@ final class ChsVisibilityTests: XCTestCase {
             try Data().write(to: dir.appendingPathComponent(name))
         }
         XCTAssertEqual(ChsModelStore.fittedIDs(in: dir),
-                       ["chs-07120", "chs-x-current", "chs-y-online"])
+                       ["chs-07120", "chs-y-online"])
+    }
+
+    func testDiscoveryRejectsLegacyAndMismatchedCurrentModels() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { !$0.isOnline })
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var model = ChsModel(stationID: gate.id, iwlsID: "fixture", iwlsName: gate.name,
+                             fittedAt: .now, fitStartMs: 0, fitEndMs: 1, fitDays: gate.fitDays,
+                             offset: 0, rms: 0, constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
+        let url = dir.appendingPathComponent(gate.id + "-current.json")
+        try JSONEncoder().encode(model).write(to: url)
+        XCTAssertFalse(ChsModelStore.fittedIDs(in: dir).contains(gate.id + "-current"))
+        model.recipe = "other"
+        try JSONEncoder().encode(model).write(to: url)
+        XCTAssertFalse(ChsModelStore.fittedIDs(in: dir).contains(gate.id + "-current"))
+        model.recipe = gate.recipe
+        try JSONEncoder().encode(model).write(to: url)
+        XCTAssertTrue(ChsModelStore.fittedIDs(in: dir).contains(gate.id + "-current"))
+        model.fitDays = 90
+        try JSONEncoder().encode(model).write(to: url)
+        XCTAssertFalse(ChsModelStore.fittedIDs(in: dir).contains(gate.id + "-current"))
     }
 
     /// A fresh watch has never fitted anything, so the folder does not exist.

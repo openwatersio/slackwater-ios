@@ -55,7 +55,7 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     /// comparison. A deep link (`slackwater://station/<id>`) carries no instant at all. Any URL
     /// this app didn't mint — a hand-made event's own link — resolves to no station and never
     /// matches.
-    private static func urlNames(_ wanted: String, url: URL) -> Bool {
+    nonisolated static func urlNames(_ wanted: String, url: URL) -> Bool {
         if let link = stationLink(from: url) { return stationItem(for: link)?.id == wanted }
         if url.scheme == "slackwater" { return stationID(from: url) == wanted }
         return false
@@ -142,6 +142,7 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
         // invisible here, and `calendarFor`'s ownership check creates the duplicate it exists to
         // prevent.
         store.reset()
+        CurrentCalendarInvalidations.retry { clearInvalidatedCurrent($0, now: now) }
         let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
                                                         live: live, skipping: skipping) {
@@ -151,6 +152,29 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
             guard let calendar = calendarFor(stationID: stationID, title: title,
                                              create: !planned.isEmpty, now: now) else { continue }
             sync(calendar, to: planned, now: now)
+        }
+    }
+
+    private static func clearInvalidatedCurrent(_ stationID: String, now: Date) -> Bool {
+        guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return false }
+        let title = stationCalendarTitle(name: gate.name, kind: .current)
+        guard let calendar = calendarFor(stationID: stationID, title: title, create: false, now: now) else {
+            let subscribed = StationCalendarStore.shared.subscriptions.contains { $0.stationID == stationID }
+            return !subscribed && StationCalendarStore.shared.calendarID(for: stationID) == nil
+        }
+        let existing = store.events(matching: store.predicateForEvents(
+            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: [calendar]))
+        let removals = calendarInvalidationRemovals(existing.map {
+            (start: $0.startDate, url: $0.url)
+        }, stationID: stationID, now: now)
+        do {
+            for i in removals { try store.remove(existing[i], span: .thisEvent, commit: false) }
+            try store.commit()
+            return true
+        } catch {
+            store.reset()
+            logger.error("Current calendar invalidation failed: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 

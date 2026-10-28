@@ -13,7 +13,7 @@ struct ChsModelRequest: Codable, Hashable {
               model.constituents.allSatisfy({ $0.amplitude.isFinite && $0.phase.isFinite }) else { return nil }
         if isCurrent {
             guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }),
-                  !gate.isOnline, !gate.isProvisional(model) else { return nil }
+                  gate.usableModel(model) != nil, !gate.isProvisional(model) else { return nil }
         } else {
             guard ChsStationInfo.all.contains(where: { $0.id == stationID }) else { return nil }
         }

@@ -1,12 +1,13 @@
 // Slackwater — GPL v3. Reuse a paired phone's fitted model before fetching IWLS.
 import XCTest
+import SlackwaterKit
 @testable import Slackwater
 
 final class ChsModelTransferTests: XCTestCase {
     private func model(_ id: String = "chs-victoria", days: Double? = nil) -> ChsModel {
         ChsModel(stationID: id, iwlsID: "test", iwlsName: "Test",
                  fittedAt: Date(timeIntervalSince1970: 100), fitStartMs: 0, fitEndMs: 1,
-                 fitDays: days, offset: 1, rms: 0.01,
+                 fitDays: days, recipe: days == nil ? nil : ChsCurrentFit.stamp, offset: 1, rms: 0.01,
                  constituents: [Con(name: "M2", amplitude: 1, phase: 0)])
     }
 
@@ -38,11 +39,16 @@ final class ChsModelTransferTests: XCTestCase {
     }
 
     func testCurrentRequiresFinalModelAndCorrectSeries() throws {
-        let request = ChsModelRequest(stationID: "chs-dodd-narrows", isCurrent: true)
-        XCTAssertNil(request.decode(try JSONEncoder().encode(model("chs-dodd-narrows", days: 60))))
-        XCTAssertNotNil(request.decode(try JSONEncoder().encode(model("chs-dodd-narrows", days: 210))))
-        let wrongSeries = ChsModelRequest(stationID: "chs-dodd-narrows", isCurrent: false)
-        XCTAssertNil(wrongSeries.decode(try JSONEncoder().encode(model("chs-dodd-narrows", days: 210))))
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { !$0.isOnline && $0.fitDays == 210 })
+        let request = ChsModelRequest(stationID: gate.id, isCurrent: true)
+        XCTAssertNil(request.decode(try JSONEncoder().encode(model(gate.id, days: 60))))
+        XCTAssertNotNil(request.decode(try JSONEncoder().encode(model(gate.id, days: gate.fitDays))))
+        var stale = model(gate.id, days: gate.fitDays)
+        stale.recipe = "other"
+        XCTAssertNil(request.decode(try JSONEncoder().encode(stale)))
+        XCTAssertNil(request.decode(try JSONEncoder().encode(model(gate.id, days: 90))))
+        let wrongSeries = ChsModelRequest(stationID: gate.id, isCurrent: false)
+        XCTAssertNil(wrongSeries.decode(try JSONEncoder().encode(model(gate.id, days: gate.fitDays))))
     }
 
     func testTransferUsesPhoneReply() async throws {
@@ -148,7 +154,7 @@ final class ChsModelTransferTests: XCTestCase {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let victoria = ChsModelRequest(stationID: "chs-victoria", isCurrent: false)
-        let dodd = ChsModelRequest(stationID: "chs-dodd-narrows", isCurrent: true)
+        let dodd = ChsModelRequest(stationID: "chs-johnstone-strait-central", isCurrent: true)
         try JSONEncoder().encode(model()).write(to: dir.appendingPathComponent(ChsModelStore.url(victoria.stationID).lastPathComponent))
         try JSONEncoder().encode(model(dodd.stationID, days: 60)).write(to: dir.appendingPathComponent(ChsModelStore.url(dodd.stationID, suffix: "-current").lastPathComponent))
         let batch = ChsModelBatch(requests: [victoria, dodd])

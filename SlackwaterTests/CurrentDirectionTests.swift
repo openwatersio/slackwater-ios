@@ -57,6 +57,37 @@ final class CurrentDirectionTests: XCTestCase {
         XCTAssertEqual(flow.bearingDeg, 21)
     }
 
+    func testDoddProductionUsesOnlineCacheAndNeverExtrapolates() throws {
+        let id = "chs-dodd-narrows"
+        let url = ChsModelStore.onlineUrl(id)
+        let saved = try? Data(contentsOf: url)
+        defer {
+            if let saved { try? saved.write(to: url) }
+            else { try? FileManager.default.removeItem(at: url) }
+        }
+        let now = appNow(), t = now.timeIntervalSince1970
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
+                                     fetchedAt: now, start: now, end: now.addingTimeInterval(900),
+                                     floodDirection: 21, ebbDirection: 201,
+                                     times: [t, t + 900], speeds: [2, -6])
+        try ChsModelStore.saveOnline(window)
+        let flow = try XCTUnwrap(DoddMapFlowProvider().flow(at: now.addingTimeInterval(450)))
+        XCTAssertEqual(flow.speedKn, 2, accuracy: 1e-9)
+        XCTAssertEqual(flow.bearingDeg, 201)
+        XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(901)))
+        XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(-1)))
+    }
+
+    func testOnlineMapReadingDoesNotBridgeAMissingSample() {
+        let now = appNow(), t = now.timeIntervalSince1970
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC",
+                                     fetchedAt: now, start: now, end: now.addingTimeInterval(1800),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [t, t + 1800], speeds: [2, -2])
+        XCTAssertNil(window.signedSpeed(at: now.addingTimeInterval(900)))
+        XCTAssertEqual(window.signedSpeed(at: now), 2)
+    }
+
     func testDoddOmitsMissingModel() {
         XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in nil }).flow(at: date))
     }

@@ -293,13 +293,13 @@ struct ConditionsItem: View {
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(speedUnitLabel(unit))")
                 .font(.body))
-                .foregroundStyle(.white)
+                .foregroundStyle(tilde ? SN.amber : .white)
             // Direction-first (#59): a novice reads the arrow + cardinal;
             // the word demotes to a dimmer label. "Slack" wears the go
             // colour — the same meaning it has everywhere else. Under
             // 0.05 kn the set gives way to a neutral mark of the same
             // footprint so the header never resizes.
-            let tint = slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
+            let tint = tilde ? SN.amber : slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
             if compact {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     // The number never truncates; a tight row loses the set's words.

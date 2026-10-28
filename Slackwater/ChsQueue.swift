@@ -35,8 +35,7 @@ struct ChsJob: Identifiable, Hashable {
     let isCurrent: Bool
     let latitude: Double
     let longitude: Double
-    /// This station's OWN fit window — 60 d for every tide port and for the
-    /// four gates validated at 60 d, 210 d for the rest (M51).
+    /// The tide recipe's window or this current gate's measured window.
     let fitDays: Double
     var status: ChsJobStatus = .pending
     var attempts = 0

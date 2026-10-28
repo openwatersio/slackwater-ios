@@ -65,7 +65,7 @@ user's own derivation. That yields three options, of which only one works:
 So, structurally:
 
 - **Identity only is bundled.** `Resources/chs-stations.json` (1,058 stations)
-  and `Resources/chs-current-gates.json` (22 gates) carry name, region, aliases,
+  and `Resources/chs-current-gates.json` (23 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
   `Resources/chs-tombstones.json` is the same posture for stations that have
   since left the bundle: identity we authored, for a favorite that persists a
@@ -74,7 +74,7 @@ So, structurally:
   stations that never entered the bundle and never can, because upstream
   states their predictions are non-commercial (issue #401). Written by
   `gen-tides.mjs` as the complement of the commercial-use filter below, and
-  limited to the 139 that are more than 50 km from anything we do ship: where
+  limited to the 109 that are more than 50 km from anything we do ship: where
   the app has an answer, the fact that a licensed station also sits there is
   not the user's problem. The map draws them as empty rings, which open an
   explanation rather than a forecast.
@@ -82,7 +82,7 @@ So, structurally:
 - CHS data is **not to be used for navigation**; the app says so in Settings and
   marks *"Predictions — not for navigation"* on every detail footer.
 
-`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. Tide ports fit `ChsFitter.tideBasis`, the engine's shared CHS tide recipe `ChsTideFit.basis`: the validated 23 constituents, without SA/SSA. Current gates fit `ChsFitter.currentBasis`, the same 23 constituents held in the app, so a change to the tide recipe can't move a current fit without the current bar being rerun. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
+`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. Tide ports fit `ChsFitter.tideBasis`, the engine's shared CHS tide recipe `ChsTideFit.basis`: the validated 23 constituents, without SA/SSA. Current gates fit `ChsFitter.currentBasis`, the engine's shared `ChsCurrentFit.basis`; its recipe stamp prevents a changed recipe from reusing evidence measured on another fit. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
 
 On iPhone, tide ports first cache seven elapsed days of official water-level predictions, beginning 48 hours before station-local midnight. The finite preview supplies the initial reading, curve, and sampled turns while the full model downloads. It does not make yearly claims, supply derived gates, or travel to the watch as a harmonic model. Preview files survive interrupted downloads and remain useful offline inside their coverage; invalid or expired coverage never permits extrapolation.
 
@@ -126,7 +126,7 @@ terms are worse than "no" — silence is not permission.
   for bundling third-party harmonic constants** — see `tools/gen-tides.mjs`.
 
   The non-commercial half's CONSTANTS can never ship, and none do. Its
-  IDENTITY does, for 139 of those stations: name, region and position, with no
+  IDENTITY does, for 109 of those stations: name, region and position, with no
   harmonic data, so the map can explain an absence instead of leaving a hole
   (issue #401, `unavailable-stations.json`). Displaying a name to say "there
   is a station here we may not serve" is not a use of the predictions the
@@ -135,61 +135,23 @@ terms are worse than "no" — silence is not permission.
 
 ---
 
-## 4. The four tiers of current data
+## 4. The current data sources
 
-Coverage is not uniform, and the differences decide what any feature can render.
+NOAA currents ship bundled harmonics or subordinate offsets. CHS currents use the database's curated `chs_fit` disposition; `tools/gen-chs-gates.mjs` carries its window, bound and recipe stamp into the app. Every curated gate remains findable, including Arran Rapids. A gate without measured fit evidence and without a derived reference is online.
 
-| Tier | Count | Flow axis | Speed | Available |
-|---|---|---|---|---|
-| NOAA current stations | 842 | bundled | bundled constituents | immediately, offline |
-| Fitted CHS gates | 13 | IWLS metadata, at fit time | fitted model | after download |
-| Online CHS gates | 9 | in the fetched window | official CHS predictions | after fetch, needs signal |
-| Derived gate | 1 | **never** | **never** | timing only |
+Fitted gates use `ChsCurrentFit.basis` and `ChsCurrentFit.project` over their measured 60- or 210-day window. Final gates show plain readings. Phone cards and details retain approximate readings for bounded gates and quote their year-round slack bound without download wording or progress. The watch detail sheet quotes the bound; watch rows, widgets, alerts and Siri keep their existing presentation, with follow-up [#852](https://github.com/openwatersio/slackwater-ios/issues/852). A 210-day gate offers a provisional 60-day answer only when its evidence explicitly supplies `provisionalSlackMinutes`; the remaining download continues while that answer is visible.
 
-**Fitted gates** (`online` absent/false) are fitted from `wcsp1`+`wcdp1` over the
-gate's own validated window — 60 or 210 days, per gate, from the M51 validation,
-not a blanket number (`ChsCurrentGateInfo.fitDays`). 210 exists because K1/P1
-drive PNW diurnal inequality and separate under Rayleigh only at ≥183 days.
+Online gates fetch official CHS predictions on demand, covering about a month per download. Their explanation combines a translated water-context sentence with the measured failing clause, in the user's speed unit where relevant. Only online and derived gates carry a sourced magnitude note.
 
-Eight of them additionally offer a **provisional** 60-day fast answer with a
-measured worst-case slack error of 20–35 minutes (`provisionalSlackMinutes`),
-marked in the UI with a ⚠️ badge and a `~` on every number.
+Malibu Rapids derives slack timing from a reference tide port and fixed high/low lags. It has no speed, axis or current constituents.
 
-**Online gates** (`online: true`) are the fit-rejects: findable identities backed
-by official CHS predictions fetched on demand into a `ChsOnlineWindow`, 30 days
-forward, never fitted. Sechelt Rapids carries the reason in its own registry
-entry — the on-device model missed published slacks there by up to ~40 minutes.
+## 5. What "validated" means here
 
-**The derived gate** — Malibu Rapids, the only entry in
-`Resources/chs-gates.json` — is a reference tide port plus fixed high/low lag
-offsets. It has timing and nothing else: no speed, no axis, no constituents,
-ever. Lag offsets cannot produce a velocity.
+[The engine's validation record](https://github.com/openwatersio/slackwater/blob/main/docs/validation/chs-currents.md) defines the shipping recipe and year-round measurement. [CHS current validation](https://github.com/openwatersio/chs-current-validation) publishes the evidence cited by each database disposition. Both the fit inputs and the reference events are CHS predictions; the bound measures agreement with CHS, not weather or observed water.
 
----
+Final fits pass quarterly median limits of 15 minutes for slack, 20 minutes for extremum timing and 0.5 knots for peak speed, with no missed or invented slack or reversed axis, and a year-round worst slack error at most 30 minutes. Bounded fits meet the same clauses with worst slack error over 30 and at most 45 minutes, rounded up to five minutes for display. Other gates use official online predictions. Demotions follow the first failing grid point; promotions require the published margin on two consecutive grid points.
 
-## 5. What "validated" means here, and why it outranks a model
-
-The M47 pass scored each candidate gate's **fitted** slacks against CHS's own
-published `wcp1-events`, held out 28–35 days into the future, on the app's exact
-shipping path. The bar was set before scoring
-(`docs/validation/chs-currents.md`):
-
-| Quantity | Bar |
-|---|---|
-| Slack timing, median | ≤ 15 min |
-| Slack timing, worst | ≤ 30 min |
-| Extremum timing, median | ≤ 20 min |
-| Peak speed error, median | ≤ 0.5 kn |
-| Axis | no systematic flip |
-
-Slack is the safety quantity — a gate is transited *at slack* — so it gets the
-tightest numbers.
-
-A failed fit never ships as a fitted prediction. An online gate can retain its identity and display official CHS samples, with fetched-coverage checks and provenance. A derived gate has its separate timing-only model.
-
-The consequence for any future data source: a shipped gate's numbers have been
-measured against CHS's published truth. An unvalidated source that disagrees with
-one does not get to quietly win.
+A stored current model is usable only when its recipe stamp matches the gate's evidence and its window is the full measured window, or the 60-day answer that gate explicitly offers. Unstamped models and models without a recorded fit window refit once. Reusing an unstamped model requires the app to reproduce the shared recipe golden; it does not infer that equivalence from the pinned stamp alone. A changed bound on the same recipe needs no refit. Moving online removes the fitted model and its chunk cache; moving back to fitted removes downloaded online windows.
 
 ---
 
@@ -204,7 +166,7 @@ The app's current-field data has two sources:
 
 Both provide speed context. Slack timing and transitability belong to the station prediction and its validated windows. The field ramp contains no green. Missing or rejected elements remain absent, never calm, and interpolation must not paint across certification boundaries. Keep raw-source and derived-bundle provenance with the generated resources; a model refit is a release decision.
 
-The [SSCOFS validation harness](../tools/sscofs-validation/README.md) records why speed certification is distinct from timing certification: none of the 53 scoreable stations in its 60-day box experiment passed all five current-fit bars. A fine-looking mesh is not proof of slack accuracy. Dodd Narrows is a negative control: a throat about 60–80 m wide is below the resolving scale of roughly 500 m elements. A model field cannot overrule a validated gate there.
+The [SSCOFS validation harness](../tools/sscofs-validation/README.md) records why speed certification is distinct from timing certification: none of the 53 scoreable stations in its 60-day box experiment passed all five current-fit bars. A fine-looking mesh is not proof of slack accuracy. Dodd Narrows is a negative control: a throat about 60–80 m wide is below the resolving scale of roughly 500 m elements. A model field cannot overrule CHS's current predictions there. The Dodd map arrow and any patch anchored to an online gate use cached CHS predictions, with no flow outside the downloaded samples.
 
 ## 7. Consequences that keep catching people
 
@@ -214,7 +176,7 @@ The practical list. Each of these has cost someone time.
   constants until a model is fitted, so a sweep over the bundled data is a sweep
   over NOAA and TICON only. `tools/ramp-domain.mjs` reports a maximum current of
   ~10 kn; Sechelt Rapids runs ~16 and is simply not in the sample.
-- **Zero of the 22 gates carry a flow axis in the registry.** It arrives with the
+- **Zero of the 23 gates carry a flow axis in the registry.** It arrives with the
   fit or the fetched window. Anything drawing direction has staged availability
   and must degrade honestly — `chsPinStates` (`MapPinState.swift`) already models
   this: a station the sync has not reached is absent and draws neutral.
@@ -248,8 +210,8 @@ The practical list. Each of these has cost someone time.
 |---|---|
 | CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
 | Identity for stations that have LEFT the bundle (28) | `Slackwater/Resources/chs-tombstones.json` |
-| Identity for stations that may NEVER ship (139) | `Slackwater/Resources/unavailable-stations.json` |
-| CHS current gates (22: 13 fitted, 9 online) | `Slackwater/Resources/chs-current-gates.json` |
+| Identity for stations that may NEVER ship (109) | `Slackwater/Resources/unavailable-stations.json` |
+| CHS current gates (23: 7 fitted, 16 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |
 | NOAA current stations (842) | `Slackwater/Resources/currents.json` |

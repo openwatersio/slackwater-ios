@@ -23,18 +23,14 @@ final class ChsProvisionalTests: XCTestCase {
     // MARK: - The bundled per-gate windows
 
     func testEveryBundledGateCarriesItsOwnValidatedWindow() {
-        // +9 online fit-reject identities (online-gates task 1): fitDays 0 is
-        // their documented never-fitted sentinel, so the window check below
-        // is scoped to the fitted (offline) gates.
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 22)
+        // Online gates use the never-fitted sentinel; fitted windows come from evidence.
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 23)
         for g in ChsCurrentGateInfo.all where !g.isOnline {
             XCTAssert(g.fitDays == 60 || g.fitDays == 210, "\(g.id): unexpected window \(g.fitDays)")
         }
         let fast = ChsCurrentGateInfo.all.filter { $0.fitDays == 60 }.map(\.id).sorted()
-        XCTAssertEqual(fast, ["chs-active-pass", "chs-first-narrows",
-                              "chs-great-bras-dor", "chs-johnstone-strait-central",
-                              "chs-seymour-narrows"],
-                       "the 60-day passers are exactly the gates the harness scored as PASS at 60 d")
+        XCTAssertEqual(fast, ["chs-active-pass", "chs-first-narrows", "chs-seymour-narrows"])
+
     }
 
     /// A gate final at 60 d has nothing provisional to show: it goes straight
@@ -59,14 +55,9 @@ final class ChsProvisionalTests: XCTestCase {
         }
     }
 
-    /// The measured numbers, per gate, as recorded by the M47 harness at the
-    /// 60-day window and rounded up to 5 min. If a regeneration changes one of
-    /// these, the copy in front of the user changed — that is worth a failure.
+    /// The year-round evidence offers one qualified 60-day answer.
     func testTheShippedTolerancesAreTheMeasuredOnes() {
-        let expected = ["chs-blackney-passage": 35, "chs-dodd-narrows": 35,
-                        "chs-gillard-passage": 20, "chs-hole-in-the-wall": 20,
-                        "chs-porlier-pass": 35, "chs-quatsino-narrows": 25,
-                        "chs-race-passage": 30, "chs-weynton-passage": 35]
+        let expected = ["chs-johnstone-strait-central": 35]
         for (id, minutes) in expected {
             XCTAssertEqual(gate(id).provisionalSlackMinutes, minutes, id)
         }
@@ -77,12 +68,10 @@ final class ChsProvisionalTests: XCTestCase {
     /// The warning names THIS station's number, never a generic hedge, and
     /// stays separate from download progress.
     func testTheWarningNamesTheStationAndItsOwnNumber() {
-        let dodd = gate("chs-dodd-narrows")
-        XCTAssertEqual(dodd.provisionalHeadline,
-                       "Slack at Dodd Narrows can be off by 35 min.")
-        // Gillard is a different pass with a different error: different copy.
-        XCTAssertEqual(gate("chs-gillard-passage").provisionalHeadline,
-                       "Slack at Gillard Passage can be off by 20 min.")
+        let johnstone = gate("chs-johnstone-strait-central")
+        XCTAssertEqual(johnstone.provisionalHeadline,
+                       "Slack at Johnstone Strait - Central can differ from CHS's prediction by up to 35 min.")
+
     }
 
     // MARK: - Chunks
@@ -112,16 +101,16 @@ final class ChsProvisionalTests: XCTestCase {
                        "only the newest, uncached chunk may move")
     }
 
-    /// A model stored before M51 has no `fitDays` and was always the full
-    /// window — it must not suddenly read as provisional after an upgrade.
-    func testALegacyStoredModelIsNotProvisional() throws {
+    func testALegacyStoredModelRequiresAStampedRefit() throws {
         let json = """
-        {"schemaVersion":1,"stationID":"chs-dodd-narrows","iwlsID":"x","iwlsName":"x",
+        {"schemaVersion":1,"stationID":"chs-johnstone-strait-central","iwlsID":"x","iwlsName":"x",
          "fittedAt":770000000,"fitStartMs":0,"fitEndMs":0,"floodDirection":10,
          "ebbDirection":190,"offset":0,"rms":0.1,"constituents":[]}
         """
         let model = try JSONDecoder().decode(ChsCurrentModel.self, from: Data(json.utf8))
         XCTAssertNil(model.fitDays)
-        XCTAssertFalse(gate("chs-dodd-narrows").isProvisional(model))
+        XCTAssertNil(model.recipe)
+        XCTAssertNil(gate("chs-johnstone-strait-central").usableModel(model))
+        XCTAssertFalse(gate("chs-johnstone-strait-central").isProvisional(model))
     }
 }

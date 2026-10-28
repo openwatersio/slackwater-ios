@@ -445,7 +445,7 @@ import CoreLocation
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         var model = ChsModel(stationID: gate.id, iwlsID: "fixture", iwlsName: gate.name,
                              fittedAt: now, fitStartMs: 0, fitEndMs: 1,
-                             fitDays: 60, floodDirection: 0, ebbDirection: 180,
+                             fitDays: 60, recipe: gate.recipe, floodDirection: 0, ebbDirection: 180,
                              offset: 0, rms: 0, constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
         try ChsModelStore.saveCurrent(model)
         guard case .current(let provisional, _) = try XCTUnwrap(WidgetStationLoader.loadRecord(id: gate.id)) else {

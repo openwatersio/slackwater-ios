@@ -18,7 +18,7 @@
   "versionLocalization": {
     "promotionalText": "The tide and currents app that works without signal. Tides worldwide and currents across the US and Canada, already on your phone. Free, no account, no ads.",
     "description": [
-      "The tide and currents app that works without signal. Tides for more than 4,700 stations worldwide and currents across the US and Canada, already on your phone — on the water, on the beach, in the anchorage, with no bars and nothing to load.",
+      "The tide and currents app that works without signal. Tides for more than 5,000 stations worldwide and currents across the US and Canada, already on your phone — on the water, on the beach, in the anchorage, with no bars and nothing to load.",
       "",
       "No spinner. No \"no internet connection\". You open it, and the answer is there: rising or falling, flooding or ebbing, and how long until the next high, low or slack.",
       "",
@@ -42,7 +42,7 @@
       "Slackwater Premium is optional and funds development: lock screen widgets, Apple Watch complications, alerts before the tides and currents you care about, and station calendars. Choose a yearly subscription or a one-time lifetime purchase.",
       "",
       "WHERE THE NUMBERS COME FROM",
-      "Tides for more than 4,700 stations across a hundred countries are built in, from NOAA, the Canadian Hydrographic Service, Norway's Kartverket, Toitū Te Whenua Land Information New Zealand (LINZ) and the TICON-4 global tide-gauge catalogue, and checked against each station's published tidal datums wherever it has them. Currents cover the United States and Canada: more than 2,500 NOAA current stations, plus 22 Canadian passes from the Salish Sea to Haida Gwaii and Cape Breton. Canadian stations download their data from the Canadian Hydrographic Service once, then work offline. A few Canadian passes sit in water the on-device model cannot predict; those fetch predictions when you are online, and say so. Where we cannot publish numbers we trust, the station is listed but blank instead of guessed.",
+      "Tides for more than 5,000 stations across a hundred countries are built in, from NOAA, the Canadian Hydrographic Service, Norway's Kartverket, Toitū Te Whenua Land Information New Zealand (LINZ), Denmark's DMI, the Japan Coast Guard and the TICON-4 global tide-gauge catalogue, and checked against each station's published tidal datums wherever it has them. Currents cover the United States and Canada: more than 2,500 NOAA current stations, plus 23 Canadian passes from the Salish Sea to Haida Gwaii and Cape Breton. Canadian tide stations download their data from the Canadian Hydrographic Service once, then work offline. Seven Canadian current passes use downloaded harmonic models; the other sixteen fetch CHS predictions when you are online and keep the downloaded window for offline use. Where we cannot publish numbers we trust, the station is listed but blank instead of guessed.",
       "",
       "Predictions are not observations — conditions vary with weather and river flow. Not for navigation.",
       "",
@@ -63,7 +63,7 @@
       "versionLocalization": {
         "promotionalText": "La app de mareas y corrientes que funciona sin señal. Mareas de todo el mundo y corrientes de EE. UU. y Canadá, ya en tu celular. Gratis, sin registro, sin anuncios.",
         "description": [
-          "La app de mareas y corrientes que funciona sin señal. Mareas de más de 4,700 estaciones en todo el mundo y corrientes de Estados Unidos y Canadá, ya en tu celular: en el agua, en la playa, en el fondeadero, sin cobertura y sin nada que cargar.",
+          "La app de mareas y corrientes que funciona sin señal. Mareas de más de 5,000 estaciones en todo el mundo y corrientes de Estados Unidos y Canadá, ya en tu celular: en el agua, en la playa, en el fondeadero, sin cobertura y sin nada que cargar.",
           "",
           "Nada de pantallas de carga. Nada de \"No hay conexión a internet\". Abres la app y la respuesta ya está ahí: si sube o baja, si es flujo o reflujo, y cuánto falta para la próxima pleamar, bajamar o estoa.",
           "",
@@ -87,7 +87,7 @@
           "Slackwater Premium es opcional y financia el desarrollo: widgets en la pantalla de bloqueo, complicaciones para Apple Watch, alertas antes de las mareas y corrientes que te importan, y calendarios de estaciones. Elige una suscripción anual o una compra única de por vida.",
           "",
           "DE DÓNDE VIENEN LOS DATOS",
-          "Las mareas de más de 4,700 estaciones en un centenar de países ya vienen en la app, de NOAA, el Servicio Hidrográfico de Canadá, el Kartverket de Noruega, Toitū Te Whenua Land Information New Zealand (LINZ) y el catálogo mundial de mareógrafos TICON-4, y se verifican contra los niveles de referencia publicados de cada estación, donde los hay. Las corrientes cubren Estados Unidos y Canadá: más de 2,500 estaciones de corriente de NOAA y 22 pasos canadienses, desde el mar Salish hasta Haida Gwaii y la isla del Cabo Bretón. Las estaciones canadienses descargan sus datos del Servicio Hidrográfico de Canadá una sola vez y después funcionan sin conexión. Algunos pasos canadienses están en aguas que el cálculo en tu celular no puede predecir; esos descargan predicciones cuando tienes conexión, y lo indican. Donde no podemos publicar números confiables, la estación aparece en la lista pero en blanco: no adivinamos.",
+          "Las mareas de más de 5,000 estaciones en un centenar de países ya vienen en la app, de NOAA, el Servicio Hidrográfico de Canadá, el Kartverket de Noruega, Toitū Te Whenua Land Information New Zealand (LINZ), el DMI de Dinamarca, la Guardia Costera de Japón y el catálogo mundial de mareógrafos TICON-4, y se verifican contra los niveles de referencia publicados de cada estación, donde los hay. Las corrientes cubren Estados Unidos y Canadá: más de 2,500 estaciones de corriente de NOAA y 23 pasos canadienses, desde el mar Salish hasta Haida Gwaii y la isla del Cabo Bretón. Las estaciones canadienses de mareas descargan sus datos del Servicio Hidrográfico de Canadá una sola vez y después funcionan sin conexión. Las corrientes de siete pasos canadienses usan modelos descargados. Los otros dieciséis descargan predicciones del Servicio Hidrográfico de Canadá cuando tienes conexión y guardan ese periodo para usarlo sin conexión. Donde no podemos publicar números confiables, la estación aparece en la lista pero en blanco: no adivinamos.",
           "",
           "Las predicciones no son observaciones: las condiciones cambian con el clima y el caudal de los ríos. No usar para la navegación.",
           "",
@@ -106,7 +106,7 @@
       "versionLocalization": {
         "promotionalText": "L’appli de marées et de courants qui fonctionne sans réseau. Marées du monde entier, courants des États-Unis et du Canada, déjà sur votre téléphone. Gratuit, sans compte.",
         "description": [
-          "L’appli de marées et de courants qui fonctionne sans réseau. Les marées de plus de 4 700 stations partout dans le monde et les courants des États-Unis et du Canada, déjà sur votre téléphone : sur l’eau, à la plage, au mouillage, sans une seule barre et sans rien à charger.",
+          "L’appli de marées et de courants qui fonctionne sans réseau. Les marées de plus de 5 000 stations partout dans le monde et les courants des États-Unis et du Canada, déjà sur votre téléphone : sur l’eau, à la plage, au mouillage, sans une seule barre et sans rien à charger.",
           "",
           "Pas de roue qui tourne. Pas de message « Aucune connexion Internet ». Vous ouvrez l’appli, et la réponse est là : la marée monte ou descend, le courant est en flot ou en jusant, et le temps qu’il reste avant la prochaine marée haute, marée basse ou étale.",
           "",
@@ -130,7 +130,7 @@
           "Slackwater Premium est facultatif et finance le développement : widgets de l’écran verrouillé, complications Apple Watch, alertes avant les marées et les courants qui vous importent, et calendriers de stations. Choisissez un abonnement annuel ou un achat unique à vie.",
           "",
           "D’OÙ VIENNENT LES DONNÉES",
-          "Les marées de plus de 4 700 stations dans une centaine de pays sont intégrées, de la NOAA, du Service hydrographique du Canada, du Kartverket norvégien, de Toitū Te Whenua Land Information New Zealand (LINZ) et du catalogue mondial de marégraphes TICON-4, et vérifiées par rapport aux niveaux de référence publiés pour chaque station, lorsqu’elle en a. Les courants couvrent les États-Unis et le Canada : plus de 2 500 stations de courant de la NOAA et 22 passes canadiennes, de la mer des Salish à Haida Gwaii et au Cap-Breton. Les stations canadiennes téléchargent leurs données du Service hydrographique du Canada une seule fois, puis fonctionnent hors ligne. Quelques passes canadiennes se trouvent dans des eaux que le calcul sur votre téléphone ne peut pas prédire ; celles-là téléchargent les prévisions quand vous êtes en ligne, et l’indiquent. Là où nous ne pouvons pas publier de chiffres fiables, la station figure dans la liste, mais vide : nous ne devinons pas.",
+          "Les marées de plus de 5 000 stations dans une centaine de pays sont intégrées, de la NOAA, du Service hydrographique du Canada, du Kartverket norvégien, de Toitū Te Whenua Land Information New Zealand (LINZ), du DMI danois, de la Garde côtière du Japon et du catalogue mondial de marégraphes TICON-4, et vérifiées par rapport aux niveaux de référence publiés pour chaque station, lorsqu’elle en a. Les courants couvrent les États-Unis et le Canada : plus de 2 500 stations de courant de la NOAA et 23 passes canadiennes, de la mer des Salish à Haida Gwaii et au Cap-Breton. Les stations de marées canadiennes téléchargent leurs données du Service hydrographique du Canada une seule fois, puis fonctionnent hors ligne. Les courants de sept passes canadiennes utilisent des modèles téléchargés. Les seize autres téléchargent les prévisions du Service hydrographique du Canada quand vous êtes en ligne et conservent cette période pour une utilisation hors ligne. Là où nous ne pouvons pas publier de chiffres fiables, la station figure dans la liste, mais vide : nous ne devinons pas.",
           "",
           "Les prévisions ne sont pas des observations : les conditions varient selon la météo et le débit des rivières. Non destiné à la navigation.",
           "",
@@ -148,9 +148,9 @@
     "contactEmail": "slackwater@openwaters.io",
     "demoAccountRequired": false,
     "notes": [
-      "Bundled tide and current predictions are computed on-device from public harmonic data. Nine Canadian current passes use online predictions from CHS instead. The app is marked \"not for navigation\" on every station detail, the map, and Settings → About. Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
+      "Bundled tide and current predictions are computed on-device from public harmonic data. Sixteen Canadian current passes use online predictions from CHS instead. The app is marked \"not for navigation\" on every station detail, the map, and Settings → About. Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
       "",
-      "No account is needed. Canadian tide stations and 13 Canadian current passes download their data from the Canadian Hydrographic Service once and then work offline. The other nine current passes download a month of predictions at a time and show their offline availability.",
+      "No account is needed. Canadian tide stations and seven Canadian current passes download their data from the Canadian Hydrographic Service once and then work offline. The other sixteen current passes download a month of predictions at a time and show their offline availability.",
       "",
       "Premium is optional: a yearly auto-renewable subscription or a one-time lifetime purchase. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars; every prediction stays free. To reach the purchase sheet, scroll to the bottom of the station list and tap Support Slackwater. Restore purchase and the Privacy Policy and Terms of Use links are on the same sheet."
     ]

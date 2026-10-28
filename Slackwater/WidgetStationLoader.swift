@@ -128,7 +128,7 @@ enum WidgetStationLoader {
     /// Mirrors `ChsCurrentGateInfo.record(with:)` (ChsCurrentGate.swift:306-315),
     /// fed by the on-device fitted model — never `ChsFitService`'s in-memory cache.
     private static func fittedCurrentRecord(for info: ChsCurrentGateInfo) -> CurrentStationRecord? {
-        guard let model = ChsModelStore.loadCurrent(info.id) else { return nil }
+        guard let model = ChsModelStore.usableCurrent(info.id) else { return nil }
         return info.record(with: model)
     }
 

@@ -216,6 +216,8 @@ vanishes off the user's Mac without them having read that sentence.
 
 **A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the dedicated Support Slackwater sheet and changes nothing. Without Premium the toggles read off and do the same.
 
+A rejected CHS current model is an explicit invalidation, rather than a temporary missing prediction. The app records the affected place when rejecting its stored model. A place that remains fitted keeps the unusable file until a replacement lands, preserving its queued refit across launches; a fitted-to-online transition removes its file and chunk cache. Once Calendar grants full access, the app removes only that place's future generated events, identified by its own station URLs. It leaves events already underway, personal events without those URLs, and the subscription itself in place. A durable pending set survives model deletion and denied Calendar access; an EventKit failure keeps the entry for retry. A missing online window alone never invalidates a calendar.
+
 ### 5.2 Notifications
 
 - Interruption level `.active`. `.timeSensitive` needs the time-sensitive entitlement, which

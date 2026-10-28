@@ -97,7 +97,7 @@ test("Eastport, Friar Roads ships as a subordinate of the Estes Head bin", () =>
 });
 
 test("exactly the referenced bins ship, flagged, harmonic, and each one used", () => {
-  assert.equal(referenceOnly.length, 13);
+  assert.equal(referenceOnly.length, 16);
   const referenced = new Set(subordinates.map((s) => s.reference));
   for (const bin of referenceOnly) {
     assert.ok(bin.id.includes("@"), `${bin.id} is not a bin`);

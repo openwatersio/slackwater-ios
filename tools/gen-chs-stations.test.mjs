@@ -56,8 +56,7 @@ test("every curated CHS station ships as the database curates it", async () => {
   const curated = Object.entries(await curatedRecords()).filter(([, e]) => e.provider === "chs");
   const shipped = new Map([...stations, ...resource("chs-current-gates.json"), ...resource("chs-gates.json")]
     .map((s) => [s.id, s]));
-  // Arran Rapids is excluded outright as a hazard call (gen-chs-gates.mjs).
-  assert.deepEqual(curated.filter(([id]) => !shipped.has(id)).map(([id]) => id), ["chs-arran-rapids"]);
+  assert.deepEqual(curated.filter(([id]) => !shipped.has(id)).map(([id]) => id), []);
   for (const [id, e] of curated.filter(([id]) => shipped.has(id))) {
     const s = shipped.get(id);
     // A tide station the database leaves without a context gets a province or coast instead.

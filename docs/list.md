@@ -179,6 +179,8 @@ Changing the slack threshold refreshes already-mounted measured-current cards, i
 
 A Canadian current gate with a usable early model prefixes numbers with “~” and keeps the ordinary downloading, queued, retrying, offline, or failed status alongside its reading and progress wave. Timing uncertainty is explained in detail, separate from download status. There is no separate refining state or fast-answer badge. A usable tide preview follows the same download states. Both remain unfinished in the overall queue until their full models land.
 
+A bounded CHS current model keeps the approximate mark and attention colour after its full download. It is downloaded in the Downloads manager and shows no additional-download status or progress; its measured slack bound lives in the detail notice.
+
 An online Canadian gate shows an ordinary current card while its downloaded window covers today; otherwise it shows the pending shell with "Not downloaded" (never fetched) or "Expired" (fetched before).
 
 ### 6.3 Download status

@@ -105,6 +105,7 @@ nonisolated struct StationCardGraph: View {
     /// Signed current curves keep zero in the domain so flood/ebb read as
     /// above/below the resting line.
     var includesZero = false
+    var uncertain = false
     /// Formats the axis times computed inside the canvas; the
     /// extremes arrive with their times already formatted.
     var tz: TimeZone = .current
@@ -282,7 +283,7 @@ nonisolated struct StationCardGraph: View {
                 // A past extreme fades like the past line.
                 let fade = e.time < now ? CurveStyle.pastLabelFade : 1.0
                 let tint = (e.high ? SN.graphHigh : SN.graphLow).opacity(fade)
-                let ink = SN.foam.opacity(fade)
+                let ink = (uncertain ? SN.amber : SN.foam).opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
                 let isCurrent = e.isCurrent
                 // A tide turn is the event and gets a dot; a current peak is context and does not.
@@ -472,6 +473,7 @@ extension CurrentStationRecord {
             now: now,
             forward: end.timeIntervalSince(now),
             includesZero: true,
+            uncertain: tilde,
             tz: tz,
             windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
             cores: cardCores(points: raw, slacks: slackTimes, threshold: threshold),

@@ -44,17 +44,16 @@ test("a station with no published MHW/MLW is uncheckable, not failing", () => {
   assert.equal(passesDatumCheck(fake), true);
 });
 
-// Southampton is the double-tide port the spec named as the UK risk, and it
-// is one of exactly two UK stations that fail. If this starts passing, either
-// upstream fixed the station or the tolerance was widened — find out which.
-test("Southampton fails the gate and Aberdeen passes it", () => {
+// The current database corrects Southampton below the unchanged 0.3 m bar.
+// Keep the named UK calibration ports, alongside the NOAA controls above.
+test("corrected Southampton and Aberdeen pass the datum gate", () => {
   const pick = (name) => allStations.find(
     (s) => s.name === name && s.country === "United Kingdom" && checkable(s));
   const soton = pick("Southampton");
   const aberdeen = pick("Aberdeen");
   assert.ok(soton && aberdeen, "the two calibration stations must both be in the database");
-  assert.ok(datumDeviation(soton) > DATUM_TOLERANCE_M,
-            `Southampton deviation ${datumDeviation(soton).toFixed(3)} m no longer exceeds the gate`);
+  assert.ok(datumDeviation(soton) <= DATUM_TOLERANCE_M,
+            `Southampton deviation ${datumDeviation(soton).toFixed(3)} m now exceeds the gate`);
   assert.ok(datumDeviation(aberdeen) <= DATUM_TOLERANCE_M,
             `Aberdeen deviation ${datumDeviation(aberdeen).toFixed(3)} m now exceeds the gate`);
 });

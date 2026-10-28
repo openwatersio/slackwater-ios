@@ -619,19 +619,19 @@ final class ChsCurrentGateTests: XCTestCase {
 
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)
 
-    /// The 9 validation rejects ship as online: true identities — findable,
+    /// Online identities remain findable,
     /// never fitted, never provisional (online-gates spec §1).
     func testOnlineGatesShipAndShippedGatesStayOffline() throws {
         let online = ChsCurrentGateInfo.all.filter(\.isOnline)
-        XCTAssertEqual(online.count, 9, "the 9 fit-rejects ship as online gates")
+        XCTAssertEqual(online.count, 16, "year-round evidence decides online admission")
         for g in online {
             XCTAssert(g.id.hasPrefix("chs-"))
             XCTAssertFalse(g.offersProvisional, "an online gate never offers a fast answer")
-            XCTAssertNotNil(g.onlineNote, "\(g.id) needs its plain-words measured error")
+            XCTAssertNotNil(g.onlineMiss, "\(g.id) needs its measured failing clause")
         }
-        // The 13 shipped gates are untouched: not online, still fittable.
-        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 13)
-        XCTAssert(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" }?.isOnline == false)
+        // Seven gates qualify for a fitted model on year-round evidence.
+        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 7)
+        XCTAssert(ChsCurrentGateInfo.all.first { $0.id == "chs-active-pass" }?.isOnline == false)
     }
 
     /// The origin bug: Sechelt Rapids must be findable by name AND alias.

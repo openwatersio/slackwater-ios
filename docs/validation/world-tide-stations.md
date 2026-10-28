@@ -146,6 +146,8 @@ to match the measurement above.)
 
 ## The named failures
 
+The Southampton record in database `1.0.0-beta.20261028` passes the unchanged 0.30 m gate with a maximum deviation of 0.131 m and ships in the app. The calibration figures below record the original station inputs.
+
 Exactly two UK home-waters stations exceed 0.30 m:
 
 | Station | Deviation | Note |
