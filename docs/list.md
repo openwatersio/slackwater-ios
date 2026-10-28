@@ -46,7 +46,7 @@ Sections appear top to bottom in this order:
 | 6 | Recents | At least one recent remains after de-duplication |
 | 7 | Footer | Always: Downloads, Settings, and supporter-status rows, then the wordmark |
 
-Favorites and Recents have no empty-state copy; their heading simply does not render. The list has no pull-to-refresh and no reordering.
+Favorites and Recents have no empty-state copy; their heading simply does not render. The list has no pull-to-refresh and no reordering. Visible cards recalculate their readings and curves immediately when the app becomes active and every 60 seconds while active, preserving scroll position and the selected detail. Online current cards also recheck the cached prediction window for the current day, including while offline.
 
 Section headings are small uppercase monospaced labels in the go colour (`#88B868`). The uppercase is visual only; assistive technology must hear the heading in its written case.
 
@@ -221,7 +221,7 @@ The curve announces as "25-hour curve" with a value listing its extremes as "val
 
 ### 6.5 Liveness
 
-A card computes its reading and curve once, when it appears. There is no ticking clock in the list. Canadian cards follow their download state live, and a refined fit or a freshly downloaded online window rebuilds its card.
+Cards compute their readings and curves when they appear. A shared clock refreshes mounted cards immediately when the app becomes active and every 60 seconds while active; the clock pauses while inactive or backgrounded. The list, search results, and map previews receive the same refresh signal. A newly mounted card uses the current time, and a fresh eager map preview keeps its first frame until a later tick. Cached seeds retain their original calculation time. A Canadian tide preview outside its downloaded coverage shows no reading and returns to its pending state. Online current cards recheck coverage for the current local day without requiring a network request. Canadian cards follow their download state live, and a refined fit or a freshly downloaded online window rebuilds its card.
 
 ## 7. Search
 
@@ -404,6 +404,7 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 22. **Approximate fix:** My Location says "Approximate location" instead of precise coordinates when iOS supplies reduced accuracy.
 23. **Slack threshold:** Changing comfort current changes the example window in Settings and refreshes measured-current cards already mounted in the list or map preview.
 24. **Heading navigation:** With a fix, a favorite, and a recent, the headings rotor steps through My Location, Favorites, Near Me, and Recents, and stops on nothing inside a card.
+25. **Resume and live readings:** Leave the app overnight, then reopen it with the list and a selected detail visible. Mounted cards refresh immediately, keep updating every 60 seconds while active, and preserve the selection and scroll position. A map preview keeps its eager first frame until the next tick. After midnight, online current cards select the current day’s cached window without a network request.
 
 ## 15. Known iOS deviations from the intended contract
 
@@ -423,6 +424,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Ranking, anchor, search index, station kinds | `Slackwater/CurrentStation.swift`, `Slackwater/LocationService.swift` |
 | Namesake collapse, chooser picks, series filter | `Slackwater/Theme.swift`, `Slackwater/StationChooser.swift` |
 | Card shell and readings | `Slackwater/StationCardFace.swift`, `Slackwater/StationCard.swift` |
+| Card refresh lifecycle | `Slackwater/CardRefresh.swift`, `SlackwaterTests/CardRefreshTests.swift` |
 | Mini curve | `Slackwater/StationCardGraph.swift` |
 | Download status and strip | `Slackwater/CardStatus.swift`, `Slackwater/DownloadStrip.swift`, `Slackwater/DownloadTier.swift` |
 | Deep links | `Slackwater/DeepLink.swift` |

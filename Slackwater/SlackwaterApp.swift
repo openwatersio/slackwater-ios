@@ -84,6 +84,7 @@ struct RootView: View {
 
     var body: some View {
         StationListView()
+        .modifier(CardRefreshModifier())
         // The refresh that survives a flight. `.onAppear` fires once per view
         // lifetime, and re-activating a backgrounded scene does not re-appear
         // a view that is already on screen, so the list's own `.onAppear` only

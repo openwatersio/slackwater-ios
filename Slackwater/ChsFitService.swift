@@ -645,9 +645,9 @@ final class ChsFitService: ObservableObject {
         }
     }
 
-    func state(_ id: String) -> ChsState {
+    func state(_ id: String, at now: Date = appNow()) -> ChsState {
         if let record = tideRecords[id] { return .fitted(record) }
-        if let preview = tidePreviews[id], preview.coverage?.contains(appNow()) == true { return .preview(preview) }
+        if let preview = tidePreviews[id], preview.coverage?.contains(now) == true { return .preview(preview) }
         switch queue.status(id) ?? .pending {
         case .downloading: return .fitting
         case .failed: return .failed

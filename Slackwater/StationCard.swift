@@ -50,12 +50,12 @@ final class SeedCache<Value>: @unchecked Sendable {
     private var at = Date.distantPast
     private var cached: Value?
 
-    func value(for key: String, now: Date, build: () -> Value) -> Value {
+    func value(for key: String, now: Date, build: () -> Value) -> (value: Value, at: Date) {
         lock.lock(); defer { lock.unlock() }
-        if self.key == key, let cached, now.timeIntervalSince(at) < PIN_REFRESH_S { return cached }
+        if self.key == key, let cached, (0..<PIN_REFRESH_S).contains(now.timeIntervalSince(at)) { return (cached, at) }
         let value = build()
         (self.key, at, cached) = (key, now, value)
-        return value
+        return (value, at)
     }
 }
 
@@ -79,7 +79,12 @@ struct StationCardView: View {
     private let downloadProgress: Double?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
-    @State private var appliedPreviewAt: Date?
+    @State private var calculatedAt: Date?
+    @State private var appliedInputKey: String?
+    @Environment(\.cardRefreshTime) private var refreshTime
+
+    private var inputKey: String { "\(imperial)-\(preview?.fetchedAt.timeIntervalSince1970 ?? 0)" }
+    private var refreshKey: String { "\(inputKey)-\(refreshTime?.timeIntervalSince1970 ?? 0)" }
 
     init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false,
          preview: ChsTidePreview? = nil, status: CardStatus? = nil, statusDetail: String? = nil, downloadProgress: Double? = nil) {
@@ -121,13 +126,15 @@ struct StationCardView: View {
     /// which publishes continuously while the map is up.
     private mutating func seed(_ record: TideStationRecord) {
         let now = appNow()
+        if let preview, preview.coverage?.contains(now) != true { return }
         let station: any TidePredicting = preview.map { $0 as any TidePredicting } ?? record.engineStation
         let seeded = tideSeeds.value(for: "\(record.id)-\(imperial)-\(preview?.fetchedAt.timeIntervalSince1970 ?? 0)", now: now) {
             (record.cardState(at: now, station: station), record.cardGraph(at: now, imperial: imperial, station: station))
         }
-        _state = State(initialValue: seeded.0)
-        _graph = State(initialValue: seeded.1)
-        _appliedPreviewAt = State(initialValue: preview?.fetchedAt)
+        _state = State(initialValue: seeded.value.0)
+        _graph = State(initialValue: seeded.value.1)
+        _calculatedAt = State(initialValue: seeded.at)
+        _appliedInputKey = State(initialValue: inputKey)
     }
 
     var body: some View {
@@ -136,14 +143,25 @@ struct StationCardView: View {
                 ConditionsItem(reading: .tide(state, imperial: imperial))
             }
         }
-        .task(id: preview?.fetchedAt) {
-            guard state == nil || graph == nil || appliedPreviewAt != preview?.fetchedAt else { return }
-            guard let record = await resolve() else { return }
-            guard !Task.isCancelled else { return }
+        .task(id: refreshKey) {
+            let now = cardCalculationTime(refreshTime)
+            if let preview, preview.coverage?.contains(now) != true {
+                state = nil
+                graph = nil
+                return
+            }
+            if appliedInputKey == inputKey, cardCalculationIsCurrent(calculatedAt, refreshTime: refreshTime) { return }
+            guard let record = await resolve(), !Task.isCancelled else { return }
             let station: any TidePredicting = preview.map { $0 as any TidePredicting } ?? record.engineStation
-            state = record.cardState(at: appNow(), station: station)
-            graph = record.cardGraph(at: appNow(), imperial: imperial, station: station)
-            appliedPreviewAt = preview?.fetchedAt
+            let imperial = imperial
+            guard let result = await cardPrediction({
+                (record.cardState(at: now, station: station),
+                 record.cardGraph(at: now, imperial: imperial, station: station))
+            }) else { return }
+            state = result.0
+            graph = result.1
+            calculatedAt = now
+            appliedInputKey = inputKey
         }
     }
 }
@@ -158,10 +176,11 @@ struct ChsCardView: View {
     var eager = false
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
+    @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
-        switch service.state(info.id) {
+        switch service.state(info.id, at: cardCalculationTime(refreshTime)) {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial, km: km, eager: eager)
         case .preview(let preview):
@@ -220,8 +239,6 @@ struct ChsGateCardView: View {
     var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
-    @State private var state: DerivedGateCardState?
-    @State private var graph: StationCardGraph?
 
     /// Phase → tone. `static` so tests can call it without mounting the view.
     static func glyphTone(_ phase: DerivedPhase?) -> StationGlyph.Tone {
@@ -236,7 +253,7 @@ struct ChsGateCardView: View {
     var body: some View {
         switch service.state(gate.reference) {
         case .fitted(let port):
-            fittedCard(DerivedGateRecord(gate: gate, port: port))
+            DerivedGateCardView(record: DerivedGateRecord(gate: gate, port: port), km: km)
         case .preview:
             pending()
         case .fitting:
@@ -256,16 +273,29 @@ struct ChsGateCardView: View {
                               progress: status == .downloading ? service.queue.job(gate.reference)?.downloadProgress ?? 0 : nil)
     }
 
-    private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
+}
+
+struct DerivedGateCardView: View {
+    let record: DerivedGateRecord
+    var km: Double? = nil
+    @Environment(\.cardRefreshTime) private var refreshTime
+    @State private var state: DerivedGateCardState?
+    @State private var graph: StationCardGraph?
+
+    var body: some View {
+        StationCard(name: record.gate.name, region: record.gate.region, km: km, graph: graph) {
             if let state {
                 ConditionsItem(reading: .gate(state.phase))
             }
         }
-        .task {
-            let now = appNow()
-            if state == nil { state = record.cardState(at: now) }
-            if graph == nil { graph = record.cardGraph(at: now) }
+        .task(id: CardRefreshInput(time: refreshTime, record: record)) {
+            let now = cardCalculationTime(refreshTime)
+            let record = record
+            guard let result = await cardPrediction({
+                (record.cardState(at: now), record.cardGraph(at: now))
+            }) else { return }
+            state = result.0
+            graph = result.1
         }
     }
 }
@@ -281,6 +311,7 @@ struct ChsCurrentGateCardView: View {
     @ObservedObject private var net = Connectivity.shared
     /// Only ever read for an online gate — a fitted gate never touches this.
     @State private var onlineStore: ChsOnlineStore?
+    @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
@@ -302,7 +333,7 @@ struct ChsCurrentGateCardView: View {
                 }
             }
         }
-        .task { refreshOnlineWindow() }
+        .task(id: refreshTime) { refreshOnlineWindow() }
         // The fitted path re-renders off `service.currentRecords` (the
         // `@ObservedObject` above) the moment a fit lands. An online gate's
         // data isn't in that dictionary — it's a disk read — so without this
@@ -333,7 +364,7 @@ struct ChsCurrentGateCardView: View {
     /// carries the strip `onlineGateStatus` picks — never a queue status this
     /// gate can't be in.
     @ViewBuilder private var onlineCard: some View {
-        let today = todayLocal(gate.tz)
+        let today = dayLocal(cardCalculationTime(refreshTime), gate.tz)
         if let block = onlineStore?.block(covering: today) {
             OnlineGateCardView(gate: gate, window: block, km: km)
         } else {
@@ -367,11 +398,11 @@ struct OnlineGateCardView: View {
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
 
-    private var state: CurrentCardState { window.cardState(at: appNow()) }
+    @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
-        let state = state
-        let now = appNow()
+        let now = cardCalculationTime(refreshTime)
+        let state = window.cardState(at: now)
         let graph = window.cardGraph(at: now, unit: speedUnit,
                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
         StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
@@ -409,9 +440,15 @@ struct CurrentCardView: View {
     @State private var state: CurrentCardState?
     @State private var graph: StationCardGraph?
     @State private var graphKey: String?
+    @State private var calculatedAt: Date?
+    @Environment(\.cardRefreshTime) private var refreshTime
 
     private var graphInputKey: String {
         "\(speedUnit)-\(normalizedSlackThresholdKn(slackWindowSpeed))"
+    }
+
+    private var refreshKey: CardRefreshInput<CurrentStationRecord?> {
+        .init(time: refreshTime, record: fitted, settings: graphInputKey)
     }
 
     init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil, bounded: Bool = false,
@@ -445,9 +482,10 @@ struct CurrentCardView: View {
             (record.cardState(at: now), record.cardGraph(at: now, unit: unit, tilde: tilde))
         }
         _record = State(initialValue: record)
-        _state = State(initialValue: seeded.0)
-        _graph = State(initialValue: seeded.1)
+        _state = State(initialValue: seeded.value.0)
+        _graph = State(initialValue: seeded.value.1)
         _graphKey = State(initialValue: "\(unit)-\(slackThresholdKn)")
+        _calculatedAt = State(initialValue: seeded.at)
     }
 
     private var status: CardStatus? {
@@ -466,30 +504,29 @@ struct CurrentCardView: View {
                     deg: record.setDegrees(signed: state.signed),
                     unit: speedUnit,
                     tilde: provisional != nil || bounded,
-                    inWindow: graph?.isSlack(at: appNow()) ?? false))
+                    inWindow: graph?.isSlack(at: cardCalculationTime(refreshTime)) ?? false))
             }
         }
-        .task(id: graphInputKey) {
+        .task(id: refreshKey) {
             let key = graphInputKey
+            if let fitted, fitted != record { record = fitted; calculatedAt = nil }
+            if graphKey == key, cardCalculationIsCurrent(calculatedAt, refreshTime: refreshTime) { return }
             if record == nil { record = await resolve() }
             guard !Task.isCancelled else { return }
             guard let record else { return }
-            if state == nil { state = record.cardState(at: appNow()) }
-            if graphKey != key {
-                graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil || bounded,
-                                         threshold: normalizedSlackThresholdKn(slackWindowSpeed))
-                graphKey = key
-            }
+            let now = cardCalculationTime(refreshTime)
+            let unit = speedUnit
+            let tilde = provisional != nil || bounded
+            let threshold = normalizedSlackThresholdKn(slackWindowSpeed)
+            guard let result = await cardPrediction({
+                (record.cardState(at: now), record.cardGraph(at: now, unit: unit, tilde: tilde, threshold: threshold))
+            }) else { return }
+            state = result.0
+            graph = result.1
+            graphKey = key
+            calculatedAt = now
         }
-        // The refinement replaces the record under an open list: recompute.
-        .onChange(of: fitted) { _, refined in
-            guard let refined else { return }
-            record = refined
-            state = refined.cardState(at: appNow())
-            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil || bounded,
-                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
-            graphKey = graphInputKey
-        }
+
     }
 }
 
