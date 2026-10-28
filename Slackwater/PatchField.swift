@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. PatchField provider (grown-patches spec §5,
 // task-7-brief.md): loads the committed patches bundle
 // (tools/patch-pipeline/pack.py, format_version 1) and evaluates each
-// patch's ANCHOR harmonic (a bundled NOAA current station or a fitted CHS
+// patch's ANCHOR prediction (a bundled NOAA current station or a downloaded CHS
 // gate) once per call, then scales that single signed speed per cell —
 // this is a hand-grown channel model, not an independently-fitted mesh
 // element the way FillField's elements are.
@@ -19,7 +19,7 @@
 // ("noaa/PUG1701", see currents.json) while CHS gate ids are already bare
 // ("chs-dodd-narrows", see chs-current-gates.json) — the two providers use
 // different id shapes on purpose, not an inconsistency to paper over.
-// An anchor that can't resolve (unknown id, CHS model not yet fitted on
+// An anchor that can't resolve (unknown id, CHS predictions not downloaded on
 // device) vends no cells for that patch: absence stays absence, no
 // partial/flagged state.
 import CoreLocation
@@ -132,8 +132,8 @@ final class PatchField: Sendable {
     /// The anchor's signed speed at `date` — the app-wide 1-second-window
     /// idiom (`speeds(from:to:step:)`, same call every station card makes).
     /// NOAA resolves against the bundled catalog; CHS resolves the gate's
-    /// on-device fitted model. nil (not 0) on anything unresolved: unknown
-    /// id, or a CHS model that hasn't been fitted yet — absence, not a
+    /// cached fitted model or online predictions. nil (not 0) on anything unresolved: unknown
+    /// id, or CHS predictions not downloaded yet — absence, not a
     /// zero reading.
     private func anchorSpeed(_ anchor: PatchAnchor, at date: Date) -> Double? {
         let record: CurrentStationRecord?
@@ -141,12 +141,7 @@ final class PatchField: Sendable {
         case "noaa":
             record = CurrentStationRecord.all.first { $0.id == "noaa/\(anchor.stationId)" }
         case "chs":
-            if let gate = ChsCurrentGateInfo.all.first(where: { $0.id == anchor.stationId }),
-               let model = ChsModelStore.loadCurrent(anchor.stationId) {
-                record = gate.record(with: model)
-            } else {
-                record = nil
-            }
+            return ChsCurrentGateInfo.all.first { $0.id == anchor.stationId }?.cachedReading(at: date)?.signedKn
         default:
             record = nil
         }

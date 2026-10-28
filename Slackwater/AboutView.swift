@@ -28,6 +28,12 @@ struct AboutView: View {
                     Text(
                         "Norwegian stations: harmonic constants © Kartverket (Norwegian Mapping Authority, Hydrographic Service) under CC BY 4.0 (kartverket.no)."
                     )
+                    Text(
+                        "Danish stations: harmonic constants fitted from Danish Meteorological Institute (DMI) predictions under CC BY 4.0 (dmi.dk)."
+                    )
+                    Text(
+                        "Japanese stations: Japan Coast Guard, Hydrographic and Oceanographic Department data under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived."
+                    )
                     // LINZ asks for this credit in writing, never its logo.
                     Text(
                         "New Zealand stations: harmonic constants based on Toitū Te Whenua Land Information New Zealand data, licensed by Toitū Te Whenua Land Information New Zealand for re-use under CC BY 4.0 (linz.govt.nz)."

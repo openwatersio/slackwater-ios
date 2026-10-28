@@ -233,7 +233,7 @@ test("a saved New Zealand TICON station moves to LINZ's record of the same gauge
   // A known datum shift moves a saved tide height; a CHS port has none.
   assert.deepEqual(successors["ticon/wellington-071-nzl-uhslc_fd"], { id: "linz/071", datumShiftM: 0.416 });
   assert.deepEqual(successors["noaa/8218617"], { id: "chs-mill-bay" });
-  const stones = read("station-tombstones.json").map((t) => t.id);
+  const stones = read("station-tombstones.json").map((t) => t.id).filter(id => id.includes("-nzl-"));
   assert.deepEqual(stones.sort(), [
     "ticon/auckland-070a-nzl-uhslc_rq", "ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw",
   ]);

@@ -171,14 +171,14 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// The sharp assertion is the FAVORITES section label itself: it only
     /// renders when a favorite id RESOLVES, so the phantom leaves it absent.
     func testFavoritePendingChsGateFromDetail() throws {
-        // Fit only Victoria, so Dodd Narrows deterministically stays the
+        // Fit only Victoria, so Johnstone Strait - Central deterministically stays the
         // pending ⚠️ waiting page.
         let app = launch("-resetRecents", "-resetFavorites",
                          "-chsResetModels", "-chsFitOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
-        openSearch(app, "dodd")
-        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        openSearch(app, "johnstone")
+        pickSearchResult(app, app.staticTexts["Johnstone Strait - Central"].firstMatch)
 
         // The pending detail still carries the header star — tap it.
         let star = app.buttons["detail-favorite"].firstMatch
@@ -195,7 +195,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(stationList(app).appears(within: 5))
         XCTAssert(app.staticTexts["Favorites"].appears(within: 5),
                   "favoriting a pending CHS gate produced no Favorites group — the star wrote an id the list cannot resolve")
-        let row = app.staticTexts["Dodd Narrows"].firstMatch
+        let row = app.staticTexts["Johnstone Strait - Central"].firstMatch
         XCTAssert(row.exists, "the favorited pending gate is missing from the Favorites group")
 
         // Leave the simulator as found: swipe-unfavorite the row so later
@@ -244,8 +244,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["week-range-bar"].firstMatch.exists,
                        "no stored window: the week-range bar has nowhere to go")
 
-        // Its one tap out: the nearest of the 11 shipped (fittable) gates —
-        // Dodd Narrows, ~67 km away. Bundled-identity distance, independent of
+        // Its one tap out: the nearest shipped fittable gate —
+        // First Narrows, ~72 km away. Bundled-identity distance, independent of
         // the fix, so this is deterministic without depending on -fixLat/-fixLon.
         let link = app.descendants(matching: .any)["nearest-gate-link"].firstMatch
         XCTAssert(link.appears(within: 5), "nearest-gate-link missing from the honesty card")
@@ -254,12 +254,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         link.tap()
 
         // Scoped to the now-active detail header, not a bare name lookup: on
-        // iPad the persistent sidebar can carry "Dodd Narrows" in its own Near
+        // iPad the persistent sidebar can carry "First Narrows" in its own Near
         // Me ranking independently of what's pushed, so the name alone is a
         // secondary tell at best.
         let header = app.otherElements["detail-header"].firstMatch
         XCTAssert(header.appears(within: 5), "nearest-gate-link did not open a detail")
-        XCTAssert(header.staticTexts["Dodd Narrows"].firstMatch.exists,
+        XCTAssert(header.staticTexts["First Narrows"].firstMatch.exists,
                   "nearest-gate-link did not land on the nearest shipped gate's detail")
 
         // Back to Sechelt's own (still-honesty) detail — one pop, since the
@@ -415,7 +415,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let cards = listContainer(app).staticTexts
             .matching(NSPredicate(format: "label == %@", "Cape Cod Canal"))
         XCTAssertEqual(cards.count, 1, "same-named stations must render as one entry")
-        XCTAssertFalse(listContainer(app).staticTexts["Sagamore"].exists,
+        // Sagamore Bridge is a separate current station whose region is also
+        // Sagamore. Scope the region check to the Cape Cod Canal tide card.
+        let canalCard = listContainer(app).cells.containing(
+            .staticText, identifier: "Cape Cod Canal").firstMatch
+        XCTAssert(canalCard.exists, "the collapsed tide card must be present")
+        XCTAssertFalse(canalCard.staticTexts["Sagamore"].exists,
                        "a farther namesake must not render as its own card")
 
         // The list offers no chooser; the station page does.

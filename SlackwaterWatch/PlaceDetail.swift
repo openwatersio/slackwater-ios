@@ -242,6 +242,8 @@ struct PlaceDetail: View {
                 CardStatusStrip(status: cardStatus(id: gate.id))
                     .accessibilityLabel(cardStatus(id: gate.id).label)
                 Text(gate.provisionalHeadline)
+            } else if case .chsCurrent(let gate) = item, let bound = gate.slackBoundMinutes {
+                Text(gate.boundHeadline(minutes: bound))
             }
             if let tl = store?.timeline {
                 ForEach(ScrubReading.todaysEvents(after: scrubTime, in: tl, imperial: imperial,

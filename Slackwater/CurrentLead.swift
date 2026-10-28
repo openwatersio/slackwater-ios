@@ -20,6 +20,7 @@ struct CurrentLead: View {
     var ink: Color = .white
     /// A fast answer marks every number with a tilde and paints them amber.
     var provisional = false
+    var bounded = false
     /// Where the next maximum stands among its own direction's maxima over the
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
@@ -27,9 +28,9 @@ struct CurrentLead: View {
 
     private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
     private var phase: CurrentPhase { currentPhase(signed: signed, inWindow: isSlack) }
-    private var tilde: String { provisional ? "~" : "" }
+    private var tilde: String { (provisional || bounded) ? "~" : "" }
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
-    private var readingColor: Color { provisional ? SN.amber : ink }
+    private var readingColor: Color { (provisional || bounded) ? SN.amber : ink }
 
     /// The stops the commentary walks: a slack window's opening, the slack
     /// inside it, the window's closing, each max, and the sun's
@@ -116,7 +117,7 @@ struct CurrentLead: View {
     }
 
     var body: some View {
-        let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(phase)
+        let phaseColor = (provisional || bounded) ? SN.amber : CurrentDetailView.phaseColor(phase)
         LeadCard(value: "\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))",
                  unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),

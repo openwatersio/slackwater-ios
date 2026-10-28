@@ -75,7 +75,7 @@ struct CurrentDetailView: View {
     private func lead(_ tl: TimelineData, ink: Color = .white) -> CurrentLead {
         var l = CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
                             floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                            speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
+                            speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil, bounded: record.chsGate?.isBounded == true)
         // The tile ranks the maximum it prints, against its own direction's.
         l.standing = l.nextMaxEvent.flatMap {
             standings.standing(speed: $0.speed, time: $0.time, kind: $0.kind)
@@ -118,11 +118,16 @@ struct CurrentDetailView: View {
                                 VStack(spacing: 12) {
                                     if let gate = provisionalGate {
                                         ChsDownloadNotice(stationID: gate.id, tz: tz, gate: gate)
+                                    } else if let gate = record.chsGate, let bound = gate.slackBoundMinutes {
+                                        Text(gate.boundHeadline(minutes: bound))
+                                            .font(.caption).foregroundStyle(SN.amber)
+                                            .multilineTextAlignment(.center)
+                                            .accessibilityIdentifier("chs-bound-notice")
                                     }
                                     SummaryTiles(primary: lead(tl).nextMax,
                                                  primaryDetail: maxDetail(tl, jump: jump),
                                                  primarySymbol: maxSymbol(tl),
-                                                 primaryValueColor: provisionalGate != nil ? SN.amber : .white,
+                                                 primaryValueColor: (provisionalGate != nil || record.chsGate?.isBounded == true) ? SN.amber : .white,
                                                  moon: sky.illumination,
                                                  at: scrubTime, sunDays: tl.days,
                                                  moonAngle: sky.moonLightAngle,
@@ -156,7 +161,7 @@ struct CurrentDetailView: View {
                     resetStore(focus: linked ? scrubTime : FoldHandoff.pending(record.itemId))
                 }
                 RecentsStore.shared.record(record.itemId)
-                if record.isChs { chsModel = ChsModelStore.loadCurrent(record.id) }
+                if record.isChs { chsModel = ChsModelStore.usableCurrent(record.id) }
                 if pairedTide == nil, nearbyTide == nil,
                    let n = StationItem.nearest(.tide, toLat: record.latitude, lon: record.longitude),
                    n.km <= nearbyStationRadiusKm {
@@ -182,7 +187,7 @@ struct CurrentDetailView: View {
             // a fresh store, parked where the scrub already is.
             .onChange(of: record) { _, r in
                 resetStore(focus: scrubTime)
-                if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
+                if r.isChs { chsModel = ChsModelStore.usableCurrent(r.id) }
             }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
             // After the strip, never before it: the scan only feeds a tile

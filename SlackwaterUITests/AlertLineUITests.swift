@@ -107,8 +107,13 @@ final class AlertLineUITests: ScreenshotTestCase {
         // Found again from where it was made: the sheet opens on the rule, with Delete.
         line(app).tap()
         XCTAssert(sheet(app).appears(within: 5))
-        // Below the medium detent's fold, and a Form only materializes rows near the screen.
-        scrollTo(app.buttons["Delete Alert"], in: app)
+        // A missing lazy row cannot identify its scroll container on an iPad split view.
+        let delete = app.buttons["Delete Alert"]
+        for _ in 0..<8 {
+            if delete.exists && delete.isHittable { break }
+            sheet(app).swipeUp()
+        }
+        XCTAssertTrue(delete.exists && delete.isHittable, "Delete Alert stayed below the sheet's fold")
         app.buttons["Delete Alert"].tap()
         XCTAssert(sheet(app).disappears(within: 5))
         XCTAssertEqual(line(app).label, "Set an alert")
@@ -137,6 +142,10 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssert(line(app).appears(within: 5))
         line(app).tap()
         XCTAssert(sheet(app).appears(within: 5))
+        // On iPad the focused sentence field puts the keyboard over this row; a swipe
+        // at the row's reported frame hits keyboard keys instead of scrolling the Form.
+        let hideKeyboard = app.keyboards.buttons["Hide keyboard"].firstMatch
+        if hideKeyboard.exists { hideKeyboard.tap() }
         let sun = app.descendants(matching: .any)["alert-sheet-sun"].firstMatch
         scrollTo(sun, in: app)
         XCTAssert(sun.exists, "no Sun row in the sheet")

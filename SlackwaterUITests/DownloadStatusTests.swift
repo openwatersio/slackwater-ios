@@ -51,11 +51,11 @@ final class DownloadStatusTests: ScreenshotTestCase {
         let app = launch(["-chsResetModels", "-resetFavorites", "-resetRecents",
                           "-seedOnlineWindow", "chs-sechelt-rapids",
                           "-chsFixture", token, "-chsFixtureScenario", "hold-first",
-                          "-chsFitOnly", "chs-second-narrows",
+                          "-chsFitOnly", "chs-great-bras-dor",
                           "-fixLat", "42.3601", "-fixLon", "-71.0589"])
         openDownloads(app)
         app.buttons["download-all-currents"].firstMatch.tap()
-        let held = app.descendants(matching: .any)["download-row-chs-second-narrows"].firstMatch
+        let held = app.descendants(matching: .any)["download-row-chs-great-bras-dor"].firstMatch
         XCTAssert(held.staticTexts["Downloading…"].appears(within: 10))
         app.buttons["Done"].tap()
         openSearch(app, "skookumchuck")

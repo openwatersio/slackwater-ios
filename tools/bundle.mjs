@@ -61,6 +61,7 @@ export async function curatedRecords() {
       kind: s.kind,
       tideReference: c.tide_reference,
       magnitudeNote: c.magnitude_note,
+      chsFit: c.chs_fit,
       ...(c.derived && { derived: {
         reference: c.derived.reference,
         hwLagMinutes: c.derived.high_water_lag_minutes,

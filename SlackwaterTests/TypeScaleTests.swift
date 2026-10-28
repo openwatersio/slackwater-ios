@@ -91,6 +91,9 @@ extension TypeScaleTests {
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
         // See blind spot 2 above — "File.swift:declaringSymbol".
         let knownIndirections: Set<String> = [
+            // Fit evidence is rendered by the monospaced headline in ChsAmberCard
+            // and the monospaced value in StationDetailRow.
+            "ChsCurrentCopy.swift:onlineExplanation",
             // Siri details are rendered by TideShortcutSnippetView's monospaced Text.
             "TideShortcuts.swift:next",
             "TideShortcuts.swift:on",

@@ -405,7 +405,7 @@ struct TideDetailView: View {
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             } else if let source = record.source {
                 // Kartverket's terms ask to be named wherever its data is used.
-                Text("\(record.chartDatum) chart datum. Harmonic constants from \(source).")
+                Text(tideSourceNotice(chartDatum: record.chartDatum, source: source))
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             }
@@ -573,4 +573,19 @@ func tideRatePeakStop(_ peak: TideRatePoint) -> CommentaryStop {
     NavigationStack {
         TideDetailView(record: TideStationRecord.record(id: TideStationRecord.fridayHarborID)!)
     }
+}
+
+/// Source transformations and required credits belong beside the prediction they describe.
+func tideSourceNotice(chartDatum: String, source: String) -> String {
+    let credit: String
+    switch source {
+    case "Danish Meteorological Institute":
+        credit = String(localized: "Danish stations: harmonic constants fitted from Danish Meteorological Institute (DMI) predictions under CC BY 4.0 (dmi.dk).")
+    case "Japan Coast Guard, Hydrographic and Oceanographic Department":
+        credit = String(localized: "Japanese stations: Japan Coast Guard, Hydrographic and Oceanographic Department data under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived.")
+    default:
+        return String(localized: "\(chartDatum) chart datum. Harmonic constants from \(source).")
+    }
+    let datum = String(localized: "\(chartDatum) chart datum", comment: "Station-detail datum. The value is a datum acronym.")
+    return "\(datum). \(credit)"
 }

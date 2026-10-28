@@ -291,7 +291,7 @@ struct ChsCurrentGateCardView: View {
                 switch service.currentState(gate.id) {
                 case .fitted(let record):
                     CurrentCardView(record: record, km: km,
-                                    provisional: service.isProvisional(gate.id) ? gate : nil,
+                                    provisional: service.isProvisional(gate.id) ? gate : nil, bounded: gate.isBounded,
                                     eager: eager)
                 case .fitting:
                     pending()
@@ -395,6 +395,7 @@ struct CurrentCardView: View {
     /// that is the ongoing download status and a `~` on the readings — nothing
     /// else. The measured timing tolerance lives in the detail notice.
     var provisional: ChsCurrentGateInfo? = nil
+    var bounded = false
     /// The caller's own record, when it has one. A CHS fit is replaced under
     /// an open list when a refinement lands, so it has to stay observable; a
     /// bundled NOAA station's record never changes and is decoded on demand
@@ -413,12 +414,13 @@ struct CurrentCardView: View {
         "\(speedUnit)-\(normalizedSlackThresholdKn(slackWindowSpeed))"
     }
 
-    init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil,
+    init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil, bounded: Bool = false,
          eager: Bool = false) {
         name = record.name
         region = record.region
         self.km = km
         self.provisional = provisional
+        self.bounded = bounded
         fitted = record
         resolve = { record }
         if eager { seed(record) }
@@ -438,7 +440,7 @@ struct CurrentCardView: View {
     private mutating func seed(_ record: CurrentStationRecord) {
         let unit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let now = appNow()
-        let tilde = provisional != nil
+        let tilde = provisional != nil || bounded
         let seeded = currentSeeds.value(for: "\(record.id)-\(unit)-\(tilde)-\(slackThresholdKn)", now: now) {
             (record.cardState(at: now), record.cardGraph(at: now, unit: unit, tilde: tilde))
         }
@@ -463,7 +465,7 @@ struct CurrentCardView: View {
                     signed: state.signed,
                     deg: record.setDegrees(signed: state.signed),
                     unit: speedUnit,
-                    tilde: provisional != nil,
+                    tilde: provisional != nil || bounded,
                     inWindow: graph?.isSlack(at: appNow()) ?? false))
             }
         }
@@ -474,7 +476,7 @@ struct CurrentCardView: View {
             guard let record else { return }
             if state == nil { state = record.cardState(at: appNow()) }
             if graphKey != key {
-                graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil,
+                graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil || bounded,
                                          threshold: normalizedSlackThresholdKn(slackWindowSpeed))
                 graphKey = key
             }
@@ -484,7 +486,7 @@ struct CurrentCardView: View {
             guard let refined else { return }
             record = refined
             state = refined.cardState(at: appNow())
-            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil,
+            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil || bounded,
                                       threshold: normalizedSlackThresholdKn(slackWindowSpeed))
             graphKey = graphInputKey
         }

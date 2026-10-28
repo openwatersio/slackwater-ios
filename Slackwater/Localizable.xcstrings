@@ -47780,107 +47780,6 @@
         }
       }
     },
-    "Slack at %@ can be off by %lld min." : {
-      "comment" : "Provisional current-model warning. Values are place name and its measured slack-current timing uncertainty in minutes.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstille ved %1$@ kan afvige med %2$lld min."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stauwasser bei %1$@ kann um %2$lld min abweichen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Slack at %1$@ can be off by %2$lld min."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La estoa en %1$@ puede desviarse %2$lld min."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Virran tyyntymishetki paikassa %1$@ voi poiketa %2$lld min."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’étale à %1$@ peut varier de %2$lld min."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "D'fhéadfadh fáfall ag %1$@ a bheith %2$lld nóim. as."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dh'fhaodadh am marbh-shruth aig %1$@ a bhith %2$lld min ceàrr."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La stanca a %1$@ può discostarsi di %2$lld min."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@の潮止まりは、%2$lld minずれることがあります。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@의 정조 시간은 %2$lld min 차이 날 수 있습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strømstille ved %1$@ kan avvike med %2$lld min."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De kentering bij %1$@ kan %2$lld min afwijken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O estofo em %1$@ pode desviar %2$lld min."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O estofo em %1$@ pode desviar %2$lld min."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strömstilla vid %1$@ kan avvika med %2$lld min."
-          }
-        }
-      }
-    },
     "Slack · %@" : {
       "comment" : "Tide and current interface text. Placeholders are runtime values shown in context.",
       "localizations" : {
@@ -61765,6 +61664,1621 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Det finns ingen strömstilla period vid %@ under de närmaste 48 timmarna."
+          }
+        }
+      }
+    },
+    "Slack at %@ can differ from CHS's prediction by up to %lld min." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømskifte ved %@ kan afvige fra CHS’ forudsigelse med op til %lld min."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stillwasser bei %@ kann bis zu %lld Min. von der CHS-Vorhersage abweichen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora de la estoa en %@ puede diferir hasta %lld min de la predicción del CHS."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tyvenen ajankohta paikassa %@ voi poiketa CHS:n ennusteesta enintään %lld min."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’étale à %@ peut différer de la prévision du SHC de jusqu’à %lld min."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Féadfaidh am an uisce mhairbh ag %@ a bheith suas le %lld nóim. difriúil ó réamhaisnéis CHS."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faodaidh àm an uisge mhairbh aig %@ a bhith suas ri %lld mion. eadar-dhealaichte bho ro-aithris CHS."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La stanca a %@ può differire dalla previsione del CHS fino a %lld min."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の憩流時刻はCHSの予測と最大%lld分異なる場合があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 정조 시각은 CHS 예측과 최대 %lld분 다를 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømskifte ved %@ kan avvike fra CHS-prognosen med opptil %lld min."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De kentering bij %@ kan tot %lld min afwijken van de CHS-voorspelling."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A estofa em %@ pode diferir da previsão do CHS em até %lld min."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A estofa em %@ pode diferir da previsão do CHS em até %lld min."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strömkantring vid %@ kan avvika från CHS prognos med upp till %lld min."
+          }
+        }
+      }
+    },
+    "The current here is slow to reverse, which makes slack harder to predict." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømmen her vender langsomt, hvilket gør strømskifte sværere at forudsige."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Strömung kehrt hier langsam um, was Stillwasser schwerer vorhersagbar macht."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La corriente aquí tarda en invertirse, lo que dificulta predecir la estoa."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Virta kääntyy täällä hitaasti, mikä vaikeuttaa tyvenen ennustamista."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le courant s’inverse lentement ici, ce qui rend l’étale plus difficile à prévoir."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Casann an sruth anseo go mall, rud a fhágann go bhfuil sé níos deacra uisce marbh a thuar."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bidh an sruth an seo a’ tionndadh gu slaodach, agus mar sin tha e nas duilghe uisge marbh a ro-innse."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui la corrente si inverte lentamente, rendendo più difficile prevedere la stanca."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここでは流れがゆっくり反転するため、憩流の予測が難しくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이곳은 해류 방향이 천천히 바뀌어 정조 예측이 더 어렵습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømmen her snur langsomt, noe som gjør strømskifte vanskeligere å forutsi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De stroming keert hier langzaam om, waardoor de kentering moeilijker te voorspellen is."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A corrente aqui demora a inverter, o que dificulta prever a estofa."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A corrente aqui demora a inverter, o que dificulta prever a estofa."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strömmen här vänder långsamt, vilket gör strömkantring svårare att förutsäga."
+          }
+        }
+      }
+    },
+    "This place has reversing tidal falls." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her er tidevandsfald, der skifter retning."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier gibt es umkehrende Gezeitenwasserfälle."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí hay cascadas de marea que invierten su sentido."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Täällä on suuntaa vaihtavia vuorovesiputouksia."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il y a ici des chutes de marée réversibles."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá easanna taoide anseo a athraíonn treo."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha easan làn-mara an seo a dh’atharraicheas an treòrachadh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui si trovano cascate di marea che invertono direzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここには流れが反転する潮汐の滝があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이곳에는 방향이 바뀌는 조석 폭포가 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her finnes tidevannsfall som skifter retning."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier zijn getijdenwatervallen die van richting veranderen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqui há quedas de maré que invertem o sentido."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqui há quedas de maré que invertem o sentido."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Här finns tidvattenfall som byter riktning."
+          }
+        }
+      }
+    },
+    "This place has tidal rapids." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her er tidevandsstryg."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier gibt es Gezeitenstromschnellen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí hay rápidos de marea."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Täällä on vuorovesikoskia."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il y a ici des rapides de marée."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá sruthanna tapa taoide anseo."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha bras-shruthan làn-mara an seo."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui si trovano rapide di marea."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここには潮汐による急流があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이곳에는 조석 급류가 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her finnes tidevannsstryk."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier zijn getijdenstroomversnellingen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqui há corredeiras de maré."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqui há rápidos de maré."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Här finns tidvattenforsar."
+          }
+        }
+      }
+    },
+    "An on-device fit has not been validated here. Slackwater uses CHS predictions." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En model på enheden er ikke valideret her. Slackwater bruger CHS’ forudsigelser."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Geräteanpassung wurde hier noch nicht validiert. Slackwater verwendet CHS-Vorhersagen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no se ha validado un ajuste en el dispositivo aquí. Slackwater usa predicciones del CHS."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehtyä sovitusta ei ole validoitu täällä. Slackwater käyttää CHS:n ennusteita."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun ajustement sur l’appareil n’a été validé ici. Slackwater utilise les prévisions du SHC."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níor bailíochtaíodh feistiú ar an ngléas anseo fós. Úsáideann Slackwater réamhaisnéisí CHS."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cha deach freagarrachadh air an uidheam a dhearbhadh an seo fhathast. Cleachdaidh Slackwater ro-aithrisean CHS."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui non è stato validato un adattamento sul dispositivo. Slackwater usa le previsioni del CHS."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここでは端末上の近似モデルはまだ検証されていません。SlackwaterはCHSの予測を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이곳에서는 기기 내 적합 모델이 검증되지 않았습니다. Slackwater는 CHS 예측을 사용합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En tilpasning på enheten er ikke validert her. Slackwater bruker CHS-prognoser."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een aanpassing op het apparaat is hier nog niet gevalideerd. Slackwater gebruikt CHS-voorspellingen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um ajuste no dispositivo ainda não foi validado aqui. O Slackwater usa previsões do CHS."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não foi validado um ajuste no dispositivo aqui. O Slackwater utiliza previsões do CHS."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En anpassning på enheten har inte validerats här. Slackwater använder CHS prognoser."
+          }
+        }
+      }
+    },
+    "The on-device fit is close to the validation bar. Slackwater uses CHS predictions until it passes consistently." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellen på enheden er tæt på valideringskravet. Slackwater bruger CHS’ forudsigelser, indtil modellen består stabilt."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Geräteanpassung liegt nahe an der Validierungsgrenze. Slackwater verwendet CHS-Vorhersagen, bis sie die Prüfung dauerhaft besteht."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El ajuste en el dispositivo está cerca del umbral de validación. Slackwater usa predicciones del CHS hasta que lo supere de forma consistente."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehty sovitus on lähellä validointirajaa. Slackwater käyttää CHS:n ennusteita, kunnes sovitus läpäisee sen johdonmukaisesti."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ajustement sur l’appareil approche du seuil de validation. Slackwater utilise les prévisions du SHC jusqu’à ce qu’il réussisse de façon constante."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá an feistiú ar an ngléas gar don tairseach bailíochtaithe. Úsáideann Slackwater réamhaisnéisí CHS go dtí go n-éiríonn leis go comhsheasmhach."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha am freagarrachadh air an uidheam faisg air stairsneach an dearbhaidh. Cleachdaidh Slackwater ro-aithrisean CHS gus an tèid leis gu cunbhalach."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adattamento sul dispositivo è vicino alla soglia di validazione. Slackwater usa le previsioni del CHS finché non la supera con costanza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末上の近似モデルは検証基準に近づいています。安定して基準を満たすまで、SlackwaterはCHSの予測を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 내 적합 모델이 검증 기준에 근접했습니다. 안정적으로 통과할 때까지 Slackwater는 CHS 예측을 사용합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningen på enheten er nær valideringsgrensen. Slackwater bruker CHS-prognoser til den består jevnt."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De aanpassing op het apparaat ligt dicht bij de validatiegrens. Slackwater gebruikt CHS-voorspellingen totdat deze consequent wordt gehaald."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo está perto do limite de validação. O Slackwater usa previsões do CHS até que ele passe de forma consistente."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo está próximo do limite de validação. O Slackwater utiliza previsões do CHS até que o ultrapasse de forma consistente."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningen på enheten är nära valideringsgränsen. Slackwater använder CHS prognoser tills den klarar den konsekvent."
+          }
+        }
+      }
+    },
+    "The on-device fit predicted the wrong flow direction for %@%% of peak flows in its worst week." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellen på enheden forudsagde forkert strømretning ved %@%% af strømtoppene i den dårligste uge."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Geräteanpassung sagte in ihrer schlechtesten Woche bei %@%% der Strömungsmaxima die falsche Fließrichtung voraus."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El ajuste en el dispositivo predijo una dirección incorrecta en el %@%% de los máximos de corriente durante su peor semana."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehty sovitus ennusti väärän virtaussuunnan %@%%:ssa virran huipuista huonoimmalla viikollaan."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ajustement sur l’appareil a prédit la mauvaise direction pour %@%% des maximums de courant pendant sa pire semaine."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thuar an feistiú ar an ngléas treo mícheart ag %@%% de bhuaicsruthanna sa tseachtain ba mheasa."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ro-innis am freagarrachadh air an uidheam an treòrachadh ceàrr aig %@%% de na sruthan as àirde san t-seachdain a bu mhiosa."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adattamento sul dispositivo ha previsto la direzione errata nel %@%% dei massimi di corrente nella settimana peggiore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末上の近似モデルは、最も悪い週の最大流速時の%@%%で流れの向きを誤って予測しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 내 적합 모델은 가장 나쁜 주에 최대 유속의 %@%%에서 흐름 방향을 잘못 예측했습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningen på enheten forutsa feil strømretning ved %@%% av strømtoppene i den dårligste uken."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De aanpassing op het apparaat voorspelde in de slechtste week bij %@%% van de stroommaxima de verkeerde richting."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo previu a direção errada em %@%% dos picos de corrente na pior semana."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo previu a direção errada em %@%% dos picos de corrente na pior semana."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningen på enheten förutsade fel strömriktning vid %@%% av strömtopparna under den sämsta veckan."
+          }
+        }
+      }
+    },
+    "The on-device fit’s yearly count of slacks absent from CHS predictions was %lld." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellens årlige antal strømskifter, som CHS ikke forudsagde, var %lld."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die jährliche Anzahl der von der Geräteanpassung vorhergesagten, bei CHS fehlenden Stillwasser betrug %lld."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El recuento anual de estoas del ajuste en el dispositivo ausentes de las predicciones del CHS fue de %lld."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehdyn sovituksen CHS:n ennusteista puuttuvien tyventen vuosimäärä oli %lld."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nombre annuel d’étales prédites par l’ajustement sur l’appareil mais absentes des prévisions du SHC était de %lld."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ba é %lld líon bliantúil na dtréimhsí uisce mhairbh a thuar an feistiú ach nach raibh i réamhaisnéisí CHS."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B’ e %lld àireamh bhliadhnail nan amannan uisge mhairbh a ro-innis am freagarrachadh ach nach robh ann an ro-aithrisean CHS."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il conteggio annuale delle stanche dell’adattamento assenti dalle previsioni del CHS era %lld."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末上の近似モデルが予測し、CHSの予測にはなかった憩流の年間回数は%lld回でした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 내 적합 모델이 예측했으나 CHS 예측에는 없는 정조의 연간 횟수는 %lld회였습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det årlige antallet strømskifter fra tilpasningen som manglet i CHS-prognosene, var %lld."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het jaarlijkse aantal kenteringen van de aanpassing dat ontbrak in de CHS-voorspellingen was %lld."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A contagem anual de estofas do ajuste ausentes das previsões do CHS foi %lld."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A contagem anual de estofas do ajuste ausentes das previsões do CHS foi %lld."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det årliga antalet strömkantringar från anpassningen som saknades i CHS prognoser var %lld."
+          }
+        }
+      }
+    },
+    "The on-device fit’s yearly count of missed CHS slacks was %lld." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellens årlige antal oversete CHS-strømskifter var %lld."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die jährliche Anzahl der von der Geräteanpassung verpassten CHS-Stillwasser betrug %lld."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El recuento anual de estoas del CHS omitidas por el ajuste en el dispositivo fue de %lld."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehdyltä sovitukselta puuttuvien CHS-tyventen vuosimäärä oli %lld."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nombre annuel d’étales du SHC manquées par l’ajustement sur l’appareil était de %lld."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ba é %lld líon bliantúil na dtréimhsí uisce mhairbh CHS a chaill an feistiú."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B’ e %lld àireamh bhliadhnail nan amannan uisge mhairbh CHS a chaill am freagarrachadh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il conteggio annuale delle stanche del CHS mancate dall’adattamento era %lld."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末上の近似モデルが見逃したCHSの憩流の年間回数は%lld回でした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 내 적합 모델이 놓친 CHS 정조의 연간 횟수는 %lld회였습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det årlige antallet CHS-strømskifter som tilpasningen overså, var %lld."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het jaarlijkse aantal CHS-kenteringen dat de aanpassing miste was %lld."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A contagem anual de estofas do CHS que o ajuste não previu foi %lld."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A contagem anual de estofas do CHS não previstas pelo ajuste foi %lld."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det årliga antalet CHS-strömkantringar som anpassningen missade var %lld."
+          }
+        }
+      }
+    },
+    "The on-device fit differed from CHS's slack predictions by up to %@ min over a year." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellen på enheden afveg fra CHS’ strømskifter med op til %@ min over et år."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Geräteanpassung wich über ein Jahr um bis zu %@ Min. von den CHS-Stillwasservorhersagen ab."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El ajuste en el dispositivo difirió hasta %@ min de las predicciones de estoa del CHS a lo largo de un año."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehty sovitus poikkesi CHS:n tyvenennusteista vuoden aikana enintään %@ min."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ajustement sur l’appareil a différé des prévisions d’étale du SHC de jusqu’à %@ min sur un an."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bhí an feistiú ar an ngléas suas le %@ nóim. difriúil ó réamhaisnéisí uisce mhairbh CHS thar bhliain."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bha am freagarrachadh air an uidheam suas ri %@ mion. eadar-dhealaichte bho ro-aithrisean uisge mhairbh CHS thar bliadhna."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adattamento sul dispositivo ha differito dalle previsioni di stanca del CHS fino a %@ min nell’arco di un anno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末上の近似モデルは、1年間でCHSの憩流予測と最大%@分異なりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 내 적합 모델은 1년 동안 CHS 정조 예측과 최대 %@분 차이가 났습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningen på enheten avvek fra CHS-prognosene for strømskifte med opptil %@ min over et år."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De aanpassing op het apparaat week over een jaar tot %@ min af van de CHS-kenteringsvoorspellingen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo diferiu das previsões de estofa do CHS em até %@ min ao longo de um ano."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo diferiu das previsões de estofa do CHS em até %@ min ao longo de um ano."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningen på enheten avvek från CHS prognoser för strömkantring med upp till %@ min under ett år."
+          }
+        }
+      }
+    },
+    "The on-device fit's median slack timing difference from CHS was %@ min in its worst quarter." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellens medianafvigelse fra CHS for strømskiftets tidspunkt var %@ min i det dårligste kvartal."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die mediane Zeitabweichung der Geräteanpassung von CHS beim Stillwasser betrug im schlechtesten Quartal %@ Min."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diferencia mediana de la hora de estoa entre el ajuste y el CHS fue de %@ min en su peor trimestre."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sovituksen tyvenajankohdan mediaaniero CHS:ään oli huonoimmalla neljänneksellä %@ min."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’écart médian de l’heure d’étale entre l’ajustement et le SHC était de %@ min au pire trimestre."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ba é %@ nóim. airmheán na difríochta idir am uisce mhairbh an fheistithe agus CHS sa ráithe ba mheasa."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B’ e %@ mion. meadhan an eadar-dhealachaidh eadar àm uisge mhairbh an fhreagarrachaidh agus CHS sa chairteal a bu mhiosa."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La differenza mediana dell’orario di stanca tra l’adattamento e il CHS era %@ min nel trimestre peggiore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最も悪い四半期における端末上の近似モデルとCHSの憩流時刻の差の中央値は%@分でした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 나쁜 분기에 기기 내 적합 모델과 CHS의 정조 시각 차이 중앙값은 %@분이었습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningens medianavvik fra CHS for tidspunktet for strømskifte var %@ min i det dårligste kvartalet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het mediane tijdsverschil voor kentering tussen de aanpassing en CHS was %@ min in het slechtste kwartaal."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana do horário da estofa entre o ajuste e o CHS foi %@ min no pior trimestre."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana do horário da estofa entre o ajuste e o CHS foi %@ min no pior trimestre."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningens mediantidsskillnad mot CHS för strömkantring var %@ min under det sämsta kvartalet."
+          }
+        }
+      }
+    },
+    "The on-device fit's median peak-flow timing difference from CHS was %@ min in its worst quarter." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellens medianafvigelse fra CHS for tidspunktet for strømspidser var %@ min i det dårligste kvartal."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die mediane Zeitabweichung der Geräteanpassung von CHS bei Strömungsmaxima betrug im schlechtesten Quartal %@ Min."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diferencia mediana de la hora de máxima corriente entre el ajuste y el CHS fue de %@ min en su peor trimestre."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sovituksen virran huipun ajankohdan mediaaniero CHS:ään oli huonoimmalla neljänneksellä %@ min."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’écart médian de l’heure du courant maximal entre l’ajustement et le SHC était de %@ min au pire trimestre."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ba é %@ nóim. airmheán na difríochta idir am buaicsrutha an fheistithe agus CHS sa ráithe ba mheasa."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B’ e %@ mion. meadhan an eadar-dhealachaidh eadar àm an t-srutha as àirde aig an fhreagarrachadh agus CHS sa chairteal a bu mhiosa."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La differenza mediana dell’orario di massima corrente tra l’adattamento e il CHS era %@ min nel trimestre peggiore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最も悪い四半期における端末上の近似モデルとCHSの最大流速時刻の差の中央値は%@分でした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 나쁜 분기에 기기 내 적합 모델과 CHS의 최대 유속 시각 차이 중앙값은 %@분이었습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningens medianavvik fra CHS for tidspunktet for maksimal strøm var %@ min i det dårligste kvartalet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het mediane tijdsverschil voor maximale stroming tussen de aanpassing en CHS was %@ min in het slechtste kwartaal."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana do horário de pico da corrente entre o ajuste e o CHS foi %@ min no pior trimestre."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana do horário de pico da corrente entre o ajuste e o CHS foi %@ min no pior trimestre."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningens mediantidsskillnad mot CHS för strömtoppar var %@ min under det sämsta kvartalet."
+          }
+        }
+      }
+    },
+    "The on-device fit's median peak-speed difference from CHS was %@ %@ in its worst quarter." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellens medianafvigelse fra CHS for maksimal strømhastighed var %@ %@ i det dårligste kvartal."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die mediane Geschwindigkeitsabweichung der Geräteanpassung von CHS bei Strömungsmaxima betrug im schlechtesten Quartal %@ %@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diferencia mediana de la velocidad máxima entre el ajuste y el CHS fue de %@ %@ en su peor trimestre."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sovituksen huippunopeuden mediaaniero CHS:ään oli huonoimmalla neljänneksellä %@ %@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’écart médian de vitesse maximale entre l’ajustement et le SHC était de %@ %@ au pire trimestre."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ba é %@ %@ airmheán na difríochta idir buaicluas an fheistithe agus CHS sa ráithe ba mheasa."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B’ e %@ %@ meadhan an eadar-dhealachaidh eadar an luaths as àirde aig an fhreagarrachadh agus CHS sa chairteal a bu mhiosa."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La differenza mediana della velocità massima tra l’adattamento e il CHS era %@ %@ nel trimestre peggiore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最も悪い四半期における端末上の近似モデルとCHSの最大流速の差の中央値は%@ %@でした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 나쁜 분기에 기기 내 적합 모델과 CHS의 최대 유속 차이 중앙값은 %@ %@였습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningens medianavvik fra CHS for maksimal strømhastighet var %@ %@ i det dårligste kvartalet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het mediane snelheidsverschil bij maximale stroming tussen de aanpassing en CHS was %@ %@ in het slechtste kwartaal."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana da velocidade máxima entre o ajuste e o CHS foi %@ %@ no pior trimestre."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A diferença mediana da velocidade máxima entre o ajuste e o CHS foi %@ %@ no pior trimestre."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningens medianhastighetsskillnad mot CHS för strömtoppar var %@ %@ under det sämsta kvartalet."
+          }
+        }
+      }
+    },
+    "The on-device fit did not pass validation here. Slackwater uses CHS predictions." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellen på enheden bestod ikke valideringen her. Slackwater bruger CHS’ forudsigelser."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Geräteanpassung bestand hier die Validierung nicht. Slackwater verwendet CHS-Vorhersagen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El ajuste en el dispositivo no superó la validación aquí. Slackwater usa predicciones del CHS."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laitteessa tehty sovitus ei läpäissyt validointia täällä. Slackwater käyttää CHS:n ennusteita."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ajustement sur l’appareil n’a pas réussi la validation ici. Slackwater utilise les prévisions du SHC."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níor éirigh leis an bhfeistiú ar an ngléas sa bhailíochtú anseo. Úsáideann Slackwater réamhaisnéisí CHS."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cha deach leis an fhreagarrachadh air an uidheam san dearbhadh an seo. Cleachdaidh Slackwater ro-aithrisean CHS."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adattamento sul dispositivo non ha superato la validazione qui. Slackwater usa le previsioni del CHS."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここでは端末上の近似モデルは検証基準を満たしませんでした。SlackwaterはCHSの予測を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이곳에서는 기기 내 적합 모델이 검증을 통과하지 못했습니다. Slackwater는 CHS 예측을 사용합니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilpasningen på enheten bestod ikke valideringen her. Slackwater bruker CHS-prognoser."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De aanpassing op het apparaat doorstond hier de validatie niet. Slackwater gebruikt CHS-voorspellingen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo não passou na validação aqui. O Slackwater usa previsões do CHS."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ajuste no dispositivo não passou na validação aqui. O Slackwater utiliza previsões do CHS."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anpassningen på enheten klarade inte valideringen här. Slackwater använder CHS prognoser."
+          }
+        }
+      }
+    },
+    "There were not enough CHS events to validate the on-device fit in every quarter." : {
+      "comment" : "Measured CHS current-fit limitation. CHS is the Canadian Hydrographic Service; times are minutes, peak speeds use the reader’s selected unit. Preserve all placeholders.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der var ikke nok CHS-hændelser til at validere modellen på enheden i hvert kvartal."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es gab nicht genügend CHS-Ereignisse, um die Geräteanpassung in jedem Quartal zu validieren."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hubo suficientes eventos del CHS para validar el ajuste en el dispositivo en todos los trimestres."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CHS-tapahtumia ei ollut riittävästi laitteen sovituksen validoimiseksi jokaisella vuosineljänneksellä."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n’y avait pas assez d’événements du SHC pour valider l’ajustement sur l’appareil chaque trimestre."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ní raibh dóthain imeachtaí CHS ann chun an feistiú ar an ngléas a bhailíochtú i ngach ráithe."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cha robh tachartasan CHS gu leòr ann gus am freagarrachadh air an uidheam a dhearbhadh anns gach cairteal."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli eventi del CHS non erano sufficienti per validare l’adattamento sul dispositivo in ogni trimestre."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての四半期で端末上の近似モデルを検証するには、CHSのイベントが不足していました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 분기에 기기 내 적합 모델을 검증하기에는 CHS 이벤트가 부족했습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det var ikke nok CHS-hendelser til å validere tilpasningen på enheten i hvert kvartal."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er waren onvoldoende CHS-gebeurtenissen om de aanpassing op het apparaat in elk kwartaal te valideren."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não houve eventos suficientes do CHS para validar o ajuste no dispositivo em todos os trimestres."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não houve eventos suficientes do CHS para validar o ajuste no dispositivo em todos os trimestres."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det fanns inte tillräckligt med CHS-händelser för att validera anpassningen på enheten varje kvartal."
+          }
+        }
+      }
+    },
+    "Danish stations: harmonic constants fitted from Danish Meteorological Institute (DMI) predictions under CC BY 4.0 (dmi.dk)." : {
+      "comment" : "Data attribution in About. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danske stationer: harmoniske konstanter tilpasset prognoser fra Danish Meteorological Institute (DMI) under CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dänische Stationen: harmonische Konstanten, angepasst an Vorhersagen des Danish Meteorological Institute (DMI), unter CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones danesas: constantes armónicas ajustadas a partir de predicciones del Danish Meteorological Institute (DMI) bajo CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tanskalaiset asemat: Danish Meteorological Instituten (DMI) ennusteista sovitetut harmoniset vakiot, CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stations danoises : constantes harmoniques ajustées à partir des prévisions du Danish Meteorological Institute (DMI), sous CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stáisiúin na Danmhairge: tairisigh armónacha feistithe ó réamhaisnéisí Danish Meteorological Institute (DMI) faoi CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stèiseanan na Danmhairge: cunbhalachan co-sheirmeach air am freagarrachadh bho ro-aithrisean Danish Meteorological Institute (DMI) fo CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stazioni danesi: costanti armoniche adattate dalle previsioni del Danish Meteorological Institute (DMI), sotto CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デンマークの観測所：Danish Meteorological Institute（DMI）の予測から近似した調和定数をCC BY 4.0に基づき使用しています（dmi.dk）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "덴마크 관측소: Danish Meteorological Institute(DMI) 예측에서 적합한 조화상수를 CC BY 4.0에 따라 사용합니다(dmi.dk)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danske målesteder: harmoniske konstanter tilpasset prognoser fra Danish Meteorological Institute (DMI) under CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deense stations: harmonische constanten aangepast aan voorspellingen van het Danish Meteorological Institute (DMI), onder CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações dinamarquesas: constantes harmônicas ajustadas a partir das previsões do Danish Meteorological Institute (DMI), sob CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações dinamarquesas: constantes harmónicas ajustadas a partir das previsões do Danish Meteorological Institute (DMI), sob CC BY 4.0 (dmi.dk)."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danska stationer: harmoniska konstanter anpassade från prognoser från Danish Meteorological Institute (DMI) under CC BY 4.0 (dmi.dk)."
+          }
+        }
+      }
+    },
+    "Japanese stations: Japan Coast Guard, Hydrographic and Oceanographic Department data under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived." : {
+      "comment" : "Data attribution in About. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanske stationer: data fra Japan Coast Guard, Hydrographic and Oceanographic Department under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Redigeret af Open Waters: navne, enheder og faser for harmoniske komponenter konverteret; tidevandsreferencer afledt."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanische Stationen: Daten der Japan Coast Guard, Hydrographic and Oceanographic Department unter Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Bearbeitet von Open Waters: Komponentennamen, Einheiten und Phasen umgerechnet; Gezeitenbezugsflächen abgeleitet."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones japonesas: datos de Japan Coast Guard, Hydrographic and Oceanographic Department bajo Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Editados por Open Waters: conversión de nombres de componentes, unidades y fases; derivación de niveles de referencia de marea."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanilaiset asemat: Japan Coast Guard, Hydrographic and Oceanographic Department -tiedot, Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Open Watersin muokkaamat: komponenttien nimet, yksiköt ja vaiheet muunnettu; vuorovesien vertailutasot johdettu."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stations japonaises : données de Japan Coast Guard, Hydrographic and Oceanographic Department sous Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Modifications par Open Waters : conversion des noms de composantes, des unités et des phases; calcul des niveaux de référence des marées."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stáisiúin na Seapáine: sonraí ó Japan Coast Guard, Hydrographic and Oceanographic Department faoi Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Curtha in eagar ag Open Waters: ainmneacha comhábhar, aonaid agus céimeanna tiontaithe; leibhéil tagartha taoide díorthaithe."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stèiseanan Iapanach: dàta bho Japan Coast Guard, Hydrographic and Oceanographic Department fo Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Air a dheasachadh le Open Waters: ainmean cho-phàirtean, aonadan is ìrean air an atharrachadh; ìrean-iomraidh làn-mara air an obrachadh a-mach."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stazioni giapponesi: dati di Japan Coast Guard, Hydrographic and Oceanographic Department sotto Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Modificati da Open Waters: conversione di nomi delle componenti, unità e fasi; derivazione dei livelli di riferimento delle maree."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本の観測所：Japan Coast Guard, Hydrographic and Oceanographic Department（海上保安庁海洋情報部）のデータを政府標準利用規約第2.0版に基づき使用しています（www1.kaiho.mlit.go.jp/copyright.html）。Open Watersによる編集：分潮名・単位・位相の変換、潮位基準面の算出。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일본 관측소: Japan Coast Guard, Hydrographic and Oceanographic Department 데이터를 Government Standard Terms of Use 2.0에 따라 사용합니다(www1.kaiho.mlit.go.jp/copyright.html). Open Waters 편집: 분조 이름, 단위 및 위상 변환, 조석 기준면 산출."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanske målesteder: data fra Japan Coast Guard, Hydrographic and Oceanographic Department under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Redigert av Open Waters: komponentnavn, enheter og faser konvertert; tidevannsreferanser beregnet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanse stations: gegevens van Japan Coast Guard, Hydrographic and Oceanographic Department onder Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Bewerkt door Open Waters: componentnamen, eenheden en fasen omgezet; getijdenreferentieniveaus afgeleid."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações japonesas: dados de Japan Coast Guard, Hydrographic and Oceanographic Department sob Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Editados pela Open Waters: conversão de nomes de componentes, unidades e fases; derivação dos níveis de referência das marés."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações japonesas: dados de Japan Coast Guard, Hydrographic and Oceanographic Department sob Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Editados pela Open Waters: conversão de nomes de componentes, unidades e fases; derivação dos níveis de referência das marés."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanska stationer: data från Japan Coast Guard, Hydrographic and Oceanographic Department under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Bearbetat av Open Waters: komponentnamn, enheter och faser konverterade; referensnivåer för tidvatten härledda."
           }
         }
       }

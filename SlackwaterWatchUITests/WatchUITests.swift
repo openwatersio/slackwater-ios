@@ -172,31 +172,59 @@ import XCTest
     func testInterruptedRefinementKeepsItsUsableModel() {
         app.terminate()
         app.launchArguments.removeAll { $0 == "-networkKillSwitch" }
-        app.launchArguments += ["-chsResetModels", "-chsFitOnly", "chs-dodd-narrows",
+        app.launchArguments += ["-chsResetModels", "-chsFitOnly", "chs-johnstone-strait-central",
                                 "-chsFixture", UUID().uuidString,
-                                "-chsFixtureScenario", "provisional-final", "-seedFavorites", "chs-dodd-narrows"]
+                                "-chsFixtureScenario", "provisional-final", "-seedFavorites", "chs-johnstone-strait-central"]
         app.launch()
-        let dodd = app.buttons.matching(NSPredicate(
-            format: "identifier == 'place-row' AND label CONTAINS 'Dodd Narrows'"))
-        for _ in 0..<6 where !dodd.firstMatch.exists {
+        let johnstone = app.buttons.matching(NSPredicate(
+            format: "identifier == 'place-row' AND label CONTAINS 'Johnstone Strait'"))
+        for _ in 0..<6 where !johnstone.firstMatch.exists {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
                 .press(forDuration: 0.05, thenDragTo:
                     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
-            _ = dodd.firstMatch.waitForExistence(timeout: 5)
+            _ = johnstone.firstMatch.waitForExistence(timeout: 5)
         }
-        XCTAssertTrue(dodd.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(johnstone.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
         app.terminate()
         app.launchArguments = ["-locDenied", "-noCloudSync", "-networkKillSwitch"]
         app.launch()
-        for _ in 0..<6 where !dodd.firstMatch.exists {
+        for _ in 0..<6 where !johnstone.firstMatch.exists {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
                 .press(forDuration: 0.05, thenDragTo:
                     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
         }
-        XCTAssertTrue(dodd.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(dodd.firstMatch.label.contains("Refining"), dodd.firstMatch.label)
-        dodd.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
+        XCTAssertTrue(johnstone.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(johnstone.firstMatch.label.contains("Offline"), johnstone.firstMatch.label)
+        johnstone.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
         XCTAssertTrue(app.buttons["reading-card"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["reading-card"].tap()
+        let bound = app.staticTexts["Slack at Johnstone Strait - Central can differ from CHS's prediction by up to 35 min."]
+        scrollIntoView(bound)
+        XCTAssertTrue(bound.waitForExistence(timeout: 5), app.debugDescription)
+        snapshot("watch-provisional-offline")
+    }
+
+    func testBoundedCurrentSheetShowsLimitWithoutDownloadWording() {
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-networkKillSwitch" }
+        app.launchArguments += ["-chsFitOnly", "chs-blackney-passage",
+                                "-chsFixture", UUID().uuidString,
+                                "-seedFavorites", "chs-blackney-passage"]
+        app.launch()
+        let blackney = app.buttons.matching(NSPredicate(
+            format: "identifier == 'place-row' AND label CONTAINS 'Blackney Passage'"))
+        XCTAssertTrue(blackney.firstMatch.waitForExistence(timeout: 60), app.debugDescription)
+        scrollIntoView(blackney.firstMatch)
+        tap(blackney.firstMatch, until: app.buttons["reading-card"])
+        app.buttons["reading-card"].tap()
+        let bound = app.staticTexts["Slack at Blackney Passage can differ from CHS's prediction by up to 45 min."]
+        XCTAssertTrue(bound.waitForExistence(timeout: 5), app.debugDescription)
+        scrollIntoView(bound)
+        XCTAssertTrue(bound.isHittable, "the bound is off screen: \(bound.frame)")
+        XCTAssertFalse(app.staticTexts["Additional data is required to improve accuracy"].exists,
+                       app.debugDescription)
+        XCTAssertFalse(app.progressIndicators.firstMatch.exists, app.debugDescription)
+        snapshot("watch-bounded-limit")
     }
 
     func testPhoneActionInFrench() {

@@ -106,16 +106,16 @@ import XCTest
             "notes.txt",                    // not ours, not ours to delete
         ]
         let orphans = ChsFitService.orphanFiles(
-            in: files, ports: ["chs-victoria"], gates: ["chs-active-pass"])
+            in: files, ports: ["chs-victoria"], gates: ["chs-active-pass"], onlineGates: [])
         XCTAssertEqual(orphans,
-                       ["chs-gone-current.json", "chs-gone-online.json", "chs-gone-tide-preview.json", "chs-north-galiano.json"])
+                       ["chs-active-pass-online.json", "chs-gone-current.json", "chs-gone-online.json", "chs-gone-tide-preview.json", "chs-north-galiano.json"])
     }
 
     /// A gate id is not a port id: a `-current` file must be judged against the
     /// gate catalog, or every gate model on the device reads as an orphan.
     func testGateSuffixesAreCheckedAgainstTheGateCatalog() {
         let files: Set<String> = ["chs-active-pass-current.json", "chs-active-pass.json"]
-        let orphans = ChsFitService.orphanFiles(in: files, ports: [], gates: ["chs-active-pass"])
+        let orphans = ChsFitService.orphanFiles(in: files, ports: [], gates: ["chs-active-pass"], onlineGates: [])
         XCTAssertEqual(orphans, ["chs-active-pass.json"],
                        "the gate's fit stays; a port file for a gate-only id does not")
     }
@@ -125,10 +125,12 @@ import XCTest
     func testNothingBundledLooksLikeAnOrphan() {
         let ports = Set(ChsStationInfo.all.map(\.id))
         let gates = Set(ChsCurrentGateInfo.all.map(\.id))
+        let fitted = Set(ChsCurrentGateInfo.all.filter { !$0.isOnline }.map(\.id))
+        let online = Set(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
         let files = Set(ports.map { "\($0).json" }
                         + ports.map { "\($0)-tide-preview.json" }
-                        + gates.map { "\($0)-current.json" }
-                        + gates.map { "\($0)-online.json" })
-        XCTAssertEqual(ChsFitService.orphanFiles(in: files, ports: ports, gates: gates), [])
+                        + fitted.map { "\($0)-current.json" }
+                        + online.map { "\($0)-online.json" })
+        XCTAssertEqual(ChsFitService.orphanFiles(in: files, ports: ports, gates: gates, onlineGates: online), [])
     }
 }

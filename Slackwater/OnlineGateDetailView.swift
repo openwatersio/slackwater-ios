@@ -331,9 +331,7 @@ struct OnlineGateDetailView: View {
                 StationDetailRow("Reference", "\(port.name), \(Int(distanceKm(gate.latitude, gate.longitude, port.latitude, port.longitude).rounded())) km away")
             }
             StationDetailRow("Prediction", "CHS-published predictions downloaded for offline use; not computed on this device")
-            if let note = gate.onlineNote {
-                StationDetailRow("On-device fit unavailable", note)
-            }
+            StationDetailRow("On-device fit unavailable", gate.onlineExplanation(speedUnit: speedUnit))
             if let window {
                 StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz))")
             }
@@ -360,7 +358,7 @@ struct OnlineGateDetailView: View {
     // MARK: - Download status
 
     private var honestyCard: some View {
-        ChsAmberCard(title: downloadTitle, headline: gate.onlineNote ?? "",
+        ChsAmberCard(title: downloadTitle, headline: gate.onlineExplanation(speedUnit: speedUnit),
                      expectation: expectation, action: downloadAction,
                      identifier: "online-honesty-card", status: downloadStatus) {
             if downloadStatus == .downloading { showDownloads = true; return }

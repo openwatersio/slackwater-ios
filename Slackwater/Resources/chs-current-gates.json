@@ -8,7 +8,45 @@
   "longitude": -123.3128,
   "timezone": "America/Vancouver",
   "tideReference": "chs-fulford-harbour",
-  "fitDays": 60
+  "fitDays": 60,
+  "recipe": "8f85912ce223"
+ },
+ {
+  "id": "chs-arran-rapids",
+  "name": "Arran Rapids",
+  "region": "Stuart Island",
+  "aliases": [],
+  "latitude": 50.42,
+  "longitude": -125.14,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 47.4
+  },
+  "missContext": "rapids"
+ },
+ {
+  "id": "chs-beazley-passage",
+  "name": "Beazley Passage",
+  "region": "Surge Narrows",
+  "aliases": [
+   "surge narrows"
+  ],
+  "latitude": 50.2263,
+  "longitude": -125.142,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-owen-bay",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 44.5,
+   "nearBar": true
+  }
  },
  {
   "id": "chs-blackney-passage",
@@ -19,7 +57,25 @@
   "longitude": -126.6842,
   "timezone": "America/Vancouver",
   "fitDays": 210,
-  "provisionalSlackMinutes": 35
+  "slackBoundMinutes": 45,
+  "recipe": "8f85912ce223"
+ },
+ {
+  "id": "chs-dent-rapids",
+  "name": "Dent Rapids",
+  "region": "Cordero Channel",
+  "aliases": [],
+  "latitude": 50.41,
+  "longitude": -125.2117,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 51.9
+  },
+  "missContext": "rapids"
  },
  {
   "id": "chs-dodd-narrows",
@@ -29,8 +85,13 @@
   "latitude": 49.13546639419797,
   "longitude": -123.81735084108287,
   "timezone": "America/Vancouver",
-  "fitDays": 210,
-  "provisionalSlackMinutes": 35
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 49.3
+  }
  },
  {
   "id": "chs-first-narrows",
@@ -43,7 +104,24 @@
   "longitude": -123.1401,
   "timezone": "America/Vancouver",
   "tideReference": "chs-vancouver",
-  "fitDays": 60
+  "fitDays": 60,
+  "recipe": "8f85912ce223"
+ },
+ {
+  "id": "chs-gabriola-passage",
+  "name": "Gabriola Passage",
+  "region": "Gulf Islands",
+  "aliases": [],
+  "latitude": 49.1291,
+  "longitude": -123.7043,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 2
+  }
  },
  {
   "id": "chs-gillard-passage",
@@ -56,7 +134,8 @@
   "longitude": -125.1567,
   "timezone": "America/Vancouver",
   "fitDays": 210,
-  "provisionalSlackMinutes": 20
+  "slackBoundMinutes": 40,
+  "recipe": "8f85912ce223"
  },
  {
   "id": "chs-great-bras-dor",
@@ -71,7 +150,13 @@
   "latitude": 46.2816,
   "longitude": -60.4247,
   "timezone": "America/Glace_Bay",
-  "fitDays": 60
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 70.8
+  }
  },
  {
   "id": "chs-hole-in-the-wall",
@@ -82,8 +167,13 @@
   "longitude": -125.2083,
   "timezone": "America/Vancouver",
   "tideReference": "chs-owen-bay",
-  "fitDays": 210,
-  "provisionalSlackMinutes": 20
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 45.3
+  }
  },
  {
   "id": "chs-johnstone-strait-central",
@@ -93,134 +183,9 @@
   "latitude": 50.4717,
   "longitude": -126.1367,
   "timezone": "America/Vancouver",
-  "fitDays": 60
- },
- {
-  "id": "chs-porlier-pass",
-  "name": "Porlier Pass",
-  "region": "Galiano & Valdes Islands",
-  "aliases": [],
-  "latitude": 49.015,
-  "longitude": -123.585,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-fulford-harbour",
   "fitDays": 210,
-  "provisionalSlackMinutes": 35
- },
- {
-  "id": "chs-quatsino-narrows",
-  "name": "Quatsino Narrows",
-  "region": "Holberg & Rupert Inlets",
-  "aliases": [
-   "drake island",
-   "coal harbour"
-  ],
-  "latitude": 50.555,
-  "longitude": -127.5574,
-  "timezone": "America/Vancouver",
-  "fitDays": 210,
-  "provisionalSlackMinutes": 25
- },
- {
-  "id": "chs-race-passage",
-  "name": "Race Passage",
-  "region": "Race Rocks",
-  "aliases": [],
-  "latitude": 48.3067,
-  "longitude": -123.5367,
-  "timezone": "America/Vancouver",
-  "fitDays": 210,
-  "provisionalSlackMinutes": 30
- },
- {
-  "id": "chs-seymour-narrows",
-  "name": "Seymour Narrows",
-  "region": "Discovery Passage",
-  "aliases": [],
-  "latitude": 50.1333,
-  "longitude": -125.35,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-campbell-river",
-  "fitDays": 60
- },
- {
-  "id": "chs-weynton-passage",
-  "name": "Weynton Passage",
-  "region": "Broughton Strait",
-  "aliases": [],
-  "latitude": 50.6033,
-  "longitude": -126.8117,
-  "timezone": "America/Vancouver",
-  "fitDays": 210,
-  "provisionalSlackMinutes": 35
- },
- {
-  "id": "chs-beazley-passage",
-  "name": "Beazley Passage",
-  "region": "Surge Narrows",
-  "aliases": [
-   "surge narrows"
-  ],
-  "latitude": 50.2263,
-  "longitude": -125.142,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-owen-bay",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Slackwater's on-device model predicted the peak speeds here off by up to ~0.5 kn in testing, so it won't guess at Beazley Passage."
- },
- {
-  "id": "chs-dent-rapids",
-  "name": "Dent Rapids",
-  "region": "Cordero Channel",
-  "aliases": [],
-  "latitude": 50.41,
-  "longitude": -125.2117,
-  "timezone": "America/Vancouver",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Dent Rapids."
- },
- {
-  "id": "chs-gabriola-passage",
-  "name": "Gabriola Passage",
-  "region": "Gulf Islands",
-  "aliases": [],
-  "latitude": 49.1291,
-  "longitude": -123.7043,
-  "timezone": "America/Vancouver",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~35 minutes in testing, so it won't guess at Gabriola Passage."
- },
- {
-  "id": "chs-second-narrows",
-  "name": "Second Narrows",
-  "region": "Burrard Inlet",
-  "aliases": [],
-  "latitude": 49.2947,
-  "longitude": -123.0245,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-vancouver",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Second Narrows."
- },
- {
-  "id": "chs-sechelt-rapids",
-  "name": "Sechelt Rapids",
-  "region": "Skookumchuck Narrows",
-  "aliases": [
-   "skookumchuck"
-  ],
-  "latitude": 49.7383,
-  "longitude": -123.8983,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-point-atkinson",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids.",
-  "magnitudeNote": "16.5 kn flood · 16 kn ebb"
+  "provisionalSlackMinutes": 35,
+  "recipe": "8f85912ce223"
  },
  {
   "id": "chs-juan-de-fuca-east",
@@ -231,38 +196,13 @@
   "longitude": -123.53,
   "timezone": "America/Los_Angeles",
   "fitDays": 0,
+  "recipe": "8f85912ce223",
   "online": true,
-  "onlineNote": "Juan de Fuca's current here is weak and slow to reverse, which makes slack hard to pin down — testing missed the published slacks by up to ~85 minutes, so Slackwater won't guess at Juan de Fuca - East."
- },
- {
-  "id": "chs-tillicum-bridge",
-  "name": "Tillicum Bridge",
-  "region": "Gorge Waterway",
-  "aliases": [],
-  "latitude": 48.4464,
-  "longitude": -123.4002,
-  "timezone": "America/Vancouver",
-  "tideReference": "chs-victoria",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Tillicum Bridge sits on the Gorge Waterway's reversing tidal falls, where testing missed the published slacks by up to ~95 minutes, so Slackwater won't guess here."
- },
- {
-  "id": "chs-nakwakto-rapids",
-  "name": "Nakwakto Rapids",
-  "region": "Slingsby Channel",
-  "aliases": [
-   "turret rock",
-   "tremble island",
-   "seymour inlet",
-   "belize inlet"
-  ],
-  "latitude": 51.0967,
-  "longitude": -127.5033,
-  "timezone": "America/Vancouver",
-  "fitDays": 0,
-  "online": true,
-  "onlineNote": "Nakwakto Rapids runs to about 14 knots and its slack lasts minutes — Slackwater's on-device model predicted the peak speeds here off by about 0.8 kn in testing, so it won't guess at Nakwakto."
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 24
+  },
+  "missContext": "slow_reversal"
  },
  {
   "id": "chs-masset-sound",
@@ -278,7 +218,166 @@
   "longitude": -132.1543,
   "timezone": "America/Vancouver",
   "fitDays": 0,
+  "recipe": "8f85912ce223",
   "online": true,
-  "onlineNote": "Slackwater's on-device model missed the timing of peak flows here by about 25 minutes in testing, so it won't guess at Masset Sound."
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 47.3
+  }
+ },
+ {
+  "id": "chs-nakwakto-rapids",
+  "name": "Nakwakto Rapids",
+  "region": "Slingsby Channel",
+  "aliases": [
+   "turret rock",
+   "tremble island",
+   "seymour inlet",
+   "belize inlet"
+  ],
+  "latitude": 51.0967,
+  "longitude": -127.5033,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 49.8
+  },
+  "missContext": "rapids",
+  "magnitudeNote": "11.5 kn flood · 14.5 kn ebb"
+ },
+ {
+  "id": "chs-porlier-pass",
+  "name": "Porlier Pass",
+  "region": "Galiano & Valdes Islands",
+  "aliases": [],
+  "latitude": 49.015,
+  "longitude": -123.585,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-fulford-harbour",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 53.7
+  }
+ },
+ {
+  "id": "chs-quatsino-narrows",
+  "name": "Quatsino Narrows",
+  "region": "Holberg & Rupert Inlets",
+  "aliases": [
+   "drake island",
+   "coal harbour"
+  ],
+  "latitude": 50.555,
+  "longitude": -127.5574,
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "slackBoundMinutes": 40,
+  "recipe": "8f85912ce223"
+ },
+ {
+  "id": "chs-race-passage",
+  "name": "Race Passage",
+  "region": "Race Rocks",
+  "aliases": [],
+  "latitude": 48.3067,
+  "longitude": -123.5367,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 16
+  }
+ },
+ {
+  "id": "chs-sechelt-rapids",
+  "name": "Sechelt Rapids",
+  "region": "Skookumchuck Narrows",
+  "aliases": [
+   "skookumchuck"
+  ],
+  "latitude": 49.7383,
+  "longitude": -123.8983,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-point-atkinson",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 16
+  },
+  "missContext": "rapids",
+  "magnitudeNote": "16.5 kn flood · 16 kn ebb"
+ },
+ {
+  "id": "chs-second-narrows",
+  "name": "Second Narrows",
+  "region": "Burrard Inlet",
+  "aliases": [],
+  "latitude": 49.2947,
+  "longitude": -123.0245,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 2
+  }
+ },
+ {
+  "id": "chs-seymour-narrows",
+  "name": "Seymour Narrows",
+  "region": "Discovery Passage",
+  "aliases": [],
+  "latitude": 50.1333,
+  "longitude": -125.35,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-campbell-river",
+  "fitDays": 60,
+  "recipe": "8f85912ce223"
+ },
+ {
+  "id": "chs-tillicum-bridge",
+  "name": "Tillicum Bridge",
+  "region": "Gorge Waterway",
+  "aliases": [],
+  "latitude": 48.4464,
+  "longitude": -123.4002,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-victoria",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "invented_slack",
+   "value": 42
+  },
+  "missContext": "tidal_falls"
+ },
+ {
+  "id": "chs-weynton-passage",
+  "name": "Weynton Passage",
+  "region": "Broughton Strait",
+  "aliases": [],
+  "latitude": 50.6033,
+  "longitude": -126.8117,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "recipe": "8f85912ce223",
+  "online": true,
+  "onlineMiss": {
+   "clause": "slack_worst",
+   "value": 45.3
+  }
  }
 ]

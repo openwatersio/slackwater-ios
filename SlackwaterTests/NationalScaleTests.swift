@@ -27,14 +27,12 @@ import XCTest
         XCTAssertGreaterThanOrEqual(tides, 1_100, "NOAA tide stations")
         XCTAssertGreaterThanOrEqual(currents, 800, "NOAA current stations")
         XCTAssertGreaterThanOrEqual(chs, 1_000, "CHS tide station identities")
-        // 13 fitted + 9 online. M55 took the gates national: Great Bras d'Or
-        // and Quatsino fit, Nakwakto and Masset Sound ship online.
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 22,
-                       "the 13 validated gates (M47/M53/M55) plus the 9 online fit-rejects")
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 23,
+                       "all curated gates ship at their measured tier")
         XCTAssertEqual(Set(StationItem.all.map(\.id)).count, StationItem.all.count,
                        "two stations sharing an id is a duplicate row, pin and model file")
         let hidden = CurrentStationRecord.all.filter { $0.referenceOnly == true }.count
-        XCTAssertEqual(hidden, 13, "reference-only bins")
+        XCTAssertEqual(hidden, 16, "reference-only bins")
         XCTAssertEqual(currents, CurrentStationRecord.all.count - hidden, "every non-hidden record is listed once")
     }
 
@@ -409,7 +407,7 @@ import XCTest
         XCTAssertLessThan(service.queue.total, 60,
                           "the queue is the download set, not the 1,097-station catalog")
         XCTAssertGreaterThan(service.notQueued, 1_000, "the rest of Canada is on demand, not gone")
-        for (place, fix, ports, gates) in [("Victoria", (lat: 48.4235, lon: -123.3705), 6, 3),
+        for (place, fix, ports, gates) in [("Victoria", (lat: 48.4235, lon: -123.3705), 6, 2),
                                            ("Halifax", (lat: 44.65, lon: -63.57), 6, 0),
                                            ("Boston", (lat: 42.3601, lon: -71.0589), 0, 0),
                                            ("Detroit", (lat: 42.3314, lon: -83.0458), 0, 0)] {
@@ -421,11 +419,6 @@ import XCTest
                          seconds / 60, far))
             XCTAssertEqual(set.filter { !$0.isCurrent }.count, ports,
                            "\(place) auto-fits only the ports within reach of the fix")
-            // Halifax's gate count is 0 for the honest reason rather than the
-            // accidental one: since M55 there IS a CHS gate on the Atlantic
-            // (Great Bras d'Or), it is simply ~305 km away and the auto-fit
-            // radius is 150 km. Distance decides this, not an ocean the bundle
-            // happens not to reach.
             XCTAssertEqual(set.filter(\.isCurrent).count, gates,
                            "\(place) auto-fits only the passes within reach of the fix")
             XCTAssertLessThan(seconds, 10 * 60, "\(place)'s first run must not be an afternoon")
@@ -467,10 +460,9 @@ import XCTest
 
     /// The manager's bulk currents action, and why #8 needs no region picker.
     ///
-    /// The radius is right for ports and leaves gates stranded: Great Bras
-    /// d'Or is 305 km from Halifax, so an Atlantic fix auto-fits zero passes,
+    /// The radius is right for ports and leaves gates stranded: Quatsino Narrows is far from Victoria, so a Victoria fix leaves it out,
     /// and a passage planned from the dock crosses gates well past 150 km.
-    /// Every fittable gate in the country is 13 stations and minutes — the
+    /// Every fittable gate in the country is seven stations and minutes — the
     /// 1,058 ports are hours — so the whole set is the selection, and "the
     /// Gulf Islands" never has to become a place you pick.
     @MainActor
@@ -483,8 +475,8 @@ import XCTest
         XCTAssertEqual(Set(everyGate.map(\.id)),
                        Set(ChsCurrentGateInfo.all.filter { !$0.isOnline }.map(\.id)),
                        "every fittable gate is either already queued or one tap from it")
-        XCTAssertTrue(everyGate.contains { $0.id == "chs-great-bras-dor" },
-                      "the Atlantic gate no fix is ever within 150 km of is the point of this")
+        XCTAssertTrue(everyGate.contains { $0.id == "chs-quatsino-narrows" },
+                      "the distant fitted gate remains available through the bulk download")
         let seconds = everyGate.reduce(0) { $0 + $1.estimatedSeconds() }
         XCTAssertLessThan(seconds, 30 * 60,
                           "all of Canada's gates must stay minutes, not an afternoon")

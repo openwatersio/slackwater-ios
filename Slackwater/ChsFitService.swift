@@ -303,6 +303,9 @@ final class ChsFitService: ObservableObject {
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
+        #if os(iOS)
+        Self.invalidateCurrentCalendars(in: files)
+        #endif
         var jobs: [ChsJob] = []
         for var job in Self.candidates {
             let stored = files.contains(job.isCurrent ? "\(job.id)-current.json" : "\(job.id).json")
@@ -310,7 +313,7 @@ final class ChsFitService: ObservableObject {
                let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
                 tideRecords[job.id] = info.record(with: model)
                 job.status = .ready
-            } else if stored, job.isCurrent, let model = ChsModelStore.loadCurrent(job.id),
+            } else if stored, job.isCurrent, let model = ChsModelStore.usableCurrent(job.id),
                       let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
                 currentRecords[job.id] = gate.record(with: model)
                 // A usable provisional model still needs the remaining download when selected.
@@ -347,6 +350,19 @@ final class ChsFitService: ObservableObject {
         observeDataMode()
     }
 
+    #if os(iOS)
+    static func invalidateCurrentCalendars(in files: Set<String>, directory: URL = ChsModelStore.dir,
+                                           defaults: UserDefaults = AppGroup.defaults) {
+        var invalid: Set<String> = []
+        for gate in ChsCurrentGateInfo.all where files.contains(gate.id + "-current.json") {
+            let url = directory.appendingPathComponent(gate.id + "-current.json")
+            let model = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(ChsModel.self, from: $0) }
+            if model.flatMap(gate.usableModel) == nil { invalid.insert(gate.id) }
+        }
+        CurrentCalendarInvalidations.record(invalid, in: defaults)
+    }
+    #endif
+
     /// Which files under `ChsModels/` belong to no station the bundle still
     /// ships (issue #91). Pure and passed its sets so it can be tested without
     /// a filesystem — the destructive half is four lines in `sweepOrphans`.
@@ -357,16 +373,20 @@ final class ChsFitService: ObservableObject {
     /// `nonisolated` so a test can call it off the main actor: it reads nothing
     /// but its arguments, all value types.
     nonisolated static func orphanFiles(in files: Set<String>,
-                                        ports: Set<String>, gates: Set<String>) -> [String] {
+                                        ports: Set<String>, gates: Set<String>, onlineGates: Set<String>) -> [String] {
         files.sorted().filter { file in
             guard file.hasSuffix(".json") else { return false }
             let stem = String(file.dropLast(5))
             if stem.hasSuffix("-tide-preview") {
                 return !ports.contains(String(stem.dropLast("-tide-preview".count)))
             }
-            // Current fits and fetched windows belong to gates.
-            if let suffix = ["-current", "-online"].first(where: { stem.hasSuffix($0) }) {
-                return !gates.contains(String(stem.dropLast(suffix.count)))
+            if stem.hasSuffix("-current") {
+                let id = String(stem.dropLast("-current".count))
+                return !gates.contains(id) || onlineGates.contains(id)
+            }
+            if stem.hasSuffix("-online") {
+                let id = String(stem.dropLast("-online".count))
+                return !gates.contains(id) || !onlineGates.contains(id)
             }
             return !ports.contains(stem)
         }
@@ -387,7 +407,8 @@ final class ChsFitService: ObservableObject {
         // nothing is worth deleting on that evidence. Bundled catalog lookup,
         // read, and decode failures terminate through the required loader.
         guard !ports.isEmpty, !gates.isEmpty else { return }
-        for file in orphanFiles(in: files, ports: ports, gates: gates) {
+        for file in orphanFiles(in: files, ports: ports, gates: gates,
+                                onlineGates: Set(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))) {
             // The chunk cache is keyed by IWLS id, which only the model
             // carries — read it before the file goes. Best effort: an
             // `-online.json` decodes as no model and keeps its chunks, and a
@@ -1332,7 +1353,7 @@ final class ChsFitService: ObservableObject {
         return ChsModel(
             stationID: gate.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
-            fitEndMs: end.timeIntervalSince1970 * 1000, fitDays: fitDays,
+            fitEndMs: end.timeIntervalSince1970 * 1000, fitDays: fitDays, recipe: ChsCurrentFit.stamp,
             floodDirection: flood, ebbDirection: ebb,
             offset: fit.offset, rms: fit.rms, constituents: fit.constituents)
     }
@@ -1347,11 +1368,12 @@ final class ChsFitService: ObservableObject {
     /// matching direction stamp are dropped.
     nonisolated static func project(speeds: [ChsSample], dirs: [ChsSample],
                                     floodDirection: Double) -> [ChsSample] {
-        let dirAt = Dictionary(dirs.map { ($0.t, $0.v) }, uniquingKeysWith: { a, _ in a })
-        let d2r = Double.pi / 180
-        return speeds.compactMap { s in
-            guard let dir = dirAt[s.t] else { return nil }
-            return ChsSample(t: s.t, v: s.v * cos((dir - floodDirection) * d2r))
+        ChsCurrentFit.project(speeds: speeds.map {
+            HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
+        }, directions: dirs.map {
+            HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
+        }, floodDirection: floodDirection).map {
+            ChsSample(t: $0.time.timeIntervalSince1970 * 1000, v: $0.value)
         }
     }
 
@@ -1401,6 +1423,9 @@ extension ChsModelStore {
     /// silently be a resume.
     static func resetIfRequested() {
         guard CommandLine.arguments.contains("-chsResetModels") else { return }
+        #if os(iOS)
+        CurrentCalendarInvalidations.reset()
+        #endif
         // The accepted tier is persisted now, and a simulator keeps App Group
         // defaults across an uninstall — without this a run that flipped the
         // switch on would leave every later run downloading the 150 km set.

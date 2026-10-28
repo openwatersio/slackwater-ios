@@ -4,13 +4,13 @@ import XCTest
 
 final class OfflineTransitionTests: ScreenshotTestCase {
     func testOpeningAnOnlineGateDuringItsBulkDownloadKeepsItSelected() {
-        let (app, _) = fixture("hold-first", "chs-second-narrows", fix: ("42.3601", "-71.0589"))
+        let (app, _) = fixture("hold-first", "chs-great-bras-dor", fix: ("42.3601", "-71.0589"))
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
-        let row = app.descendants(matching: .any)["download-row-chs-second-narrows"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-great-bras-dor"].firstMatch
         currents.tap()
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
-        row.staticTexts["Second Narrows"].tap()
+        row.staticTexts["Great Bras d'Or"].tap()
         XCTAssert(app.descendants(matching: .any)["detail-title"].firstMatch.appears(within: 10))
         goBack(app)
         openDownloads(app)
@@ -20,15 +20,15 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testDeselectedPartialPredictionsStayUsableWithoutResumingAfterRelaunch() {
-        let (app, _) = fixture("provisional-final", "chs-dodd-narrows", fix: ("42.3601", "-71.0589"))
+        let (app, _) = fixture("provisional-final", "chs-johnstone-strait-central", fix: ("42.3601", "-71.0589"))
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
-        let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
         currents.tap()
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
         let readyPreview = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '~'"))
         app.buttons["Done"].tap()
-        openSearch(app, "dodd")
+        openSearch(app, "johnstone")
         XCTAssert(readyPreview.firstMatch.appears(within: 30), "the partial current model must be saved")
         // Search alone does not promote a download; opening its detail does.
         app.buttons["Close search"].firstMatch.tap()
@@ -43,9 +43,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssertFalse(currents.isSelected)
         XCTAssertFalse(row.exists, "the saved partial model must not restart a deselected download")
         app.buttons["Done"].tap()
-        openSearch(app, "dodd")
+        openSearch(app, "johnstone")
         XCTAssert(readyPreview.firstMatch.appears(within: 10), "deselection must retain usable partial predictions")
-        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        pickSearchResult(app, app.staticTexts["Johnstone Strait - Central"].firstMatch)
         assertCurrentDetailRendered(app)
 
         app.terminate()
@@ -59,10 +59,10 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testDeselectingCurrentsCancelsAnActiveDownloadAndKeepsCompletedData() {
-        let (app, token) = fixture("hold-first", "chs-dodd-narrows", fix: ("42.3601", "-71.0589"))
+        let (app, token) = fixture("hold-first", "chs-johnstone-strait-central", fix: ("42.3601", "-71.0589"))
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
-        let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
         currents.tap()
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
         currents.tap()
@@ -70,7 +70,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(row.disappears(within: 5), "the active deselected download must leave the queue")
 
         currents.tap()
-        releaseFixture(token, "chs-dodd-narrows-first-chunk")
+        releaseFixture(token, "chs-johnstone-strait-central-first-chunk")
         let completed = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '1 of ' AND label ENDSWITH ' ready'"))
         XCTAssert(completed.firstMatch.appears(within: 30),
                   "selecting again must restart the cancelled worker")
@@ -195,7 +195,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Active Pass"].firstMatch)
         assertCurrentDetailRendered(app)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'can be off by up to'"
+            format: "label CONTAINS 'can differ from CHS'"
         )).firstMatch.exists)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
@@ -203,9 +203,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testCurrentDownloadStaysUsableAndFinishesInOpenDetail() {
-        let (app, token) = fixture("provisional-final", "chs-dodd-narrows",
-                                   fix: ("49.1344", "-123.8171"))
-        openSearch(app, "dodd")
+        let (app, token) = fixture("provisional-final", "chs-johnstone-strait-central",
+                                   fix: ("50.4717", "-126.1367"))
+        openSearch(app, "johnstone")
         let reading = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS '~'")).firstMatch
         XCTAssert(reading.appears(within: 30))
@@ -216,9 +216,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let tildeCurve = app.descendants(matching: .any).matching(
             NSPredicate(format: "value CONTAINS '~'")).firstMatch
         XCTAssert(tildeReading.exists || tildeCurve.exists)
-        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        pickSearchResult(app, app.staticTexts["Johnstone Strait - Central"].firstMatch)
         let warning = app.staticTexts.matching(NSPredicate(
-            format: "label == 'Slack at Dodd Narrows can be off by 35 min.'"
+            format: "label == %@", "Slack at Johnstone Strait - Central can differ from CHS's prediction by up to 35 min."
         )).firstMatch
         XCTAssert(warning.appears(within: 5))
         XCTAssert(app.staticTexts["Additional data is required to improve accuracy"].exists)
@@ -243,8 +243,8 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.terminate()
         app.launchArguments = testArguments(["-nowOffsetDays", "1"])
         app.launch()
-        openSearch(app, "dodd")
-        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        openSearch(app, "johnstone")
+        pickSearchResult(app, app.staticTexts["Johnstone Strait - Central"].firstMatch)
         assertCurrentDetailRendered(app)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
@@ -252,33 +252,33 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testPromotionReordersQueueWithoutInterruptingDownload() {
-        let (app, token) = fixture("no-interrupt", "chs-dodd-narrows,chs-tofino",
-                                   fix: ("49.1344", "-123.8171"))
+        let (app, token) = fixture("no-interrupt", "chs-johnstone-strait-central,chs-tofino",
+                                   fix: ("50.4717", "-126.1367"))
         openDownloads(app)
-        let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        let johnstone = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
         // The status in the predicate, not read off the row once it appears:
         // the row can exist a frame before its label says Downloading (#341).
-        XCTAssert(waitFor(dodd, "label CONTAINS 'Downloading'"),
-                  "Dodd Narrows never showed as downloading: \(dodd.label)")
+        XCTAssert(waitFor(johnstone, "label CONTAINS 'Downloading'"),
+                  "Johnstone Strait - Central never showed as downloading: \(johnstone.label)")
         app.buttons["Done"].tap()
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
         goBack(app)
         openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
-        releaseFixture(token, "dodd-first-chunk")
-        XCTAssert(waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30),
-                  "Dodd did not become available offline: \(dodd.label)")
-        // The queue starts Tofino after Dodd finishes, not in the same frame (#663).
+        releaseFixture(token, "johnstone-first-chunk")
+        XCTAssert(waitFor(johnstone, "label CONTAINS 'Available offline'", timeout: 30),
+                  "Johnstone did not become available offline: \(johnstone.label)")
+        // The queue starts Tofino after Johnstone finishes, not in the same frame (#663).
         XCTAssert(waitFor(tofino, "label CONTAINS 'Downloading'"),
-                  "Tofino did not start downloading after Dodd: \(tofino.label)")
+                  "Tofino did not start downloading after Johnstone: \(tofino.label)")
         releaseFixture(token, "tofino-first-chunk")
         XCTAssert(waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30),
                   "Tofino did not become available offline")
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {
-        let (app, _) = fixture("hold-first", "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
+        let (app, _) = fixture("hold-first", "chs-victoria,chs-active-pass,chs-first-narrows,chs-blackney-passage",
                                fix: ("48.4235", "-123.3705"))
         let indicator = app.buttons["offline-status"].firstMatch
         scrollTo(indicator, in: app)
@@ -287,7 +287,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let gear = app.buttons["Settings"].firstMatch
         XCTAssert(indicator.frame.maxY <= gear.frame.minY + 1)
         openDownloads(app)
-        // Race Passage (18 km) and Porlier Pass (68 km) sit outside the
+        // Active Pass (18 km) and First Narrows (68 km) sit outside the
         // `.inView` cohort, so they only join the queue once the widest tier
         // is accepted (DownloadTier.swift) — this test is about queue order
         // and promotion, not tier gating, so pull the whole fixture set in.
@@ -297,21 +297,21 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(waitFor(everything, "isSelected == true"), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
-        let race = rows["download-row-chs-race-passage"].firstMatch
-        let porlier = rows["download-row-chs-porlier-pass"].firstMatch
+        let race = rows["download-row-chs-active-pass"].firstMatch
+        let porlier = rows["download-row-chs-first-narrows"].firstMatch
         XCTAssert(victoria.appears(within: 5))
         XCTAssert(race.appears(within: 5))
         XCTAssert(porlier.appears(within: 5))
         let ordered = settled { [victoria.frame, race.frame, porlier.frame] }
         XCTAssert(ordered[0].minY < ordered[1].minY && ordered[1].minY < ordered[2].minY)
         // `.everything` still stops at ChsFitService.autoFitRadiusKm (150 km):
-        // Weynton Passage at 347 km stays out of the queue until it is opened
+        // Blackney Passage at 347 km stays out of the queue until it is opened
         // by hand below, which pins that ceiling.
-        XCTAssertFalse(rows["download-row-chs-weynton-passage"].firstMatch.exists)
+        XCTAssertFalse(rows["download-row-chs-blackney-passage"].firstMatch.exists)
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists)
         app.buttons["Done"].tap()
-        openSearch(app, "weynton")
-        pickSearchResult(app, app.staticTexts["Weynton Passage"].firstMatch)
+        openSearch(app, "blackney")
+        pickSearchResult(app, app.staticTexts["Blackney Passage"].firstMatch)
         let next = app.staticTexts.matching(identifier: "chs-waiting-warning")
             .matching(NSPredicate(format: "label == 'Next'")).firstMatch
         XCTAssert(next.appears(within: 5))
@@ -323,7 +323,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(nearby.descendants(matching: .any)["nearby-station"].firstMatch.exists)
         goBack(app)
         openDownloads(app)
-        let promoted = rows["download-row-chs-weynton-passage"].firstMatch
+        let promoted = rows["download-row-chs-blackney-passage"].firstMatch
         XCTAssert(promoted.appears(within: 5))
         XCTAssert(app.staticTexts["You opened"].firstMatch.exists)
         let promotedOrder = settled { [promoted.frame, porlier.frame] }
@@ -352,19 +352,43 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testSeededFinalCurrentModelRendersOffline() {
-        let app = launch("-seedCurrentModel", "chs-dodd-narrows")
-        openSearch(app, "dodd")
-        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
+        let app = launch("-seedCurrentModel", "chs-johnstone-strait-central")
+        openSearch(app, "johnstone")
+        pickSearchResult(app, app.staticTexts["Johnstone Strait - Central"].firstMatch)
         assertCurrentDetailRendered(app)
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists)
     }
 
+    func testBoundedCurrentShowsMeasuredLimitWithoutDownloadProgress() {
+        let app = launch("-seedCurrentModel", "chs-blackney-passage", "-networkKillSwitch")
+        openSearch(app, "blackney")
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '~'")).firstMatch.appears(within: 10))
+        save(app, "bounded-current-card.png")
+        pickSearchResult(app, app.staticTexts["Blackney Passage"].firstMatch)
+        assertCurrentDetailRendered(app)
+        XCTAssertFalse(leadReading(app).label.contains("~"), "VoiceOver should read the bound notice instead of speaking tilde")
+        let notice = app.staticTexts["chs-bound-notice"].firstMatch
+        XCTAssert(notice.appears(within: 5))
+        XCTAssertEqual(notice.label, "Slack at Blackney Passage can differ from CHS's prediction by up to 45 min.")
+        XCTAssertFalse(app.descendants(matching: .any)["chs-download-notice"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Additional data is required to improve accuracy"].exists)
+        save(app, "bounded-current-detail.png")
+        goBack(app)
+        if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
+        openDownloads(app)
+        let row = app.descendants(matching: .any)["download-row-chs-blackney-passage"].firstMatch
+        scrollTo(row, in: app)
+        XCTAssert(row.staticTexts["Available offline"].appears(within: 5))
+        XCTAssertFalse(row.progressIndicators.firstMatch.exists)
+        save(app, "bounded-current-downloaded.png")
+    }
+
     func testSeededProvisionalModelAppearsInManager() {
-        let app = launch("-seedCurrentModel", "chs-dodd-narrows",
+        let app = launch("-seedCurrentModel", "chs-johnstone-strait-central",
                          "-seedCurrentProvisional", "-fixLat", "49.1344", "-fixLon", "-123.8171")
         openDownloads(app)
-        let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
         XCTAssert(row.appears(within: 10))
         XCTAssert(row.label.contains("Queued"))
         XCTAssertFalse(row.label.contains("Fast answer"))

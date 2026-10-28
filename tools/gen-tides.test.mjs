@@ -36,6 +36,8 @@ test("every publisher that ships is credited in About", () => {
   const credits = {
     "US National Oceanic and Atmospheric Administration": "NOAA",
     "TICON-4": "TICON-4",
+    "Danish Meteorological Institute": "Danish Meteorological Institute",
+    "Japan Coast Guard, Hydrographic and Oceanographic Department": "Japan Coast Guard",
     "Kartverket / Norwegian Mapping Authority, Hydrographic Service": "© Kartverket",
     "Toitū Te Whenua Land Information New Zealand": "Toitū Te Whenua Land Information New Zealand",
   };
@@ -204,13 +206,10 @@ test("the bundle reaches beyond North America", () => {
   }
 });
 
-// Bryan opened the app in the Solent and Near Me ranked stations 4,700 nm
-// away. These three are the acceptance test for that. Southampton is
-// deliberately not in `want`: it fails the datum gate at 0.53 m (see the
-// next test) and must not ship — asserting it present here would contradict
-// the entire point of the gate.
+// The southern England ports remain available, including Southampton after
+// the database corrected its model below the unchanged datum threshold.
 test("the Solent is in the bundle", () => {
-  const want = ["Portsmouth", "Lymington", "Bournemouth"];
+  const want = ["Portsmouth", "Lymington", "Bournemouth", "Southampton"];
   const solent = stations.filter(
     (s) => want.includes(s.name) && s.latitude > 50 && s.latitude < 51
            && s.longitude > -2.5 && s.longitude < -0.5);
@@ -303,9 +302,7 @@ test("no UHSLC gauge ships through both of its feeds", () => {
   assert.deepEqual(dupes, []);
 });
 
-// The gate is only worth having if it actually removed something. Southampton
-// is a double high water port whose model disagrees with its own published
-// datums by 0.53 m; it must not be in the bundle at any range.
+// Every bundled reference passes the current database's datum gate.
 test("stations that fail the datum gate are not bundled", () => {
   const bundled = new Set(stations.map((s) => s.id));
   // Subordinates never run the gate: their constituents are the reference's copy.
@@ -315,7 +312,8 @@ test("stations that fail the datum gate are not bundled", () => {
   assert.deepEqual(rejected.map((s) => s.id), []);
   const soton = allStations.find(
     (s) => s.name === "Southampton" && s.country === "United Kingdom");
-  assert.ok(!bundled.has(soton.id), "Southampton failed the gate but shipped anyway");
+  assert.ok(passesDatumCheck(soton), "Southampton must still pass the datum gate");
+  assert.ok(bundled.has(soton.id), "corrected Southampton is missing");
 });
 
 // Subordinate stations (#229). A subordinate has no model of its own: its
@@ -346,12 +344,16 @@ test("no subordinate carries constituents", () => {
   assert.deepEqual(subordinates.filter((s) => s.constituents?.length).map((s) => s.id), []);
 });
 
-test("astronomical bounds ship for nearly every station, and never invert", () => {
+test("published astronomical bounds ship together and never invert", () => {
   const bounded = stations.filter((s) => s.latDatum != null);
-  assert.ok(
-    bounded.length > stations.length - 20,
-    `only ${bounded.length} of ${stations.length} stations carry latDatum/hatDatum`,
-  );
+  const source = new Map(allStations.map(s => [s.id, s]));
+  // DMI publishes LAT without HAT; absence must stay absent rather than invent
+  // a complete range. Keep the completeness check for records publishing both.
+  const lost = stations.filter(s => {
+    const d = source.get(s.id);
+    return d?.datums?.LAT != null && d?.datums?.HAT != null && s.latDatum == null;
+  });
+  assert.deepEqual(lost.map(s => s.id), []);
   // Both keys travel together or neither does.
   assert.deepEqual(
     stations.filter((s) => (s.latDatum == null) !== (s.hatDatum == null)).map((s) => s.id),

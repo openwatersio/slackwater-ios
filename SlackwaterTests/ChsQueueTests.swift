@@ -30,13 +30,13 @@ final class ChsQueueTests: XCTestCase {
         service.accept(.inView)
         service.setAllCurrents(false)
         service.prioritize(lat: 49.1344, lon: -123.8171, favorites: [])
-        service.captureCohort(ids: ["chs-dodd-narrows"], heroID: "earlier-automatic")
+        service.captureCohort(ids: ["chs-johnstone-strait-central"], heroID: "earlier-automatic")
         service.prioritize(lat: 44.65, lon: -63.57, favorites: [])
         service.captureCohort(ids: ["chs-halifax"], heroID: "later-automatic")
-        XCTAssertNotNil(service.queue.job("chs-dodd-narrows"))
+        XCTAssertNotNil(service.queue.job("chs-johnstone-strait-central"))
         service.setAllCurrents(true)
         service.setAllCurrents(false)
-        XCTAssertNotNil(service.queue.job("chs-dodd-narrows"), "unchecking bulk work must keep the earlier automatic download")
+        XCTAssertNotNil(service.queue.job("chs-johnstone-strait-central"), "unchecking bulk work must keep the earlier automatic download")
     }
 
     @MainActor
@@ -154,11 +154,11 @@ final class ChsQueueTests: XCTestCase {
         service.accept(.nearby)
 
         service.setAllCurrents(true)
-        XCTAssertNotNil(service.queue.job("chs-weynton-passage"))
+        XCTAssertNotNil(service.queue.job("chs-blackney-passage"))
         service.accept(.inView)
-        XCTAssertNotNil(service.queue.job("chs-weynton-passage"), "all currents still selects this gate")
+        XCTAssertNotNil(service.queue.job("chs-blackney-passage"), "all currents still selects this gate")
         service.setAllCurrents(false)
-        XCTAssertNil(service.queue.job("chs-weynton-passage"))
+        XCTAssertNil(service.queue.job("chs-blackney-passage"))
         XCTAssertNotNil(service.queue.job("chs-victoria"))
         XCTAssertEqual(AppGroup.defaults.string(forKey: AppGroup.downloadTierKey), "inView")
         XCTAssertFalse(AppGroup.defaults.bool(forKey: AppGroup.downloadAllCurrentsKey))
@@ -843,12 +843,15 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
-    func testAutoFitTakesEverythingInReachWithTheBudgetedNineStillFirst() {
+    func testAutoFitTakesEverythingInReachWithAvailableBudgetedJobsFirst() {
         let victoria = (lat: 48.4235, lon: -123.3705)
         let full = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon, constrained: false)
         let near = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon, constrained: true)
 
-        XCTAssertEqual(near.count, ChsFitService.autoFitPorts + ChsFitService.autoFitGates)
+        let availablePorts = full.filter { !$0.isCurrent }.count
+        let availableGates = full.filter(\.isCurrent).count
+        XCTAssertEqual(near.count, min(availablePorts, ChsFitService.autoFitPorts)
+                       + min(availableGates, ChsFitService.autoFitGates))
         XCTAssertGreaterThan(full.count, near.count)
         XCTAssertEqual(Array(full.prefix(near.count)).map(\.id), near.map(\.id))
         XCTAssert(full.allSatisfy {

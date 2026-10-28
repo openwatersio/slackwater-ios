@@ -1,156 +1,23 @@
-// Slackwater — GPL v3. CHS current-gate fits vs live IWLS over a held-out
-// window. Fit runs in JSCore via tools/chs-reference's frozen JavaScript oracle;
-// prediction runs in SlackwaterKit. Native-fit parity and holdouts run in IwlsFixtureTests.
-// Tide fits are validated in the engine instead: slackwater's
-// benchmarks/chs-fit.ts, against the bar in its docs/validation/chs-tides.md.
-//
-//   swift run fit-validation --current <name> <lat> <lon> [cacheDir]  # current gate (wcsp1)
-//   swift run fit-validation --samples <file> --events <file> --flood <deg> --ebb <deg> --label <slug>
-//
-// Current mode (M47): fetch wcsp1 (speed) + wcdp1 (direction) for 210 d ending
-// today 00Z, project onto the CHS flood axis (speed·cos(dir−floodDirection) —
-// the chs-constituents pipeline's own projection), fit BOTH the full 210 d and
-// the trailing 60 d in JSCore, predict the held-out window (+28..+35 d) with
-// SlackwaterKit's CurrentStation (the shipping synthesis), and score slack/extremum
-// timing + peak speed against CHS's own published wcp1-events.
-//
-// Fetched IWLS data is cached under cacheDir (default /tmp/fit-validation) and
-// deliberately never written into the repo — it is CHS data, the user's own.
+// Slackwater — GPL v3. File-input validation for the fill and patch pipelines.
+// Fits use tools/chs-reference's frozen JavaScript oracle. Shipping CHS gate
+// validation lives in the engine and chs-current-validation results repository.
 import Foundation
 import JavaScriptCore
 import SlackwaterKit
-import os
 
-let isCurrentMode = CommandLine.arguments.contains("--current")
-let isFileMode = CommandLine.arguments.contains("--samples")
-// File-input mode (Task 5): --samples/--events/--flood/--ebb/--label replace
-// IWLS discovery+fetch entirely; see runFileMode() below.
 func flagValue(_ flag: String) -> String? {
     guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
     return CommandLine.arguments[i + 1]
 }
 
-/// Positional args only: every flag, and the value following a valued flag, is
-/// dropped so `<name> <lat> <lon> [cacheDir]` keeps its indices whatever flags
-/// are passed. Without this, a trailing `--flood 120` reads as the cacheDir.
-let valuedFlags: Set<String> = ["--samples", "--events", "--flood", "--ebb", "--label"]
-let args: [String] = {
-    var out: [String] = []
-    var skip = false
-    for a in CommandLine.arguments {
-        if skip { skip = false; continue }
-        if valuedFlags.contains(a) { skip = true; continue }
-        if a.hasPrefix("--") { continue }
-        out.append(a)
-    }
-    return out
-}()
-
-let lat: Double
-let lon: Double
-if isFileMode {
-    lat = 0
-    lon = 0
-} else {
-    guard isCurrentMode, args.count >= 4, let l = Double(args[2]), let o = Double(args[3]) else {
-        print("usage: fit-validation --current <name> <lat> <lon> [cacheDir]")
-        print("       fit-validation --samples <file> --events <file> --flood <deg> --ebb <deg> --label <slug>")
-        exit(2)
-    }
-    lat = l
-    lon = o
+guard CommandLine.arguments.contains("--samples"), !CommandLine.arguments.contains("--current") else {
+    print("usage: fit-validation --samples <file> --events <file> --flood <deg> --ebb <deg> --label <slug>")
+    exit(2)
 }
-let name = isFileMode ? (flagValue("--label") ?? "file") : args[1]
-let cacheDir = URL(fileURLWithPath: isFileMode ? "/tmp/fit-validation" : (args.count > 4 ? args[4] : "/tmp/fit-validation"))
+let cacheDir = URL(fileURLWithPath: "/tmp/fit-validation")
 try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-
-let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
 let iso = ISO8601DateFormatter()
-
-@MainActor
-func cachedGet(_ path: String, key: String) throws -> Data {
-    let file = cacheDir.appendingPathComponent(key)
-    if let data = try? Data(contentsOf: file) { return data }
-    // A 210-day gate is 60+ requests, and IWLS rate-limits a long run partway
-    // through. That used to be fatal at whatever chunk it hit, throwing away the
-    // gate — two of ten died that way on the first national pass. Back off and
-    // carry on instead; the cache means a retry only ever refetches the one
-    // chunk that failed.
-    for attempt in 0..<6 {
-        let sem = DispatchSemaphore(value: 0)
-        let response = OSAllocatedUnfairLock(initialState: (data: Optional<Data>.none, status: 0))
-        URLSession.shared.dataTask(with: URL(string: base + path)!) { data, resp, _ in
-            response.withLock { $0 = (data, (resp as? HTTPURLResponse)?.statusCode ?? 0) }
-            sem.signal()
-        }.resume()
-        sem.wait()
-        let (result, status) = response.withLock { $0 }
-        if status == 200, let data = result {
-            try data.write(to: file)
-            Thread.sleep(forTimeInterval: 2.5)  // polite: same spacing as the app
-            return data
-        }
-        guard status == 429 || status >= 500 || status == 0 else {
-            fatalError("IWLS \(status) for \(path)")
-        }
-        let backoff = pow(2.0, Double(attempt)) * 5  // 5, 10, 20, 40, 80, 160 s
-        FileHandle.standardError.write(
-            Data("IWLS \(status), retrying in \(Int(backoff))s: \(path)\n".utf8))
-        Thread.sleep(forTimeInterval: backoff)
-    }
-    fatalError("IWLS still failing after 6 attempts for \(path)")
-}
-
-// --- resolve by position (never name), nearest wcsp1 station within 3 km ---
-struct IwlsStation: Decodable {
-    struct Series: Decodable { let code: String }
-    let id: String, officialName: String, latitude: Double, longitude: Double
-    let timeSeries: [Series]
-}
-func km(_ la1: Double, _ lo1: Double, _ la2: Double, _ lo2: Double) -> Double {
-    let d = Double.pi / 180, dLat = (la2 - la1) * d, dLon = (lo2 - lo1) * d
-    let a = sin(dLat / 2) * sin(dLat / 2) + cos(la1 * d) * cos(la2 * d) * sin(dLon / 2) * sin(dLon / 2)
-    return 12742 * atan2(sqrt(a), sqrt(1 - a))
-}
-let resolveSeries = "wcsp1"
-// File mode skips discovery entirely — no live vessel position to resolve against.
-var station: IwlsStation!
-var distance: Double = -1
-if !isFileMode {
-    let list = try JSONDecoder().decode([IwlsStation].self, from: cachedGet("/stations", key: "stations.json"))
-    let seriesStations = list.filter { st in st.timeSeries.contains { $0.code == resolveSeries } }
-    station = seriesStations.min { km(lat, lon, $0.latitude, $0.longitude) < km(lat, lon, $1.latitude, $1.longitude) }!
-    distance = km(lat, lon, station.latitude, station.longitude)
-    guard distance <= 3.0 else { fatalError("no \(resolveSeries) station within 3 km of \(name) (nearest \(station.officialName) at \(distance) km)") }
-    print("resolved: \(name) -> \(station.officialName) (\(station.id)), \(String(format: "%.2f", distance)) km")
-}
-
-// --- windows: fits end today 00Z; validate +28 d .. +35 d ---
-struct IwlsSample: Decodable { let eventDate: String; let value: Double }
 let dayS = 86_400.0
-let today = floor(Date().timeIntervalSince1970 / dayS) * dayS
-let valStart = Date(timeIntervalSince1970: today + 28 * dayS)
-let valEnd = Date(timeIntervalSince1970: today + 35 * dayS)
-
-@MainActor
-func fetchSeries(_ code: String, _ from: Date, _ to: Date) throws -> [(t: Double, v: Double)] {
-    var out: [(Double, Double)] = []
-    var t = from
-    while t < to {
-        let next = min(t.addingTimeInterval(7 * dayS), to)
-        let path = "/stations/\(station.id)/data?time-series-code=\(code)" +
-            "&from=\(iso.string(from: t))&to=\(iso.string(from: next))"
-        let key = "\(station.id)_\(code)_\(Int(t.timeIntervalSince1970)).json"
-        let chunk = try JSONDecoder().decode([IwlsSample].self, from: cachedGet(path, key: key))
-        for s in chunk {
-            guard let d = iso.date(from: s.eventDate) else { continue }
-            let ms = d.timeIntervalSince1970 * 1000
-            if out.last?.0 != ms { out.append((ms, s.value)) }
-        }
-        t = next
-    }
-    return out
-}
 
 // The JavaScript reference artifacts (shared by current and file modes).
 let resources = URL(fileURLWithPath: #filePath) // tools/FitValidation/Sources/fit-validation/main.swift
@@ -185,7 +52,6 @@ let isoFrac: ISO8601DateFormatter = {
 }()
 
 struct IwlsEvent: Decodable { let eventDate: String; let qualifier: String; let value: Double }
-struct StationMeta: Decodable { let floodDirection: Double?; let ebbDirection: Double? }
 struct FitOut: Decodable {
     struct Con: Decodable { let name: String; let amplitude: Double; let phase: Double }
     let fitMs: Double
@@ -217,52 +83,6 @@ func med(_ xs: [Double]) -> Double? {
     return s.count % 2 == 1 ? s[s.count / 2] : (s[s.count / 2 - 1] + s[s.count / 2]) / 2
 }
 
-@MainActor
-func runCurrentValidation() throws -> Int32 {
-    // Flood/ebb axis from CHS metadata — required to project wcsp1/wcdp1 into
-    // a signed along-channel velocity. No axis, no fit.
-    let meta = try JSONDecoder().decode(StationMeta.self,
-        from: cachedGet("/stations/\(station.id)/metadata", key: "\(station.id)_metadata.json"))
-    guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-        print("FAIL-FOR-FITTING: \(name) — IWLS metadata has no flood/ebb axis")
-        return 3
-    }
-
-    // 210 d of wcsp1+wcdp1 ending today 00Z; the 60 d fit is the trailing slice
-    // of the same series (one fetch, two windows).
-    let fitStart210 = Date(timeIntervalSince1970: today - 210 * dayS)
-    let fitEnd = Date(timeIntervalSince1970: today)
-    let speeds = try fetchSeries("wcsp1", fitStart210, fitEnd)
-    let dirs = try fetchSeries("wcdp1", fitStart210, fitEnd)
-    let dirAt = Dictionary(dirs.map { ($0.t, $0.v) }, uniquingKeysWith: { a, _ in a })
-    let d2r = Double.pi / 180
-    // ponytail: projection = chs-constituents fetchProjectedSeries, one line.
-    let projected: [(t: Double, v: Double)] = speeds.compactMap { s in
-        guard let dir = dirAt[s.t] else { return nil }
-        return (s.t, s.v * cos((dir - flood) * d2r))
-    }
-    let cut60 = (today - 60 * dayS) * 1000
-    let projected60 = projected.filter { $0.t >= cut60 }
-    print("samples: \(projected.count) @ 210 d (\(projected60.count) in trailing 60 d), axis flood \(Int(flood))° / ebb \(Int(ebb))°")
-
-    // Held-out CHS events, +28..+35 d (exactly one 7-day request).
-    let evData = try cachedGet(
-        "/stations/\(station.id)/data?time-series-code=wcp1-events" +
-        "&from=\(iso.string(from: valStart))&to=\(iso.string(from: valEnd))",
-        key: "\(station.id)_wcp1-events_\(Int(valStart.timeIntervalSince1970)).json")
-    let rawEvents = try JSONDecoder().decode([IwlsEvent].self, from: evData)
-    let observed = toObservations(rawEvents)
-    guard !observed.isEmpty else {
-        print("FAIL-FOR-FITTING: \(name) — IWLS serves no wcp1-events for the validation window")
-        return 3
-    }
-
-    return try runFit(name: name, flood: flood, ebb: ebb,
-                       projected: projected, projected60: projected60, observed: observed,
-                       valStart: valStart, valEnd: valEnd,
-                       stationId: station.id, stationName: station.officialName, resolvedKm: distance)
-}
-
 /// File-input mode (Task 5): samples + events come from disk instead of IWLS.
 /// Joins the shared fit/score path in runFit() below — same JSCore fit, same
 /// CurrentStation prediction, same scoring bars, byte-identical for the same
@@ -284,8 +104,7 @@ func runFileMode() throws -> Int32 {
         from: Data(contentsOf: URL(fileURLWithPath: samplesPath)))
     let projected: [(t: Double, v: Double)] = decoded.map { ($0.t, $0.v) }
     // chs-glue.js documents fitTides' contract as epoch-ms ("t: epoch-ms" —
-    // tools/chs-reference/chs-glue.js:4), and every existing caller (fetchSeries,
-    // the current-mode IWLS fetch) hands ms. File-mode does NOT convert units —
+    // tools/chs-reference/chs-glue.js:4), and the file pipelines hand ms. File-mode does NOT convert units —
     // it decodes t literally, matching what the parity check requires (replaying
     // an already-ms samples file must stay byte-identical). The trailing-60d
     // cutoff still needs to know which unit it's looking at, so it disambiguates
@@ -312,9 +131,7 @@ func runFileMode() throws -> Int32 {
                        stationId: "file", stationName: label, resolvedKm: -1)
 }
 
-/// Shared fit -> CurrentStation -> scoring path (M47), fed either by live
-/// IWLS (runCurrentValidation) or by files (runFileMode). Must never diverge
-/// by mode — that's the whole parity guarantee file-input mode rests on.
+/// File-input fit, prediction and scoring path for the fill and patch pipelines.
 @MainActor
 func runFit(name: String, flood: Double, ebb: Double,
             projected: [(t: Double, v: Double)], projected60: [(t: Double, v: Double)],
@@ -417,7 +234,4 @@ func runFit(name: String, flood: Double, ebb: Double,
     return exitCode
 }
 
-if isFileMode {
-    exit(try runFileMode())
-}
-exit(try runCurrentValidation())
+exit(try runFileMode())

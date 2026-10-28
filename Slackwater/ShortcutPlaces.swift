@@ -77,7 +77,7 @@ enum ShortcutPlaceQuery {
 
     static func usable(_ item: StationItem) -> Bool {
         guard case .chsCurrent(let gate) = item, !gate.isOnline,
-              let model = ChsModelStore.loadCurrent(gate.id) else { return true }
+              let model = ChsModelStore.usableCurrent(gate.id) else { return true }
         return !gate.isProvisional(model)
     }
 

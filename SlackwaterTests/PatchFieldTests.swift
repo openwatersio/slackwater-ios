@@ -85,6 +85,35 @@ final class PatchFieldTests: XCTestCase {
         XCTAssertEqual(vector.bearingDeg, 270, accuracy: 0.1)
     }
 
+    func testChsPatchUsesOnlyTheOnlineGatesCachedWindow() throws {
+        let id = "chs-dodd-narrows", now = appNow()
+        let onlineURL = ChsModelStore.onlineUrl(id), modelURL = ChsModelStore.currentUrl(id)
+        let savedOnline = try? Data(contentsOf: onlineURL), savedModel = try? Data(contentsOf: modelURL)
+        defer {
+            for (url, data) in [(onlineURL, savedOnline), (modelURL, savedModel)] {
+                if let data { try? data.write(to: url) }
+                else { try? FileManager.default.removeItem(at: url) }
+            }
+        }
+        let stale = ChsModel(stationID: id, iwlsID: "fixture", iwlsName: "Dodd", fittedAt: now,
+                             fitStartMs: 0, fitEndMs: 1, fitDays: 210, offset: 9, rms: 0,
+                             constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
+        try ChsModelStore.saveCurrent(stale)
+        try? FileManager.default.removeItem(at: onlineURL)
+        let (bin, header) = fixture(provider: "chs", anchorId: id)
+        let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
+        XCTAssertTrue(field.cells(at: now).isEmpty)
+        let t = now.timeIntervalSince1970
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
+            fetchedAt: now, start: now, end: now.addingTimeInterval(900),
+            floodDirection: 21, ebbDirection: 201, times: [t, t + 900], speeds: [-2, -2]))
+        let cells = field.cells(at: now.addingTimeInterval(450))
+        XCTAssertEqual(cells.count, 2)
+        XCTAssertEqual(cells.first?.speedKn ?? 0, 1, accuracy: 1e-9)
+        XCTAssertEqual(cells.first?.bearingDeg ?? 0, 270, accuracy: 0.1)
+        XCTAssertTrue(field.cells(at: now.addingTimeInterval(901)).isEmpty)
+    }
+
     func testUnresolvableAnchorVendsNothing() throws {
         let (bin, header) = fixture(anchorId: "NO-SUCH-STATION")
         let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))

@@ -179,8 +179,8 @@ final class IwlsFetcher {
                 try await Self.waitForFixtureRelease("\(stationID)-first-chunk")
             }
             if Self.fixtureScenario == "no-interrupt", count == 0 {
-                if stationID == "chs-dodd-narrows", code == "wcsp1" {
-                    try await Self.waitForFixtureRelease("dodd-first-chunk")
+                if stationID == "chs-johnstone-strait-central", code == "wcsp1" {
+                    try await Self.waitForFixtureRelease("johnstone-first-chunk")
                 } else if stationID == "chs-tofino", code == "wlp" {
                     try await Self.waitForFixtureRelease("tofino-first-chunk")
                 }

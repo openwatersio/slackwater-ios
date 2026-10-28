@@ -28,7 +28,7 @@ final class DeepLinkTests: XCTestCase {
     }
 
     func testTiconID() throws {
-        try assertRoundTrips("ticon/aasiaat-aas-grl-gloss")
+        try assertRoundTrips("ticon/aberdeen-abe-gbr-bodc")
     }
 
     /// The escape does not always survive the trip to `.onOpenURL`: an id whose

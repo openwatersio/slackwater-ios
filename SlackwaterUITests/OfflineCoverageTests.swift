@@ -13,7 +13,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     func testCanadianDownloadChecklistAddsWork() {
         let app = launch("-resetFavorites", "-chsResetModels",
                          "-networkKillSwitch", "-chsFitOnly",
-                         "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
+                         "chs-victoria,chs-active-pass,chs-first-narrows,chs-blackney-passage",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openDownloads(app)
         save(app, "canadian-download-checklist.png")
@@ -31,7 +31,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(waitFor(within25, "isSelected == true"))
         within150.tap()
         XCTAssert(waitFor(within150, "isSelected == true"))
-        let farGate = app.descendants(matching: .any)["download-row-chs-weynton-passage"].firstMatch
+        let farGate = app.descendants(matching: .any)["download-row-chs-blackney-passage"].firstMatch
         XCTAssertFalse(farGate.exists)
         currents.tap()
         XCTAssert(waitFor(currents, "isSelected == true"))
@@ -89,7 +89,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
     func testDownloadOfferOpensExplanation() {
         let app = launch("-resetFavorites", "-chsResetModels",
-                         "-networkKillSwitch", "-chsFitOnly", "chs-victoria,chs-race-passage",
+                         "-networkKillSwitch", "-chsFitOnly", "chs-victoria,chs-pedder-bay",
                          "-chsFailOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         let offer = app.buttons["download-strip-open"].firstMatch
@@ -469,6 +469,16 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(ink > Self.drawnStripInk, "the online-gate strip drew nothing — ink \(ink)")
         sleep(1)  // the header's tile floor; MLNMapView reports nothing
         save(app, "online-gate-seeded.png")
+        let details = app.buttons["Station details"].firstMatch
+        scrollTo(details, in: app)
+        details.tap()
+        let explanation = app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'yearly count of slacks absent from CHS predictions was 16'"
+        )).firstMatch
+        scrollTo(explanation, in: app)
+        XCTAssert(explanation.appears(within: 5))
+        XCTAssert(explanation.label.contains("tidal rapids"))
+        save(app, "online-gate-measured-miss.png")
     }
 
     /// Paging an online gate to a week nobody has downloaded, with no network,

@@ -331,6 +331,7 @@ struct ChsAmberCard: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(SN.paper)
                 Text(headline)
+                    .monospacedDigit()
                     .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.72))
                     .fixedSize(horizontal: false, vertical: true)

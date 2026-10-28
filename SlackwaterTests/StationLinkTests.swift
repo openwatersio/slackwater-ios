@@ -167,7 +167,7 @@ import XCTest
     /// through the parser and resolver to the same station.
     func testShareURLRoundTripsEveryIDShape() throws {
         for id in ["noaa/9454616", "current:noaa/CHB9904", "chs-abbotts-harbour",
-                   "chs-dodd-narrows", "chs-malibu-rapids", "ticon/aasiaat-aas-grl-gloss"] {
+                   "chs-dodd-narrows", "chs-malibu-rapids", "ticon/aberdeen-abe-gbr-bodc"] {
             let url = try XCTUnwrap(shareURL(forStationID: id, at: nil, tz: vancouver), id)
             let parsed = try XCTUnwrap(stationLink(from: url), id)
             XCTAssertNil(parsed.instant, id)
