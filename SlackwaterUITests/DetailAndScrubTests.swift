@@ -93,6 +93,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         }
         let daylight = app.descendants(matching: .any)["sun-daylight"].firstMatch
         XCTAssertGreaterThan(daylight.frame.minY, previousY)
+        // ⓘ explains the moment in place: no jump, the sheet stays up.
+        app.buttons["sun-info-astroDawn"].tap()
+        let explanation = app.descendants(matching: .any)["sun-explanation"].firstMatch
+        XCTAssertTrue(explanation.appears(within: 5))
+        XCTAssertTrue(explanation.label.contains("18°"), explanation.label)
+        save(app, "sun-explanation.png")
+        app.tap()
+        XCTAssertTrue(explanation.disappears(within: 5))
+        XCTAssertTrue(app.navigationBars["Sun activity"].exists)
         // Every row is a destination: the sheet closes and the timeline lands on the row's time.
         let golden = app.descendants(matching: .any)["sun-event-eveningGoldenStart"].firstMatch
         let clock = try XCTUnwrap(golden.label.components(separatedBy: ", ").last)
