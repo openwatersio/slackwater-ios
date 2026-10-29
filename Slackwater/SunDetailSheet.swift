@@ -51,9 +51,12 @@ struct SunDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .subheadline) private var iconWidth = 24
+    @ScaledMetric(relativeTo: .subheadline) private var popoverWidth = 280
     @State private var facts: SunDayFacts?
     @State private var orbit: SunOrbitFacts?
     @State private var failed = false
+    /// The row whose ⓘ popover is open.
+    @State private var explaining: SunMoment?
 
     var body: some View {
         NavigationStack {
@@ -160,6 +163,7 @@ struct SunDetailSheet: View {
             }
             if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
             HStack(spacing: 8) {
+                infoButton(moment, label)
                 Text(time.map { chartTime($0, tz) } ?? "—").foregroundStyle(color).fixedSize()
                 if time != nil {
                     Image(systemName: "chevron.right").font(.caption2)
@@ -178,6 +182,57 @@ struct SunDetailSheet: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(time != nil ? .isButton : [])
         .accessibilityIdentifier("sun-event-\(moment.rawValue)")
+    }
+
+    /// Says what the moment means: a popover on the phone, a sheet on the watch, which
+    /// has no popovers. Its own tap target, so a tap here never jumps the timeline.
+    private func infoButton(_ moment: SunMoment, _ label: LocalizedStringKey) -> some View {
+        let shown = Binding(get: { explaining == moment }, set: { if !$0 { explaining = nil } })
+        let card = VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.headline)
+            Text(explanation(moment)).font(.subheadline)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sun-explanation")
+        let button = Button { explaining = moment } label: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(SN.foam.opacity(0.5))
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, -6)
+        .accessibilityLabel("Explain")
+        .accessibilityIdentifier("sun-info-\(moment.rawValue)")
+        #if os(iOS)
+        return button.popover(isPresented: shown) {
+            card
+                .frame(width: popoverWidth, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(16)
+                .presentationCompactAdaptation(.popover)
+        }
+        #else
+        return button.sheet(isPresented: shown) { ScrollView { card } }
+        #endif
+    }
+
+    private func explanation(_ moment: SunMoment) -> LocalizedStringKey {
+        switch moment {
+        case .astroDawn: "The Sun is 18° below the horizon and the first faint light reaches the sky. To the eye it still looks like night."
+        case .nauticalDawn: "The Sun is 12° below the horizon. The horizon at sea becomes visible, so navigators can take star sights."
+        case .civilDawn: "The Sun is 6° below the horizon. There is enough light to see clearly outside without lights."
+        case .morningBlueStart, .morningBlueEnd, .eveningBlueStart, .eveningBlueEnd:
+            "Blue hour is while the Sun is between 4° and 8° below the horizon, and the sky turns a deep, even blue."
+        case .rise: "The top edge of the Sun appears above the horizon. The time allows for the atmosphere bending sunlight over the horizon."
+        case .morningGoldenEnd, .eveningGoldenStart:
+            "Golden hour is while the Sun is less than 6° above the horizon, giving low, warm, soft light."
+        case .transit: "The Sun reaches its highest point of the day. Time zones and daylight saving time mean it is rarely noon on the clock."
+        case .set: "The top edge of the Sun drops below the horizon. Like sunrise, the time allows for the atmosphere bending the light."
+        case .civilDusk: "The Sun sinks 6° below the horizon. After this, you need lights to see clearly outside and the brightest stars appear."
+        case .nauticalDusk: "The Sun sinks 12° below the horizon. The horizon at sea fades from view, ending the evening window for star sights."
+        case .astroDusk: "The Sun sinks 18° below the horizon and the last trace of twilight leaves the sky. Full night begins."
+        }
     }
 
     private func eventLink(_ event: SunSummaryState.Event, previous: Bool) -> some View {

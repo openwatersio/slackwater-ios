@@ -1709,6 +1709,101 @@
         }
       }
     },
+    "Blue hour is while the Sun is between 4° and 8° below the horizon, and the sky turns a deep, even blue." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Blue hour begins / Blue hour ends. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den blå time er, mens Solen står mellem 4° og 8° under horisonten, og himlen bliver dybt og jævnt blå."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die blaue Stunde dauert, solange die Sonne zwischen 4° und 8° unter dem Horizont steht und der Himmel tief und gleichmäßig blau wird."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora azul es mientras el Sol está entre 4° y 8° por debajo del horizonte y el cielo se vuelve de un azul intenso y uniforme."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sininen hetki kestää, kun aurinko on 4–8° horisontin alapuolella ja taivas muuttuu syvän tasaisen siniseksi."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’heure bleue, c’est quand le Soleil est entre 4° et 8° sous l’horizon et que le ciel prend un bleu profond et uniforme."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Is í an uair ghorm an t-am a mbíonn an ghrian idir 4° agus 8° faoi bhun na spéire, agus casann an spéir gorm domhain cothrom."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "’S e an uair ghorm an t-àm nuair a tha a’ ghrian eadar 4° is 8° fon fhàire, agus fàsaidh an speur gorm domhainn rèidh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ora blu è quando il Sole è tra 4° e 8° sotto l’orizzonte e il cielo diventa di un blu intenso e uniforme."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブルーアワーは、太陽が地平線の下4°〜8°にあり、空が深く均一な青色になる時間です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "블루 아워는 태양이 지평선 아래 4°에서 8° 사이에 있어 하늘이 짙고 고른 파란색이 되는 시간입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den blå timen er mens solen står mellom 4° og 8° under horisonten, og himmelen blir dypt og jevnt blå."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het blauwe uur is wanneer de zon tussen 4° en 8° onder de horizon staat en de lucht diep en egaal blauw kleurt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora azul é quando o Sol está entre 4° e 8° abaixo do horizonte e o céu fica de um azul profundo e uniforme."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora azul é quando o Sol está entre 4° e 8° abaixo do horizonte e o céu fica de um azul profundo e uniforme."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blå timmen är när solen står mellan 4° och 8° under horisonten och himlen blir djupt och jämnt blå."
+          }
+        }
+      }
+    },
     "Closing time unavailable" : {
       "comment" : "Siri place/date parameter or dated prediction answer. Preserve all format arguments; dates and times are already localized.",
       "extractionState" : "manual",
@@ -2567,6 +2662,101 @@
         }
       }
     },
+    "Explain" : {
+      "comment" : "VoiceOver action on a Sun activity row that opens a short explanation of the event.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forklar"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erklären"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explicar"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selitä"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expliquer"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mínigh"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mìnich"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spiega"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설명"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forklar"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uitleg"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explicar"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explicar"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Förklara"
+          }
+        }
+      }
+    },
     "Fastest rise" : {
       "comment" : "Tide event: the rising tide's fastest point.",
       "localizations" : {
@@ -3323,6 +3513,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gyllene timmen slutar"
+          }
+        }
+      }
+    },
+    "Golden hour is while the Sun is less than 6° above the horizon, giving low, warm, soft light." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Golden hour begins / Golden hour ends. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den gyldne time er, mens Solen står under 6° over horisonten og giver lavt, varmt og blødt lys."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die goldene Stunde dauert, solange die Sonne weniger als 6° über dem Horizont steht und tiefes, warmes, weiches Licht gibt."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora dorada es mientras el Sol está a menos de 6° sobre el horizonte y da una luz baja, cálida y suave."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kultainen tunti kestää, kun aurinko on alle 6° horisontin yläpuolella ja antaa matalaa, lämmintä ja pehmeää valoa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’heure dorée, c’est quand le Soleil est à moins de 6° au-dessus de l’horizon et donne une lumière basse, chaude et douce."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Is í an uair órga an t-am a mbíonn an ghrian níos lú ná 6° os cionn na spéire, ag tabhairt solas íseal, te, bog."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "’S e an uair òir an t-àm nuair a tha a’ ghrian nas lugha na 6° os cionn na fàire, a’ toirt solas ìosal, blàth, bog."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ora d’oro è quando il Sole è a meno di 6° sopra l’orizzonte e dà una luce bassa, calda e morbida."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゴールデンアワーは、太陽が地平線から6°未満の高さにあり、低く暖かくやわらかな光になる時間です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "골든 아워는 태양이 지평선 위 6° 미만에 있어 낮고 따뜻하며 부드러운 빛을 주는 시간입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den gylne timen er mens solen står under 6° over horisonten og gir lavt, varmt og mykt lys."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het gouden uur is wanneer de zon minder dan 6° boven de horizon staat en laag, warm en zacht licht geeft."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora dourada é quando o Sol está a menos de 6° acima do horizonte, com uma luz baixa, quente e suave."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora dourada é quando o Sol está a menos de 6° acima do horizonte, com uma luz baixa, quente e suave."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gyllene timmen är när solen står lägre än 6° över horisonten och ger lågt, varmt och mjukt ljus."
           }
         }
       }
@@ -9340,6 +9625,861 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Den verkliga himlen"
+          }
+        }
+      }
+    },
+    "The Sun is 12° below the horizon. The horizon at sea becomes visible, so navigators can take star sights." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Nautical dawn. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 12° under horisonten. Horisonten til søs bliver synlig, så navigatører kan tage stjernehøjder."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne steht 12° unter dem Horizont. Die Kimm auf See wird sichtbar, sodass Navigatoren Sternhöhen messen können."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol está 12° por debajo del horizonte. El horizonte en el mar se hace visible y los navegantes pueden tomar alturas de estrellas."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko on 12° horisontin alapuolella. Merellä horisontti tulee näkyviin, joten navigoijat voivat mitata tähtien korkeuksia."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil est à 12° sous l’horizon. L’horizon en mer devient visible : les navigateurs peuvent faire le point aux étoiles."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá an ghrian 12° faoi bhun na spéire. Bíonn fíor na spéire ar muir le feiceáil, ionas gur féidir le loingseoirí réaltaí a thomhas."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha a’ ghrian 12° fon fhàire. Thig fàire na mara am fradharc, ’s mar sin ’s urrainn do sheòladairean àirde nan rionnag a thomhas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole è 12° sotto l’orizzonte. L’orizzonte in mare diventa visibile e i navigatori possono misurare l’altezza delle stelle."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下12°にあります。海上で水平線が見え始め、航海士は星の高度を測れます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 12°에 있습니다. 바다의 수평선이 보이기 시작해 항해사가 별의 고도를 측정할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 12° under horisonten. Horisonten til sjøs blir synlig, så navigatører kan ta stjernehøyder."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon staat 12° onder de horizon. De kim op zee wordt zichtbaar, zodat navigators sterrenhoogten kunnen meten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 12° abaixo do horizonte. O horizonte no mar fica visível, e os navegadores podem medir a altura das estrelas."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 12° abaixo do horizonte. O horizonte no mar torna-se visível e os navegadores podem medir a altura das estrelas."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 12° under horisonten. Horisonten till sjöss blir synlig, så navigatörer kan ta stjärnhöjder."
+          }
+        }
+      }
+    },
+    "The Sun is 18° below the horizon and the first faint light reaches the sky. To the eye it still looks like night." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Astronomical dawn. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 18° under horisonten, og det første svage lys når himlen. For øjet ligner det stadig nat."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne steht 18° unter dem Horizont, und das erste schwache Licht erreicht den Himmel. Für das Auge wirkt es noch wie Nacht."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol está 18° por debajo del horizonte y la primera luz tenue llega al cielo. A simple vista todavía parece de noche."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko on 18° horisontin alapuolella, ja ensimmäinen heikko valo saavuttaa taivaan. Silmälle on yhä yö."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil est à 18° sous l’horizon et la première lueur atteint le ciel. À l’œil, il fait encore nuit."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá an ghrian 18° faoi bhun na spéire agus sroicheann an chéad solas lag an spéir. Don tsúil, is cosúil gur oíche í fós."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha a’ ghrian 18° fon fhàire agus ruigidh a’ chiad solas fann an speur. Don t-sùil, tha i fhathast coltach ri oidhche."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole è 18° sotto l’orizzonte e la prima debole luce raggiunge il cielo. A occhio nudo sembra ancora notte."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下18°にあり、空にかすかな光が届き始めます。目にはまだ夜のように見えます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 18°에 있으며 하늘에 첫 희미한 빛이 닿습니다. 눈으로 보기에는 아직 밤입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 18° under horisonten, og det første svake lyset når himmelen. For øyet ser det fortsatt ut som natt."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon staat 18° onder de horizon en het eerste zwakke licht bereikt de hemel. Voor het oog lijkt het nog nacht."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 18° abaixo do horizonte e a primeira luz fraca chega ao céu. A olho nu, ainda parece noite."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 18° abaixo do horizonte e a primeira luz ténue chega ao céu. À vista desarmada, ainda parece noite."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 18° under horisonten och det första svaga ljuset når himlen. För ögat ser det fortfarande ut som natt."
+          }
+        }
+      }
+    },
+    "The Sun is 6° below the horizon. There is enough light to see clearly outside without lights." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Civil dawn. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 6° under horisonten. Der er lys nok til at se tydeligt udenfor uden lygter."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne steht 6° unter dem Horizont. Es ist hell genug, um draußen ohne Licht klar zu sehen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol está 6° por debajo del horizonte. Hay luz suficiente para ver bien al aire libre sin luces."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko on 6° horisontin alapuolella. Ulkona on tarpeeksi valoisaa nähdä selvästi ilman valoja."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil est à 6° sous l’horizon. Il y a assez de lumière pour bien voir dehors sans éclairage."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá an ghrian 6° faoi bhun na spéire. Tá go leor solais ann le feiceáil go soiléir amuigh gan soilse."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha a’ ghrian 6° fon fhàire. Tha solas gu leòr ann airson faicinn gu soilleir a-muigh gun solais."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole è 6° sotto l’orizzonte. C’è abbastanza luce per vedere bene all’aperto senza luci."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下6°にあります。屋外で明かりなしでもはっきり見えるほど明るくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 6°에 있습니다. 조명 없이도 바깥이 잘 보일 만큼 밝습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 6° under horisonten. Det er lyst nok til å se klart ute uten lys."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon staat 6° onder de horizon. Er is genoeg licht om buiten zonder verlichting goed te zien."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 6° abaixo do horizonte. Há luz suficiente para enxergar bem ao ar livre sem iluminação."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol está 6° abaixo do horizonte. Há luz suficiente para ver bem ao ar livre sem iluminação."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen står 6° under horisonten. Det är ljust nog att se tydligt utomhus utan belysning."
+          }
+        }
+      }
+    },
+    "The Sun reaches its highest point of the day. Time zones and daylight saving time mean it is rarely noon on the clock." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Solar noon. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen når dagens højeste punkt. På grund af tidszoner og sommertid er klokken sjældent præcis tolv."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne erreicht ihren höchsten Punkt des Tages. Wegen Zeitzonen und Sommerzeit ist es dann selten genau zwölf Uhr."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol alcanza su punto más alto del día. Por los husos horarios y el horario de verano, rara vez coincide con las doce en el reloj."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko on päivän korkeimmillaan. Aikavyöhykkeiden ja kesäajan vuoksi kello on harvoin tasan kaksitoista."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil atteint son point le plus haut de la journée. Avec les fuseaux horaires et l’heure avancée, il est rarement midi pile à l’horloge."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sroicheann an ghrian a pointe is airde sa lá. De bharr criosanna ama agus am samhraidh, is annamh a bhíonn sé meán lae ar an gclog."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruigidh a’ ghrian an t-àite as àirde aice san latha. Air sàillibh roinnean-ama is tìde samhraidh, ’s ann ainneamh a bhios e meadhan-latha air a’ ghleoc."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole raggiunge il punto più alto della giornata. Per via dei fusi orari e dell’ora legale, raramente sull’orologio è mezzogiorno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽がその日の最も高い位置に達します。時間帯や夏時間の影響で、時計の正午と一致することはまれです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 하루 중 가장 높은 지점에 이릅니다. 시간대와 서머타임 때문에 시계상 정오와 일치하는 경우는 드뭅니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen når dagens høyeste punkt. På grunn av tidssoner og sommertid er klokken sjelden nøyaktig tolv."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon bereikt haar hoogste punt van de dag. Door tijdzones en zomertijd is het dan zelden precies twaalf uur."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol atinge seu ponto mais alto do dia. Por causa dos fusos horários e do horário de verão, raramente é meio-dia no relógio."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol atinge o seu ponto mais alto do dia. Devido aos fusos horários e à hora de verão, raramente é meio-dia no relógio."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen når dagens högsta punkt. På grund av tidszoner och sommartid är klockan sällan exakt tolv."
+          }
+        }
+      }
+    },
+    "The Sun sinks 12° below the horizon. The horizon at sea fades from view, ending the evening window for star sights." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Nautical dusk. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 12° under horisonten. Horisonten til søs forsvinder, og aftenens mulighed for stjernehøjder slutter."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne sinkt 12° unter den Horizont. Die Kimm auf See verschwindet, und die abendliche Zeit für Sternhöhen endet."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol baja 12° por debajo del horizonte. El horizonte en el mar deja de verse y termina la ventana vespertina para tomar alturas de estrellas."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko laskee 12° horisontin alapuolelle. Merellä horisontti katoaa näkyvistä, ja illan tähtimittausten aika päättyy."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil descend à 12° sous l’horizon. L’horizon en mer disparaît, ce qui met fin au créneau du soir pour le point aux étoiles."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téann an ghrian 12° faoi bhun na spéire. Imíonn fíor na spéire ar muir as radharc, rud a chuireann deireadh le deis an tráthnóna réaltaí a thomhas."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thèid a’ ghrian 12° fon fhàire. Falbhaidh fàire na mara à sealladh, agus thig crìoch air cothrom an fheasgair àirde nan rionnag a thomhas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole scende 12° sotto l’orizzonte. L’orizzonte in mare scompare alla vista e finisce la finestra serale per misurare le stelle."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下12°まで沈みます。海上の水平線が見えなくなり、夕方の星の高度観測ができる時間が終わります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 12°로 내려갑니다. 바다의 수평선이 보이지 않게 되어 저녁 별 고도 측정 시간이 끝납니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 12° under horisonten. Horisonten til sjøs forsvinner, og kveldens mulighet for stjernehøyder er over."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon zakt 12° onder de horizon. De kim op zee verdwijnt uit zicht en de avondperiode voor sterrenhoogten eindigt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 12° abaixo do horizonte. O horizonte no mar some de vista, encerrando a janela noturna para medir a altura das estrelas."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 12° abaixo do horizonte. O horizonte no mar deixa de se ver, terminando a janela do fim do dia para medir a altura das estrelas."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen sjunker 12° under horisonten. Horisonten till sjöss försvinner ur sikte, och kvällens tid för stjärnhöjder tar slut."
+          }
+        }
+      }
+    },
+    "The Sun sinks 18° below the horizon and the last trace of twilight leaves the sky. Full night begins." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Astronomical dusk. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 18° under horisonten, og det sidste spor af tusmørke forsvinder fra himlen. Den fulde nat begynder."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne sinkt 18° unter den Horizont, und die letzte Spur der Dämmerung verschwindet vom Himmel. Die volle Nacht beginnt."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol baja 18° por debajo del horizonte y el último rastro del crepúsculo deja el cielo. Empieza la noche cerrada."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko laskee 18° horisontin alapuolelle, ja hämärän viimeinen jälki katoaa taivaalta. Täysi yö alkaa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil descend à 18° sous l’horizon et la dernière trace de crépuscule quitte le ciel. La nuit noire commence."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téann an ghrian 18° faoi bhun na spéire agus fágann an rian deireanach den chlapsholas an spéir. Tosaíonn an oíche iomlán."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thèid a’ ghrian 18° fon fhàire agus fàgaidh an lorg mu dheireadh den chamhanaich an speur. Tòisichidh an làn-oidhche."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole scende 18° sotto l’orizzonte e l’ultima traccia di crepuscolo lascia il cielo. Inizia la notte piena."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下18°まで沈み、薄明の最後の名残が空から消えます。完全な夜が始まります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 18°로 내려가고 박명의 마지막 흔적이 하늘에서 사라집니다. 완전한 밤이 시작됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 18° under horisonten, og det siste sporet av skumring forsvinner fra himmelen. Full natt begynner."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon zakt 18° onder de horizon en het laatste spoor van schemering verdwijnt van de hemel. De volle nacht begint."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 18° abaixo do horizonte e o último vestígio de crepúsculo deixa o céu. Começa a noite fechada."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 18° abaixo do horizonte e o último vestígio de crepúsculo deixa o céu. Começa a noite cerrada."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen sjunker 18° under horisonten och det sista spåret av skymning lämnar himlen. Full natt börjar."
+          }
+        }
+      }
+    },
+    "The Sun sinks 6° below the horizon. After this, you need lights to see clearly outside and the brightest stars appear." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Civil dusk. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 6° under horisonten. Herefter skal der lys til for at se tydeligt udenfor, og de klareste stjerner kommer frem."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sonne sinkt 6° unter den Horizont. Danach braucht man draußen Licht, um klar zu sehen, und die hellsten Sterne erscheinen."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol baja 6° por debajo del horizonte. A partir de aquí hacen falta luces para ver bien fuera y aparecen las estrellas más brillantes."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko laskee 6° horisontin alapuolelle. Tämän jälkeen ulkona tarvitaan valoa, ja kirkkaimmat tähdet tulevat näkyviin."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Soleil descend à 6° sous l’horizon. Ensuite, il faut de l’éclairage pour bien voir dehors et les étoiles les plus brillantes apparaissent."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téann an ghrian 6° faoi bhun na spéire. Ina dhiaidh seo, teastaíonn soilse le feiceáil go soiléir amuigh agus tagann na réaltaí is gile amach."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thèid a’ ghrian 6° fon fhàire. Às dèidh seo, feumaidh tu solais airson faicinn gu soilleir a-muigh agus nochdaidh na rionnagan as soilleire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Sole scende 6° sotto l’orizzonte. Da qui servono luci per vedere bene all’aperto e compaiono le stelle più luminose."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽が地平線の下6°まで沈みます。この後は屋外ではっきり見るには明かりが必要になり、明るい星が見え始めます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양이 지평선 아래 6°로 내려갑니다. 이후에는 바깥을 잘 보려면 조명이 필요하고 가장 밝은 별들이 나타납니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen synker 6° under horisonten. Etter dette trenger du lys for å se klart ute, og de klareste stjernene kommer fram."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De zon zakt 6° onder de horizon. Daarna heb je buiten licht nodig om goed te zien en verschijnen de helderste sterren."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 6° abaixo do horizonte. A partir daí, é preciso iluminação para enxergar bem ao ar livre e as estrelas mais brilhantes aparecem."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Sol desce 6° abaixo do horizonte. A partir daí, é preciso iluminação para ver bem ao ar livre e as estrelas mais brilhantes aparecem."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solen sjunker 6° under horisonten. Därefter behövs belysning för att se tydligt utomhus, och de ljusaste stjärnorna syns."
+          }
+        }
+      }
+    },
+    "The top edge of the Sun appears above the horizon. The time allows for the atmosphere bending sunlight over the horizon." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Sunrise. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens øverste kant kommer op over horisonten. Tiden tager højde for, at atmosfæren bøjer sollyset over horisonten."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der obere Rand der Sonne erscheint über dem Horizont. Die Zeit berücksichtigt, dass die Atmosphäre das Sonnenlicht über den Horizont beugt."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El borde superior del Sol aparece sobre el horizonte. La hora tiene en cuenta que la atmósfera curva la luz solar sobre el horizonte."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auringon yläreuna nousee horisontin yläpuolelle. Aika huomioi, että ilmakehä taittaa auringonvaloa horisontin yli."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le bord supérieur du Soleil apparaît au-dessus de l’horizon. L’heure tient compte de l’atmosphère qui courbe la lumière par-dessus l’horizon."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nochtar imeall uachtair na gréine os cionn na spéire. Cuirtear san áireamh go lúbann an t-atmaisféar solas na gréine thar fhíor na spéire."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nochdaidh oir àrd na grèine os cionn na fàire. Tha an t-àm a’ toirt aire gun lùb an àile solas na grèine thar na fàire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il bordo superiore del Sole compare sopra l’orizzonte. L’orario tiene conto dell’atmosfera che piega la luce solare oltre l’orizzonte."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽の上端が地平線の上に現れます。大気が太陽光を地平線の向こうから屈折させる分も考慮した時刻です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양의 윗가장자리가 지평선 위로 나타납니다. 대기가 햇빛을 지평선 너머로 굴절시키는 효과를 반영한 시각입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens øverste kant kommer over horisonten. Tiden tar hensyn til at atmosfæren bøyer sollyset over horisonten."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bovenrand van de zon verschijnt boven de horizon. De tijd houdt rekening met de atmosfeer die het zonlicht over de horizon buigt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A borda superior do Sol aparece acima do horizonte. O horário considera a atmosfera curvando a luz do Sol sobre o horizonte."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O bordo superior do Sol aparece acima do horizonte. A hora tem em conta a atmosfera a curvar a luz do Sol sobre o horizonte."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens övre kant syns ovanför horisonten. Tiden tar hänsyn till att atmosfären böjer solljuset över horisonten."
+          }
+        }
+      }
+    },
+    "The top edge of the Sun drops below the horizon. Like sunrise, the time allows for the atmosphere bending the light." : {
+      "comment" : "Explanation in the Sun activity sheet's ⓘ popover for the event Sunset. Keep the degree values.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens øverste kant forsvinder under horisonten. Som ved solopgang tager tiden højde for, at atmosfæren bøjer lyset."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der obere Rand der Sonne verschwindet unter dem Horizont. Wie beim Sonnenaufgang berücksichtigt die Zeit, dass die Atmosphäre das Licht beugt."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El borde superior del Sol desaparece bajo el horizonte. Como en la salida del sol, la hora tiene en cuenta que la atmósfera curva la luz."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auringon yläreuna laskee horisontin alapuolelle. Kuten auringonnousussa, aika huomioi ilmakehän valoa taittavan vaikutuksen."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le bord supérieur du Soleil passe sous l’horizon. Comme pour le lever, l’heure tient compte de l’atmosphère qui courbe la lumière."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téann imeall uachtair na gréine faoi bhun na spéire. Mar le héirí na gréine, cuirtear san áireamh go lúbann an t-atmaisféar an solas."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thèid oir àrd na grèine fon fhàire. Mar le èirigh na grèine, tha an t-àm a’ toirt aire gun lùb an àile an solas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il bordo superiore del Sole scende sotto l’orizzonte. Come per l’alba, l’orario tiene conto dell’atmosfera che piega la luce."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽の上端が地平線の下に沈みます。日の出と同じく、大気による光の屈折を考慮した時刻です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태양의 윗가장자리가 지평선 아래로 내려갑니다. 일출처럼 대기의 빛 굴절을 반영한 시각입니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens øverste kant forsvinner under horisonten. Som ved soloppgang tar tiden hensyn til at atmosfæren bøyer lyset."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bovenrand van de zon zakt onder de horizon. Net als bij zonsopkomst houdt de tijd rekening met de atmosfeer die het licht buigt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A borda superior do Sol desce abaixo do horizonte. Como no nascer do sol, o horário considera a atmosfera curvando a luz."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O bordo superior do Sol desce abaixo do horizonte. Tal como no nascer do sol, a hora tem em conta a atmosfera a curvar a luz."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solens övre kant sjunker under horisonten. Som vid soluppgången tar tiden hänsyn till att atmosfären böjer ljuset."
           }
         }
       }
