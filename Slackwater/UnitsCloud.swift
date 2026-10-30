@@ -1,7 +1,8 @@
 import Foundation
 
 /// Display preferences that follow the person between devices: units, the set's
-/// format, and the comfort current. The App Group copy is what every reader uses.
+/// format, the comfort current, and the sky's sun, moon and stars switch. The
+/// App Group copy is what every reader uses.
 @MainActor final class UnitsCloud {
     static let shared = UnitsCloud()
 
@@ -10,7 +11,11 @@ import Foundation
         speedUnitKey: { ["kn", "kmh", "ms"].contains($0 as? String) },
         setFormatKey: { ["compass", "degrees"].contains($0 as? String) },
         AppGroup.slackWindowSpeedKey: { ($0 as? Double).map(slackThresholdRange.contains) == true },
+        AppGroup.skyBodiesKey: { $0 is Bool },
     ]
+    /// Keys no widget reads. A change to one of these is not worth a widget
+    /// timeline reload, which iOS budgets.
+    private static let quietKeys: Set<String> = [AppGroup.skyBodiesKey]
     private let defaults: UserDefaults
     private let cloud: NSUbiquitousKeyValueStore?
     private let reload: () -> Void
@@ -66,7 +71,7 @@ import Foundation
         }
         guard !same(defaults.object(forKey: key), value) else { return }
         defaults.set(value, forKey: key)
-        if reloading { reload() }
+        if reloading && !Self.quietKeys.contains(key) { reload() }
     }
 
     /// Strings and numbers both bridge to `NSObject`, whose `isEqual` compares values.
@@ -82,7 +87,7 @@ import Foundation
             if let value = remote, allowed(value) {
                 if !same(defaults.object(forKey: key), value) {
                     defaults.set(value, forKey: key)
-                    changed = true
+                    if !Self.quietKeys.contains(key) { changed = true }
                 }
             } else if seedMissing, remote == nil,
                       let value = defaults.object(forKey: key), allowed(value) {

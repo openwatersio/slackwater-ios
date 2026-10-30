@@ -2282,6 +2282,101 @@
         }
       }
     },
+    "Draw them in the sky above the chart as they stand at the selected time. Off keeps the sky's day and night colors." : {
+      "comment" : "Settings footnote under the sun, moon and stars switch.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tegner dem på himlen over grafen, som de står på det valgte tidspunkt. Fra beholder himlens dag- og natfarver."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeichnet sie am Himmel über dem Diagramm, so wie sie zur gewählten Zeit stehen. Aus behält die Tag- und Nachtfarben des Himmels."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los dibuja en el cielo sobre la gráfica tal como están a la hora seleccionada. Desactivado conserva los colores de día y de noche del cielo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piirtää ne kaavion yläpuoliselle taivaalle sellaisina kuin ne ovat valittuna hetkenä. Pois päältä säilyttää taivaan päivä- ja yövärit."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les dessine dans le ciel au-dessus du graphique, tels qu'ils se trouvent à l'heure choisie. Désactivé conserve les couleurs de jour et de nuit du ciel."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarraingíonn sé iad sa spéir os cionn an ghraif mar a bhíonn siad ag an am roghnaithe. Coinníonn As dathanna lae agus oíche na spéire."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarraingidh e iad san speur os cionn a' ghraif mar a tha iad aig an àm a thagh thu. Cumaidh Dheth dathan latha is oidhche an speura."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Li disegna nel cielo sopra il grafico come si trovano all'ora selezionata. Disattivato mantiene i colori del giorno e della notte del cielo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した時刻の位置に合わせて、グラフの上の空に描きます。オフにしても空の昼夜の色は残ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 시각의 위치대로 그래프 위 하늘에 그립니다. 끄면 하늘의 낮과 밤 색은 그대로 유지됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tegner dem på himmelen over grafen slik de står på valgt tidspunkt. Av beholder himmelens dag- og nattfarger."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekent ze aan de lucht boven de grafiek zoals ze op het gekozen moment staan. Uit behoudt de dag- en nachtkleuren van de lucht."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desenha-os no céu acima do gráfico como estão no horário selecionado. Desligado mantém as cores de dia e de noite do céu."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desenha-os no céu por cima do gráfico tal como estão à hora selecionada. Desligado mantém as cores de dia e de noite do céu."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ritar dem på himlen ovanför grafen som de står vid vald tidpunkt. Av behåller himlens dag- och nattfärger."
+          }
+        }
+      }
+    },
     "Each bar is one day's biggest swing." : {
       "comment" : "Explains the unit of the swing figure's bars.",
       "localizations" : {
@@ -6534,6 +6629,101 @@
         }
       }
     },
+    "Sky" : {
+      "comment" : "Settings section heading: the sky drawn above a chart.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cielo"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taivas"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciel"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spéir"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cielo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하늘"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lucht"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Céu"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Céu"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        }
+      }
+    },
     "Slack runs %lld minutes around it, against about %lld here usually." : {
       "comment" : "Current sheet fact. Both integers are counts of minutes; vary by plural.",
       "localizations" : {
@@ -7793,6 +7983,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sol"
+          }
+        }
+      }
+    },
+    "Sun, moon and stars" : {
+      "comment" : "Settings switch: draw the sun, moon and stars in the sky above the chart.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne og stjerner"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonne, Mond und Sterne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, luna y estrellas"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko, kuu ja tähdet"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soleil, lune et étoiles"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grian, gealach agus réaltaí"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grian, gealach agus reultan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sole, luna e stelle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽・月・星"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "해, 달, 별"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne og stjerner"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zon, maan en sterren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, lua e estrelas"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, lua e estrelas"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne och stjärnor"
           }
         }
       }

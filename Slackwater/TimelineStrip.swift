@@ -1166,7 +1166,7 @@ struct TimelineCanvas: View {
             fadedBand(from: data.x(night.start), to: data.x(night.end), color: SN.night, opacity: 0.7)
         }
         for day in spans where day.daylight {
-            fadedBand(from: data.x(day.start), to: data.x(day.end), color: Color(hex: 0xA8CAE0), opacity: 0.08)
+            fadedBand(from: data.x(day.start), to: data.x(day.end), color: Color(hex: 0xA8CAE0), opacity: 0.22)
         }
     }
 

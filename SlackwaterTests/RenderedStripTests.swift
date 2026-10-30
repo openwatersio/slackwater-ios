@@ -221,10 +221,11 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
-    /// The daylight tint is faint: `#A8CAE0` at 8% over the bare sea, where the curve's water
-    /// carries no fill above datum, so a lit afternoon reads close to the sea itself.
+    /// The daylight tint is `#A8CAE0` at 22% over the bare sea, where the curve's water carries
+    /// no fill above datum: strong enough that a lit afternoon tells from the night beside it
+    /// without the sky's bodies, faint enough that the sea still reads as sea.
     @MainActor
-    func testTheDaylightTintIsEightPercent() throws {
+    func testTheDaylightTintIsTwentyTwoPercent() throws {
         let (tz, days) = try lateSunsetDays()
         let start = days[0].start, end = try XCTUnwrap(days.last?.start)
         let lit = flatTide(start: start, end: end, tz: tz, days: days)
@@ -242,8 +243,8 @@ final class RenderedStripTests: XCTestCase {
             let over = rgb(shaded, x: lit.x(afternoon), y: y), under = rgb(plain, x: lit.x(afternoon), y: y)
             for c in 0..<3 {
                 let alpha = Double(over[c] - under[c]) / Double(tint[c] - under[c])
-                XCTAssert((0.055...0.105).contains(alpha),
-                          "\(d.start)'s afternoon tint is \(alpha) in channel \(c), not 0.08")
+                XCTAssert((0.195...0.245).contains(alpha),
+                          "\(d.start)'s afternoon tint is \(alpha) in channel \(c), not 0.22")
             }
         }
     }
