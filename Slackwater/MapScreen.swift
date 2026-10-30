@@ -254,23 +254,13 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
     }
 
     private func currentBadgeImage(inflate: CGFloat = 0) -> UIImage {
-        let radius: CGFloat = 19, reach: CGFloat = 25, center = CGPoint(x: 27, y: 27)
-        // The front meets the circle tangentially; the rear notch reinforces flow direction.
-        let tangentY = radius * radius / reach
-        let tangentX = (radius * radius - tangentY * tangentY).squareRoot()
-        let rearAngle = CGFloat.pi / 9
         let path = UIBezierPath()
-        path.move(to: CGPoint(x: center.x, y: center.y - reach))
-        path.addLine(to: CGPoint(x: center.x + tangentX, y: center.y - tangentY))
-        path.addArc(withCenter: center, radius: radius,
-                    startAngle: atan2(-tangentY, tangentX), endAngle: .pi / 2 - rearAngle,
-                    clockwise: true)
-        path.addLine(to: CGPoint(x: center.x, y: center.y + 15))
-        path.addLine(to: CGPoint(x: center.x - radius * sin(rearAngle),
-                                y: center.y + radius * cos(rearAngle)))
-        path.addArc(withCenter: center, radius: radius,
-                    startAngle: .pi / 2 + rearAngle, endAngle: atan2(-tangentY, -tangentX),
-                    clockwise: true)
+        path.move(to: CGPoint(x: 15, y: 51))
+        path.addLine(to: CGPoint(x: 15, y: 13))
+        path.addLine(to: CGPoint(x: 27, y: 1))
+        path.addLine(to: CGPoint(x: 39, y: 13))
+        path.addLine(to: CGPoint(x: 39, y: 51))
+        path.addLine(to: CGPoint(x: 27, y: 44))
         path.close()
         return pinGlyphImage(path, bounds: CGSize(width: 54, height: 54), inflate: inflate)
     }

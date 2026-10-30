@@ -355,8 +355,11 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
                                 ["case", ["has", "reading"], 0, 1]])
     }
 
+    // Longer speeds must fit the narrow body even when it points north.
+    let wideReading: [Any] = [">", ["length", ["coalesce", ["get", "reading"], ""]], 3]
     let badgeScale = e(["interpolate", ["linear"], ["zoom"],
-                        READING_MIN_ZOOM, 0.8, PIN_GROWTH_TO, 1.0])
+                        READING_MIN_ZOOM, ["case", wideReading, 1.0, 0.8],
+                        PIN_GROWTH_TO, ["case", wideReading, 1.25, 1.0]])
     let badgePredicate = NSPredicate(mglJSONObject:
         ["all", ["has", "bearing"], ["has", "reading"]])
     func badgeGlyph(_ id: String, image: String, rotation: NSExpression,
@@ -411,11 +414,13 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // and every name self-collides and vanishes.
     let labels = caption("station-labels", text: e(["get", "name"]))
     labels.minimumZoomLevel = Float(NAME_MIN_ZOOM)
+    let currentLabelOffset: [Any] = ["case", wideReading,
+                                    ["literal", [0, 4.6]], ["literal", [0, 3.8]]]
     labels.textOffset = e(["interpolate", ["linear"], ["zoom"],
                            READING_MIN_ZOOM, ["case", ["has", "bearing"],
-                                             ["literal", [0, 3.8]], ["literal", [0, 1]]],
+                                             currentLabelOffset, ["literal", [0, 1]]],
                            PIN_GROWTH_TO, ["case", ["has", "bearing"],
-                                          ["literal", [0, 3.8]], ["literal", [0, 2.4]]]])
+                                          currentLabelOffset, ["literal", [0, 2.4]]]])
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textPadding = NSExpression(forConstantValue: 4)
 
