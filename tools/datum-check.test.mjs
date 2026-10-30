@@ -12,8 +12,10 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allStations } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { datumDeviation, passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
+
+const db = await loadStations();
 
 const checkable = (s) =>
   s.license?.commercial_use === true && s.type === "reference"
@@ -26,7 +28,7 @@ const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 // median / 0.018 m max over 25 stations on 2026-08-16. A regression here means
 // the reduction broke — most likely someone dropped the `- cd` on one side.
 test("the check reads near-zero on known-good NOAA stations", () => {
-  const noaa = allStations.filter((s) => s.id.startsWith("noaa/") && checkable(s)).slice(0, 25);
+  const noaa = db.all.filter((s) => s.id.startsWith("noaa/") && checkable(s)).slice(0, 25);
   assert.ok(noaa.length >= 20, `only ${noaa.length} checkable NOAA rows`);
   const devs = noaa.map((s) => datumDeviation(s));
   const nullRows = noaa.filter((s) => datumDeviation(s) === null);
@@ -47,7 +49,7 @@ test("a station with no published MHW/MLW is uncheckable, not failing", () => {
 // The current database corrects Southampton below the unchanged 0.3 m bar.
 // Keep the named UK calibration ports, alongside the NOAA controls above.
 test("corrected Southampton and Aberdeen pass the datum gate", () => {
-  const pick = (name) => allStations.find(
+  const pick = (name) => db.all.find(
     (s) => s.name === name && s.country === "United Kingdom" && checkable(s));
   const soton = pick("Southampton");
   const aberdeen = pick("Aberdeen");
