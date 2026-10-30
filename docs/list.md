@@ -322,7 +322,7 @@ The right button swaps the list and the map in place. At regular width, opening 
 
 The map's preview panel uses the station card (§6) without a distance; tapping it opens the detail.
 
-At reading zooms, measured currents show an upright speed inside a rectangular arrow with straight sides, a forward point within the body's height, and an inward chevron at the rear. Both ends indicate the direction the water flows toward. Longer readings use a proportionally larger marker so the upright digits fit at every bearing. The marker keeps its speed colour, including green at slack. Speeds use the selected unit without repeating its abbreviation at every pin; the discovery and Nearby maps show that unit once in a shared label. Zoomed-out currents use small arrows, which remain visible until detailed readings load. Tide heights retain their units beside the gauges. Tapping the current marker opens the station preview on the discovery map.
+At reading zooms, measured currents show an upright speed inside a borderless rectangular arrow with straight sides, a forward point within the body's height, and an inward chevron at the rear. Both ends indicate the direction the water flows toward. Longer readings use a proportionally larger marker so the upright digits fit at every bearing. The marker keeps its speed colour, including green at slack. Speeds use the selected unit without repeating its abbreviation at every pin; the discovery and Nearby maps show that unit once in a shared label. Zoomed-out currents use small arrows, which remain visible until detailed readings load. Tide heights retain their units beside the gauges. Tapping the current marker opens the station preview on the discovery map.
 
 ## 11. First run
 

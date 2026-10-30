@@ -370,13 +370,9 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
         layer.minimumZoomLevel = Float(READING_MIN_ZOOM)
         return layer
     }
-    let badgePlate = badgeGlyph("station-pins-current-badge-plate", image: "pin-current-badge-plate",
-                                rotation: setRotation, colour: ink)
     let badge = badgeGlyph("station-pins-current-badge", image: "pin-current-badge",
                            rotation: setRotation, colour: e(PIN_STATE_COLOUR))
-    for layer in [badgePlate, badge] {
-        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
-    }
+    badge.iconRotationAlignment = NSExpression(forConstantValue: "map")
     badge.text = e(["get", "reading"])
     badge.textFontNames = font
     badge.textFontSize = e(["interpolate", ["linear"], ["zoom"],
@@ -465,6 +461,6 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // so even a stray overlap keeps the symbol on top.
     return [selected, labels, flowReadings, tideReadings,
             dotPlate, dots, currentPinPlate, currentPins,
-            badgePlate, badge,
+            badge,
             tidePinPlate, tidePins]
 }

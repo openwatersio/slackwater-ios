@@ -349,7 +349,7 @@ A disclosure, "Station details", collapsed by default and at least 44 units tall
 
 A "Nearby" heading with the series filter shared with the list (list §5.2), then the six nearest stations in that series, each showing "<region> · <kind>" and the distance with a 16-point compass direction from this station. Kinds read "Tide · NOAA", "Current · NOAA", "Tide · CHS", or "Current · CHS". A 220-unit map frames those stations with this station marked; tapping the map away from a pin opens the full map.
 
-The map uses the discovery map's current markers (list §10), with upright speeds inside rectangular arrows whose front points and rear chevrons indicate the flow direction. A shared label shows the selected current-speed unit, and changing that unit refreshes both the label and the map's readings.
+The map uses the discovery map's current markers (list §10), with upright speeds inside borderless rectangular arrows whose front points and rear chevrons indicate the flow direction. A shared label shows the selected current-speed unit, and changing that unit refreshes both the label and the map's readings.
 
 ## 12. Pages and cards instead of a scrubber
 

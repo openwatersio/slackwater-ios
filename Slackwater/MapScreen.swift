@@ -253,7 +253,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
                                  lineWidth: 2.3, inflate: inflate)
     }
 
-    private func currentBadgeImage(inflate: CGFloat = 0) -> UIImage {
+    private func currentBadgeImage() -> UIImage {
         let path = UIBezierPath()
         path.move(to: CGPoint(x: 15, y: 51))
         path.addLine(to: CGPoint(x: 15, y: 13))
@@ -262,7 +262,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
         path.addLine(to: CGPoint(x: 39, y: 51))
         path.addLine(to: CGPoint(x: 27, y: 44))
         path.close()
-        return pinGlyphImage(path, bounds: CGSize(width: 54, height: 54), inflate: inflate)
+        return pinGlyphImage(path, bounds: CGSize(width: 54, height: 54))
     }
 
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -296,7 +296,6 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
         style.setImage(arrowPinImage(), forName: "pin-arrow")
         style.setImage(arrowPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-arrow-plate")
         style.setImage(currentBadgeImage(), forName: "pin-current-badge")
-        style.setImage(currentBadgeImage(inflate: CGFloat(PIN_HALO)), forName: "pin-current-badge-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below
