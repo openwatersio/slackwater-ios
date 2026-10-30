@@ -489,13 +489,16 @@ struct StationListView: View {
             // "not for navigation" on every detail footer AND the map, and
             // that claim has to remain true on this surface. Glass, like the
             // FABs it sits between — one material for the whole toolbar row.
-            Text("Not for navigation.")
+            VStack(spacing: 3) {
+                MapCurrentUnits(speedUnit: speedUnit)
+                Text("Not for navigation.")
+                    .accessibilityIdentifier("map-disclaimer")
+            }
                 .font(.caption2)
                 .foregroundStyle(SN.foam)
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .glassEffect(.regular, in: Capsule())
                 .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
-                .accessibilityIdentifier("map-disclaimer")
                 .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
 
             // The pin-tap preview: our own bottom panel, NOT a `.sheet` —

@@ -320,7 +320,9 @@ There are no tabs. Two floating 56-unit glass buttons sit at the bottom of the l
 
 The right button swaps the list and the map in place. At regular width, opening the map clears the detail pane, and returning to the list shows the placeholder. Tapping a detail header's title returns to the map focused on that station.
 
-The map's preview panel uses the station card (§6) without a distance; tapping it opens the detail. The map's pins, camera, and gestures are outside this document.
+The map's preview panel uses the station card (§6) without a distance; tapping it opens the detail.
+
+At reading zooms, measured currents show an upright speed inside a circular marker with a forward point and an inward chevron at the rear. Both ends indicate the direction the water flows toward. The marker keeps its speed colour, including green at slack. Speeds use the selected unit without repeating its abbreviation at every pin; the discovery and Nearby maps show that unit once in a shared label. Zoomed-out currents use small arrows, which remain visible until detailed readings load. Tide heights retain their units beside the gauges. Tapping the current marker opens the station preview on the discovery map.
 
 ## 11. First run
 

@@ -7,6 +7,24 @@ import UIKit
 import XCTest
 
 final class MapSearchAndNavigationTests: ScreenshotTestCase {
+    func testCurrentDirectionBadgeOpensItsStation() throws {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-openMap", "-locDenied", "-resetRecents",
+                                             "-mapCenter", "48.4062,-122.6431", "-mapZoom", "10.8"])
+        app.launch()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.appears(within: 15))
+        let units = app.descendants(matching: .any)["map-current-units"].firstMatch
+        XCTAssert(units.appears(within: 5))
+        XCTAssertTrue(units.label.contains("kn"))
+        sleep(5)
+        save(app, "current-direction-badge-map.png")
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let preview = app.descendants(matching: .any)["map-preview-card"].firstMatch
+        XCTAssert(preview.appears(within: 10))
+        XCTAssertEqual(preview.label, "Deception Pass (Narrows)")
+    }
+
     // Current stations sit in the list beside the tide ports; walk into
     // Deception Pass and scrub the signed velocity curve.
     func testM2Currents() throws {

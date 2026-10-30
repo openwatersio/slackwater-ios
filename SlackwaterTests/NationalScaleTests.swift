@@ -397,6 +397,45 @@ import XCTest
                       "station labels must use the basemap style's own fontstack")
     }
 
+    func testCurrentBadgeKeepsItsNumberUprightAndTogether() throws {
+        let layers = stationPinLayers(source: stationShapeSource())
+        let badge = try XCTUnwrap(layers.first { $0.identifier == "station-pins-current-badge" }
+                                 as? MLNSymbolStyleLayer)
+        XCTAssertEqual(badge.minimumZoomLevel, Float(READING_MIN_ZOOM))
+        XCTAssertEqual(badge.iconRotationAlignment.constantValue as? String, "map")
+        XCTAssertEqual(badge.textRotationAlignment.constantValue as? String, "viewport")
+        XCTAssertEqual(badge.textAllowsOverlap.constantValue as? Bool, true)
+        XCTAssertEqual(badge.textIgnoresPlacement.constantValue as? Bool, false)
+        XCTAssertEqual(badge.textHaloWidth.constantValue as? Double, 0)
+        XCTAssertNotNil(badge.text)
+    }
+
+    func testCurrentArrowRemainsAvailableWhileDetailedReadingsLoad() throws {
+        let layers = stationPinLayers(source: stationShapeSource())
+        let arrow = try XCTUnwrap(layers.first { $0.identifier == "station-pins-current" }
+                                 as? MLNSymbolStyleLayer)
+        // MapLibre evaluates the selector; Foundation rejects its Boolean functions.
+        let opacity: [Any] = ["step", ["zoom"], 1, READING_MIN_ZOOM,
+                              ["case", ["==", ["has", "reading"], true], 0, 1]]
+        XCTAssertEqual(arrow.iconOpacity.mgl_jsonExpressionObject as? NSArray, opacity as NSArray)
+        XCTAssertGreaterThan(arrow.maximumZoomLevel, Float(stationZoom))
+    }
+
+    func testCurrentMapReadingIsOnlyTheSpeedInTheSelectedUnit() throws {
+        let record = try XCTUnwrap(CurrentStationRecord.all.first {
+            $0.name == "Deception Pass (Narrows)"
+        })
+        let now = Date(timeIntervalSince1970: 1_788_868_800)
+        let speed = try XCTUnwrap(record.engineStation.speeds(
+            from: now, to: now.addingTimeInterval(1), step: 1).first?.speed)
+        for unit in ["kn", "kmh", "ms"] {
+            let state = currentPinState(record, at: now, speedUnit: unit)
+            XCTAssertEqual(state.reading, formatSpeed(abs(speed), unit: unit))
+            XCTAssertEqual(state.bearing, record.setDegrees(signed: speed))
+        }
+        XCTAssertNil(currentPinState(record, at: now, speedUnit: "kn", detailed: false).reading)
+    }
+
     // MARK: - Canada on demand
 
     /// Low Data Mode keeps the first-run budget bounded while preserving the

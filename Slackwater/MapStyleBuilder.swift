@@ -107,7 +107,7 @@ private let LABEL_FONT = ["Noto Sans Regular"]
 private let LABEL_TEXT = "#ffffff"
 private let LABEL_HALO = CHART_INK   // one shadow tone: pins' rim and text's halo
 
-/// Where the first station text appears: the readings ("3.2 ft", "1.8 kn"),
+/// Where the first station text appears: the readings ("3.2 ft", "1.8"),
 /// alone in the 9.5-10.5 band. Below this the pins carry the story by
 /// themselves and the basemap's own geography labels get the ink back.
 /// Also the threshold the DATA reads: under it no gauge or reading is drawn,
@@ -277,7 +277,10 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // tone the state palette has not spent.
     let selected = MLNCircleStyleLayer(identifier: "station-selected", source: source)
     selected.predicate = NSPredicate(mglJSONObject: ["has", "selected"] as [Any])
-    selected.circleRadius = grown(PIN_RADIUS * PIN_SELECTED_DISC)
+    let hasCurrentReading: [Any] = ["all", ["has", "bearing"], ["has", "reading"]]
+    selected.circleRadius = e(["interpolate", ["exponential", 1.7], ["zoom"],
+        PIN_SHRINK_FROM, ["case", hasCurrentReading, 30, PIN_RADIUS * PIN_SELECTED_DISC * PIN_ZOOM_SHRINK],
+        PIN_GROWTH_TO, ["case", hasCurrentReading, 30, PIN_RADIUS * PIN_SELECTED_DISC * PIN_ZOOM_GROWTH]])
     selected.circleColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
     selected.circleOpacity = NSExpression(forConstantValue: PIN_SELECTED_DISC_OPACITY)
 
@@ -347,7 +350,41 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // collision-thinned copy of every layer.
     for layer in [currentPins, currentPinPlate] {
         layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
+        // Keep the arrow while a zoom gesture's source still lacks detailed readings.
+        layer.iconOpacity = e(["step", ["zoom"], 1, READING_MIN_ZOOM,
+                                ["case", ["has", "reading"], 0, 1]])
     }
+
+    let badgeScale = e(["interpolate", ["linear"], ["zoom"],
+                        READING_MIN_ZOOM, 0.8, PIN_GROWTH_TO, 1.0])
+    let badgePredicate = NSPredicate(mglJSONObject:
+        ["all", ["has", "bearing"], ["has", "reading"]])
+    func badgeGlyph(_ id: String, image: String, rotation: NSExpression,
+                    colour: NSExpression) -> MLNSymbolStyleLayer {
+        let layer = glyph(id, image: NSExpression(forConstantValue: image),
+                          rotation: rotation, colour: colour, predicate: badgePredicate,
+                          scale: badgeScale)
+        layer.minimumZoomLevel = Float(READING_MIN_ZOOM)
+        return layer
+    }
+    let badgePlate = badgeGlyph("station-pins-current-badge-plate", image: "pin-current-badge-plate",
+                                rotation: setRotation, colour: ink)
+    let badge = badgeGlyph("station-pins-current-badge", image: "pin-current-badge",
+                           rotation: setRotation, colour: e(PIN_STATE_COLOUR))
+    for layer in [badgePlate, badge] {
+        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
+    }
+    badge.text = e(["get", "reading"])
+    badge.textFontNames = font
+    badge.textFontSize = e(["interpolate", ["linear"], ["zoom"],
+                            READING_MIN_ZOOM, 11, PIN_GROWTH_TO, 13])
+    badge.textColor = ink
+    badge.textHaloWidth = NSExpression(forConstantValue: 0)
+    badge.textRotationAlignment = NSExpression(forConstantValue: "viewport")
+    // A badge cannot lose its number independently of its pointer.
+    badge.textAllowsOverlap = NSExpression(forConstantValue: true)
+    badge.textIgnoresPlacement = NSExpression(forConstantValue: false)
+    badge.textAnchor = NSExpression(forConstantValue: "center")
 
     // The glyphs keep growing toward the station zoom while an em offset
     // One caption dressing for both text tiers — basemap label paint,
@@ -375,12 +412,14 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let labels = caption("station-labels", text: e(["get", "name"]))
     labels.minimumZoomLevel = Float(NAME_MIN_ZOOM)
     labels.textOffset = e(["interpolate", ["linear"], ["zoom"],
-                           READING_MIN_ZOOM, ["literal", [0, 1]],
-                           PIN_GROWTH_TO, ["literal", [0, 2.4]]])
+                           READING_MIN_ZOOM, ["case", ["has", "bearing"],
+                                             ["literal", [0, 3.8]], ["literal", [0, 1]]],
+                           PIN_GROWTH_TO, ["case", ["has", "bearing"],
+                                          ["literal", [0, 3.8]], ["literal", [0, 2.4]]]])
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textPadding = NSExpression(forConstantValue: 4)
 
-    // The station's reading ("3.2 ft" / "1.8 kn") — tier two, and the ONLY
+    // The station's reading ("3.2 ft") — tier two, and the ONLY
     // text in the 9.5–10.5 band. Several candidate slots per station, tried
     // in order, so a reading blocked on one side takes another before
     // giving up; readings place before names, so a reading that needs a
@@ -408,12 +447,10 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let tideReadings = readingLayer("station-readings-tide", anchors: ["left", "right"],
                                     from: 0.7, to: 1.0)
     tideReadings.predicate = gauged
-    // An arrow is nearly square: all four slots cost about the same, so it
-    // keeps them all and takes the first that is free.
     let flowReadings = readingLayer("station-readings", anchors: ["bottom", "top", "left", "right"],
                                     from: 0.9, to: 1.5)
     flowReadings.predicate = NSPredicate(mglJSONObject:
-        ["all", ["has", "reading"], ["!", ["has", "gauge"]]])
+        ["all", ["has", "reading"], ["!", ["has", "gauge"]], ["!", ["has", "bearing"]]])
 
     // The placement hierarchy. MapLibre places symbols in REVERSE style
     // order — the LAST layer claims space first — so the priority runs from
@@ -423,5 +460,6 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // so even a stray overlap keeps the symbol on top.
     return [selected, labels, flowReadings, tideReadings,
             dotPlate, dots, currentPinPlate, currentPins,
+            badgePlate, badge,
             tidePinPlate, tidePins]
 }

@@ -29,6 +29,7 @@ struct NearbySection: View {
     }
 
     @AppStorage(seriesFilterKey) private var filter: StationSeries?
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     /// Ranked on a filter change, not in `body`: the scaffold re-renders on
     /// every scrub frame, and ranking sorts the whole catalog.
     @State private var stations: [StationItem] = []
@@ -58,8 +59,14 @@ struct NearbySection: View {
                                      selected: focus.map(MapSelection.init),
                                      onSelect: open)
                     // The representable reads its camera once, in makeUIView.
-                    .id(stations.map(\.id))
+                    .id("\(stations.map(\.id))-\(speedUnit)")
                     .frame(height: 220)
+                    .overlay(alignment: .bottomTrailing) {
+                        MapCurrentUnits(speedUnit: speedUnit)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .glassEffect(.regular, in: Capsule())
+                            .padding(8)
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .strokeBorder(SN.cardStroke, lineWidth: 0.5))

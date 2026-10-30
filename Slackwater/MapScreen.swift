@@ -253,6 +253,28 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
                                  lineWidth: 2.3, inflate: inflate)
     }
 
+    private func currentBadgeImage(inflate: CGFloat = 0) -> UIImage {
+        let radius: CGFloat = 19, reach: CGFloat = 25, center = CGPoint(x: 27, y: 27)
+        // The front meets the circle tangentially; the rear notch reinforces flow direction.
+        let tangentY = radius * radius / reach
+        let tangentX = (radius * radius - tangentY * tangentY).squareRoot()
+        let rearAngle = CGFloat.pi / 9
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: center.x, y: center.y - reach))
+        path.addLine(to: CGPoint(x: center.x + tangentX, y: center.y - tangentY))
+        path.addArc(withCenter: center, radius: radius,
+                    startAngle: atan2(-tangentY, tangentX), endAngle: .pi / 2 - rearAngle,
+                    clockwise: true)
+        path.addLine(to: CGPoint(x: center.x, y: center.y + 15))
+        path.addLine(to: CGPoint(x: center.x - radius * sin(rearAngle),
+                                y: center.y + radius * cos(rearAngle)))
+        path.addArc(withCenter: center, radius: radius,
+                    startAngle: .pi / 2 + rearAngle, endAngle: atan2(-tangentY, -tangentX),
+                    clockwise: true)
+        path.close()
+        return pinGlyphImage(path, bounds: CGSize(width: 54, height: 54), inflate: inflate)
+    }
+
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
         if let framing {
             mapView.setVisibleCoordinateBounds(centeredBounds(around: center, fitting: framing),
@@ -283,6 +305,8 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
         }
         style.setImage(arrowPinImage(), forName: "pin-arrow")
         style.setImage(arrowPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-arrow-plate")
+        style.setImage(currentBadgeImage(), forName: "pin-current-badge")
+        style.setImage(currentBadgeImage(inflate: CGFloat(PIN_HALO)), forName: "pin-current-badge-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below
@@ -449,6 +473,21 @@ struct MapSelection: Equatable {
     }
 }
 
+struct MapCurrentUnits: View {
+    let speedUnit: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("Currents")
+            Text(verbatim: "· \(speedUnitLabel(speedUnit))")
+        }
+        .font(.caption2)
+        .foregroundStyle(SN.foam)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("map-current-units")
+    }
+}
+
 struct MapViewRepresentable: UIViewRepresentable {
     /// Where the discovery map opens. A real fix when there is one — a user in
     /// Boston must not open the map on the Salish Sea (M53) — and the Salish
@@ -590,7 +629,8 @@ struct MapViewRepresentable: UIViewRepresentable {
                     return hypot(pa.x - point.x, pa.y - point.y) < hypot(pb.x - point.x, pb.y - point.y)
                 }
             }
-            if let id = nearest(["station-pins-current", "station-pins-tide",
+            if let id = nearest(["station-pins-current", "station-pins-current-badge",
+                                 "station-pins-tide",
                                  "station-pins-dot"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)

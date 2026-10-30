@@ -72,7 +72,7 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
 /// speed-bearing current, the bearing its flow arrow rotates to.
 struct PinState: Equatable {
     var state: String
-    /// "3.2 ft" / "1.8 kn" — formatted at build time with the app's units,
+    /// "3.2 ft" / "1.8" — formatted at build time with the app's units,
     /// so a unit change has to rebuild the source (`MapStyler.refreshPins`
     /// watches for it) rather than restyle it.
     var reading: String?
@@ -180,7 +180,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),
-        reading: detailed ? "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))" : nil,
+        reading: detailed ? formatSpeed(abs(signed), unit: speedUnit) : nil,
         bearing: station.setDegrees(signed: signed))
 }
 
