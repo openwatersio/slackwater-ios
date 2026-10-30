@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var skyBodies = true
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var alerts = AlertRuleStore.shared
     @ObservedObject private var calendars = StationCalendarStore.shared
@@ -91,6 +92,20 @@ struct SettingsView: View {
                             SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
                             Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn). Off shows only slack.")
                         }
+                    }
+
+                    section(String(localized: "Sky", comment: "Settings section heading: the sky drawn above a chart.")) {
+                        Toggle(isOn: Binding(
+                            get: { skyBodies },
+                            set: { UnitsCloud.shared.set($0, forKey: AppGroup.skyBodiesKey) })
+                        ) {
+                            Text("Sun, moon and stars", comment: "Settings switch: draw the sun, moon and stars in the sky above the chart.")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(SN.foam.opacity(0.85))
+                        }
+                        .tint(SN.leaf)
+                        .accessibilityIdentifier("settings-sky-bodies")
+                        Text("Draw them in the sky above the chart as they stand at the selected time. Off keeps the sky's day and night colors.", comment: "Settings footnote under the sun, moon and stars switch.")
                     }
 
                     section(String(localized: "Alerts", comment: "Settings section heading."), premium: true) {

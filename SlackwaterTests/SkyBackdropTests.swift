@@ -1,10 +1,53 @@
 // Slackwater — GPL v3.
 import CoreGraphics
 import Almanac
+import SwiftUI
 import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    /// Settings' sun, moon and stars switch empties the sky of its bodies and
+    /// nothing else: the sun disc is gone, the day gradient behind it is not.
+    @MainActor
+    func testTheSkyBodiesSwitchHidesTheSunAndKeepsTheGradient() throws {
+        // Friday Harbor at 13:00 PDT on the shot day: the sun is high in the south.
+        let noon = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-26T20:00:00Z"))
+        let sky = SkyState(time: noon, latitude: 48.545, longitude: -123.013)
+        XCTAssertGreaterThan(try XCTUnwrap(sky.sun?.altDeg), 20)
+        // The switch is the developer's own on this simulator's App Group; put it back.
+        let saved = AppGroup.defaults.object(forKey: AppGroup.skyBodiesKey)
+        defer {
+            if let saved { AppGroup.defaults.set(saved, forKey: AppGroup.skyBodiesKey) }
+            else { AppGroup.defaults.removeObject(forKey: AppGroup.skyBodiesKey) }
+        }
+        func render() throws -> [UInt8] {
+            let renderer = ImageRenderer(content: SkyBackdrop(sky: sky).frame(width: 300, height: 400))
+            renderer.scale = 1
+            let image = try XCTUnwrap(renderer.uiImage?.cgImage)
+            var px = [UInt8](repeating: 0, count: image.width * image.height * 4)
+            let ctx = try XCTUnwrap(CGContext(data: &px, width: image.width, height: image.height,
+                                              bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return px
+        }
+        // The sun's disc is `#F0C860`: the only warm, bright paint in a daytime sky.
+        func sunPixels(_ px: [UInt8]) -> Int {
+            stride(from: 0, to: px.count, by: 4).filter { px[$0] > 200 && px[$0 + 1] > 160 && px[$0 + 2] < 140 }.count
+        }
+        AppGroup.defaults.removeObject(forKey: AppGroup.skyBodiesKey)
+        let on = try render()
+        AppGroup.defaults.set(false, forKey: AppGroup.skyBodiesKey)
+        let off = try render()
+        XCTAssertGreaterThan(sunPixels(on), 50, "the switch unset draws the sun")
+        XCTAssertEqual(sunPixels(off), 0, "the switch off draws no sun")
+        // The gradient is the same picture either way: the top-left corner, far from the
+        // sun, matches, and it is painted, not clear.
+        XCTAssertEqual(Array(on[0..<4]), Array(off[0..<4]))
+        XCTAssertGreaterThan(off[3], 0, "the day gradient stays when the bodies go")
+    }
+
     func testBodiesMoveContinuouslyAcrossRiseAndSet() throws {
         let observer = try Observer(latitudeDeg: 48.4237, longitudeDeg: -123.3027)
         let f = ISO8601DateFormatter()

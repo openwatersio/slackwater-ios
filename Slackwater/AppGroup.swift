@@ -85,6 +85,9 @@ enum AppGroup {
     static let cancelledDownloadsKey = "slackwater.cancelledDownloads"
     static let requestedDownloadsKey = "slackwater.requestedDownloads"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
+    /// Whether the sky above a chart draws its sun, moon and stars (Settings).
+    /// Unset is on: the bodies are the default, the quieter sky the choice.
+    static let skyBodiesKey = "slackwater.skyBodies"
     /// Alert rules (docs/alerts.md §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.
     static let alertRulesKey = "slackwater.alertRules"
@@ -112,4 +115,9 @@ enum AppGroup {
         }
         d.set(true, forKey: migratedKey)
     }
+}
+
+/// The Settings switch for the sky's sun, moon and stars. Unset is on.
+func showsSkyBodies(defaults: UserDefaults = AppGroup.defaults) -> Bool {
+    defaults.object(forKey: AppGroup.skyBodiesKey) as? Bool ?? true
 }
