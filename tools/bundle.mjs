@@ -139,8 +139,8 @@ export function tombstones({ shipping, previous = [], existing = [] }) {
  * id, so an id that stops shipping strands everything saved under it.
  *
  * - `successors` — departed id → `{ id, datumShiftM? }`: the bundled id the
- *   database publishes as the same station (`successorOf`, the other bundled
- *   id on its route), and the metres to add to a height measured from the old
+ *   database publishes as the same station (`successorOf`: the other bundled
+ *   id on its route, or the one `quality.redundant` names), and the metres to add to a height measured from the old
  *   record's chart datum to measure it from the new one's. The shift is absent
  *   when it cannot be established, and the app then asks the user to set a
  *   tide-height alert again rather than keep a threshold on the wrong datum.
@@ -212,6 +212,49 @@ export function gateTombstones({ previous, shipping, existing = [] }) {
   return [...byId.values()].sort(byNameThenId);
 }
 
+/**
+ * The ids `quality.redundant` leads to from `id`, nearest first. The database
+ * sets it on a duplicate, and on a relay its operator's record supersedes, to
+ * name the record published for that gauge, so the walk ends at the first
+ * accepted record, and at a loop. Every pointer at 1.0.0-beta.20261028 lands on
+ * an accepted record in one hop.
+ */
+export function redundantChain(id, stationsById) {
+  const chain = [];
+  const seen = new Set([id]);
+  let next = stationsById.get(id)?.quality?.redundant;
+  while (next && !seen.has(next)) {
+    seen.add(next);
+    chain.push(next);
+    const record = stationsById.get(next);
+    next = record?.quality?.accepted === false ? record.quality.redundant : undefined;
+  }
+  return chain;
+}
+
+/** The rejections that say "another record is this gauge", not "this record is wrong". */
+const LICENCE_FALLBACK_REASONS = new Set(["duplicate", "superseded"]);
+
+/**
+ * LICENCE FALLBACK. A record the database rejected only in favour of a record
+ * the app may not ship: the Danish CMEMS relays are cc-by-nc-4.0 and win their
+ * gauge over DMI's own records, so without this the app would have no station
+ * in harbours the database covers. It keeps the rejected record only while
+ * `quality.redundant` ends at an accepted record without commercial rights, and
+ * only if the record itself has them. A record rejected for its own data (range,
+ * timing, datum) never qualifies, whatever it points at, and neither does a
+ * rejection without a pointer, which is how the database supersedes all of
+ * TICON's `rws_hist` source.
+ */
+export function keptForLicence(s, stationsById) {
+  if (s.license?.commercial_use !== true) return false;
+  if (!LICENCE_FALLBACK_REASONS.has(s.quality?.reason)) return false;
+  const published = stationsById.get(redundantChain(s.id, stationsById).at(-1));
+  return published !== undefined &&
+    published.quality?.accepted !== false &&
+    published.license?.commercial_use !== true;
+}
+
 /** Write the bundle as compact JSON; returns its size for the census line. */
 export function writeBundle(path, data) {
   const json = JSON.stringify(data);
@@ -280,6 +323,7 @@ export const NORTH_AMERICA = new Set(["United States", "Canada", "Puerto Rico",
  * Upstream reads a station's OPERATING AGENCY as its country, so the 17 gauges
  * NOAA runs outside US waters arrive as "United States" — Dakar, Lagos, Suva,
  * Easter Island. Every one carries a `-usa-noaa` id suffix, which is the tell.
+ * Argentina's Esperanza base in Antarctica arrives as "Argentina" the same way.
  *
  * Corrected, not deny-listed, because the correction is what is actually true
  * and it is the form the world bundle needs: these are keepers, they just have
@@ -296,7 +340,7 @@ const COUNTRY_FIX = new Map([
   ["ticon/diego_garcia-2431000-usa-noaa", "British Indian Ocean Territory"],
   ["ticon/diego_ramirez_island-9952000-usa-noaa", "Chile"],
   ["ticon/easter_island-9962420-usa-noaa", "Chile"],
-  ["ticon/esperanza-1495000-usa-noaa", "Antarctica"],
+  ["ticon/esperanza-601-arg-uhslc_fd", "Antarctica"],
   ["ticon/fare_ute_point-1732417-usa-noaa", "French Polynesia"],
   ["ticon/kwajalein-1820000-usa-noaa", "Marshall Islands"],
   ["ticon/lagos-7641400-usa-noaa", "Nigeria"],
