@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
     # This workflow runs on pull_request_target and must NEVER check out or
     # execute pull-request code. The four scopes are the minimum the assistant
-    # needs: contents to record signatures in .cla.json on main, pull-requests
-    # and statuses to report on the PR, actions to re-run the check after a
-    # signature lands.
+    # needs: contents to record signatures in .cla.json on the cla-signatures
+    # branch, pull-requests and statuses to report on the PR, actions to re-run
+    # the check after a signature lands.
     permissions:
       actions: write
       contents: write
@@ -34,8 +34,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-document: "https://github.com/${{ github.repository }}/blob/main/CLA.md"
+          # The protect-main ruleset rejects direct commits, so signatures live on
+          # their own unprotected branch.
           path-to-signatures: ".cla.json"
-          branch: "main"
+          branch: "cla-signatures"
           allowlist: "*[bot]"
           custom-notsigned-prcomment: |
             Thank you for this pull request! Before we can accept your contribution, you need to sign our [Contributor License Agreement](https://github.com/${{ github.repository }}/blob/main/CLA.md). [Read more about why this is necessary.](https://github.com/${{ github.repository }}/blob/main/docs/licensing.md)
