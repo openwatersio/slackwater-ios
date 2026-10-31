@@ -74,7 +74,7 @@ So, structurally:
   stations that never entered the bundle and never can, because upstream
   states their predictions are non-commercial (issue #401). Written by
   `gen-tides.mjs` as the complement of the commercial-use filter below, and
-  limited to the 109 that are more than 50 km from anything we do ship: where
+  limited to the 112 that are more than 50 km from anything we do ship: where
   the app has an answer, the fact that a licensed station also sits there is
   not the user's problem. The map draws them as empty rings, which open an
   explanation rather than a forecast.
@@ -126,7 +126,7 @@ terms are worse than "no" — silence is not permission.
   for bundling third-party harmonic constants** — see `tools/gen-tides.mjs`.
 
   The non-commercial half's CONSTANTS can never ship, and none do. Its
-  IDENTITY does, for 109 of those stations: name, region and position, with no
+  IDENTITY does, for 112 of those stations: name, region and position, with no
   harmonic data, so the map can explain an absence instead of leaving a hole
   (issue #401, `unavailable-stations.json`). Displaying a name to say "there
   is a station here we may not serve" is not a use of the predictions the
@@ -210,7 +210,7 @@ The practical list. Each of these has cost someone time.
 |---|---|
 | CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
 | Identity for stations that have LEFT the bundle (28) | `Slackwater/Resources/chs-tombstones.json` |
-| Identity for stations that may NEVER ship (109) | `Slackwater/Resources/unavailable-stations.json` |
+| Identity for stations that may NEVER ship (112) | `Slackwater/Resources/unavailable-stations.json` |
 | CHS current gates (23: 7 fitted, 16 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |

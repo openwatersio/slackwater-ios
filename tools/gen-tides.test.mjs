@@ -11,10 +11,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations } from "@slackwater/database";
+import { allStations, qualityFilter, stationsById } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
-  undangle, countryOf, sourceCredits,
+  undangle, countryOf, sourceCredits, keptForLicence, redundantChain,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -28,6 +28,103 @@ test("no station without commercial-use rights ships", () => {
   const rights = new Map(allStations.map((s) => [s.id, s.license?.commercial_use]));
   const bad = stations.filter((s) => rights.get(s.id) !== true);
   assert.deepEqual(bad.map((s) => s.id), []);
+});
+
+// The database's quality decisions decide: a rejected record ships only as the
+// licence fallback, so the app and the website show the same record of a gauge.
+test("every rejected station that ships stands in for one the licence forbids", () => {
+  const rejected = stations.map((s) => stationsById.get(s.id)).filter((s) => !qualityFilter(s));
+  assert.deepEqual(rejected.filter((s) => !keptForLicence(s, stationsById)).map((s) => s.id), []);
+  assert.ok(rejected.length >= 20, `only ${rejected.length} fallback records: the fallback stopped working`);
+});
+
+test("the app ships the record the database accepted at Nuuk and Ilulissat", () => {
+  const ids = new Set(stations.map((s) => s.id));
+  assert.ok(ids.has("ticon/nuuk_godthaab-820-dnk-uhslc_fd"));
+  assert.ok(ids.has("ticon/ilulissat-298a-dnk-uhslc_rq"));
+  assert.ok(!ids.has("dmi/2991320"), "DMI's rejected Nuuk still ships");
+  assert.ok(!ids.has("dmi/2991550"), "DMI's rejected Ilulissat still ships");
+});
+
+test("a harbour whose accepted record is non-commercial keeps the record it displaced", () => {
+  const juelsminde = stationsById.get("dmi/23132");
+  assert.equal(juelsminde.quality.redundant, "ticon/juelsminde-jue-dnk-cmems");
+  assert.ok(stations.some((s) => s.id === juelsminde.id));
+});
+
+// A rule that stopped reaching these records would lose harbours with nothing
+// failing, so the only reason one may stay out is a kept station on its water.
+test("a record the licence fallback qualifies ships, or yields within a kilometre", () => {
+  const ids = new Set(stations.map((s) => s.id));
+  const lost = allStations
+    .filter((s) => (s.kind ?? "tide") === "tide" && keptForLicence(s, stationsById) && !ids.has(s.id))
+    .filter((s) => !stations.some((k) => km(s, k) < 1.0));
+  assert.deepEqual(lost.map((s) => s.id), []);
+});
+
+const record = (id, quality, commercial = true) =>
+  ({ id, quality, license: { commercial_use: commercial } });
+const indexed = (...rows) => new Map(rows.map((s) => [s.id, s]));
+const rejectedFor = (reason, redundant) => ({ accepted: false, reason, redundant });
+
+test("the licence fallback keeps a commercial duplicate of a non-commercial accepted record", () => {
+  const dmi = record("dmi/1", rejectedFor("duplicate", "ticon/nc"));
+  const byId = indexed(dmi, record("ticon/nc", { accepted: true }, false));
+  assert.equal(keptForLicence(dmi, byId), true);
+});
+
+test("the licence fallback does not keep a duplicate of a record that can ship", () => {
+  const dmi = record("dmi/1", rejectedFor("duplicate", "ticon/open"));
+  const byId = indexed(dmi, record("ticon/open", { accepted: true }));
+  assert.equal(keptForLicence(dmi, byId), false);
+});
+
+test("the licence fallback does not keep a record without commercial rights itself", () => {
+  const relay = record("ticon/nc2", rejectedFor("duplicate", "ticon/nc"), false);
+  const byId = indexed(relay, record("ticon/nc", { accepted: true }, false));
+  assert.equal(keptForLicence(relay, byId), false);
+});
+
+test("the licence fallback never keeps a record rejected for its own data", () => {
+  const nc = record("ticon/nc", { accepted: true }, false);
+  for (const reason of ["range", "timing", "datum", "constituents", "seasonal"]) {
+    const bad = record("dmi/1", rejectedFor(reason, nc.id));
+    assert.equal(keptForLicence(bad, indexed(bad, nc)), false, reason);
+  }
+});
+
+test("the licence fallback needs a pointer, and a pointer to an accepted record", () => {
+  const nc = record("ticon/nc", { accepted: true }, false);
+  const superseded = record("ticon/hist", rejectedFor("superseded"));
+  assert.equal(keptForLicence(superseded, indexed(superseded, nc)), false);
+  const toRejected = record("dmi/1", rejectedFor("duplicate", "ticon/nc-rejected"));
+  const rejectedNc = record("ticon/nc-rejected", rejectedFor("range"), false);
+  assert.equal(keptForLicence(toRejected, indexed(toRejected, rejectedNc)), false);
+});
+
+test("the licence fallback follows a chain of pointers to its end", () => {
+  const first = record("dmi/1", rejectedFor("duplicate", "dmi/2"));
+  const second = record("dmi/2", rejectedFor("duplicate", "ticon/nc"));
+  const nc = record("ticon/nc", { accepted: true }, false);
+  const byId = indexed(first, second, nc);
+  assert.deepEqual(redundantChain(first.id, byId), ["dmi/2", "ticon/nc"]);
+  assert.equal(keptForLicence(first, byId), true);
+});
+
+test("a chain ends at the first accepted record, whatever that record points at", () => {
+  const dmi = record("dmi/1", rejectedFor("duplicate", "ticon/open"));
+  const open = record("ticon/open", { accepted: true, redundant: "ticon/nc" });
+  const nc = record("ticon/nc", { accepted: true }, false);
+  const byId = indexed(dmi, open, nc);
+  assert.deepEqual(redundantChain(dmi.id, byId), ["ticon/open"]);
+  assert.equal(keptForLicence(dmi, byId), false);
+});
+
+test("a loop of pointers ends rather than hangs", () => {
+  const a = record("a", rejectedFor("duplicate", "b"));
+  const b = record("b", rejectedFor("duplicate", "a"));
+  assert.deepEqual(redundantChain("a", indexed(a, b)), ["b"]);
+  assert.equal(keptForLicence(a, indexed(a, b)), false);
 });
 
 // A publisher new to the bundle fails here until AboutView credits it, as its
@@ -174,6 +271,11 @@ test("stations NOAA runs abroad do not ship as US", () => {
   assert.ok(abroad.length > 0, "none of the NOAA-abroad stations shipped");
   const asUS = abroad.filter((s) => /^[A-Z]{2}$/.test(s.region) || s.region === "United States");
   assert.deepEqual(asUS.map((s) => s.name), []);
+});
+
+test("Esperanza ships in Antarctica, not under the country of its operator", () => {
+  const esperanza = stations.find((s) => s.id === "ticon/esperanza-601-arg-uhslc_fd");
+  assert.equal(esperanza.region, "Antarctica");
 });
 
 // Task 1 (world coverage): a precondition guard for the datum-validation
@@ -338,6 +440,16 @@ test("every subordinate's reference ships in the bundle", () => {
   const ids = new Set(stations.map((s) => s.id));
   assert.ok(subordinates.length > 2000, `only ${subordinates.length} subordinates`);
   assert.deepEqual(subordinates.filter((s) => !ids.has(s.reference)).map((s) => s.id), []);
+});
+
+// Starting from accepted records removes references, which would cascade to
+// their subordinates. None does at this release: this fails if one starts to.
+test("no accepted subordinate lost its reference to a quality rejection", () => {
+  const ids = new Set(stations.map((s) => s.id));
+  const stranded = allStations.filter((s) =>
+    (s.kind ?? "tide") === "tide" && s.type === "subordinate" && qualityFilter(s) &&
+    !ids.has(s.offsets.reference));
+  assert.deepEqual(stranded.map((s) => s.id), []);
 });
 
 test("no subordinate carries constituents", () => {
