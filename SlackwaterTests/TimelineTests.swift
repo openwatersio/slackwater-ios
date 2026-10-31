@@ -1599,6 +1599,25 @@ private struct FoldPageTestHarness: View {
         XCTAssertTrue(helpers.contains("SN.graphLow.opacity(0), location: fadeStop"), "the below-datum hue fades in from the same line")
     }
 
+    /// A station whose whole day is below chart datum (Tesoro Marine
+    /// Terminal, −0.8 to −0.2 ft) puts datum above the plot. The amber there
+    /// covered all the sky over the curve and was cut off by the plot's top
+    /// edge, so neither surface draws it. Y grows downward.
+    func testDatumFillSkipsDatumAboveThePlot() {
+        for strip in [true, false] {
+            let fillsAboveDatum = !strip
+            XCTAssertFalse(CurveDrawing.datumFillShows(plotTop: 20, datumY: -40, lowestY: 120,
+                                                       fillsAboveDatum: fillsAboveDatum),
+                           "datum above the plot draws nothing (strip: \(strip))")
+            XCTAssertTrue(CurveDrawing.datumFillShows(plotTop: 20, datumY: 60, lowestY: 120,
+                                                      fillsAboveDatum: fillsAboveDatum),
+                          "a low under a datum inside the plot keeps its amber (strip: \(strip))")
+        }
+        // Datum below every trough: the card fades its blue at the trough, the strip draws nothing.
+        XCTAssertTrue(CurveDrawing.datumFillShows(plotTop: 20, datumY: 200, lowestY: 120, fillsAboveDatum: true))
+        XCTAssertFalse(CurveDrawing.datumFillShows(plotTop: 20, datumY: 200, lowestY: 120, fillsAboveDatum: false))
+    }
+
     /// Below the ramp floor the line is the base colour; above it the stroke
     /// follows the absolute tide-rate ramp, so a lazy tide never leaves blue
     /// and a Fundy run reaches red.
