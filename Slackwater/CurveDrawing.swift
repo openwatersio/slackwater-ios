@@ -99,8 +99,9 @@ enum CurveDrawing {
     static func datumFill(_ ctx: GraphicsContext, _ area: Path,
                           plotTop: CGFloat, plotBottom: CGFloat, width: CGFloat,
                           datumY: CGFloat, lowestY: CGFloat, fillsAboveDatum: Bool = true) {
+        guard datumFillShows(plotTop: plotTop, datumY: datumY, lowestY: lowestY,
+                             fillsAboveDatum: fillsAboveDatum) else { return }
         let datumInReach = lowestY >= datumY
-        guard fillsAboveDatum || datumInReach else { return }
         let fadeY = datumInReach ? datumY : lowestY
         let top = min(plotTop, fadeY), bottom = max(plotBottom, fadeY)
         let fadeStop = (fadeY - top) / (bottom - top)
@@ -119,6 +120,17 @@ enum CurveDrawing {
         plot.fill(area, with: .linearGradient(Gradient(stops: stops),
                                               startPoint: CGPoint(x: 0, y: top),
                                               endPoint: CGPoint(x: 0, y: bottom)))
+    }
+
+    /// Whether `datumFill` draws anything. Nothing when datum lies above the
+    /// plot: the whole series is below it, so the amber would cover every
+    /// point of sky over the curve and start part-strong at the plot's top
+    /// edge, a hard line with no datum rule to read it against. Nothing on
+    /// the strip when the water never reaches datum either.
+    static func datumFillShows(plotTop: CGFloat, datumY: CGFloat, lowestY: CGFloat,
+                               fillsAboveDatum: Bool) -> Bool {
+        guard datumY >= plotTop else { return false }
+        return fillsAboveDatum || lowestY >= datumY
     }
 
     /// The current fill, beneath the curve only: blue at the flood peaks,
