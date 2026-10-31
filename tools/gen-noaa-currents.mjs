@@ -54,9 +54,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { allStations, stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, byNameThenId, undangle, round3, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
+
+const db = await loadStations();
 
 const res = join(here, "..", "Slackwater", "Resources");
 const NOAA = "noaa/";
@@ -93,7 +95,7 @@ function fromDatabase(s) {
   };
 }
 const bundle = {
-  stations: allStations.filter((s) => s.kind === "current" && s.id.startsWith(NOAA)).map(fromDatabase),
+  stations: db.all.filter((s) => s.kind === "current" && s.id.startsWith(NOAA)).map(fromDatabase),
 };
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
 
@@ -141,7 +143,7 @@ const kept = bundle.stations
     const id = `noaa/${s.id}`;
     const near = nearestTide(s);
     // A bin is named for its surface station: same water, same name.
-    const named = stationsById.get(`noaa/${s.id.split("@")[0]}`) ?? stationsById.get(id);
+    const named = db.byId(`noaa/${s.id.split("@")[0]}`) ?? db.byId(id);
     const context = undangle(named.context);
     // The neighbour only matters when it names the region. Three subordinates
     // (Rat Islands, Meyers Passage) sit 250-350 km from any harmonic gauge and
