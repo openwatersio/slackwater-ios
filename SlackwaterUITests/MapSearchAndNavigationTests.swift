@@ -7,6 +7,91 @@ import UIKit
 import XCTest
 
 final class MapSearchAndNavigationTests: ScreenshotTestCase {
+    func testMapLegendOpensUnitSettingsAndUpdatesOnReturn() throws {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-openMap", "-locDenied", "-mapCenter", "48.40618896484375,-122.64311981201172",
+                                             "-mapZoom", "11", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+        app.launch()
+        XCTAssert(app.otherElements["map-canvas"].firstMatch.appears(within: 15))
+        sleep(5)
+        save(app, "map-legend.png")
+        let legend = app.buttons["map-disclaimer"].firstMatch
+        guard legend.appears(within: 5) else {
+            XCTFail("The map legend must open settings")
+            return
+        }
+        XCTAssert(legend.label.contains("feet"))
+        XCTAssert(legend.label.contains("knots"))
+        XCTAssert(legend.label.contains("Not for navigation."))
+        XCTAssertLessThan(app.frame.maxY - legend.frame.maxY, 20)
+        let map = app.otherElements["map-canvas"].firstMatch
+        map.pinch(withScale: 2, velocity: 1)
+        sleep(2)
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let preview = app.descendants(matching: .any)["map-preview-card"].firstMatch
+        XCTAssert(preview.appears(within: 5))
+        XCTAssertLessThanOrEqual(preview.frame.maxY, legend.frame.minY - 4)
+        sleep(2)
+        let before = try mapBackdrop(map)
+        save(app, "map-camera-before-units.png")
+        legend.tap()
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        app.segmentedControls.buttons["Meters"].tap()
+        app.segmentedControls.buttons["km/h"].tap()
+        app.buttons["Done"].tap()
+        XCTAssert(legend.appears(within: 5))
+        XCTAssert(legend.label.contains("metres"))
+        XCTAssert(legend.label.contains("kilometres per hour"))
+        XCTAssertFalse(legend.label.contains("feet"))
+        XCTAssertFalse(legend.label.contains("knots"))
+        XCTAssert(preview.appears(within: 5), "Changing units must keep the map and its selected place")
+        sleep(2)
+        save(app, "map-legend-metric.png")
+        let after = try mapBackdrop(map)
+        var retained = 0
+        for i in stride(from: 0, to: before.count, by: 4) {
+            let red = abs(Int(before[i]) - Int(after[i]))
+            let green = abs(Int(before[i + 1]) - Int(after[i + 1]))
+            let blue = abs(Int(before[i + 2]) - Int(after[i + 2]))
+            if max(red, green, blue) <= 12 { retained += 1 }
+        }
+        XCTAssertGreaterThan(Double(retained) / Double(before.count / 4), 0.9,
+                             "Changing units must preserve the map's camera")
+    }
+
+    func testMapLegendStaysClearOfThePreviewAtLargeText() {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-openMap", "-locDenied", "-mapCenter", "48.40618896484375,-122.64311981201172",
+                                             "-mapZoom", "11", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        app.launch()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.appears(within: 15))
+        sleep(5)
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let preview = app.descendants(matching: .any)["map-preview-card"].firstMatch
+        XCTAssert(preview.appears(within: 5))
+        let legend = app.buttons["map-disclaimer"].firstMatch
+        save(app, "map-legend-large-preview.png")
+        XCTAssert(legend.isHittable)
+        XCTAssertLessThanOrEqual(preview.frame.maxY, legend.frame.minY - 4)
+    }
+
+    private func mapBackdrop(_ map: XCUIElement) throws -> [UInt8] {
+        let image = try XCTUnwrap(map.screenshot().image.cgImage)
+        // Compare geography above the preview; changing number labels affects few pixels here.
+        let crop = try XCTUnwrap(image.cropping(to: CGRect(x: Double(image.width) * 0.05,
+                                                          y: Double(image.height) * 0.12,
+                                                          width: Double(image.width) * 0.75,
+                                                          height: Double(image.height) * 0.2)))
+        let w = 160, h = 80
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8,
+                                             bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(crop, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return pixels
+    }
+
     // Current stations sit in the list beside the tide ports; walk into
     // Deception Pass and scrub the signed velocity curve.
     func testM2Currents() throws {
@@ -294,18 +379,12 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header")
         XCTAssert(app.buttons["List"].exists, "toggle did not flip to the list icon")
 
-        // #43: the "not for navigation" pill belongs ON the FAB row, not
-        // floating above it mid-chart. Asserted as geometry rather than by
-        // eye — placing it at a fixed constant (96pt from the screen edge, past
-        // the safe area) looks right in one simulator and wrong on the
-        // next, which is exactly what a frame comparison catches.
-        let disclaimer = app.staticTexts["map-disclaimer"].firstMatch
+        let disclaimer = app.buttons["map-disclaimer"].firstMatch
         XCTAssert(disclaimer.appears(within: 5), "map disclaimer missing")
         let toggle = app.buttons["List"].firstMatch
-        XCTAssertGreaterThan(disclaimer.frame.minY, toggle.frame.minY,
-                             "the pill floats above the FABs instead of sitting on their row")
-        XCTAssertLessThanOrEqual(disclaimer.frame.maxY, toggle.frame.maxY + 1,
-                                 "the pill hangs below the FAB row, into the home indicator")
+        XCTAssertGreaterThan(disclaimer.frame.midY, toggle.frame.midY,
+                             "the legend must sit below the FABs")
+        XCTAssertLessThan(app.frame.maxY - disclaimer.frame.maxY, 20)
 
         // Over the map the left FAB is My Location, not Search.
         XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")

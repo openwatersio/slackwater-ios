@@ -34,7 +34,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    section(String(localized: "Tides", comment: "Tide stations: the station list's series filter chip, and the Settings section for tide settings.")) {
+                    section(String(localized: "Tides", comment: "Tide category, filter, or height-unit heading.")) {
                         row(String(localized: "Height", comment: "Settings row label: the unit tide heights are written in.")) {
                             Picker(
                                 "Tide height units",
@@ -48,7 +48,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    section(String(localized: "Currents", comment: "Current stations: the station list's series filter chip, and the Settings section for current settings.")) {
+                    section(String(localized: "Currents", comment: "Current category, filter, or speed-unit heading.")) {
                         row(String(localized: "Speed", comment: "Settings row label: the unit current speeds are written in.")) {
                             Picker(
                                 "Current speed units",

@@ -939,8 +939,8 @@ struct SeriesFilterChips: View {
 
     var body: some View {
         let all = chip(String(localized: "All", comment: "Station series filter showing all stations."), nil)
-        let tides = chip(String(localized: "Tides", comment: "Tide stations: the station list's series filter chip, and the Settings section for tide settings."), .tide)
-        let currents = chip(String(localized: "Currents", comment: "Current stations: the station list's series filter chip, and the Settings section for current settings."), .current)
+        let tides = chip(String(localized: "Tides", comment: "Tide category, filter, or height-unit heading."), .tide)
+        let currents = chip(String(localized: "Currents", comment: "Current category, filter, or speed-unit heading."), .current)
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) { all; tides; currents }
             VStack(alignment: .leading, spacing: 0) {

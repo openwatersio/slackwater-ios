@@ -13256,7 +13256,7 @@
       }
     },
     "%@ %@" : {
-      "comment" : "Nearby station distance and compass bearing. Values are a localized nautical-mile distance and invariant bearing.",
+      "comment" : "Two adjacent values: nearby distance and bearing, or map category and unit.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -25008,7 +25008,7 @@
       }
     },
     "Currents" : {
-      "comment" : "Current stations: the station list's series filter chip, and the Settings section for current settings.",
+      "comment" : "Current category, filter, or speed-unit heading.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -57786,7 +57786,7 @@
       }
     },
     "Tides" : {
-      "comment" : "Tide stations: the station list's series filter chip, and the Settings section for tide settings.",
+      "comment" : "Tide category, filter, or height-unit heading.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

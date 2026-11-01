@@ -74,15 +74,12 @@ struct StationListView: View {
     /// One state, not one per kind: the panel shows exactly one thing, and
     /// two optionals that must never both be set is a bug waiting for the
     /// tap that sets the second without clearing the first.
+    @State private var mapPreviewCover: CGFloat = 0
     @State private var mapPreview: MapPreview?
     @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
-    /// Read for the map's identity, not for this view's own text: the pins'
-    /// readings are baked into the GeoJSON, so a speed-unit change has to
-    /// rebuild the source. Observing it here is what republishes the body.
+    /// A unit change must rebuild the GeoJSON readings as well as the legend.
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
-    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
-    private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -443,13 +440,6 @@ struct StationListView: View {
         // focus, so `makeUIView` handles the camera even on the pin-tap path
         // where the pane is already mounted (`showMap` stayed true across the
         // push/pop).
-        //
-        // A ZStack, not `.overlay` on the map: the map ignores the safe area
-        // and an overlay on it inherits that frame, so the pill's offset was
-        // measured from the screen edge — 96pt put it ABOVE the 56pt FABs
-        // rather than beside them, hovering mid-chart (#43). The ZStack keeps
-        // its safe area, so the pill takes the same `fabBarBottomPadding` the
-        // FAB row does and lands on that row, clear of the home indicator.
         ZStack(alignment: .bottom) {
             MapViewRepresentable(
                 center: mapCenterOverride
@@ -462,6 +452,7 @@ struct StationListView: View {
                     ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
                 selected: mapPreview?.selection,
+                previewCover: mapPreviewCover,
                 onSelect: { item in
                     withAnimation(reduceMotion ? nil : .snappy) { mapPreview = .station(item) }
                 },
@@ -470,11 +461,7 @@ struct StationListView: View {
                 },
                 onDeselect: { withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil } }
             )
-            // Units belong in the identity for the same reason the slack
-            // window does: both are baked into the pin source at build time,
-            // and `updateUIView` only carries selection. Without them a unit
-            // change sits in the old units until the 60s tick.
-            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))-\(units)-\(speedUnit)")
+            .id(mapFocusToken)
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
@@ -482,21 +469,6 @@ struct StationListView: View {
             // resets with it.
             .onAppear { mapFocus = nil; locateFocus = false; mapPreview = nil }
             .ignoresSafeArea()
-
-            // The basemap shows no depths, so there is no chart-datum
-            // claim to disclaim. The navigation half is not decoration:
-            // the App Store review notes (private planning repo) tell the reviewer this app marks
-            // "not for navigation" on every detail footer AND the map, and
-            // that claim has to remain true on this surface. Glass, like the
-            // FABs it sits between — one material for the whole toolbar row.
-            Text("Not for navigation.")
-                .font(.caption2)
-                .foregroundStyle(SN.foam)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .glassEffect(.regular, in: Capsule())
-                .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
-                .accessibilityIdentifier("map-disclaimer")
-                .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
 
             // The pin-tap preview: our own bottom panel, NOT a `.sheet` —
             // `.sheet(item:)` re-negotiates detents when the item swaps and
@@ -506,12 +478,63 @@ struct StationListView: View {
             // second pin tap updates the same card view and its `@State`
             // graph never re-resolves — the new station wears the old one's
             // curve.
-            if let preview = mapPreview {
-                previewPanel(preview)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            VStack(spacing: 8) {
+                if let preview = mapPreview {
+                    previewPanel(preview)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                mapLegend.padding(.horizontal, 80)
             }
+            .padding(.bottom, 11)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { mapPreviewCover = $0 }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            // Match the Dynamic Island's edge spacing, measured from the screen, not the safe area.
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         .background(SN.canvas.ignoresSafeArea())
+    }
+
+    private var mapLegend: some View {
+        Button { showSettings = true } label: {
+            VStack(spacing: 3) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { mapLegendEntries }
+                    VStack(spacing: 3) { mapLegendEntries }
+                }
+                .fontWeight(.medium)
+                // App Store review notes promise this disclaimer on the map.
+                Text("Not for navigation.")
+            }
+            .font(.caption2)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(SN.foam)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 24))
+            .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text("Settings"))
+        .accessibilityIdentifier("map-disclaimer")
+    }
+
+    @ViewBuilder private var mapLegendEntries: some View {
+        mapLegendEntry(String(localized: "Tides", comment: "Tide category, filter, or height-unit heading."),
+                       unit: heightUnit(imperial: imperial), symbol: "circle.fill")
+        mapLegendEntry(String(localized: "Currents", comment: "Current category, filter, or speed-unit heading."),
+                       unit: speedUnitLabel(speedUnit), symbol: "arrow.up")
+    }
+
+    private func mapLegendEntry(_ title: String, unit: String, symbol: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol).accessibilityHidden(true)
+            Text("\(title) \(unit)", comment: "Two adjacent values: nearby distance and bearing, or map category and unit.")
+        }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(title) \(spokenUnit(unit))", comment: "Two adjacent values: nearby distance and bearing, or map category and unit."))
     }
 
     /// The preview panel: what the tapped pin has to say, over the map.
@@ -564,7 +587,6 @@ struct StationListView: View {
         }
         .id(preview.selection.id)
         .padding(.horizontal, 12)
-        .padding(.bottom, 12)
         .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
             guard drag.translation.height > 40 else { return }
             withAnimation(reduceMotion ? nil : .snappy) { mapPreview = nil }
