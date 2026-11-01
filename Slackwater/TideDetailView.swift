@@ -509,7 +509,7 @@ struct ChsDownloadNotice: View {
             }
             if let gate {
                 Text(gate.provisionalHeadline)
-                    .foregroundStyle(SN.amber)
+                    .foregroundStyle(SN.foam.opacity(0.7))
             }
         }
         .font(.caption)

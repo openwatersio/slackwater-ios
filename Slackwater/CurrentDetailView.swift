@@ -120,8 +120,9 @@ struct CurrentDetailView: View {
                                         ChsDownloadNotice(stationID: gate.id, tz: tz, gate: gate)
                                     } else if let gate = record.chsGate, let bound = gate.slackBoundMinutes {
                                         Text(gate.boundHeadline(minutes: bound))
-                                            .font(.caption).foregroundStyle(SN.amber)
+                                            .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                                             .multilineTextAlignment(.center)
+                                            .fixedSize(horizontal: false, vertical: true)
                                             .accessibilityIdentifier("chs-bound-notice")
                                     }
                                     SummaryTiles(primary: lead(tl).nextMax,
