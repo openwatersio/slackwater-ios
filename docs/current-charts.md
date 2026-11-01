@@ -16,22 +16,21 @@ bind it wherever it shows current state.
 A tide reader wants the extremes. High and low *are* the events; the curve
 between them is interpolation. Peak height is the number you act on.
 
-A current reader wants the **equilibrium**. Max flood at 6.1 kn is context — it
-says what you are avoiding, not what you are doing. The number you act on is
-*when the water is slow enough for this boat to get through this pass, and for
-how long*. That is a **run of time**, and it sits at the zero crossing, not at
-the peaks.
+A current reader at a **gate** wants the **equilibrium**. Where the water runs faster than the boat can make way against, max flood at 6.1 kn is context: it says what you are avoiding, not what you are doing. The number you act on is *when the water is slow enough for this boat to get through this pass, and for how long*. That is a **run of time**, and it sits at the zero crossing, not at the peaks. This is the **gate reading**.
 
-This inverts figure and ground. On a tide track the curve is the subject and the
-axis is reference. On a current track **the band around zero is the subject** and
-the curve is what intrudes into it.
+A current reader at a **reach** wants the **flow**. Where the day's peak stays within what the boat can make way against, the peaks and their set are the events: a paddler crossing a shipping channel plans around the ebb that carries them to the far shore, and around the same ebb kicking up a race if the wind turns against it. Slack there is the moment the help stops, and the window is only the stretch where the current does not matter. This is the **reach reading**.
+
+Which reading applies is a fact about the station and the boat, not about the reader, and one number decides it everywhere: the ramp's **make-way anchor** (§6.3), the speed above which the boat can no longer make way against the water. A peak under the anchor is an event. A peak over it is context. The same chart draws both; what changes is which marks lead (§5.1).
+
+Favorable is not something the chart can know. Whether an ebb helps depends on the route, the wind, the sea state and the reader's own judgment, so the chart states magnitude and set and leaves the valence to the reader (§6.5). Our judgment lives in words and defaults, in the readout and the threshold, where the reader can disagree with it (§4.2, §4.3). The table under every chart holds the plain prediction they fall back to (§13).
+
+This inverts figure and ground at a gate. On a tide track the curve is the subject and the axis is reference. On a current track at a gate **the band around zero is the subject** and the curve is what intrudes into it. At a reach the curve is the subject again, and the band is reference: the threshold lines still draw, pinned near the plot edges, and that position is itself the statement that the whole day is workable (§7.3).
 
 Everything below follows. It is also the standing review question: **any rule
 that arrived from the tide track is suspect until re-argued here.** The two
 tracks can share geometry, a strip, a palette. They do not share a thesis.
 
-The plainest test of whether a chart obeys this: the reader should be able to
-answer *can I go, and when* without reading a single speed number.
+The plainest test of whether a chart obeys this: the reader should be able to answer *can I go, and when* without reading a single speed number, where *go* includes going with the water.
 
 ---
 
@@ -122,7 +121,9 @@ an encoding and this latitude ends.
 
 ## 4. Slack windows
 
-The window is the subject. Every rule here exists to keep it from over-claiming.
+The window is the subject at a gate. Every rule here exists to keep it from over-claiming.
+
+The countdown questions below are the gate reading's. At a reach the question is *when does it turn*, and the slack instants on the axis already answer it. The window still draws there: the threshold is the reader's number, and the chart does not withhold it on a guess about what they need. A reader who finds the default window noise at a reach raises the station's threshold (§3.1) or turns the window off.
 
 1. **Endpoints are the interpolated ±threshold crossings**, never the nearest
    sample. At a fast gate a 10-minute sample lands a long way from the edge, and
@@ -135,9 +136,9 @@ The window is the subject. Every rule here exists to keep it from over-claiming.
    instant instead (§5.3).
 5. **Show the time remaining, not the original length.** An already-open window
    must not claim its full run.
-6. **Count down to the window opening, not to the slack instant.** The question
-   is *when can I be there*. The window brackets the slack, so it is often
-   already open — then the answer is `now`.
+6. **Count down to the window opening, not to the slack instant.** The gate
+   question is *when can I be there*. The window brackets the slack, so it is
+   often already open — then the answer is `now`.
 7. **Window entry and exit are scrub snap targets**, alongside the peaks and sun
    events. They are the moments a planner is actually aiming at.
 
@@ -211,13 +212,19 @@ State the bearing; do not mime it (§6.4).
 
 ### 5.1 The order of loudness
 
+At a gate:
+
 1. **The window** — the run, and the threshold lines that give it scale
 2. **The peaks** — context: what you are avoiding
 3. **Everything else**
 
-A mark that inverts this re-teaches the tide-chart reading the whole chart
-exists to undo. Peaks earn their place because they say how bad the alternative
-is; they must not out-shout the thing the reader came for.
+At a reach, the first two swap:
+
+1. **The peaks** — the events: the flow the reader is riding or waiting out, and its set
+2. **The window** — the stretch where the current does not matter
+3. **Everything else**
+
+The make-way anchor picks the order (§1). A mark that inverts the gate order at a gate re-teaches the tide-chart reading the whole chart exists to undo. Peaks earn their place at a gate because they say how bad the alternative is; they must not out-shout the thing the reader came for. At a reach they are the thing the reader came for, and the window is still drawn because it is the reader's number.
 
 ### 5.2 The window gets two marks, because it makes two claims
 
@@ -253,25 +260,25 @@ reaches zero has no slack. (Derived-gate presentation is specified in §9.)
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
 
-### 5.4 Peaks are not points of interest
+### 5.4 Peaks are context at a gate and events at a reach
 
-**No dot.** A peak or trough is context — what the window is measured
-against — and a dot would make it a point of interest, which is the
-tide-chart reading this whole chart exists to undo. The speed and the
-**true bearing arrow** for the set hang below a velocity crest and above a trough, following the curve's approach, styled
-as context, not as the event.
+**No dot, at either.** At a gate a peak or trough is context — what the window is measured against — and a dot would make it a point of interest, which is the tide-chart reading this whole chart exists to undo. The speed and the **true bearing arrow** for the set hang below a velocity crest and above a trough, following the curve's approach, styled as context, not as the event.
+
+At a reach the peak is the event (§1). What makes it one is its **time on the axis** (§5.4.1, §5.5), not a focal point on the curve: the ramp's colour already carries the magnitude and the label already carries the speed, so a dot would spend a channel on a fact two others hold (§6.4). The speed label and arrow keep their place.
 
 The arrow states the set. An up/down arrow would only restate which side of zero
 the peak already sits on, which is a channel spent on nothing (§6.4).
 
-### 5.4.1 The window's edges are the points of interest
+### 5.4.1 The points of interest
 
-The **opening** of a slack window is the major point of interest: the moment
+At a gate, the window's edges are the points of interest. The **opening** of a slack window is the major point: the moment
 a planner is aiming at (§4 rule 7). Its time appears on the axis for a window around one slack. A continuous merged window spanning several slacks labels each exact slack instead, even when its opening is visible. The **closing** is the minor point — a lesser mark — until the reader
 is inside the window, when it becomes the one that matters: the question has
 changed from *when can I be there* to *how long do I have*. A surface that
 can count (the widget, the readout) counts down to the closing while inside
 the window.
+
+At a reach, the peaks are the points of interest. **Max ebb and max flood times join the axis** alongside the slack times, and the window's opening becomes the lesser mark. The rule that picks between the two is the make-way anchor (§1): the peak row draws when the day's peak is one the boat can make way against, and is omitted when it is not. At a gate the peaks stay in the table (§13), where a reader planning around a race goes to find them.
 
 ### 5.5 Absolute time has exactly one home per surface
 
@@ -282,7 +289,7 @@ the readout has three homes and they will drift.
 Times that leave the chart do not leave the product — the schedule table keeps
 its absolute column.
 
-On the detail strip, maximum ebb and flood times sit on a quiet gray row below the green slack times. Each row thins crowded labels independently. The peak row is omitted when the current has no maximum events. Day names and dates follow the event times, with sunrise and sunset sharing the date row and no sun dots. Eclipse glyphs sit below the sun times.
+On the detail strip, maximum ebb and flood times sit on a quiet gray row below the green slack times. Each row thins crowded labels independently. The peak row draws under the reach reading and is omitted under the gate reading (§5.4.1), and whenever the current has no maximum events. Day names and dates follow the event times, with sunrise and sunset sharing the date row and no sun dots. Eclipse glyphs sit below the sun times.
 
 Where two labels would collide, **measure the rendered text; never estimate
 widths** — a hardcoded estimate stops being true the moment the font changes.
@@ -335,7 +342,7 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
 
 1. **Absolute, capability-anchored, hard-coded.** Anchors say what you can still
    do about the water, not what percentile the station is in — the move Beaufort
-   makes. Deriving a ceiling from whatever stations are on the device makes the
+   makes. Under the threshold the reader chooses. The yellow floor is water the boat can still make way against. Orange begins at the **make-way anchor**: water that carries the boat whichever way it is going, so that with the current there is no turning back and against it there is no progress. Red is the top of the scale. None of these stops says good or bad; they say what the boat can do, which is true whether the water is with it or against it. Deriving a ceiling from whatever stations are on the device makes the
    same colour mean different speeds on different devices, which is the absolute
    scale gone. Values above the ceiling clamp; *beyond the top of the scale* is
    not a distinction worth resolving.
@@ -345,10 +352,11 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
 3. **No green, at any stop.** A ramp that passes through green puts a second,
    opposite meaning a few hundred points from the mark that means *go*. This is
    the specific reason it is not a rainbow.
-4. **Starts at the threshold, never at zero.** Only the excess above the limit
-   is inked warm: the measured current's line is the ramp's yellow floor outside
-   every slack window and blue inside one (§6.1), and the thread adds orange and
-   red from 3 kn.
+4. **Starts at the threshold, never at zero.** The line is inked on the ramp
+   only above the threshold: the measured current's line is the ramp's yellow
+   floor outside every slack window and blue inside one (§6.1), and the thread
+   warms from the make-way anchor at 3 kn through orange to red at the top of
+   the scale.
 5. **Luminance should climb monotonically** across the ramp — that is what makes
    it survive greyscale and Reduce Motion, and what preserves rank order. A ramp
    that descends in luminance across part of its range makes mid speeds *harder*
@@ -363,7 +371,7 @@ screen, the ramp has become another auto-fit and the chart is equalizing again.
    The reading's word, Slack against Flooding or Ebbing, carries the same fact
    in text.
 7. **The anchors array is where a per-vessel limit eventually lands.** Structure
-   the domain as one array so that door stays open.
+   the domain as one array so that door stays open. A sea kayak, a sailboat and a motor vessel make way against different water, so the make-way anchor is a property of the vessel. The reach reading (§1), the order of loudness (§5.1) and the peak-time rule (§5.4.1) all key off that one anchor and move with it, never off a second constant.
 
 ### 6.4 Channel economy
 
@@ -385,11 +393,13 @@ stroke, skipped when the lobe is too narrow to hold it.
 greyscale-safe carrier, so motion would be a third redundant encoding with a
 Reduce Motion problem attached.
 
-### 6.5 An always-on encoding is never self-explanatory
+### 6.5 The ramp states commitment, not hazard
 
-The ramp replaces the warning *band*. It does not replace the numbers. The
-printed peak speed is the day-one carrier for a reader who has never seen this
-chart before, and it stays.
+The ramp says how far the water has the boat, never whether that is good. A 3 kn current the boat cannot make way against is a fact whether it is with the boat or against it: with it, there is still no turning back. Whether that commitment is the plan or the problem depends on the route, the wind and the sea state, which the chart does not know, so it never colours a current as favorable or adverse. The set stated beside the lobe (§6.4) is what lets the reader decide that for themselves.
+
+Prose about the ramp, in the spec and in the app's reading text, keeps to the same claim: what the boat can do, not what the reader should do.
+
+The ramp is an always-on encoding, and an always-on encoding is never self-explanatory. It does not replace the numbers. The printed peak speed is the day-one carrier for a reader who has never seen this chart before, and it stays.
 
 ### 6.6 Contrast
 
