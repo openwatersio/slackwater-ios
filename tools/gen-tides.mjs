@@ -4,8 +4,11 @@
  * later generators read and the app does not bundle.
  *
  * Bundled harmonic constants are the whole reason this app works with no
- * signal and no account, so the only question that decides what ships is
- * whether a station's licence lets it.
+ * signal and no account, so what ships starts from what @slackwater/database
+ * accepts: its quality decisions are the ones the website publishes, and the
+ * app and the site have to name, place and credit every station alike. See
+ * `shippable` below. The licence and the filters below then take away; the
+ * one thing that adds a rejected record back is the licence fallback.
  *
  * LICENCE (M53, widened since). @slackwater/database is a WORLD database: at
  * 0.8.20260722, 8,291 stations, of which 4,838 come from TICON-4/UHSLC. The
@@ -41,9 +44,9 @@
  *
  * GEOGRAPHY no longer gates anything — coverage was "all of the US and
  * Canada" behind a `country` allowlist (`COUNTRIES`); at world coverage
- * quality (licence, FRESHWATER_NETWORKS, the CHS cede rule, the datum check
- * below) decides what ships, and a station's country is no longer one of the
- * questions asked.
+ * quality (the database's acceptance, licence, FRESHWATER_NETWORKS, the CHS
+ * cede rule, the datum check below) decides what ships, and a station's
+ * country is no longer one of the questions asked.
  *
  * `country` itself is trustworthy for NOAA rows and NOT for TICON's, which is
  * why COUNTRY_FIX exists (bundle.mjs): upstream reads a station's operating agency as
@@ -68,19 +71,19 @@
  * repeats the state the region line already carries ("... Savannah Ga · GA").
  * ponytail: both are upstream symptoms; delete each when its source stops.
  *
- * Mixing two publishers also means DEDUPLICATION — they cover the same
- * harbours, and three pins on one anchorage is a worse map than one. See
- * DUPLICATE_KM.
+ * The database resolves which record of a gauge is published (`quality.reason`
+ * "duplicate" and `quality.redundant`), so DEDUPLICATION here is a safety net
+ * for the same harbours under records it leaves separate. See DUPLICATE_KM.
  *
  * Run: cd tools && npm install && node gen-tides.mjs
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations, buildDatabase, stationRoutes } from "@slackwater/database";
+import { allStations, buildDatabase, qualityFilter, stationRoutes, stationsById } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
-  sourceCredits,
+  sourceCredits, keptForLicence,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
@@ -99,16 +102,19 @@ const CA_PROVINCE = {
 };
 
 /**
- * NOAA and TICON both publish the same harbours: 670 TICON rows sit within a
- * kilometre of a NOAA gauge ("Aberdeen" / "ABERDEEN"), and 585 sit within a
- * kilometre of another TICON row ("Adak Alaska" twice, plus "Adak Island").
- * Three pins on one harbour is a worse map than one.
+ * The database's quality evaluation decides which record of a gauge is
+ * published. This is the safety net for what it leaves separate: at
+ * 1.0.0-beta.20261028 it drops 54 accepted reference records and 2 fallback
+ * records within a kilometre of a kept station ("Hakodate", two networks 0.7 km
+ * apart). Across this rule and the two after it, 78 of the 90 reference records
+ * dropped match the kept station's M2 (within 10% or 3 cm, and 15 degrees), so
+ * the map would otherwise carry duplicate pins. 9 differ, such as either side of
+ * the Nordfeld sluice (0.84 m against 0.03 m), and 3 had no pair to compare.
  *
  * 1 km, not 3: at 3 km this starts eating genuine neighbours — "Anacostia
  * River Aquatic Gardens" is 2.3 km from "Bladensburg, Md." and they are
  * different creeks with different curves. The residue is a handful of rounding
- * escapes (TICON positions are 2 dp, ~1 km), e.g. "Apra Harbor Guam" surviving
- * 1.34 km from "APRA HARBOR, GUAM".
+ * escapes (TICON positions are 2 dp, ~1 km).
  * ponytail: distance only. Add name similarity if the residue gets noticed.
  */
 const DUPLICATE_KM = 1.0;
@@ -228,6 +234,12 @@ const upstreamRegion = (s) => {
 };
 
 /**
+ * WHAT SHIPS STARTS FROM WHAT THE DATABASE ACCEPTS. `qualityFilter` is the
+ * rule the database's own `stations` export applies; CHS ports carry no
+ * quality block and count as accepted. Reading only the licence here would
+ * ship records the website rejects, and show a different record of the same
+ * gauge at places like Nuuk and Ilulissat.
+ *
  * LICENCE. The database is a world database and mixes three licences; the one
  * that matters is TICON's cc-by-nc-4.0 set (674 stations, GESLA upstream),
  * which forbids commercial use and so can never ship.
@@ -238,17 +250,23 @@ const upstreamRegion = (s) => {
  * the one malformed row (`baltic-sea.geo`, whose `license` is a string) for
  * free. cc-by-4.0 obliges ATTRIBUTION, which the app pays in its credits
  * screen; gen-tides.test.mjs fails when a shipped publisher is not credited.
+ *
+ * Where the record the database accepted is one this licence gate refuses,
+ * `keptForLicence` lets the record it displaced stand in (bundle.mjs).
  */
 // The database carries current stations in the same list since it unified
 // the two; this generator is the tide half, and a subordinate current keeps
 // its offsets under `current`, not where a tide's are.
-const shippable = allStations.filter((s) => (s.kind ?? "tide") === "tide" && s.license?.commercial_use === true);
+const shippable = allStations.filter((s) =>
+  (s.kind ?? "tide") === "tide" && s.license?.commercial_use === true &&
+  (qualityFilter(s) || keptForLicence(s, stationsById)));
 
 /**
  * One pin per place. NOAA wins ties outright: public domain, curated names,
  * finer positions, and the ids that already-stored fits and favourites are
  * keyed on. Beyond that, lowest id wins, so the survivor of a TICON/TICON pair
- * is the same on every machine that regenerates this file.
+ * is the same on every machine that regenerates this file. A record the
+ * licence fallback kept yields to every accepted harmonic record.
  */
 const grid = new Map();
 const cell = (la, lo) => `${Math.round(la * 20)}:${Math.round(lo * 20)}`;
@@ -345,7 +363,8 @@ const servedByChs = (s) =>
  * A route is claimed in the order the pipeline below keeps stations: CHS
  * first, since its ports are identity this app fits on device and the cede
  * rule already yields Canadian water to them; then NOAA; then everyone else
- * by id; subordinates last. This is the one rule a NOAA row yields to. The id
+ * by id; subordinates last. Past the database's own acceptance, this is the
+ * one rule a NOAA row yields to. The id
  * a device saved for the row that yields moves to the survivor at launch
  * (`StationSuccessors` in the app, `station-successors.json` here).
  */
@@ -403,6 +422,8 @@ function astronomicalBounds(s) {
   const reduce = (v, k) => (type === "ratio" ? k * v : v + k);
   return { latDatum: round3(reduce(lat, low)), hatDatum: round3(reduce(hat, high)) };
 }
+const isFallback = (s) => !qualityFilter(s);
+const claimOrder = (s) => (isSubordinate(s) ? 3 : isFallback(s) ? 2 : s.source?.name === NOAA ? 0 : 1);
 // Ids whose region line is a context the database derived, for the census below.
 const derivedIds = new Set();
 const kept = shippable
@@ -427,16 +448,15 @@ const kept = shippable
   // A failing TICON row is dropped outright; it has nothing to protect.
   .map((s) => ({ s, passes: isSubordinate(s) || passesDatumCheck(s) }))
   .filter(({ s, passes }) => (passes ? true : (failedDatum++, s.source?.name === NOAA)))
-  // NOAA harmonic first, then everyone else's harmonic, subordinates last.
-  .sort((a, b) =>
-    (isSubordinate(a.s) ? 2 : a.s.source?.name === NOAA ? 0 : 1) -
-      (isSubordinate(b.s) ? 2 : b.s.source?.name === NOAA ? 0 : 1) ||
+  // NOAA harmonic first, then everyone else's harmonic, then the records the
+  // licence fallback kept, subordinates last.
+  .sort((a, b) => claimOrder(a.s) - claimOrder(b.s) ||
     (a.s.id < b.s.id ? -1 : a.s.id > b.s.id ? 1 : 0))
   // Named BEFORE the dedupe filter runs (see samePlace above) — the collision
   // check needs the display name and NOAA-source flag can't survive on the
   // built station object, so it's carried alongside.
   .map(({ s, passes }) =>
-    ({ station: buildStation(s), isNoaa: s.source?.name === NOAA && !isSubordinate(s), passes }))
+    ({ station: buildStation(s), isNoaa: claimOrder(s) === 0, passes }))
   // A NOAA row is never dropped by distance (only by ONE STATION PER ROUTE
   // above). It was already shipping, users have fits and favourites keyed on
   // its id, and NOAA publishing two gauges a few hundred
@@ -572,9 +592,9 @@ if (contested.length) {
  * Resources/unavailable-stations.json — identity for stations that exist,
  * that we know about, and that we may never ship (issue #401).
  *
- * This is the complement of `shippable` above, which is the point: the app
- * does not maintain a hand-written list of what it is missing, it emits the
- * other side of a filter it already runs. `chs-tombstones.json` is the same
+ * This is the other side of the licence gate in `shippable` above, which is
+ * the point: the app does not maintain a hand-written list of what it is
+ * missing, it emits the other side of a filter it already runs. `chs-tombstones.json` is the same
  * posture for a DIFFERENT fact — a station that HAS shipped and stopped —
  * and the two never overlap: a CHS port left the bundle, these never entered
  * it.
@@ -718,7 +738,8 @@ console.log(
   `(${stations.length - derivedCount - codes} own contexts, ${derivedCount} derived, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
-  `${dropped} duplicates dropped, ${sameRoute} yielded their route; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);
+  `${dropped} duplicates dropped, ${sameRoute} yielded their route; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check; ` +
+  `${stations.filter((s) => isFallback(rawById.get(s.id))).length} kept by the licence fallback)`);
 console.log(
   `${unavailable.length} unavailable stations, ${unavailableSize} ` +
   `(non-commercial, no bundled station within ${UNAVAILABLE_GAP_KM} km)`);

@@ -136,7 +136,7 @@ import SlackwaterKit
     /// Three claimants, one line. Seasonal wins: at a lake, "this number is
     /// not really a tide" outranks "this one is big".
     func testSeasonalCaptionOutranksTheStanding() {
-        let seasonal = TideStationRecord.record(id: "ticon/algonac_mi-9014070-usa-noaa")!
+        let seasonal = TideStationRecord.record(id: "ticon/alpena_mi-9075065-usa-noaa")!
         XCTAssertNotNil(seasonal.seasonalRatio, "fixture station lost its flag")
         XCTAssertEqual(rangeCaption(record: seasonal, swing: swingStandings().marked, direction: "low to high"),
                        seasonalCaption(seasonal.seasonalRatio!))

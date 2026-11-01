@@ -63,7 +63,7 @@ final class TideStationDatabaseTests: XCTestCase {
                 XCTAssertNil(tcdb.latDatum, json.id)
             }
         }
-        XCTAssertGreaterThan(compared, 4_700, "#315 ships bounds on 4,772 of 4,782")
+        XCTAssertGreaterThan(compared, 4_600, "#315 ships bounds on 4,663 of 4,872")
     }
 
     /// The tide footer names the publisher from this field.
