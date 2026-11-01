@@ -799,7 +799,7 @@ struct TimelineGeo {
     var peakTimeY: CGFloat { timeY + 20 }
     var lastTimeY: CGFloat { hasPeakTimes ? peakTimeY : timeY }
     var dayY: CGFloat { lastTimeY + 26 }
-    var sunY: CGFloat { dayY + 34 }
+    var sunY: CGFloat { dayY + 17 }
     var eclipseY: CGFloat { sunY + 14 }
 
     func tideY(_ h: Double) -> CGFloat {

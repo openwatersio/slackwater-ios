@@ -73,8 +73,8 @@ MOVES HORIZONTALLY AS ONE CONTINUOUS STRIP
   event labels ─────── curve ─────── event labels
   absolute event times
   current maximum times (when present)
-  day + date
-  sunrise / sunset
+  day
+  sunrise / date / sunset
 ```
 
 Only one Now pill is ever present. It occupies the side toward which “now” lies; the two positions above illustrate the alternatives.
@@ -180,9 +180,9 @@ These are the current iOS logical-unit values. Preserve them on phone-sized surf
 | `peakTimeY` | 358 | Current-maximum times, when present |
 | `dayY` | 364 / 384 | Day names; the later row applies to currents with maximum events |
 | `dateY` | 381 / 401 | Calendar date under the day name |
-| `sunY` | 398 / 418 | Sunrise/sunset symbols and times, without dots |
-| `eclipseY` | 412 / 432 | Eclipse glyph below sun times |
-| `stripHeight` | 430 / 450 | Bottom of graph-owned chrome plus margin |
+| `sunY` | 381 / 401 | Sunrise/sunset symbols and times on the date row, without dots |
+| `eclipseY` | 395 / 415 | Eclipse glyph below sun times |
+| `stripHeight` | 413 / 433 | Bottom of graph-owned chrome plus margin |
 
 The fixed reading line begins at `topPad` and ends at `plotBottom` (§11). The lead is centred on the viewport centreline and overlaid in the top pad; it does not consume horizontal strip width.
 
@@ -655,7 +655,7 @@ For every civil day touched by the window:
 - draw sunrise as the `sunrise` SF Symbol, a space, and its localized station time, in sunrise ink at its true x-coordinate;
 - draw sunset as the `sunset` SF Symbol, a space, and its localized station time, also in sunrise ink (the symbol, not the colour, tells them apart) at its true x-coordinate.
 
-The day name is foam at 85% and the date foam at 48%, 17 units below the day name. Sun symbols and times sit 34 units below the day name, on a separate line from the date, without dots. The eclipse glyph sits 14 units below the sun times. Day names, dates, sun times, and the eclipse glyph do not fade in the past. Sunrise and sunset labels have no horizontal collision handling, so on very short days they may overprint each other. Day names, dates, sun times, and eclipse glyphs draw after the track, over its shading.
+The day name is foam at 85% and the date foam at 48%, 17 units below the day name. Sun symbols and times share the date row, without dots. The eclipse glyph sits 14 units below the sun times. Day names, dates, sun times, and the eclipse glyph do not fade in the past. Sun times and dates have no horizontal collision handling, so on very short days they may overprint. Day names, dates, sun times, and eclipse glyphs draw after the track, over its shading.
 
 Sunrise/sunset events are computed for the station coordinate and civil-day bounds; when a civil day has more than one rise or set, the first of each is used. A polar day may lack either event; omit missing marks without inventing a time.
 

@@ -1549,7 +1549,7 @@ private struct FoldPageTestHarness: View {
         XCTAssertGreaterThan(tide.timeY, tide.bodyBottom, "the time row sits under the plot")
         XCTAssertGreaterThan(tide.dayY, tide.timeY, "the day row sits under the times")
         XCTAssertGreaterThan(tide.sunY, tide.dayY, "sun times sit under the day label")
-        XCTAssertGreaterThan(tide.sunY - (tide.dayY + 17), 12, "sun times clear the date on short days")
+        XCTAssertEqual(tide.sunY, tide.dayY + 17, "sun times share the date row")
         XCTAssertGreaterThan(tide.eclipseY, tide.sunY, "eclipses clear the sun times")
         XCTAssertEqual(tide.height, tide.eclipseY + 18, "the canvas ends below the moon disc")
         // The lead and its pill row own the pad above the plot: the row's top
