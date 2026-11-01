@@ -116,7 +116,8 @@ enum Timeline {
     /// The middle two are estimates and want a source — Sailing Directions or
     /// small-craft guidance. They ship flagged because the ramp is an encoding
     /// rather than a computed hazard call: an anchor wrong by half a knot moves
-    /// a colour, not a decision.
+    /// a colour, or which marks lead (current-charts §3.2), not a decision
+    /// about the water.
     ///
     static let speedRampAnchorsKn = currentSpeedRampAnchorsKn
 
@@ -1241,7 +1242,7 @@ struct TimelineCanvas: View {
                 }
             case .maxFlood, .maxEbb:
                 guard data.clearsLabelEdges(e.time) else { continue }
-                // Context, not the event (§5.1): no dot. The speed hangs off
+                // No dot at any station (§5.4). The speed hangs off
                 // the peak, below a crest and above a trough,
                 // with the set arrow nearest the peak, in the reading's own
                 // ink — the fill and the line say nothing about direction,
