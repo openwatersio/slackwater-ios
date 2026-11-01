@@ -27,8 +27,10 @@ import { join } from "node:path";
 // catalog generators can stay on the release their output was built from until
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
-import { stationRoutes, stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, writeBundle, stationSuccessors, round3 } from "./bundle.mjs";
+
+const db = await loadStations();
 
 const res = join(here, "..", "Slackwater", "Resources");
 const out = join(res, "slugs.json");
@@ -68,7 +70,7 @@ const CORRECTED = new Map([
 /** The database's route for every station id of one kind. */
 function routesById(kind) {
   const table = new Map();
-  for (const route of stationRoutes(kind)) {
+  for (const route of db.stationRoutes(kind)) {
     const former = route.formerPaths.map((path) => path.split("/").filter(Boolean).pop());
     for (const id of route.stationIds) table.set(id, { slug: route.slug, former, ids: route.stationIds });
   }
@@ -120,7 +122,7 @@ function narrow(kind, files) {
   const clash = Object.keys(former).filter((old) => live.has(old));
   if (clash.length) throw new Error(`${kind}: former slug(s) also live: ${clash.slice(0, 5).join(", ")}`);
   const elsewhere = [];
-  for (const route of stationRoutes(kind)) {
+  for (const route of db.stationRoutes(kind)) {
     if (!(route.slug in former)) continue;
     if (route.stationIds.some((id) => table[id]))
       throw new Error(`${kind}: former slug ${route.slug} is live for bundled ${route.stationIds.join(",")}`);
@@ -182,7 +184,7 @@ for (const [kind, now] of Object.entries(nowByKind)) {
  * database does not carry.
  */
 const msl = (id) => {
-  const s = stationsById.get(id);
+  const s = db.byId(id);
   const zero = s?.datums?.[s?.chart_datum];
   return s && s.type === "reference" && s.datums?.MSL != null && zero != null ? s.datums.MSL - zero : undefined;
 };

@@ -76,7 +76,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations, buildDatabase, stationRoutes } from "@slackwater/database";
+import { buildDatabase, loadStations } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
@@ -84,6 +84,8 @@ import {
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
+
+const db = await loadStations();
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
 
@@ -242,7 +244,7 @@ const upstreamRegion = (s) => {
 // The database carries current stations in the same list since it unified
 // the two; this generator is the tide half, and a subordinate current keeps
 // its offsets under `current`, not where a tide's are.
-const shippable = allStations.filter((s) => (s.kind ?? "tide") === "tide" && s.license?.commercial_use === true);
+const shippable = db.all.filter((s) => (s.kind ?? "tide") === "tide" && s.license?.commercial_use === true);
 
 /**
  * One pin per place. NOAA wins ties outright: public domain, curated names,
@@ -349,7 +351,7 @@ const servedByChs = (s) =>
  * a device saved for the row that yields moves to the survivor at launch
  * (`StationSuccessors` in the app, `station-successors.json` here).
  */
-const routeOf = new Map(stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
+const routeOf = new Map(db.stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
 const claimedRoutes = new Set(chs.map((c) => routeOf.get(c.id)).filter(Boolean));
 let sameRoute = 0;
 const routeTaken = (s) => {
@@ -548,7 +550,7 @@ if (stations.some((s) => !s.region)) {
 // than a quality one, so it is asserted on the way OUT as well as applied on
 // the way in — a future refactor of the pipeline above cannot quietly lose it.
 const ids = new Set(stations.map((s) => s.id));
-if (allStations.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)) {
+if (db.all.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)) {
   throw new Error("a station without commercial-use rights reached the bundle");
 }
 // TICON must never compete with CHS in the water CHS serves. If a Victoria or
@@ -558,7 +560,7 @@ if (allStations.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)
 // province code. The line stopped being a reliable carrier of that the moment
 // a derived context could win it ("Sidney, BC"), and this guard failing open
 // is how two Victorias reach the map — so it reads the fact, not the label.
-const canadianIds = new Set(allStations.filter((s) => countryOf(s) === "Canada").map((s) => s.id));
+const canadianIds = new Set(db.all.filter((s) => countryOf(s) === "Canada").map((s) => s.id));
 const canadian = stations.filter((s) => canadianIds.has(s.id));
 const contested = canadian.filter((s) =>
   s.id.startsWith("ticon/") && chs.some((c) => km(s, c) <= CHS_COVERAGE_KM));
@@ -591,7 +593,7 @@ if (contested.length) {
  * them is the last place that may carry a constituent.
  */
 const shippedPoints = [...stations, ...chs];
-const unavailableCandidates = allStations
+const unavailableCandidates = db.all
   .filter((s) => s.license?.commercial_use === false)
   .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
   .filter((s) => s.type === "reference")
@@ -694,7 +696,7 @@ const size = writeBundle(out, stations);
  * holding only that flag, so the factors, the issue strings and the rejection
  * reasons, which nothing here reads, stay out of the bundle.
  */
-const rawById = new Map(allStations.map((s) => [s.id, s]));
+const rawById = new Map(db.all.map((s) => [s.id, s]));
 const databaseVersion = JSON.parse(readFileSync(
   join(here, "node_modules", "@slackwater", "database", "package.json"), "utf8")).version;
 const tcdb = buildDatabase(stations.map((b) => ({
@@ -705,7 +707,7 @@ const tcdb = buildDatabase(stations.map((b) => ({
   quality: rawById.get(b.id).quality?.seasonal_dominant ? { seasonal_dominant: true } : undefined,
   harmonic_constituents: b.constituents,
   datums: b.reference ? {} : rawById.get(b.id).datums,
-})), { version: databaseVersion, credits: await sourceCredits(allStations) });
+})), { version: databaseVersion, credits: await sourceCredits(db.all) });
 writeFileSync(join(here, "..", "Slackwater", "Resources", "stations.tcdb"), tcdb);
 
 const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
