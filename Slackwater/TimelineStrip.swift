@@ -308,7 +308,7 @@ struct TimelineData {
     /// day chrome draws, derived from the window so it can't drift again. It
     /// already did: a literal `offset <= 5`, correct for the 132h strip it was
     /// written against, outlived it and left days 6 and 7 with no night bands,
-    /// no daylight tint, no label and no sun dots — while their sun events
+    /// no daylight tint, no label and no sun times — while their sun events
     /// stayed in `snapTimes`, so the magnet parked the centerline on a sunrise
     /// that was drawn nowhere.
     ///
@@ -709,14 +709,12 @@ extension WindowRun {
 /// making this geometry scale with them — a real chart-layout change, not a
 /// font swap. Until then the labels stay fixed; don't "finish the job" here.
 ///
-/// The card look (spec §2): day chrome on top, one plot box, one time row
-/// under it. Readings annotate the curve itself, so both tracks share the
-/// same box; `tideY`/`curY` map data onto it.
+/// Readings annotate the curve; absolute times sit below the plot.
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
-    /// The strip's height follows its last row of sun-event dots plus a margin.
-    var height: CGFloat { sunY + 18 }
+    let hasPeakTimes: Bool
+    var height: CGFloat { eclipseY + 18 }
     let tideTop: CGFloat
     let tideBottom: CGFloat
     let bodyTop: CGFloat
@@ -746,7 +744,7 @@ struct TimelineGeo {
     /// edge on the side now is.
     var chromeY: CGFloat { padTop - 36 }
     /// The plot box. 10 past the pad clears a turn dot's halo. Below it come
-    /// the time row, then the day row (day label and sun times) — the card
+    /// the event times, then the day and sun rows — the card
     /// graph's order, chrome under the curve rather than over it.
     /// How far the plot box runs below the sky's horizon (`bodyTop`). The
     /// sky backdrop extends this far past its horizon, under the water.
@@ -765,6 +763,7 @@ struct TimelineGeo {
          plotDepth: CGFloat = Self.plotDepth) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
+        hasPeakTimes = !data.hasTide && data.currentEvents.contains { $0.kind != .slack }
         self.padTop = padTop
         self.plotDepth = plotDepth
         let (plotTop, plotBottom) = Self.plotBox(padTop: padTop, depth: plotDepth)
@@ -796,13 +795,12 @@ struct TimelineGeo {
 
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
-    /// The one row of absolute times, under the plot (current spec §5.5:
-    /// one home per surface).
     var timeY: CGFloat { bodyBottom + 18 }
-    /// The day row under the axis: day label and sun times on `dayY`, the
-    /// date 17 below it, with sun dots centred on `sunY`.
-    var dayY: CGFloat { timeY + 26 }
-    var sunY: CGFloat { dayY + 14 }
+    var peakTimeY: CGFloat { timeY + 20 }
+    var lastTimeY: CGFloat { hasPeakTimes ? peakTimeY : timeY }
+    var dayY: CGFloat { lastTimeY + 26 }
+    var sunY: CGFloat { dayY + 34 }
+    var eclipseY: CGFloat { sunY + 14 }
 
     func tideY(_ h: Double) -> CGFloat {
         tideTop + (1 - CGFloat((h - (tideMid - tideSpan)) / (2 * tideSpan))) * (tideBottom - tideTop)
@@ -950,7 +948,7 @@ struct TimelineCanvas: View {
     /// and sets it larger but light, so the colour carries it without the
     /// weight pulling the eye; untinted times stay quiet foam.
     private func axisTimes(_ ctx: GraphicsContext, _ times: [Date], _ t0: Date, _ t1: Date,
-                           tint: ((Date) -> Color)? = nil) {
+                           y: CGFloat? = nil, tint: ((Date) -> Color)? = nil) {
         // A time is centred on its moment, so one just off the tile still
         // prints half a label into it: widen by the thinning gap, which no
         // label is wider than, or the seam clips it.
@@ -962,13 +960,13 @@ struct TimelineCanvas: View {
                 : .system(size: 14, weight: .regular).monospacedDigit()
             let color = tint.map { $0(t).opacity(fade(t)) } ?? SN.foam.opacity(0.7 * fade(t))
             ctx.draw(Text(chartTime(t, data.tz)).font(font).foregroundStyle(color),
-                     at: CGPoint(x: data.x(t), y: geo.timeY), anchor: .center)
+                     at: CGPoint(x: data.x(t), y: y ?? geo.timeY), anchor: .center)
         }
     }
 
     // Day labels and sun markers — continuous across midnight.
     private func drawDayChrome(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
-        // A day's chrome hangs off its daylight midpoint and its sun dots, so
+        // A day's chrome hangs off its daylight midpoint and its sun times, so
         // a day whose midnight is off-tile can still print into it: widen by a
         // day either side rather than testing the day's own start.
         let from = t0.addingTimeInterval(-24 * 3600), to = t1.addingTimeInterval(24 * 3600)
@@ -991,37 +989,21 @@ struct TimelineCanvas: View {
             for (t, systemImage) in [(day.sunrise, "sunrise"), (day.sunset, "sunset")] {
                 guard let t else { continue }
                 let x = data.x(t)
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
-                         with: .color(SN.sun))
                 ctx.draw((Text(Image(systemName: systemImage)) + Text(" \(cardTime(t, data.tz))"))
                             .font(.system(size: 11, weight: .medium).monospaced())
                             .foregroundStyle(SN.sunrise),
-                         at: CGPoint(x: x, y: geo.dayY), anchor: .center)
+                         at: CGPoint(x: x, y: geo.sunY), anchor: .center)
             }
         }
         drawEclipses(ctx, t0, t1)
     }
 
-    /// A moon at greatest eclipse, on the sun dots' row. That is the whole
-    /// mark on the strip.
-    ///
-    /// No text, and no band. The text came first and could not fit: `dayY`
-    /// holds the day name and sun times, `dayY + 17` the date, `sunY` the sun
-    /// dots, `height` is `sunY + 18` — there is no free row, and an eclipse
-    /// starts in the evening, so a time label lands an hour or two from sunset
-    /// and prints through it. A copper band across P1–P4 replaced it and was
-    /// worse in a different way: a coloured span over the curve reads as a
-    /// measurement of something, and nobody could tell what.
-    ///
-    /// So: half-size glyph, small enough to sit between the sun dots without
-    /// crowding them, and the times stay where they already were — the
-    /// schedule row below, and the readout as you scrub. #304 is where a
-    /// better answer goes; this one is deliberately quiet rather than wrong.
+    /// The eclipse glyph sits below sun times so a peak near sunrise cannot overprint them.
     private func drawEclipses(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
         let peaks = data.eclipses.map(\.peak) + data.solarEclipses.map(\.peak)
         for peak in peaks where data.contains(peak) && peak >= t0 && peak <= t1 {
             ctx.draw(Text(verbatim: "🌘").font(.system(size: 6.5)),
-                     at: CGPoint(x: data.x(peak), y: geo.sunY), anchor: .center)
+                     at: CGPoint(x: data.x(peak), y: geo.eclipseY), anchor: .center)
         }
     }
 
@@ -1241,6 +1223,10 @@ struct TimelineCanvas: View {
         CurveDrawing.runs(ctx, coreSegs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         axisTimes(ctx, data.slackAxisTimes.filter(data.clearsLabelEdges), t0, t1, tint: { _ in SN.go })
+        if geo.hasPeakTimes {
+            axisTimes(ctx, data.currentEvents.filter { $0.kind != .slack }.map(\.time).filter(data.clearsLabelEdges),
+                      t0, t1, y: geo.peakTimeY)
+        }
 
         // A max's speed label hangs off its peak, so the slice (one event
         // either side) rather than a strict tile test.

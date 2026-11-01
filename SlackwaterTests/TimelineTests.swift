@@ -1304,6 +1304,26 @@ private struct FoldPageTestHarness: View {
         XCTAssertFalse(m.co.magneting)
     }
 
+    func testTappingTheBottomOfAPeakTimeSelectsThePeak() async throws {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let h = { (hours: Double) in start.addingTimeInterval(hours * 3600) }
+        let peak = h(12), now = h(8)
+        let day = TimelineDay(offset: 0, start: start, sunrise: h(6), sunset: h(18), moonrise: nil, moonset: nil)
+        let data = TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: h(24), days: [day],
+                                tidePoints: [], tideRates: [], tideExtremes: [],
+                                currentPoints: [CurrentPoint(time: start, speed: 1), CurrentPoint(time: h(24), speed: 1)],
+                                currentEvents: [CurrentEvent(time: peak, speed: 1, kind: .maxFlood)],
+                                snapTimes: [peak], slackWindows: [])
+        var picked = 0
+        let selection = Selection(now)
+        let m = mountedStrip(data, selection, now: now, onPickDate: { picked += 1 })
+        defer { m.window.isHidden = true }
+        m.co.tap(m.sv, at: CGPoint(x: data.x(peak), y: TimelineGeo(data: data).peakTimeY + 5))
+        try await settle(m.co)
+        XCTAssertEqual(picked, 0)
+        XCTAssertEqual(selection.time.timeIntervalSince(peak), 0, accuracy: 1)
+    }
+
     /// A left-edge publish mid-ride would move the origin under the animation.
     func testATapRideMarksTheStoreBusy() async throws {
         let now = Date(timeIntervalSince1970: 1788868800)
@@ -1528,15 +1548,15 @@ private struct FoldPageTestHarness: View {
         // rather than as the pixel each row happens to sit on.
         XCTAssertGreaterThan(tide.timeY, tide.bodyBottom, "the time row sits under the plot")
         XCTAssertGreaterThan(tide.dayY, tide.timeY, "the day row sits under the times")
-        XCTAssertGreaterThan(tide.sunY, tide.dayY, "the sun dots and moons sit under the day label")
-        XCTAssertEqual(tide.height, tide.sunY + 18, "the canvas ends below the moon disc")
+        XCTAssertGreaterThan(tide.sunY, tide.dayY, "sun times sit under the day label")
+        XCTAssertGreaterThan(tide.sunY - (tide.dayY + 17), 12, "sun times clear the date on short days")
+        XCTAssertGreaterThan(tide.eclipseY, tide.sunY, "eclipses clear the sun times")
+        XCTAssertEqual(tide.height, tide.eclipseY + 18, "the canvas ends below the moon disc")
         // The lead and its pill row own the pad above the plot: the row's top
         // plus a pill's height has to land inside it, or a pill overlaps the
         // curve it floats above.
         XCTAssertLessThanOrEqual(tide.chromeY + 30, tide.padTop, "the pill row clears the plot's pad")
 
-        // Current-only: construct TimelineData directly — the geometry keys only
-        // on which point arrays are non-empty.
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let cur = TimelineGeo(data: TimelineData(
             tz: .current, anchor: t0, today: t0, start: t0, end: t0.addingTimeInterval(3600),
@@ -1546,7 +1566,8 @@ private struct FoldPageTestHarness: View {
         XCTAssert(!cur.hasTide && cur.hasCurrent)
         XCTAssertEqual(cur.bodyTop, cur.curTop)
         XCTAssertEqual(cur.bodyBottom, cur.curBottom)
-        XCTAssertEqual(cur.height, tide.height, "same canvas for both tracks")
+        XCTAssertEqual(cur.height, tide.height, "a current with no maxima needs no peak-time row")
+        XCTAssertFalse(cur.hasPeakTimes)
         XCTAssertEqual(cur.curTop, tide.tideTop, "same plot box for both tracks")
         XCTAssertEqual(cur.curBottom, tide.tideBottom)
         XCTAssertEqual(cur.timeY, tide.timeY)
@@ -1917,9 +1938,6 @@ private struct FoldPageTestHarness: View {
 
         let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now, anchor: today)
 
-        // TimelineGeo keys only on which point arrays are non-empty
-        // (testSingleTrackGeometries), so this is already the current-only
-        // geometry — the `== 312` that used to follow just restated its height.
         XCTAssert(d.hasCurrent && !d.hasTide)
         XCTAssertFalse(d.currentEvents.isEmpty)
         // Fetched official samples are real velocities, so the online-gate path
