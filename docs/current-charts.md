@@ -282,6 +282,8 @@ the readout has three homes and they will drift.
 Times that leave the chart do not leave the product — the schedule table keeps
 its absolute column.
 
+On the detail strip, maximum ebb and flood times sit on a quiet gray row below the green slack times. Each row thins crowded labels independently. The peak row is omitted when the current has no maximum events. Day names and dates follow the event times, with sunrise and sunset sharing the date row and no sun dots. Eclipse glyphs sit below the sun times.
+
 Where two labels would collide, **measure the rendered text; never estimate
 widths** — a hardcoded estimate stops being true the moment the font changes.
 When they would overlap, collapse to one merged range. At typical zoom, merged

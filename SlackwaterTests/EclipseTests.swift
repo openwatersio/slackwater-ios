@@ -438,7 +438,7 @@ final class EclipseTests: XCTestCase {
         let (tl, _) = try eclipseTimeline()
 
         // The SAME window with the eclipses removed — not a different week, so
-        // the tide curve, day chrome and sun dots are pixel-identical and the
+        // the tide curve, day chrome and sun times are pixel-identical and the
         // only difference left is the mark.
         var stripped = tl
         stripped.eclipses = []

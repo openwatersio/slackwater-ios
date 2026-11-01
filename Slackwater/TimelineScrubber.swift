@@ -799,7 +799,7 @@ struct TimelineScrubber: UIViewRepresentable {
         /// rather than a moment, and so opens the picker.
         /// The line between the plot with its axis times (at or above) and the day row (below),
         /// from the two rows' own y's: the strip's geometry is all literal points and moves.
-        private var rowSplit: CGFloat { (parent.geo.timeY + parent.geo.dayY) / 2 }
+        private var rowSplit: CGFloat { (parent.geo.lastTimeY + parent.geo.dayY) / 2 }
 
         private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
             let data = parent.data
