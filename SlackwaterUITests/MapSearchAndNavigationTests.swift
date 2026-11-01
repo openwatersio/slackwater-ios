@@ -24,6 +24,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(legend.label.contains("knots"))
         XCTAssert(legend.label.contains("Not for navigation."))
         XCTAssertLessThan(app.frame.maxY - legend.frame.maxY, 20)
+        XCTAssertGreaterThanOrEqual(legend.frame.height, 44)
         let map = app.otherElements["map-canvas"].firstMatch
         map.pinch(withScale: 2, velocity: 1)
         sleep(2)
@@ -57,6 +58,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         }
         XCTAssertGreaterThan(Double(retained) / Double(before.count / 4), 0.9,
                              "Changing units must preserve the map's camera")
+        legend.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 8, dy: legend.frame.height / 2)).tap()
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5), "The legend's padding must also open settings")
     }
 
     func testMapLegendStaysClearOfThePreviewAtLargeText() {

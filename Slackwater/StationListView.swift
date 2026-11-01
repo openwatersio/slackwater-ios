@@ -512,6 +512,8 @@ struct StationListView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(minHeight: 44)
+            // On iOS 26, plain buttons otherwise pass taps between the rows through to the map.
+            .contentShape(RoundedRectangle(cornerRadius: 24))
             .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 24))
             .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
         }
