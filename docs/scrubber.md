@@ -72,7 +72,7 @@ MOVES HORIZONTALLY AS ONE CONTINUOUS STRIP
 
   event labels ─────── curve ─────── event labels
   absolute event times
-  current maximum times (when present)
+  current maximum times (reach reading)
   day
   sunrise / date / sunset
 ```
@@ -177,8 +177,8 @@ These are the current iOS logical-unit values. Preserve them on phone-sized surf
 | `plotTop` | 170 | Top of tide/current plot |
 | `plotBottom` | 320 | Bottom of tide/current plot |
 | `eventTimeY` | 338 | Absolute event-time row |
-| `peakTimeY` | 358 | Current-maximum times, when present |
-| `dayY` | 364 / 384 | Day names; the later row applies to currents with maximum events |
+| `peakTimeY` | 358 | Current-maximum times, under the reach reading |
+| `dayY` | 364 / 384 | Day names; the later row applies to currents drawing the maximum-time row |
 | `dateY` | 381 / 401 | Calendar date under the day name |
 | `sunY` | 381 / 401 | Sunrise/sunset symbols and times on the date row, without dots |
 | `eclipseY` | 395 / 415 | Eclipse glyph below sun times |
@@ -622,14 +622,14 @@ A measured slack window is measured around each slack instant on the drawn sampl
 
 Each zero instant draws as a six-unit go-colour stroke along the curve, centred on the instant. Its width is a rendering minimum, not a slack duration. A merged window narrower than a turn dot's five-unit diameter is not drawn and has no magnetic targets, commentary stops, or event times of its own; its zero instant still has a mark and stop. At 18 units an hour that is a window shorter than about 17 minutes. Station cards apply the same minimum at their own scale. Derived gates retain their schematic slack presentation because they have no measured speeds.
 
-Current maxima are drawn as context rather than as marks:
+Current maxima are drawn as context rather than as marks at every station; the reach reading (current-charts §1) adds only the maximum-time row below:
 
 - no peak dot;
 - hang the absolute speed, without unit, below a velocity crest and above a trough, following the curve's approach with flood/ebb sign as the flat-approach fallback;
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The first event-time row contains each drawn window's opening and each zero instant outside every drawn window. When a merged window contains multiple zero instants, print those exact slack times instead of its opening, so a continuous window whose opening is off-screen still has useful times. These times use go green, with the usual past fade. The same selection applies to station cards at their own scale. Detail strips print maximum ebb and flood times on a separate gray row below slack times, independently thinned. Maximum times remain magnetic. Cards omit maximum times.
+The first event-time row contains each drawn window's opening and each zero instant outside every drawn window. When a merged window contains multiple zero instants, print those exact slack times instead of its opening, so a continuous window whose opening is off-screen still has useful times. These times use go green, with the usual past fade. The same selection applies to station cards at their own scale. Detail strips print maximum ebb and flood times on a separate gray row below slack times, independently thinned, at a reach: a harmonic or fitted station whose model peak for its year stays under the make-way anchor (current-charts §1, §5.4.1). At a narrows, and at every online or derived gate, the row is omitted and the maxima stay in the schedule. Maximum times remain magnetic at every station. Cards omit maximum times.
 
 ### 13.3 Schematic derived current
 
@@ -810,10 +810,13 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 36. **Slack caps:** Window and green runs replace the underlying stroke, including in the past, and only their ends against the yellow curve have separation gaps; a green run joins its window's blue with none. Fill and sky remain intact.
 37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and greatest eclipse is the eclipse's only magnetic target; its other contacts are not.
 38. **Fold:** Unfolding after scrubbing lands on the folded instant, including one weeks from now; folding while home lands on refreshed now. Both directions keep the chosen schedule week. A schedule in the upper half of the viewport returns to view after its data loads; a glimpse at the bottom leaves the chart in view. Scrolling while data loads cancels the pending schedule restoration.
+39. **Reach row:** A harmonic or fitted current whose model peak for its year stays under the make-way anchor draws the maximum-time row; one whose peak reaches it, and every online or derived gate, omits the row. Picking another week or scrolling across springs changes neither.
 
 ## 18. Known iOS deviations from the intended contract
 
-This section lists implementation gaps, not behavior to copy to another platform. No gap is known in the iOS reference.
+This section lists implementation gaps, not behavior to copy to another platform.
+
+The iOS reference draws the maximum-time row at every current with maxima, rather than only at a reach (§13.2). It has no narrows or reach classification yet.
 
 A gap found later is listed here. Fixing one should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
