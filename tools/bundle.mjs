@@ -216,7 +216,7 @@ export function gateTombstones({ previous, shipping, existing = [] }) {
  * The ids `quality.redundant` leads to from `id`, nearest first. The database
  * sets it on a duplicate, and on a relay its operator's record supersedes, to
  * name the record published for that gauge, so the walk ends at the first
- * accepted record, and at a loop. Every pointer at 1.0.0-beta.20261028 lands on
+ * accepted record, and at a loop. Every pointer at 1.0.0-beta.20261102 lands on
  * an accepted record in one hop.
  */
 export function redundantChain(id, stationsById) {

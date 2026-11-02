@@ -105,11 +105,11 @@ const CA_PROVINCE = {
 
 /**
  * The database's quality evaluation decides which record of a gauge is
- * published. This is the safety net for what it leaves separate: at
- * 1.0.0-beta.20261028 it drops 54 accepted reference records and 2 fallback
- * records within a kilometre of a kept station ("Hakodate", two networks 0.7 km
- * apart). Across this rule and the two after it, 78 of the 90 reference records
- * dropped match the kept station's M2 (within 10% or 3 cm, and 15 degrees), so
+ * published. This is the safety net for what it leaves separate, such as
+ * "Hakodate", two networks 0.7 km apart; the generator's summary counts what it
+ * drops. Measured at 1.0.0-beta.20261028, across this rule and the two after
+ * it, 78 of the 90 reference records dropped match the kept station's M2
+ * (within 10% or 3 cm, and 15 degrees), so
  * the map would otherwise carry duplicate pins. 9 differ, such as either side of
  * the Nordfeld sluice (0.84 m against 0.03 m), and 3 had no pair to compare.
  *
