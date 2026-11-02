@@ -35,7 +35,14 @@ let seenTourKey = "slackwater.seenTour"
     /// Sky steps drop under VoiceOver too: the strip is an adjustable
     /// element there, and "swipe the curve" is the wrong advice.
     private var skipsStars: Bool { !starsAvailable || UIAccessibility.isVoiceOverRunning }
-    private var skipsMoon: Bool { !moonAvailable || UIAccessibility.isVoiceOverRunning }
+    /// With Settings' sun, moon and stars switched off there is no moon to
+    /// point at, so that step drops. The stars step stays: it carries the
+    /// tour's only swipe lesson, and the scaffold keeps it on that wording
+    /// instead of gliding to an empty sky. Read at each advance, not captured
+    /// by `begin`, because the switch can sync from another device mid-tour.
+    private var skipsMoon: Bool {
+        !moonAvailable || UIAccessibility.isVoiceOverRunning || !showsSkyBodies()
+    }
 
     /// Called once on launch. A tour that has already been seen does not arm.
     func arm() {

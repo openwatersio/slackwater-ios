@@ -53,6 +53,28 @@ import XCTest
         }
     }
 
+    func testSkyBodiesShowUntilSwitchedOff() {
+        XCTAssertTrue(showsSkyBodies(defaults: defaults), "an unset switch draws the sun, moon and stars")
+        let sync = sync()
+        withExtendedLifetime(sync) {
+            sync.set(false, forKey: AppGroup.skyBodiesKey)
+            XCTAssertFalse(showsSkyBodies(defaults: defaults))
+            XCTAssertEqual(cloud.values[AppGroup.skyBodiesKey] as? Bool, false, "the switch follows the person to other devices")
+            sync.set("off", forKey: AppGroup.skyBodiesKey)
+            XCTAssertEqual(defaults.object(forKey: AppGroup.skyBodiesKey) as? Bool, false, "only a Bool is a sky switch")
+            XCTAssertEqual(reloads, 0, "no widget draws the sky, so the flip reloads none")
+        }
+    }
+
+    func testSkyBodiesSwitchArrivesFromTheCloud() {
+        cloud.values = [AppGroup.skyBodiesKey: false]
+        let sync = sync()
+        withExtendedLifetime(sync) {
+            XCTAssertFalse(showsSkyBodies(defaults: defaults))
+            XCTAssertEqual(reloads, 0, "no widget draws the sky, so the flip reloads none")
+        }
+    }
+
     func testFreshInstallDoesNotUploadDefaults() {
         XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "en_FR")), "metric")
         let sync = sync()

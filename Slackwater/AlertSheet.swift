@@ -23,6 +23,17 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
     rule.once.map { $0 >= now } ?? true
 }
 
+/// A moment still ahead whose reminder time is already behind: with a lead short enough for a
+/// Live Activity the countdown starts on save; with a longer one there is nothing left to send.
+func alertSheetStartsNow(_ rule: AlertRule, now: Date) -> Bool {
+    alertSheetReminderPassed(rule, now: now) && rule.lead <= AlertHorizon.liveActivityLead
+}
+
+func alertSheetReminderPassed(_ rule: AlertRule, now: Date) -> Bool {
+    guard let once = rule.once else { return false }
+    return once >= now && once.addingTimeInterval(-rule.lead) <= now
+}
+
 enum AlertSheetNote: Equatable {
     case nothingAhead, nothingThatDay, notOffered, failed
 }
@@ -133,6 +144,14 @@ struct AlertSheet: View {
                     .accessibilityIdentifier("alert-sheet-sun")
                     if !canSave {
                         Text("This moment has passed", comment: "Under the alert sheet's When section, when the chosen moment is already behind us.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if alertSheetStartsNow(rule, now: appNow()) {
+                        Text("The reminder time has passed; the countdown starts now", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if alertSheetReminderPassed(rule, now: appNow()) {
+                        Text("The reminder time has passed", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     }

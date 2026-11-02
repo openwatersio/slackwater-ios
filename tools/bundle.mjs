@@ -3,6 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attributionWithCredit, loadStations, PROJECT_CREDIT } from "@slackwater/database";
 
 /** tools/ — every generator resolves its paths from here. */
 export const here = dirname(fileURLToPath(import.meta.url));
@@ -16,7 +17,6 @@ export const here = dirname(fileURLToPath(import.meta.url));
  * every station of every source.
  */
 export async function sourceCredits(stations) {
-  const { attributionWithCredit, PROJECT_CREDIT } = await import("@slackwater/database");
   const credits = new Map();
   for (const s of stations) {
     if (!s.source) continue;
@@ -44,9 +44,8 @@ export async function sourceCredits(stations) {
 
 /** The database's bare-id records by id, in the field names the CHS generators read. */
 export async function curatedRecords() {
-  // Imported lazily: the database is tens of MB and most importers want constants.
-  const { allStations } = await import("@slackwater/database");
-  return Object.fromEntries(allStations.filter((s) => !s.id.includes("/")).map((s) => {
+  const db = await loadStations();
+  return Object.fromEntries(db.all.filter((s) => !s.id.includes("/")).map((s) => {
     const c = s.current ?? {};
     return [s.id, {
       name: s.name,
@@ -139,8 +138,9 @@ export function tombstones({ shipping, previous = [], existing = [] }) {
  * id, so an id that stops shipping strands everything saved under it.
  *
  * - `successors` — departed id → `{ id, datumShiftM? }`: the bundled id the
- *   database publishes as the same station (`successorOf`: the other bundled
- *   id on its route, or the one `quality.redundant` names), and the metres to add to a height measured from the old
+ *   database publishes as the same gauge (`successorOf`: the other bundled id
+ *   on its route, else the bundled record the database pairs it with as a
+ *   duplicate), and the metres to add to a height measured from the old
  *   record's chart datum to measure it from the new one's. The shift is absent
  *   when it cannot be established, and the app then asks the user to set a
  *   tide-height alert again rather than keep a threshold on the wrong datum.

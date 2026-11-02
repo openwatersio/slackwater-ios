@@ -79,6 +79,30 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         clean.terminate()
     }
 
+    /// The sky's sun, moon and stars switch is a persisted preference like the
+    /// units: launched off, it reads off; turned on, it stays on across a relaunch.
+    func testSkyBodiesSwitchPersistsAcrossRelaunch() {
+        let app = launch("-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-skyBodiesOff")
+        openSettings(app)
+        let toggle = app.switches["settings-sky-bodies"].firstMatch
+        scrollTo(toggle, in: app)
+        XCTAssert(toggle.appears(within: 5))
+        XCTAssertEqual(toggle.value as? String, "0", "-skyBodiesOff launches with the switch off")
+        toggle.tap()
+        XCTAssert(eventually(within: 5) { toggle.value as? String == "1" })
+        app.terminate()
+        let again = launch(["-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"],
+                           resetSettings: false)
+        openSettings(again)
+        let kept = again.switches["settings-sky-bodies"].firstMatch
+        scrollTo(kept, in: again)
+        XCTAssert(kept.appears(within: 5))
+        XCTAssertEqual(kept.value as? String, "1", "the switch did not survive the relaunch")
+        again.terminate()
+        let clean = launch("-locDenied", "-resetSkyBodies")
+        clean.terminate()
+    }
+
     func testLaunchResetsPersistedPreferences() {
         let app = launch("-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
         openSettings(app)

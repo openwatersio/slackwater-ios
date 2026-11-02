@@ -380,10 +380,12 @@ The preview scrubber stops at the actual downloaded bounds. Date picking and tid
 A Canadian gate with a usable 60-day model keeps its scrubber visible while the remaining data downloads toward its validated full model. The centered notice sits below the scrubber and above the summary cards, matching the tide preview notice:
 
 - “Additional data is required to improve accuracy” above the station’s retained download progress meter;
-- the station’s measured timing uncertainty: “Slack at <gate> can differ from CHS's prediction by up to N min.”; and
-- offline, retry, or failure copy when applicable.
+- offline, retry, or failure copy when applicable; and
+- the station’s measured timing uncertainty, the bound sentence: “Slack at <gate> can differ from CHS's prediction by up to N min.”
 
 There is no separate “Refining” or “Fast answer” UI state. The station remains in the ordinary download queue until its full model meets the quality bar. Readings remain usable during queued, interrupted, or failed additional downloads. The notice disappears when the full model lands. Until then, numeric readings retain “~” (scrubber §9.2).
+
+On the phone, the bound sentence is secondary text, like the available-through date, both during the download and after it. Attention colour stays on the approximate readings it explains. It wraps at every text size and never truncates, since its last words carry the bound.
 
 A bounded full model keeps the same bound sentence after downloading completes, using its year-round bound. Its readings keep the approximate mark and attention colour, while the notice contains no download status or progress. Downloads lists it as downloaded. The watch shows the bound sentence without download wording.
 

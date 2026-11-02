@@ -30,8 +30,10 @@ import { join } from "node:path";
 // catalog generators can stay on the release their output was built from until
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
-import { stationRoutes, stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, writeBundle, stationSuccessors, redundantChain, round3 } from "./bundle.mjs";
+
+const db = await loadStations();
 
 const res = join(here, "..", "Slackwater", "Resources");
 const out = join(res, "slugs.json");
@@ -71,7 +73,7 @@ const CORRECTED = new Map([
 /** The database's route for every station id of one kind. */
 function routesById(kind) {
   const table = new Map();
-  for (const route of stationRoutes(kind)) {
+  for (const route of db.stationRoutes(kind)) {
     const former = route.formerPaths.map((path) => path.split("/").filter(Boolean).pop());
     for (const id of route.stationIds) table.set(id, { slug: route.slug, former, ids: route.stationIds });
   }
@@ -104,7 +106,7 @@ function narrow(kind, files) {
     if (!table[id] && !liveSlugs.has(slug)) former[slug] = id;
   }
   for (const [old, id] of Object.entries(former)) {
-    const heir = table[id] ? undefined : redundantChain(id, stationsById).find((other) => table[other]);
+    const heir = table[id] ? undefined : redundantChain(id, { get: db.byId }).find((other) => table[other]);
     if (heir) former[old] = heir;
   }
   if (missing.length) {
@@ -134,7 +136,7 @@ function narrow(kind, files) {
   const clash = Object.keys(former).filter((old) => live.has(old));
   if (clash.length) throw new Error(`${kind}: former slug(s) also live: ${clash.slice(0, 5).join(", ")}`);
   const elsewhere = [];
-  for (const route of stationRoutes(kind)) {
+  for (const route of db.stationRoutes(kind)) {
     if (!(route.slug in former)) continue;
     if (route.stationIds.some((id) => table[id]))
       throw new Error(`${kind}: former slug ${route.slug} is live for bundled ${route.stationIds.join(",")}`);
@@ -198,7 +200,7 @@ for (const [kind, now] of Object.entries(nowByKind)) {
  * database does not carry.
  */
 const msl = (id) => {
-  const s = stationsById.get(id);
+  const s = db.byId(id);
   const zero = s?.datums?.[s?.chart_datum];
   return s && s.type === "reference" && s.datums?.MSL != null && zero != null ? s.datums.MSL - zero : undefined;
 };
@@ -209,18 +211,33 @@ const datumShift = (from, to) => {
 };
 
 /**
- * The bundled station the database publishes for a departed id, as
- * `{ id, datumShiftM? }`: the one on its route, else the one `quality.redundant`
- * leads to. A record that left as a duplicate usually has a route of its own,
- * so the route alone would tombstone a gauge that still ships.
+ * The records the database rejects as duplicates of each id (`quality.redundant`).
+ * A duplicate is one gauge recorded twice, even when the two are separate
+ * stations with separate routes: DMI's Tasiilaq record duplicates TICON's
+ * Ammassalik record 0.4 km away, but their observations cover different years.
+ */
+const duplicatesOf = new Map();
+for (const s of db.all) {
+  const target = s.quality?.accepted === false ? s.quality.redundant : undefined;
+  if (target) duplicatesOf.set(target, [...(duplicatesOf.get(target) ?? []), s.id]);
+}
+/** The same gauge under another record: the one this id duplicates, or one that duplicates it. */
+const sameGaugeIds = (id) => [db.byId(id)?.quality?.redundant, ...(duplicatesOf.get(id) ?? [])].filter(Boolean);
+
+/**
+ * The bundled station on a departed id's database route, as `{ id, datumShiftM? }`.
+ * Without one, the bundled record `quality.redundant` leads to, else any bundled
+ * record of the same gauge, so a saved station moves to it rather than being
+ * tombstoned when the bundle keeps the other record.
  */
 const successorOf = (item) => {
   const kind = item.startsWith("current:") || (!routesByKind.tide.has(item) && routesByKind.current.has(item))
     ? "current" : "tide";
   const id = item.replace(/^current:/, "");
-  const bundled = (other) => nowByKind[kind][other];
-  const twin = (routesByKind[kind].get(id)?.ids ?? []).filter(bundled).sort()[0] ??
-    redundantChain(id, stationsById).find(bundled);
+  const bundled = (ids) => ids.filter((other) => nowByKind[kind][other]).sort()[0];
+  const twin = bundled(routesByKind[kind].get(id)?.ids ?? []) ??
+    redundantChain(id, { get: db.byId }).find((other) => nowByKind[kind][other]) ??
+    bundled(sameGaugeIds(id));
   if (!twin) return undefined;
   const shift = kind === "tide" ? datumShift(id, twin) : undefined;
   return shift === undefined ? { id: itemId(kind, twin) } : { id: itemId(kind, twin), datumShiftM: shift };

@@ -68,5 +68,16 @@ final class AlertSheetTests: XCTestCase {
         XCTAssertFalse(alertSheetCanSave(past, now: moment))
         XCTAssertTrue(alertSheetCanSave(ahead, now: moment))
         XCTAssertTrue(alertSheetCanSave(every, now: moment))
+        // A moment 15 minutes off with a 30-minute lead saves, and the sheet says the countdown
+        // starts now rather than letting the reminder silently fall behind.
+        let inside = AlertRule(stationID: "a", trigger: .slack, once: moment.addingTimeInterval(900), lead: 1_800)
+        XCTAssertTrue(alertSheetCanSave(inside, now: moment))
+        XCTAssertTrue(alertSheetStartsNow(inside, now: moment))
+        XCTAssertFalse(alertSheetStartsNow(ahead, now: moment))
+        XCTAssertFalse(alertSheetStartsNow(every, now: moment))
+        XCTAssertFalse(alertSheetStartsNow(past, now: moment), "a past moment is the other note")
+        let longLead = AlertRule(stationID: "a", trigger: .slack, once: moment.addingTimeInterval(900), lead: 3_600)
+        XCTAssertFalse(alertSheetStartsNow(longLead, now: moment), "an hour's lead gets no countdown")
+        XCTAssertTrue(alertSheetReminderPassed(longLead, now: moment))
     }
 }

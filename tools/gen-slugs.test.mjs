@@ -3,8 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { stationRoutes, stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, stationSuccessors, gateTombstones } from "./bundle.mjs";
+
+const db = await loadStations();
+const stationsById = { get: db.byId };
 
 const res = join(here, "..", "Slackwater", "Resources");
 const read = (file) => JSON.parse(readFileSync(join(res, file), "utf8"));
@@ -221,7 +224,7 @@ test("no database route holds two bundled stations", () => {
   // resolver happens to meet first.
   for (const kind of ["tide", "current"]) {
     const bundled = new Set(Object.keys(slugs[kind]));
-    const doubled = stationRoutes(kind)
+    const doubled = db.stationRoutes(kind)
       .map((r) => r.stationIds.filter((id) => bundled.has(id)))
       .filter((ids) => ids.length > 1);
     assert.deepEqual(doubled, [], kind);
@@ -233,13 +236,31 @@ test("a saved New Zealand TICON station moves to LINZ's record of the same gauge
   // A known datum shift moves a saved tide height; a CHS port has none.
   assert.deepEqual(successors["ticon/wellington-071-nzl-uhslc_fd"], { id: "linz/071", datumShiftM: 0.416 });
   assert.deepEqual(successors["noaa/8218617"], { id: "chs-mill-bay" });
-  // Auckland's UHSLC record was a tombstone until its `quality.redundant` was
-  // followed: the database names LINZ's port, on a route of its own.
+  // Not on LINZ's route, but the database rejects LINZ's Auckland record as its duplicate.
   assert.deepEqual(successors["ticon/auckland-070a-nzl-uhslc_rq"], { id: "linz/070", datumShiftM: 0.097 });
   const stones = read("station-tombstones.json").map((t) => t.id).filter(id => id.includes("-nzl-"));
-  assert.deepEqual(stones.sort(), [
-    "ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw",
-  ]);
+  assert.deepEqual(stones.sort(), ["ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw"]);
+});
+
+test("no station is tombstoned while the bundle carries another record of its gauge", () => {
+  // The database marks two records of one gauge with `quality.redundant`, even
+  // when their observations keep them apart as two stations. A saved station
+  // moves to the record the bundle keeps (DMI's Ilulissat and Nuuk to TICON's).
+  const bundled = new Set(Object.keys(slugs.tide));
+  const sameGauge = new Map();
+  for (const s of db.all) {
+    const target = s.quality?.accepted === false ? s.quality.redundant : undefined;
+    if (!target) continue;
+    sameGauge.set(s.id, [...(sameGauge.get(s.id) ?? []), target]);
+    sameGauge.set(target, [...(sameGauge.get(target) ?? []), s.id]);
+  }
+  const stranded = read("station-tombstones.json")
+    .filter((t) => (sameGauge.get(t.id) ?? []).some((id) => bundled.has(id)))
+    .map((t) => t.id);
+  assert.deepEqual(stranded, []);
+  const successors = read("station-successors.json");
+  assert.equal(successors["dmi/2991550"]?.id, "ticon/ilulissat-298a-dnk-uhslc_rq");
+  assert.equal(successors["dmi/2991320"]?.id, "ticon/nuuk_godthaab-820-dnk-uhslc_fd");
 });
 
 // --- Records that leave because the database calls them duplicates
@@ -277,7 +298,7 @@ test("a duplicate's datum shift is the difference between what each record shipp
   const msl = (s) => s.datums.MSL - s.datums[s.chart_datum];
   // A move along a route can be carried from an earlier release, with the shift
   // that release measured. A move between two routes is this rule's own.
-  const routeOf = new Map(stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
+  const routeOf = new Map(db.stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
   let checked = 0;
   for (const [old, { id, datumShiftM }] of Object.entries(read("station-successors.json"))) {
     const from = stationsById.get(old);

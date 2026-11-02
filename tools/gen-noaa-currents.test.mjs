@@ -6,8 +6,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, undangle } from "./bundle.mjs";
+
+const db = await loadStations();
 
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "currents.json"), "utf8"));
@@ -41,7 +43,7 @@ const near = (a, b) => Math.abs(a - b) < 5e-4;
 
 test("every station carries its database record's fields, in the engine's units", () => {
   for (const s of stations) {
-    const record = stationsById.get(s.id);
+    const record = db.byId(s.id);
     const c = record?.current;
     assert.ok(c, `${s.id} is not a current station in the database`);
     assert.ok(near(s.floodDirection, c.flood_direction), `${s.id} flood direction`);
@@ -122,7 +124,7 @@ test("a bin is named for its surface station", () => {
 // With no context in the database, the region is borrowed from the nearest tide station.
 test("every station is named and placed by its database record", () => {
   for (const s of stations) {
-    const d = stationsById.get(s.id.split("@")[0]) ?? stationsById.get(s.id);
+    const d = db.byId(s.id.split("@")[0]) ?? db.byId(s.id);
     assert.equal(s.name, d.name, s.id);
     assert.deepEqual(s.aliases, d.aliases ?? [], s.id);
     if (d.context) assert.equal(s.region, undangle(d.context), s.id);

@@ -337,6 +337,9 @@ struct SkyBackdrop: View {
     /// The strip's plot depth, which the sky runs on under: shorter on the watch.
     var plotDepth: CGFloat = TimelineGeo.plotDepth
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Settings' sun, moon and stars switch. Off leaves the gradient alone:
+    /// the sky still says day or night, without a second axis over the plot.
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsBodies = true
 
     var body: some View {
         GeometryReader { proxy in
@@ -353,7 +356,7 @@ struct SkyBackdrop: View {
                                        .init(color: Color(hex: paint.bottom), location: 1)],
                                startPoint: .top, endPoint: .bottom)
                     .opacity(sky.opacity)
-                if sky.sun != nil {
+                if showsBodies, sky.sun != nil {
                     let opacity = starOpacity(sunAltitude: sky.litAltitude)
                     TimelineView(.animation(minimumInterval: 0.125,
                                             paused: opacity == 0 || reduceMotion)) { timeline in
@@ -382,17 +385,17 @@ struct SkyBackdrop: View {
                     }
                 }
                 // Below the horizon a body is past an edge; the clip hides it.
-                let sunPoint = sky.sun.map {
+                let sunPoint = showsBodies ? sky.sun.map {
                     skyBodyPoint(azimuth: $0.azDeg, altitude: $0.altDeg, latitude: sky.latitude,
                                  span: sky.sunSpan, pad: sunDiscRadius, size: size)
-                }
+                } : nil
                 if let point = sunPoint {
                     Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
                         .frame(width: sunGlowRadius * 2, height: sunGlowRadius * 2).position(point)
                     Circle().fill(SN.sun)
                         .frame(width: sunDiscRadius * 2, height: sunDiscRadius * 2).position(point)
                 }
-                if let moon = sky.moon, let illumination = sky.illumination {
+                if showsBodies, let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
                     let truePoint = skyBodyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                                  latitude: sky.latitude, span: sky.moonSpan,

@@ -7,7 +7,7 @@
 // it, and it is the question that matters: every readout, label and schedule
 // row can be right while the chart renders nothing (the texture-cap blank, the
 // empty gradient-stops array). Each threshold is measured against the same
-// window with no track on it, and both numbers are recorded here.
+// window with no track on it.
 import XCTest
 import SwiftUI
 @testable import Slackwater
@@ -221,10 +221,11 @@ final class RenderedStripTests: XCTestCase {
         }
     }
 
-    /// The daylight tint is faint: `#A8CAE0` at 8% over the bare sea, where the curve's water
-    /// carries no fill above datum, so a lit afternoon reads close to the sea itself.
+    /// The daylight tint is `#A8CAE0` at 22% over the bare sea, where the curve's water carries
+    /// no fill above datum: strong enough that a lit afternoon tells from the night beside it
+    /// without the sky's bodies, faint enough that the sea still reads as sea.
     @MainActor
-    func testTheDaylightTintIsEightPercent() throws {
+    func testTheDaylightTintIsTwentyTwoPercent() throws {
         let (tz, days) = try lateSunsetDays()
         let start = days[0].start, end = try XCTUnwrap(days.last?.start)
         let lit = flatTide(start: start, end: end, tz: tz, days: days)
@@ -242,8 +243,8 @@ final class RenderedStripTests: XCTestCase {
             let over = rgb(shaded, x: lit.x(afternoon), y: y), under = rgb(plain, x: lit.x(afternoon), y: y)
             for c in 0..<3 {
                 let alpha = Double(over[c] - under[c]) / Double(tint[c] - under[c])
-                XCTAssert((0.055...0.105).contains(alpha),
-                          "\(d.start)'s afternoon tint is \(alpha) in channel \(c), not 0.08")
+                XCTAssert((0.195...0.245).contains(alpha),
+                          "\(d.start)'s afternoon tint is \(alpha) in channel \(c), not 0.22")
             }
         }
     }
@@ -540,6 +541,30 @@ final class RenderedStripTests: XCTestCase {
                                           rows: Int(geo.timeY) - 8...Int(geo.timeY) + 8), 0)
     }
 
+    @MainActor
+    func testPeakTimesDrawBelowSlackEvenWhenTheyAreClose() throws {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let h = { (hours: Double) in start.addingTimeInterval(hours * 3600) }
+        let slack = CurrentEvent(time: h(12), speed: 0, kind: .slack)
+        func data(_ events: [CurrentEvent]) -> TimelineData {
+            TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: h(24), days: [],
+                         tidePoints: [], tideRates: [], tideExtremes: [],
+                         currentPoints: [CurrentPoint(time: start, speed: 1), CurrentPoint(time: h(24), speed: 1)],
+                         currentEvents: events, snapTimes: [], slackWindows: [])
+        }
+        let plain = data([slack]), geo = TimelineGeo(data: plain)
+        let before = h(-1)
+        let a = try XCTUnwrap(stripImage(plain, now: before))
+        for kind in [CurrentEventKind.maxFlood, .maxEbb] {
+            let marked = data([slack, CurrentEvent(time: h(13), speed: 1, kind: kind)])
+            let b = try XCTUnwrap(stripImage(marked, now: before))
+            XCTAssertGreaterThan(try differing(a, b, rows: Int(geo.timeY) + 12...Int(geo.timeY) + 28), 0,
+                                 "the peak time needs its own row even an hour from slack")
+            XCTAssertEqual(try differing(a, b, rows: Int(geo.timeY) - 8...Int(geo.timeY) + 8), 0,
+                           "adding a peak must preserve the slack time")
+        }
+    }
+
     private func flatCurrent(start: Date, end: Date, tz: TimeZone, slack: Date?, schematic: Bool,
                              windows: [(slack: Date, start: Date, end: Date)] = []) -> TimelineData {
         let count = Int(end.timeIntervalSince(start) / 600)
@@ -589,7 +614,6 @@ final class RenderedStripTests: XCTestCase {
     /// (Severn, 13.7 ft/hr peak) near the top, so between them they exercise
     /// both ends of the ramp rather than one colour twice.
     ///
-    /// Measured ink for both stations is tabled at `drawnStripInk`.
     @MainActor
     func testTideRateRampDrawsOnQuietAndExtremeStations() throws {
         let now = appNow()
@@ -614,7 +638,6 @@ final class RenderedStripTests: XCTestCase {
     /// its metres of range) is pinned in NationalScaleTests; what this adds is
     /// that the far end of the bundle reaches the chart.
     ///
-    /// Measured ink is tabled at `drawnStripInk`.
     @MainActor
     func testUsEastCoastStationDrawsItsCurve() throws {
         let now = appNow()
@@ -643,7 +666,7 @@ final class RenderedStripTests: XCTestCase {
     /// plausible harmonic shape gives SlackwaterKit real highs and lows to lag
     /// into slacks, which is all a gate reads from its reference.
     ///
-    /// Measured ink is tabled at `drawnStripInk`: a thin ±1 shape with fill
+    /// A thin ±1 shape with fill
     /// only in its positive half, and no speed thread.
     @MainActor
     func testDerivedGateDrawsItsSchematicStrip() throws {
@@ -684,7 +707,6 @@ final class RenderedStripTests: XCTestCase {
     /// sine at the 15-minute official-sample cadence, spanning exactly
     /// `Timeline.window(anchor:)`.
     ///
-    /// Measured ink is tabled at `drawnStripInk`.
     @MainActor
     func testOnlineGateDrawsItsFetchedStrip() throws {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
