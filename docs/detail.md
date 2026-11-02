@@ -353,7 +353,7 @@ A "Nearby" heading with the series filter shared with the list (list §5.2), the
 
 ### 12.1 Waiting page
 
-A Canadian station that has not downloaded shows the header (sharing the bare station link), a status card, "Predictions — not for navigation", and the shared Nearby section with its station rows, series filter, and map (§11). Nearby is available in every download state.
+A Canadian station that has not downloaded shows the header (sharing the bare station link), a status card, "Predictions — not for navigation", and the shared Nearby section with its station cards, series filter, and map (§11). Nearby is available in every download state.
 
 | State | Title | Text | Expectation | Action |
 |---|---|---|---|---|

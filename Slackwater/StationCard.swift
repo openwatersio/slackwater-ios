@@ -328,7 +328,6 @@ struct ChsCurrentGateCardView: View {
     @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
-        // Navigation comes from the enclosing row's hidden link (itemCard).
         Group {
             if gate.isOnline {
                 onlineCard

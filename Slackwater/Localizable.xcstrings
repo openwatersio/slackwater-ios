@@ -13149,7 +13149,7 @@
       }
     },
     "%@ · %@" : {
-      "comment" : "Moon event date and time. Values are a localized date and time.\nNearby station region and localized type. The first value is catalog data.",
+      "comment" : "Moon event date and time. Values are a localized date and time.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
