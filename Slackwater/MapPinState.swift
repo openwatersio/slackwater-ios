@@ -72,10 +72,9 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
 /// speed-bearing current, the bearing its flow arrow rotates to.
 struct PinState: Equatable {
     var state: String
-    /// "3.2 ft" / "1.8 kn" — formatted at build time with the app's units,
-    /// so a unit change has to rebuild the source (`MapStyler.refreshPins`
-    /// watches for it) rather than restyle it.
+    /// Keep each converted value paired with the unit used to format it.
     var reading: String?
+    var unit: String?
     /// True bearing the water flows toward — the arrow every current pin
     /// wears, slack included: near slack the sign still names the set, and
     /// the go-green fill is what says "slack".
@@ -129,7 +128,8 @@ func tidePinState(_ record: TideStationRecord, at now: Date,
     }()
     // No trend arrow in the text — the gauge's caret carries it.
     return PinState(state: state,
-                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))",
+                    reading: formatHeight(height, imperial: imperial),
+                    unit: heightUnit(imperial: imperial),
                     gauge: gauge)
 }
 
@@ -180,7 +180,8 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),
-        reading: detailed ? "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))" : nil,
+        reading: detailed ? formatSpeed(abs(signed), unit: speedUnit) : nil,
+        unit: detailed ? speedUnitLabel(speedUnit) : nil,
         bearing: station.setDegrees(signed: signed))
 }
 
@@ -220,8 +221,6 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
     }
 }
 
-/// The units the readouts format with — read where the features build, and
-/// part of the cache key so a settings change doesn't serve stale strings.
 /// The units as one comparable token, for callers deciding whether a built
 /// source's readings are still in the right unit.
 func readoutUnitSignature() -> String {
@@ -444,7 +443,7 @@ func visibleStations(in box: PinBox, zoom: Double,
 /// property of the symbol rather than a ring drawn beneath it.
 func pinFeatures(for items: [StationItem], zoom: Double,
                  chsStates: [String: PinState] = [:], now: Date = appNow(),
-                 selectedID: String? = nil) -> [String: Any] {
+                 selectedID: String? = nil, showsUnits: Bool = true) -> [String: Any] {
     let units = readoutUnits()
     let detailed = zoom >= READING_MIN_ZOOM
     return [
@@ -454,7 +453,13 @@ func pinFeatures(for items: [StationItem], zoom: Double,
                                  speedUnit: units.speedUnit, detailed: detailed)
             var properties: [String: Any] = ["id": s.id, "name": s.name, "kind": s.pinKind,
                                              "state": state.state, "sort": pinSortRank(s)]
-            if let reading = state.reading { properties["reading"] = reading }
+            if let reading = state.reading {
+                if showsUnits, let unit = state.unit {
+                    properties["reading"] = "\(reading) \(unit)"
+                } else {
+                    properties["reading"] = reading
+                }
+            }
             if let bearing = state.bearing { properties["bearing"] = bearing }
             // The full image name, not the bucket — `icon-image` reads it
             // straight off the feature, no string building in the style.

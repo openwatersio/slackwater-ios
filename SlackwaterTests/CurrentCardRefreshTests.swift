@@ -29,17 +29,24 @@ final class CurrentCardRefreshTests: XCTestCase {
             window.rootViewController = host
             window.makeKeyAndVisible()
             defer { window.isHidden = true }
-            host.view.layoutIfNeeded()
-            try await Task.sleep(for: .milliseconds(300))
+            let loaded = try await waitForCardRedraw {
+                host.view.layoutIfNeeded()
+                let image = snapshot(host.view)
+                guard let graph = cardGraphImage(image) else { return false }
+                return try inkFraction(graph) > 0.001 && beyondPixels(image) > 0
+            }
+            guard loaded else { XCTFail("The current card did not load its initial curve"); continue }
             let narrowImage = snapshot(host.view)
             let narrow = try beyondPixels(narrowImage)
 
             defaults.set(10.0, forKey: key)
-            try await Task.sleep(for: .milliseconds(300))
-            host.view.layoutIfNeeded()
-            let wide = try beyondPixels(snapshot(host.view))
-            XCTAssertLessThan(wide * 2, narrow,
-                              "The mounted \(eager ? "eager" : "lazy") card kept its old slack window")
+            let updated = try await waitForCardRedraw {
+                host.view.layoutIfNeeded()
+                let image = snapshot(host.view)
+                guard let graph = cardGraphImage(image) else { return false }
+                return try inkFraction(graph) > 0.001 && beyondPixels(image) * 2 < narrow
+            }
+            XCTAssertTrue(updated, "The mounted \(eager ? "eager" : "lazy") card kept its old slack window")
             let reopened = ImageRenderer(content:
                 CurrentCardView(record: record, eager: true)
                     .frame(width: 364, height: 168)
@@ -77,15 +84,23 @@ final class CurrentCardRefreshTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
-        host.view.layoutIfNeeded()
-        try await Task.sleep(for: .milliseconds(300))
+        let loaded = try await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            let image = snapshot(host.view)
+            guard let graph = cardGraphImage(image) else { return false }
+            return try inkFraction(graph) > 0.001 && beyondPixels(image) > 0
+        }
+        guard loaded else { return XCTFail("The online card did not load its initial curve") }
         let narrow = try beyondPixels(snapshot(host.view))
 
         defaults.set(10.0, forKey: key)
-        try await Task.sleep(for: .milliseconds(300))
-        host.view.layoutIfNeeded()
-        XCTAssertLessThan(try beyondPixels(snapshot(host.view)) * 2, narrow,
-                          "The mounted online card kept its old slack window")
+        let updated = try await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            let image = snapshot(host.view)
+            guard let graph = cardGraphImage(image) else { return false }
+            return try inkFraction(graph) > 0.001 && beyondPixels(image) * 2 < narrow
+        }
+        XCTAssertTrue(updated, "The mounted online card kept its old slack window")
     }
 
     @MainActor

@@ -57,7 +57,7 @@ import notify
                              "-nowEpoch", Self.fixtureNow]
         if !args.contains("-resetLocationAsk") { result.append("-seedLocationAsk") }
         // Opt out only when a relaunch is asserting persisted preferences.
-        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent"] }
+        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent", "-resetSkyBodies"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
         }
@@ -796,7 +796,7 @@ class ShotWalk: ScreenshotTestCase {
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil,
                      epoch: String? = nil, instant: String? = nil) -> XCUIApplication {
         var args = ["-seedLocationAsk", "-seedTour", "-resetRecents", "-noCloudSync",
-                    "-resetUnits", "-resetComfortCurrent",
+                    "-resetUnits", "-resetComfortCurrent", "-resetSkyBodies",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", epoch ?? shotEpoch] + fix + extra
         if let instant {

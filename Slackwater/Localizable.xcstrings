@@ -2282,6 +2282,101 @@
         }
       }
     },
+    "Draw them in the sky above the chart as they stand at the selected time. Off keeps the sky's day and night colors." : {
+      "comment" : "Settings footnote under the sun, moon and stars switch.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tegner dem på himlen over grafen, som de står på det valgte tidspunkt. Fra beholder himlens dag- og natfarver."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeichnet sie am Himmel über dem Diagramm, so wie sie zur gewählten Zeit stehen. Aus behält die Tag- und Nachtfarben des Himmels."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los dibuja en el cielo sobre la gráfica tal como están a la hora seleccionada. Desactivado conserva los colores de día y de noche del cielo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piirtää ne kaavion yläpuoliselle taivaalle sellaisina kuin ne ovat valittuna hetkenä. Pois päältä säilyttää taivaan päivä- ja yövärit."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les dessine dans le ciel au-dessus du graphique, tels qu'ils se trouvent à l'heure choisie. Désactivé conserve les couleurs de jour et de nuit du ciel."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarraingíonn sé iad sa spéir os cionn an ghraif mar a bhíonn siad ag an am roghnaithe. Coinníonn As dathanna lae agus oíche na spéire."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarraingidh e iad san speur os cionn a' ghraif mar a tha iad aig an àm a thagh thu. Cumaidh Dheth dathan latha is oidhche an speura."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Li disegna nel cielo sopra il grafico come si trovano all'ora selezionata. Disattivato mantiene i colori del giorno e della notte del cielo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した時刻の位置に合わせて、グラフの上の空に描きます。オフにしても空の昼夜の色は残ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 시각의 위치대로 그래프 위 하늘에 그립니다. 끄면 하늘의 낮과 밤 색은 그대로 유지됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tegner dem på himmelen over grafen slik de står på valgt tidspunkt. Av beholder himmelens dag- og nattfarger."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekent ze aan de lucht boven de grafiek zoals ze op het gekozen moment staan. Uit behoudt de dag- en nachtkleuren van de lucht."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desenha-os no céu acima do gráfico como estão no horário selecionado. Desligado mantém as cores de dia e de noite do céu."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desenha-os no céu por cima do gráfico tal como estão à hora selecionada. Desligado mantém as cores de dia e de noite do céu."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ritar dem på himlen ovanför grafen som de står vid vald tidpunkt. Av behåller himlens dag- och nattfärger."
+          }
+        }
+      }
+    },
     "Each bar is one day's biggest swing." : {
       "comment" : "Explains the unit of the swing figure's bars.",
       "localizations" : {
@@ -6534,6 +6629,101 @@
         }
       }
     },
+    "Sky" : {
+      "comment" : "Settings section heading: the sky drawn above a chart.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cielo"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taivas"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciel"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spéir"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cielo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하늘"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lucht"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Céu"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Céu"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        }
+      }
+    },
     "Slack runs %lld minutes around it, against about %lld here usually." : {
       "comment" : "Current sheet fact. Both integers are counts of minutes; vary by plural.",
       "localizations" : {
@@ -7793,6 +7983,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sol"
+          }
+        }
+      }
+    },
+    "Sun, moon and stars" : {
+      "comment" : "Settings switch: draw the sun, moon and stars in the sky above the chart.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne og stjerner"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonne, Mond und Sterne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, luna y estrellas"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aurinko, kuu ja tähdet"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soleil, lune et étoiles"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grian, gealach agus réaltaí"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grian, gealach agus reultan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sole, luna e stelle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽・月・星"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "해, 달, 별"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne og stjerner"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zon, maan en sterren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, lua e estrelas"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, lua e estrelas"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sol, måne och stjärnor"
           }
         }
       }
@@ -10769,6 +11054,196 @@
         }
       }
     },
+    "The reminder time has passed" : {
+      "comment" : "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påmindelsestidspunktet er passeret"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Erinnerungszeit ist vorbei"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora del recordatorio ya pasó"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muistutusaika on ohi"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'heure du rappel est passée"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá am an mheabhrúcháin thart"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha àm a' chuimhneachain seachad"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'ora del promemoria è passata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知予定時刻を過ぎています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 시각이 지났습니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsestidspunktet er passert"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De herinneringstijd is voorbij"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsetiden har passerat"
+          }
+        }
+      }
+    },
+    "The reminder time has passed; the countdown starts now" : {
+      "comment" : "Under the alert sheet's When section, when the moment is ahead but less than the lead away.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påmindelsestidspunktet er passeret; nedtællingen starter nu"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Erinnerungszeit ist vorbei; der Countdown beginnt jetzt"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La hora del recordatorio ya pasó; la cuenta atrás empieza ahora"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muistutusaika on ohi; lähtölaskenta alkaa nyt"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'heure du rappel est passée; le compte à rebours commence maintenant"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tá am an mheabhrúcháin thart; tosaíonn an comhaireamh síos anois"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tha àm a' chuimhneachain seachad; tòisichidh an cunntadh sìos an-dràsta"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'ora del promemoria è passata; il conto alla rovescia inizia ora"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知予定時刻を過ぎています。カウントダウンは今から始まります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알림 시각이 지났습니다. 카운트다운이 지금 시작됩니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsestidspunktet er passert; nedtellingen starter nå"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De herinneringstijd is voorbij; het aftellen begint nu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou; a contagem regressiva começa agora"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A hora do lembrete já passou; a contagem decrescente começa agora"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Påminnelsetiden har passerat; nedräkningen börjar nu"
+          }
+        }
+      }
+    },
     "Those are the actual stars over %@ tonight." : {
       "comment" : "First-run tour body after moving to tonight's stars. %@ is the station/place name; keep it unchanged.",
       "localizations" : {
@@ -12971,7 +13446,7 @@
       }
     },
     "%@ %@" : {
-      "comment" : "Nearby station distance and compass bearing. Values are a localized nautical-mile distance and invariant bearing.",
+      "comment" : "Two adjacent values: nearby distance and bearing, or map category and unit.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -24723,7 +25198,7 @@
       }
     },
     "Currents" : {
-      "comment" : "Current stations: the station list's series filter chip, and the Settings section for current settings.",
+      "comment" : "Current category, filter, or speed-unit heading.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -42020,6 +42495,101 @@
         }
       }
     },
+    "Open · %@" : {
+      "comment" : "Live Activity line while a slack window is open; the rest is the notification's body.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åben · %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offen · %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abierto · %@"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avoinna · %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvert · %@"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oscailte · %@"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fosgailte · %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperto · %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通過可 · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통과 가능 · %@"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpent · %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open · %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aberto · %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aberto · %@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppet · %@"
+          }
+        }
+      }
+    },
     "Open on iPhone" : {
       "comment" : "Watch Handoff action and instructions title.",
       "extractionState" : "manual",
@@ -57501,7 +58071,7 @@
       }
     },
     "Tides" : {
-      "comment" : "Tide stations: the station list's series filter chip, and the Settings section for tide settings.",
+      "comment" : "Tide category, filter, or height-unit heading.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

@@ -74,7 +74,7 @@ enum SN {
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
-    static let sun = Color(hex: 0xF0C860)          // prototype sun dot
+    static let sun = Color(hex: 0xF0C860)
     /// Attention, never alarm: deliberately red-leaning so it cannot be
     /// misread as `ebb`. Same value the web app uses. (The retired literal is
     /// not spelled here — `testNoSourceFileSpellsARetiredColour` bans it.)

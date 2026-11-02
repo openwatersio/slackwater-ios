@@ -30,14 +30,14 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertEqual(plan.notifications, Array(daily.prefix(14)))
     }
 
-    func testAFiredNotificationIsDroppedAndItsEventIsNot() {
+    func testAFiredReminderIsMovedToNowAndItsEventIsKept() {
         let rule = AlertRule(stationID: "a", trigger: .slack, lead: 3_600)
         let o = occurrence(rule, eventIn: 1_800)   // fired 30 min ago, happens in 30 min
 
         let plan = deliveryPlan(rules: [rule], occurrences: [o],
                                calendarOccurrences: [o], now: now, premium: true)
 
-        XCTAssertEqual(plan.notifications, [])
+        XCTAssertEqual(plan.notifications, [o.firing(at: now)], "set inside its lead, it is delivered now")
         XCTAssertEqual(plan.calendar, [o])
     }
 
@@ -70,7 +70,7 @@ final class DeliveryPlanTests: XCTestCase {
         let plan = deliveryPlan(rules: [rule, rule], occurrences: [o],
                                calendarOccurrences: [], now: now, premium: true)
 
-        XCTAssertEqual(plan, DeliveryPlan(calendar: [], notifications: [o]))
+        XCTAssertEqual(plan, DeliveryPlan(calendar: [], notifications: [o], liveActivities: [o]))
     }
 
     func testTwoRulesOnTheSameMomentDeliverOneNotification() {
@@ -150,5 +150,53 @@ final class DeliveryPlanTests: XCTestCase {
 
         XCTAssertEqual(through[tide.id], now.addingTimeInterval(40 * 86_400 - 600))
         XCTAssertEqual(through[pass.id], now.addingTimeInterval(7_200))
+    }
+
+    func testLiveActivityCandidatesAreTheNotificationsWithAShortLeadInFireOrder() {
+        let soon = AlertRule(stationID: "a", trigger: .slackWindowOpens, lead: 1_800)
+        let far = AlertRule(stationID: "a", trigger: .slack, lead: 3_600)
+        let later = occurrence(soon, eventIn: 7_200), sooner = occurrence(soon, eventIn: 3_600)
+        let longLead = occurrence(far, eventIn: 6_000)   // fires at +2400, between the two
+
+        let plan = deliveryPlan(rules: [soon, far], occurrences: [later, longLead, sooner],
+                                calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.liveActivities, [sooner, later], "lead over 30 minutes keeps a plain notification")
+        XCTAssertEqual(plan.notifications, [sooner, longLead, later], "the notification list is untouched here; the writer's result trims it")
+    }
+
+    func testWithoutPremiumThereAreNoLiveActivityCandidates() {
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let plan = deliveryPlan(rules: [rule], occurrences: [occurrence(rule, eventIn: 3_600)],
+                                calendarOccurrences: [], now: now, premium: false)
+        XCTAssertEqual(plan.liveActivities, [])
+    }
+
+    func testOverflowBeyondSixtyFourFillsTheSlotsPlacementFrees() {
+        // Review: five candidates placed as activities free five notification slots; the next
+        // five eligible occurrences take them instead of being dropped.
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let hourly = (1...69).map { occurrence(rule, eventIn: Double($0) * 3_600) }
+        let plan = deliveryPlan(rules: [rule], occurrences: hourly, calendarOccurrences: [], now: now, premium: true)
+        XCTAssertEqual(plan.notifications, Array(hourly.prefix(64)))
+        XCTAssertEqual(plan.overflow, Array(hourly[64...]))
+
+        let placed = Set(hourly.prefix(5).map(\.key))
+        XCTAssertEqual(plannedNotifications(plan, placed: placed), Array(hourly[5...]))
+        XCTAssertEqual(plannedNotifications(plan, placed: []), Array(hourly.prefix(64)))
+    }
+
+    func testAMomentInsideItsLeadFiresNowInsteadOfNever() {
+        // Set 15 minutes before a low with the 30-minute lead: the reminder time is behind us
+        // but the moment is not, so it is delivered now, not dropped.
+        let rule = AlertRule(stationID: "a", trigger: .tideExtreme(high: false), lead: 1_800)
+        let inside = occurrence(rule, eventIn: 900)
+        let passed = occurrence(rule, eventIn: -60)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [inside, passed], calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.notifications.map(\.event), [inside.event])
+        XCTAssertEqual(plan.notifications.first?.fire, now, "the fire time is clamped to now")
+        XCTAssertEqual(plan.liveActivities.map(\.event), [inside.event])
     }
 }

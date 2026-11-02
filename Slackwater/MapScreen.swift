@@ -17,9 +17,8 @@ let stationZoom = 12.5
 /// frame — a harbor, not a dot.
 let locateZoom = 10.5
 
-/// How much of the map's height the preview panel covers, for the selection
-/// camera: handle + card + paddings + margin over the home indicator.
-/// ponytail: a constant, not a measured layout — retune if the card grows.
+/// Fallback coverage for hosts without a measured overlay. The discovery
+/// map supplies the actual height of its preview and legend.
 let previewPanelCover: CGFloat = 240
 
 /// UI-test hook, like `-openMap`: `-mapZoom 3.2` (UserDefaults argument
@@ -353,7 +352,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
     /// Rebuild the visible set when the camera has moved off what is built —
     /// out of the padded box, or far enough in zoom to change which stations
     /// survive decimation (or which of them draw a gauge).
-    private func refreshPins(force: Bool = false) {
+    fileprivate func refreshPins(force: Bool = false) {
         guard let map, let style = map.style else { return }
         let bounds = map.visibleCoordinateBounds
         let view = PinBox(south: bounds.sw.latitude, west: bounds.sw.longitude,
@@ -374,6 +373,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
         let box = view.padded(by: PIN_VIEWPORT_PAD)
         let selectedID = selectedID
         let decimate = decimates
+        let showsUnits = framing != nil  // Nearby previews have no unit legend.
         Task { @MainActor [weak self, weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
@@ -390,7 +390,7 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
                 let states = chsPinStates(at: now, items: items, detailed: zoom >= READING_MIN_ZOOM,
                                           tideRecords: tides, currentRecords: currents, tidePreviews: previews)
                 let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now,
-                                          selectedID: selectedID)
+                                          selectedID: selectedID, showsUnits: showsUnits)
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
             self?.building = false
@@ -450,6 +450,8 @@ struct MapSelection: Equatable {
 }
 
 struct MapViewRepresentable: UIViewRepresentable {
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var heightPreference = heightUnits()
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedPreference = "kn"
     /// Where the discovery map opens. A real fix when there is one — a user in
     /// Boston must not open the map on the Salish Sea (M53) — and the Salish
     /// camera when there isn't, which is also what the UI tests see.
@@ -469,6 +471,7 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// unavailable station gets the camera but no halo — `selected` is a
     /// property of the station source, and its ring is in another one.
     var selected: MapSelection?
+    var previewCover: CGFloat = previewPanelCover
     let onSelect: (StationItem) -> Void
     /// A tap on an unavailable station's ring (issue #401) — the panel shows
     /// the explanation card instead of a station card. Its own callback, not
@@ -483,9 +486,11 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// dismissal path.
     var onDeselect: () -> Void = {}
 
+    private var pinSettings: String { "\(heightPreference)-\(speedPreference)" }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(onSelect: onSelect, onSelectUnavailable: onSelectUnavailable,
-                    onMiss: onMiss, onDeselect: onDeselect)
+                    onMiss: onMiss, onDeselect: onDeselect, pinSettings: pinSettings)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
@@ -522,10 +527,12 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     /// Camera changes arrive as remounts — `mapPane` sets `.id(mapFocusToken)`
     /// so a header-title focus rebuilds the view and `makeUIView` frames it.
-    /// Selection is the exception: it must move the LIVE camera (a remount
-    /// would rebuild the whole style under the preview panel).
+    /// Selection, overlay size, and unit changes update the mounted map so
+    /// the camera and preview survive a settings change.
     func updateUIView(_ uiView: MLNMapView, context: Context) {
-        context.coordinator.apply(selection: selected)
+        context.coordinator.apply(selection: selected,
+                                  pinSettings: pinSettings,
+                                  previewCover: previewCover)
     }
 
     @MainActor final class Coordinator: NSObject {
@@ -538,11 +545,12 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         init(onSelect: @escaping (StationItem) -> Void,
              onSelectUnavailable: @escaping (UnavailableStation) -> Void,
-             onMiss: ((Double) -> Void)?, onDeselect: @escaping () -> Void) {
+             onMiss: ((Double) -> Void)?, onDeselect: @escaping () -> Void, pinSettings: String) {
             self.onSelect = onSelect
             self.onSelectUnavailable = onSelectUnavailable
             self.onMiss = onMiss
             self.onDeselect = onDeselect
+            appliedPinSettings = pinSettings
         }
 
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
@@ -563,19 +571,51 @@ struct MapViewRepresentable: UIViewRepresentable {
         /// the panel is swiped away without the map hearing about it.
         private var selectedId: String?
         private var framed = false
-        func apply(selection item: MapSelection?) {
-            guard item?.id != selectedId, let map else { return }
+        private var appliedPinSettings: String
+        private var appliedPreviewCover: CGFloat = 0
+        private var requestedPreviewCover: CGFloat = 0
+        private var centeringPreview = false
+
+        func apply(selection item: MapSelection?, pinSettings: String, previewCover: CGFloat) {
+            if appliedPinSettings != pinSettings {
+                appliedPinSettings = pinSettings
+                styler?.refreshPins(force: true)
+            }
+            requestedPreviewCover = previewCover
+            guard let map else { return }
+            guard item?.id != selectedId else {
+                adjustPreviewCover()
+                return
+            }
             selectedId = item?.id
             styler?.select(item?.id)
-            // A framed map (a detail page's Nearby) already points where it
-            // means to; only the preview panel's map recenters, to clear the
-            // panel covering the bottom of the screen.
+            centeringPreview = false
+            appliedPreviewCover = previewCover
+            // Nearby thumbnails already frame their stations and have no preview panel.
             guard let item, !framed else { return }
             let pin = map.convert(CLLocationCoordinate2D(latitude: item.latitude,
-                                                         longitude: item.longitude),
-                                  toPointTo: map)
-            let target = CGPoint(x: pin.x, y: pin.y + previewPanelCover / 2)
-            map.setCenter(map.convert(target, toCoordinateFrom: map), animated: true)
+                                                         longitude: item.longitude), toPointTo: map)
+            let target = CGPoint(x: pin.x, y: pin.y + previewCover / 2)
+            centeringPreview = true
+            map.setCenter(map.convert(target, toCoordinateFrom: map), zoomLevel: map.zoomLevel,
+                          direction: map.direction, animated: true) { [weak self] in
+                Task { @MainActor in
+                    guard let self, self.selectedId == item.id else { return }
+                    self.centeringPreview = false
+                    self.adjustPreviewCover()
+                }
+            }
+        }
+
+        /// Card data and larger text can grow the overlay after selection. Shift only
+        /// by that growth, preserving any pan the user made while the preview was open.
+        private func adjustPreviewCover() {
+            guard selectedId != nil, !framed, !centeringPreview, let map else { return }
+            let delta = requestedPreviewCover - appliedPreviewCover
+            guard abs(delta) > 0.5 else { return }
+            appliedPreviewCover = requestedPreviewCover
+            let target = CGPoint(x: map.bounds.midX, y: map.bounds.midY + delta / 2)
+            map.setCenter(map.convert(target, toCoordinateFrom: map), animated: false)
         }
 
         /// Tap → nearest station pin within a finger-sized box → preview.

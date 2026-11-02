@@ -194,12 +194,31 @@ const datumShift = (from, to) => {
   return a === undefined || b === undefined ? undefined : round3(b - a);
 };
 
-/** The bundled station on a departed id's database route, as `{ id, datumShiftM? }`. */
+/**
+ * The records the database rejects as duplicates of each id (`quality.redundant`).
+ * A duplicate is one gauge recorded twice, even when the two are separate
+ * stations with separate routes: DMI's Tasiilaq record duplicates TICON's
+ * Ammassalik record 0.4 km away, but their observations cover different years.
+ */
+const duplicatesOf = new Map();
+for (const s of db.all) {
+  const target = s.quality?.accepted === false ? s.quality.redundant : undefined;
+  if (target) duplicatesOf.set(target, [...(duplicatesOf.get(target) ?? []), s.id]);
+}
+/** The same gauge under another record: the one this id duplicates, or one that duplicates it. */
+const sameGaugeIds = (id) => [db.byId(id)?.quality?.redundant, ...(duplicatesOf.get(id) ?? [])].filter(Boolean);
+
+/**
+ * The bundled station on a departed id's database route, as `{ id, datumShiftM? }`.
+ * Without one, the bundled record of the same gauge, so a saved station moves
+ * to it rather than being tombstoned when the bundle keeps the other record.
+ */
 const successorOf = (item) => {
   const kind = item.startsWith("current:") || (!routesByKind.tide.has(item) && routesByKind.current.has(item))
     ? "current" : "tide";
   const id = item.replace(/^current:/, "");
-  const twin = (routesByKind[kind].get(id)?.ids ?? []).filter((other) => nowByKind[kind][other]).sort()[0];
+  const bundled = (ids) => ids.filter((other) => nowByKind[kind][other]).sort()[0];
+  const twin = bundled(routesByKind[kind].get(id)?.ids ?? []) ?? bundled(sameGaugeIds(id));
   if (!twin) return undefined;
   const shift = kind === "tide" ? datumShift(id, twin) : undefined;
   return shift === undefined ? { id: itemId(kind, twin) } : { id: itemId(kind, twin), datumShiftM: shift };

@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. Deterministic CHS service transitions through the
 // production queue, fitter, publication, and persistence paths.
+import UIKit
 import XCTest
 
 final class OfflineTransitionTests: ScreenshotTestCase {
@@ -382,6 +383,31 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(row.staticTexts["Available offline"].appears(within: 5))
         XCTAssertFalse(row.progressIndicators.firstMatch.exists)
         save(app, "bounded-current-downloaded.png")
+    }
+
+    /// The notice's last words carry the bound, so its frame must hold every line the sentence
+    /// needs at its laid-out width. A shorter frame means the end was cut off.
+    func testBoundNoticeWrapsAtLargeText() {
+        for (name, category) in [("UICTContentSizeCategoryXXXL", UIContentSizeCategory.extraExtraExtraLarge),
+                                 ("UICTContentSizeCategoryAccessibilityXXXL", .accessibilityExtraExtraExtraLarge)] {
+            let app = launch(["-seedCurrentModel", "chs-blackney-passage", "-networkKillSwitch",
+                              "-UIPreferredContentSizeCategoryName", name])
+            openSearch(app, "blackney")
+            pickSearchResult(app, app.staticTexts["Blackney Passage"].firstMatch)
+            assertCurrentDetailRendered(app)
+            let notice = app.staticTexts["chs-bound-notice"].firstMatch
+            XCTAssert(notice.appears(within: 5))
+            let font = UIFont.preferredFont(forTextStyle: .caption1,
+                                            compatibleWith: UITraitCollection(preferredContentSizeCategory: category))
+            let needed = (notice.label as NSString).boundingRect(
+                with: CGSize(width: notice.frame.width, height: .greatestFiniteMagnitude),
+                options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil).height
+            XCTAssertGreaterThan(needed, font.lineHeight * 1.5, "\(name): the sentence should need more than one line")
+            XCTAssertGreaterThanOrEqual(notice.frame.height, needed - font.lineHeight / 2,
+                                        "\(name): the bound notice is shorter than its text and was cut off")
+            save(app, "bounded-current-\(name).png")
+            app.terminate()
+        }
     }
 
     func testSeededProvisionalModelAppearsInManager() {

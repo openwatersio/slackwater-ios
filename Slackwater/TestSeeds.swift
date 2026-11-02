@@ -36,6 +36,14 @@ import Foundation
     if CommandLine.arguments.contains("-resetComfortCurrent") {
         AppGroup.defaults.removeObject(forKey: AppGroup.slackWindowSpeedKey)
     }
+    if CommandLine.arguments.contains("-resetSkyBodies") {
+        AppGroup.defaults.removeObject(forKey: AppGroup.skyBodiesKey)
+    }
+    // -skyBodiesOff is the Settings switch turned off: the sky keeps its
+    // colours and loses its sun, moon and stars.
+    if CommandLine.arguments.contains("-skyBodiesOff") {
+        AppGroup.defaults.set(false, forKey: AppGroup.skyBodiesKey)
+    }
     // -comfortCurrent <kn> writes the setting, so a shot can match the
     // Settings frame it sits beside.
     if let at = CommandLine.arguments.firstIndex(of: "-comfortCurrent"),

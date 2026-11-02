@@ -138,8 +138,9 @@ export function tombstones({ shipping, previous = [], existing = [] }) {
  * id, so an id that stops shipping strands everything saved under it.
  *
  * - `successors` — departed id → `{ id, datumShiftM? }`: the bundled id the
- *   database publishes as the same station (`successorOf`, the other bundled
- *   id on its route), and the metres to add to a height measured from the old
+ *   database publishes as the same gauge (`successorOf`: the other bundled id
+ *   on its route, else the bundled record the database pairs it with as a
+ *   duplicate), and the metres to add to a height measured from the old
  *   record's chart datum to measure it from the new one's. The shift is absent
  *   when it cannot be established, and the app then asks the user to set a
  *   tide-height alert again rather than keep a threshold on the wrong datum.

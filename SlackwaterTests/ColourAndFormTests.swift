@@ -435,6 +435,15 @@ import XCTest
         }
     }
 
+    func testCurrentPinReadingsConvertUnitsWithoutRepeatingTheLegend() {
+        let station = record(speedKn: -2)
+        for (unit, expected) in [("kn", 2.0), ("kmh", 3.7), ("ms", 1.0)] {
+            let pin = currentPinState(station, at: refTime, speedUnit: unit)
+            XCTAssertEqual(pin.reading, expected.formatted(.number.precision(.fractionLength(1))))
+            XCTAssertEqual(pin.bearing, 180)
+        }
+    }
+
     private var refTime: Date { Date(timeIntervalSince1970: 1_787_000_000) }
     private func record(speedKn: Double) -> CurrentStationRecord {
         // M2 amplitude 0 → speed is meanFlow exactly, at any instant.

@@ -199,6 +199,10 @@ extension TypeScaleTests {
             // text walk climbs past it to `leadAmount` just above — the key has to match
             // what the scanner computes (a multiline signature is not a brace-opening declaration).
             "AlertPlan.swift:leadAmount",
+            // The Live Activity's stale moment: a time and a tide height formatted where the
+            // station's zone is known, consumed by the widget's one `Text(liveActivityMoment(a))`
+            // (AlertLiveActivity.swift), which carries the mono trait.
+            "AlertLiveActivityAttributes.swift:liveActivityMoment",
         ]
         // Nor is anything in this file: its readings are GeoJSON properties
         // that MapLibre rasterizes from the basemap style's own fontstack,

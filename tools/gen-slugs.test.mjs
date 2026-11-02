@@ -235,8 +235,29 @@ test("a saved New Zealand TICON station moves to LINZ's record of the same gauge
   // A known datum shift moves a saved tide height; a CHS port has none.
   assert.deepEqual(successors["ticon/wellington-071-nzl-uhslc_fd"], { id: "linz/071", datumShiftM: 0.416 });
   assert.deepEqual(successors["noaa/8218617"], { id: "chs-mill-bay" });
+  // Not on LINZ's route, but the database rejects LINZ's Auckland record as its duplicate.
+  assert.deepEqual(successors["ticon/auckland-070a-nzl-uhslc_rq"], { id: "linz/070", datumShiftM: 0.097 });
   const stones = read("station-tombstones.json").map((t) => t.id).filter(id => id.includes("-nzl-"));
-  assert.deepEqual(stones.sort(), [
-    "ticon/auckland-070a-nzl-uhslc_rq", "ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw",
-  ]);
+  assert.deepEqual(stones.sort(), ["ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw"]);
+});
+
+test("no station is tombstoned while the bundle carries another record of its gauge", () => {
+  // The database marks two records of one gauge with `quality.redundant`, even
+  // when their observations keep them apart as two stations. A saved station
+  // moves to the record the bundle keeps (Ilulissat and Nuuk to DMI's).
+  const bundled = new Set(Object.keys(slugs.tide));
+  const sameGauge = new Map();
+  for (const s of db.all) {
+    const target = s.quality?.accepted === false ? s.quality.redundant : undefined;
+    if (!target) continue;
+    sameGauge.set(s.id, [...(sameGauge.get(s.id) ?? []), target]);
+    sameGauge.set(target, [...(sameGauge.get(target) ?? []), s.id]);
+  }
+  const stranded = read("station-tombstones.json")
+    .filter((t) => (sameGauge.get(t.id) ?? []).some((id) => bundled.has(id)))
+    .map((t) => t.id);
+  assert.deepEqual(stranded, []);
+  const successors = read("station-successors.json");
+  assert.equal(successors["ticon/ilulissat-298a-dnk-uhslc_rq"]?.id, "dmi/2991550");
+  assert.equal(successors["ticon/nuuk_godthaab-820-dnk-uhslc_fd"]?.id, "dmi/2991320");
 });

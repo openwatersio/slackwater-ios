@@ -8,6 +8,8 @@
 //     `onAppear` and no `.task`, and it draws no `UIViewRepresentable` — a
 //     MapLibre header or a `TimelineScrubber` comes out empty — so it is only
 //     ever pointed at drawing leaves like `TimelineCanvas`.
+//   * REFRESH works in a key window: poll `drawHierarchy` snapshots from a
+//     `UIHostingController`, which runs the mounted view's lifecycle tasks.
 //   * SIZE works: host the view in a `UIHostingController` and ask
 //     `sizeThatFits` — the probe for "how tall does this get at
 //     accessibility5".
@@ -23,6 +25,26 @@ import SwiftUI
 import UIKit
 @testable import Slackwater
 
+// Prediction completion and its rendered frame can both arrive after the first snapshot.
+@MainActor
+func waitForCardRedraw(_ condition: () throws -> Bool) async rethrows -> Bool {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2 * max(1, perfScale)))
+    repeat {
+        if try condition() { return true }
+        try? await Task.sleep(for: .milliseconds(25))
+    } while ContinuousClock.now < deadline
+    return try condition()
+}
+
+// The lower quarter stays below the header in the fixed card fixtures, even without a graph.
+func cardGraphImage(_ image: UIImage) -> UIImage? {
+    guard let cg = image.cgImage else { return nil }
+    let height = CGFloat(cg.height)
+    guard let crop = cg.cropping(to: CGRect(x: 0, y: height * 0.75,
+                                          width: CGFloat(cg.width), height: height * 0.25)) else { return nil }
+    return UIImage(cgImage: crop)
+}
+
 /// The share of an image's pixels that differ from its most common colour —
 /// "is anything drawn here". The same measure the UI suite takes off a device
 /// screenshot, over an `ImageRenderer` bitmap instead.
@@ -33,8 +55,7 @@ import UIKit
 /// ft axis, SwiftUI overlays drawn ON TOP of the canvas. An `ImageRenderer`
 /// shot of `TimelineCanvas` alone has no overlays and the whole 228-hour span
 /// of day chrome, so its floor and its drawn strips are different numbers.
-/// `drawnStripInk` here is measured against this bitmap's own floor; see it
-/// for the numbers.
+/// `drawnStripInk` here is checked against this bitmap's own floor.
 func inkFraction(_ image: UIImage) -> Double {
     guard let cg = image.cgImage else { return 0 }
     let w = cg.width, h = cg.height
@@ -67,7 +88,7 @@ func inkFraction(_ image: UIImage) -> Double {
 /// barely moves (measured 0.388 clean against 0.389 eclipsed on the glyph).
 ///
 /// Warmth alone is not enough either, and this cost a red test: the strip's
-/// sun dots (`SN.sun` 0xF0C860) and sunrise labels are warm too. What
+/// sunrise labels are warm too. What
 /// separates them is green — the sun is a bright yellow (g 200 against r 240),
 /// the umbra a dark copper (g 42 against r 107). Hence the second clause.
 func copperFraction(_ image: UIImage) -> Double {
@@ -141,7 +162,7 @@ func stripImage(_ data: TimelineData, imperial: Bool = true, now: Date = appNow(
 
 /// A timeline of the same window with no track at all — the floor every ink
 /// threshold is measured against. Day chrome (night bands, day labels, sun
-/// dots) still draws, which is exactly why the floor is not zero, and why each
+/// times) still draws, which is exactly why the floor is not zero, and why each
 /// test asserts on it rather than trusting the number below to stay true.
 @MainActor
 func blankStripInk(tz: TimeZone, now: Date = appNow()) -> Double {
@@ -149,25 +170,5 @@ func blankStripInk(tz: TimeZone, now: Date = appNow()) -> Double {
     return stripImage(blank).map(inkFraction) ?? 0
 }
 
-/// "Something is on this strip beyond its day chrome." Measured over
-/// `ImageRenderer` at 1×, full 228-hour width, on a 396pt canvas — the height
-/// `TimelineGeo` gives a single-track strip: a 160pt lead pad, a 150pt plot,
-/// and the time, day and moon rows under it. Every number here scales with
-/// that height, because the ink is a FRACTION of the bitmap and the pad is
-/// empty canvas — the lead and its pills are SwiftUI overlays, drawn above
-/// this bitmap, not into it. A geometry change moves all six numbers, so
-/// re-measure rather than nudging the threshold.
-///
-///     no track (day chrome only)   0.005
-///     Friday Harbor tide           0.023   ← the lowest drawn shape
-///     Avonmouth tide               0.026
-///     Boston tide                  0.027
-///     derived gate (schematic ±1)  0.036
-///     online gate (fetched speeds) 0.047
-///
-/// The tides set the low end: the strip fills a tide only between chart datum
-/// and water below it, so a tide day is mostly its line, while a current fills
-/// beneath its curve. That leaves a 4.3× gap between the floor and Friday
-/// Harbor, too narrow for 2.5× of margin on both sides, so 0.011 sits at its
-/// geometric middle with ~2× either side.
+/// Rendering tests keep day chrome below this threshold and tide/current tracks above it.
 let drawnStripInk = 0.011

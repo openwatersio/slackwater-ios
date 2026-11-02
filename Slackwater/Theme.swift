@@ -55,6 +55,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// The tour's glide has settled, which swaps the stars copy from the
     /// instruction to the payoff.
     @State private var tourArrived = false
+    /// The current step glided the strip somewhere. A stars step over a sky
+    /// with its bodies switched off does not, and keeps its instruction.
+    @State private var tourGlided = false
     @State private var showPicker = false
     @State private var showingSchedule = false
     @State private var restoreSchedule = false
@@ -65,6 +68,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @State private var pressedMoment: Date? = nil
     @State private var alertSubject: AlertSheetSubject? = nil
     @ObservedObject private var alertRules = AlertRuleStore.shared
+    @State private var alertSpans: [AlertSpan] = []
+    @State private var spanRequest: AlertSpanRequest?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -175,7 +180,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 // space to land on the real screen position.
                 GeometryReader { overlayGeo in
                     TourMarkLayer(anchors: anchors, proxy: overlayGeo,
-                                  stationName: name, arrived: tourArrived,
+                                  // The stars card's payoff wording needs the glide
+                                  // to tonight's stars behind it; a step that never
+                                  // glided (bodies off) stays on its swipe lesson,
+                                  // whatever the switch does while the card is up.
+                                  stationName: name, arrived: tourArrived && tourGlided,
                                   onNext: tourNext, onSkip: { TourCoach.shared.finish() })
                         .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
                         .allowsHitTesting(TourCoach.shared.station == favoriteId)
@@ -193,6 +202,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
             .environment(\.stripAlertAction, stripAlertAction)
+            .environment(\.stripAlertSpans, alertSpans)
+            .onChange(of: alertRules.rules) { _, _ in refreshAlertSpans() }
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -224,6 +235,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // no moon tile and no scrubber — nothing to teach — so the tour
             // stays armed and fires on the next detail that does.
             .onChange(of: timeline?.revision, initial: true) { _, _ in
+                refreshAlertSpans()
                 guard let timeline else { return }
                 let coverage = timeline.start...timeline.end
                 TourCoach.shared.begin(
@@ -333,16 +345,26 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// already drawing — no almanac search (see `tourStarsTime`).
     private func tourNext() {
         tourArrived = false
+        tourGlided = false
         TourCoach.shared.advance()
         guard let step = TourCoach.shared.step, let timeline else { return }
         let coverage = timeline.start...timeline.end
+        let bodies = showsSkyBodies()
         let target: Date? = switch step {
-        case .stars: tourStarsTime(days: timeline.days, after: appNow(), within: coverage)
+        case .stars where bodies: tourStarsTime(days: timeline.days, after: appNow(), within: coverage)
         case .moon: tourMoonTime(days: timeline.days, after: appNow(), within: coverage)
         default: nil
         }
-        guard let target else { return }
-        jump(to: target)
+        if let target {
+            jump(to: target)
+            tourGlided = true
+        } else if !(step == .stars && !bodies) {
+            return
+        }
+        // A stars step over a sky with its bodies switched off has no glide,
+        // so its card keeps the swipe wording (`tourGlided` stays false). It
+        // keeps the same settle before a swipe counts, so a late write from
+        // the previous step does not advance it.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(600))
             tourArrived = true
@@ -380,6 +402,25 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     private var stripPressed: (@MainActor () -> Void)? {
         guard alertOffer != nil else { return nil }
         return { pressedMoment = scrubTime }
+    }
+
+    /// The station's alert spans over the loaded window, for the strip's bands. Nothing where
+    /// there is nothing to alert on (no `alertOffer`) or no timeline yet. The window republishes
+    /// on every chunk arrival and right-edge append, so the resolve runs only when the rules or
+    /// the window's edges change, off the main actor, and a result for a request since
+    /// superseded is dropped.
+    private func refreshAlertSpans() {
+        guard alertOffer != nil, let timeline else { alertSpans = []; spanRequest = nil; return }
+        let request = AlertSpanRequest(stationID: favoriteId, rules: alertRules.rules,
+                                       start: timeline.start, end: timeline.end)
+        guard request != spanRequest else { return }
+        spanRequest = request
+        let threshold = slackThresholdKn
+        Task.detached(priority: .userInitiated) {
+            let spans = Slackwater.alertSpans(stationID: request.stationID, rules: request.rules,
+                                              from: request.from, to: request.to, threshold: threshold)
+            await MainActor.run { if spanRequest == request { alertSpans = spans } }
+        }
     }
 
     /// VoiceOver's "Set an alert" has no line to go and find: it parks the moment and opens the
@@ -506,6 +547,18 @@ extension EnvironmentValues {
 
 private struct StripTrailingBleedKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
+}
+
+private struct StripAlertSpansKey: EnvironmentKey {
+    static let defaultValue: [AlertSpan] = []
+}
+
+extension EnvironmentValues {
+    /// Where the host's alerts will fire, for the strip to tint (docs/scrubber.md §12).
+    var stripAlertSpans: [AlertSpan] {
+        get { self[StripAlertSpansKey.self] }
+        set { self[StripAlertSpansKey.self] = newValue }
+    }
 }
 
 /// The station a detail's strip belongs to, so a fold hands its moment only
@@ -922,8 +975,8 @@ struct SeriesFilterChips: View {
 
     var body: some View {
         let all = chip(String(localized: "All", comment: "Station series filter showing all stations."), nil)
-        let tides = chip(String(localized: "Tides", comment: "Tide stations: the station list's series filter chip, and the Settings section for tide settings."), .tide)
-        let currents = chip(String(localized: "Currents", comment: "Current stations: the station list's series filter chip, and the Settings section for current settings."), .current)
+        let tides = chip(String(localized: "Tides", comment: "Tide category, filter, or height-unit heading."), .tide)
+        let currents = chip(String(localized: "Currents", comment: "Current category, filter, or speed-unit heading."), .current)
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) { all; tides; currents }
             VStack(alignment: .leading, spacing: 0) {

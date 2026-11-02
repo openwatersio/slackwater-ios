@@ -72,7 +72,9 @@ MOVES HORIZONTALLY AS ONE CONTINUOUS STRIP
 
   event labels ─────── curve ─────── event labels
   absolute event times
-  sunrise / day + date / sunset
+  current maximum times (reach reading)
+  day
+  sunrise / date / sunset
 ```
 
 Only one Now pill is ever present. It occupies the side toward which “now” lies; the two positions above illustrate the alternatives.
@@ -132,7 +134,7 @@ Chunks are counted in seven-day steps from the schedule anchor in force when the
 
 A Canadian tide preview exists only when every gap between its downloaded samples is 30 minutes or less and every sample is finite; a single longer gap rejects the whole preview, which is never trimmed to a contiguous run. It must never extend, extrapolate, or offer a date outside those samples. A preview is shown only while its samples cover the current instant; its strip spans exactly those samples, its schedule stays anchored on today, and it never re-anchors on settle. The week bar and date taps offer no picker. Now and every selection are clamped into the samples.
 
-The additional-download notice retains the station’s progress meter and available-through date while the remaining model downloads, centred below the scrubber and above the summary cards, and adds a reconnect, failure, or retry line as the download state requires. Its generic accuracy explanation is shared with current gates that already have usable early models; on a current gate the notice shows the provisional headline in amber instead of an available-through date. Download and status notices must never write over the scrubber. When the full tide model lands, the handoff waits until the strip is quiet, then starts the continuous store around the selected instant without navigating away or replaying the opening motion.
+The additional-download notice retains the station’s progress meter and available-through date while the remaining model downloads, centred below the scrubber and above the summary cards, and adds a reconnect, failure, or retry line as the download state requires. Its generic accuracy explanation is shared with current gates that already have usable early models; on a current gate the notice shows the provisional headline as secondary text instead of an available-through date. Download and status notices must never write over the scrubber. When the full tide model lands, the handoff waits until the strip is quiet, then starts the continuous store around the selected instant without navigating away or replaying the opening motion.
 
 Official online-current details remain bounded by downloaded coverage. Their displayed window is defined by `Timeline.window(anchor:)`:
 
@@ -175,10 +177,12 @@ These are the current iOS logical-unit values. Preserve them on phone-sized surf
 | `plotTop` | 170 | Top of tide/current plot |
 | `plotBottom` | 320 | Bottom of tide/current plot |
 | `eventTimeY` | 338 | Absolute event-time row |
-| `dayY` | 364 | Day names and sunrise/sunset times |
-| `dateY` | 381 | Calendar date under the day name |
-| `sunDotY` | 378 | Sunrise/sunset dots and eclipse glyph |
-| `stripHeight` | 396 | Bottom of graph-owned chrome plus margin |
+| `peakTimeY` | 358 | Current-maximum times, under the reach reading |
+| `dayY` | 364 / 384 | Day names; the later row applies to currents drawing the maximum-time row |
+| `dateY` | 381 / 401 | Calendar date under the day name |
+| `sunY` | 381 / 401 | Sunrise/sunset symbols and times on the date row, without dots |
+| `eclipseY` | 395 / 415 | Eclipse glyph below sun times |
+| `stripHeight` | 413 / 433 | Bottom of graph-owned chrome plus margin |
 
 The fixed reading line begins at `topPad` and ends at `plotBottom` (§11). The lead is centred on the viewport centreline and overlaid in the top pad; it does not consume horizontal strip width.
 
@@ -200,7 +204,7 @@ Reference typography:
 
 Graph labels stay fixed to graph geometry rather than scaling independently. The lead and interactive controls participate in the platform's accessible text sizing: the lead value and `topPad` grow with the large title, and the pills stop growing at the first accessibility size.
 
-The watch strip uses a top pad of 8 and a plot depth of 52, and ends 10 units below the event-time row; it draws no day, date, or sun row.
+The watch strip uses a top pad of 8 and a plot depth of 52, and ends 10 units below the first event-time row; it draws no peak-time, day, date, or sun row.
 
 ## 6. State and motion
 
@@ -264,7 +268,7 @@ When Reduce Motion is enabled, the pills and line appear and disappear without a
 
 A tap anywhere above the day row (the top pad, including the lead, outside the resting pills, the plot, or the event-time row) brings the tapped instant to the centreline. If a magnetic target is strictly within 4.5 units (15 minutes) of the tap, use the nearest target instead. Otherwise use the exact tapped time. The tap then moves the strip by §8: it clamps to a reachable scroll offset and derives the final selected instant from that offset, so the lead and curve agree at loaded edges.
 
-In the day/date/sun row, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between `eventTimeY` and `dayY` (351 units). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. A date's anchor is where its label is drawn: the daylight midpoint, or station-local noon where the day has no daylight to centre on (§14).
+In the day/date/sun rows, a sunrise or sunset tap centres that event; a date tap opens the host's date picker. Where the host cannot change dates (a Canadian tide preview), a date tap stops motion and opens nothing. The iOS hit-test split is halfway between the last event-time row and `dayY` (351 units, or 371 with current-maximum times). Below it, the nearest sunrise, sunset, or date anchor wins; ties select the date. A date's anchor is where its label is drawn: the daylight midpoint, or station-local noon where the day has no daylight to centre on (§14).
 
 Every tap stops opening motion, momentum, a ride, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. A time tap rides to its target like any other programmatic move and marks the strip busy for the chunk store until it lands; Reduce Motion or travel below 0.5 unit lands directly.
 
@@ -309,9 +313,9 @@ Every move made for code rather than a finger follows one rule: commentary, Now,
 
 A host moves the strip only by an explicit request. Commentary, Now, foreground return, the picker, shared links, schedule rows, Sun sheet event links, sheet jumps, the first-run tour, and a Canadian tide preview's clamp into its samples each set the selection and raise a request together. A selection that changes without a request never starts an animated move and never interrupts one, so scroll feedback during a ride cannot cancel it: a rendered selection can trail the current offset, and the destination remains the requested instant until the animation finishes or a newer request or a drag interrupts it. A quiet strip resyncs to such a selection directly, as described below.
 
-A finger that is still down retains control. A request that arrives during an active drag waits; when the finger lifts, it replaces the drag's momentum and moves by the rule above, and a newer request replaces a waiting one. On the first-run tour, a drag on the stars step advances the tour on its first frame, so the moon step's ride starts when that finger lifts. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour.
+A finger that is still down retains control. A request that arrives during an active drag waits; when the finger lifts, it replaces the drag's momentum and moves by the rule above, and a newer request replaces a waiting one. On the first-run tour, a drag on the stars step advances the tour on its first frame, so the moon step's ride starts when that finger lifts. On the tour's stars step, any selection change from 600 ms after the tour's ride begins advances the tour; a stars step with no ride (the sky's bodies switched off, §14) waits the same 600 ms from the step's start.
 
-The tour enables its stars and moon steps only when their target instants lie within the loaded prediction interval. A finite Canadian tide preview skips a sky step whose target falls beyond its downloaded bounds. The enabled steps stay fixed for that tour run when a completed model widens the interval.
+The tour enables its stars and moon steps only when their target instants lie within the loaded prediction interval. A finite Canadian tide preview skips a sky step whose target falls beyond its downloaded bounds. The enabled steps stay fixed for that tour run when a completed model widens the interval. Settings' "Sun, moon and stars" switch is read afresh at each step (§14): off, the stars step keeps its swipe lesson but does not glide to tonight's stars, and the moon step drops.
 
 When nothing is moving and no request is waiting, but the offset and the selection disagree by more than one unit, the strip lands directly on the selection without animation.
 
@@ -514,7 +518,7 @@ The base curve is 2.5 units wide with round caps and joins. Dashed reference lin
 
 A tide high's reading hangs below its dot and a low's above it, whatever the turn's height; a current max's reading hangs below a velocity crest and above a velocity trough — toward the zero line for a true flood or ebb maximum. A relaxation extremum, where the flow slackens without reversing, is still a max flood or max ebb by the sign convention, but its crest or trough points the other way, and hanging its reading by shape rather than kind keeps it off the readings of the true maxima that can sit under an hour away on either side. A flat approach falls back to the kind's side. Each is centred on the event's x. The glyph sits nearest the curve and the value beyond it: the glyph's centre is 15 units from the turn or peak (23 − 8) and the value's centre 30 units (23 + 7). The glyph is 12 units, semibold for a to-bar glyph and bold for a set arrow; the value is 18 units semibold with tabular digits.
 
-Absolute event times have one home: the event-time row beneath the plot. On detail strips, current slack and window-opening times use go green at 14 units, regular weight, matching the slack marks. Cards retain their compact time typography. Tide high and low times use their respective curve colors at the same size and weight. Untinted event times use foam at 70% opacity. Sort candidate times first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
+Absolute event times live beneath the plot. On detail strips, current slack and window-opening times use go green at 14 units, regular weight, matching the slack marks. Maximum ebb and flood times use a separate row 20 units lower, at 12 units, medium weight, in foam at 70% opacity. Omit that row when there are no maximum events. Cards retain their compact time typography. Tide high and low times use their respective curve colors at the same size and weight as detail slack times. Sort candidate times within each row first. If the next label would fall less than 64 horizontal units after the last retained label, keep the earlier label and omit the later one. The event still exists and remains magnetic.
 
 Do not draw any event mark, hanging reading, or event time within 1.5 hours (27 units) of either edge of the loaded window: turn dots, turn and peak readings, derived-gate slack dots, and every event time. The margin is half the widest of those labels, so an event near an edge is left out whole rather than cut by the edge; edge clipping makes a valid event look broken. The event still exists and remains magnetic. Slack windows, slack runs, including a short run's mark and the mark of a slack no run covers, the curve, and the now dot draw to the edge.
 
@@ -535,10 +539,10 @@ These sRGB values are the portable reference palette:
 | Go | `#88B868` | A measured-current zero instant and a derived gate's known slack instant |
 | Beyond window | `#F5C96B` | A measured current's curve outside its slack windows; the magnitude ramp's first stop |
 | Neutral unknown | `#5888A8` | Unknown or unavailable state: map pin, unavailable-station card and page, Unfavorite swipe action |
-| Sun | `#F0C860` | Sunrise/sunset dot |
+| Sun | `#F0C860` | Sun disc |
 | Sunrise label | `#F0D890` | Every sunrise and sunset time, on the strip, in schedule day headers, and in the sun sheet, which also uses it for dawn and dusk; the symbol, not the colour, tells sunrise from sunset |
 | Night | `#00101F` | Night shading beneath the curve (70%) |
-| Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (8%) |
+| Daylight tint | `#A8CAE0` | Daylight shading beneath the curve (22%) |
 | Paper | `#FCFCFC` | Absolute-now dot |
 | Attention | `#EF6F4A` | Provisional or exceptional state, not alarm |
 | Eclipse umbra | `#6B2A18` | Eclipse-only copper, drawn at 94% |
@@ -555,6 +559,10 @@ The magnitude ramp contains no green:
 | 1 | `#C93A32` | 12 kn / 1.8 m/hr |
 
 Interpolate piecewise in sRGB and clamp beyond the ends. Geometry auto-fits per station; magnitude colour remains absolute so equal speeds mean equal colours.
+
+### 12.5 Alert bands
+
+Where one of the host's alert rules will fire, the plot body is tinted with the sun colour at low opacity from the reminder time to the event, and on across a slack window to its close; a 1.5-unit hairline in the sun colour marks the moment. The tint draws before the tracks, so the curve, its fill and a slack band keep their own colour over it; the hairline draws after the tracks and before the day chrome. The spans are the host's: it resolves them from the rule store against the loaded window (`alertSpans`, `Slackwater/AlertLine.swift`) off the main actor whenever the rules or the window's edges change (`AlertSpanRequest`; a republish that moves neither costs nothing), and hands them to the strip through the environment (`stripAlertSpans`). A list card, an online gate and the watch hand none and draw none. A return from an alert's Live Activity lands the centerline on its event, inside the band (docs/alerts.md §5.3).
 
 ## 13. Track variants
 
@@ -573,7 +581,7 @@ Draw in this order:
 7. absolute event times; and
 8. the absolute-now dot.
 
-Water above chart datum has no fill: between the curve and the plot floor there is only the opaque water ground, so day and night shading lies on the same dark sea on a tide strip as on a current strip. Where the curve lies below datum, low amber fills the area between datum and the curve, clear at datum and rising to 50% at the bottom of the plot. That area lies above the curve, over the sky, not over the opaque water ground. If the loaded series never reaches datum, draw no fill. Station cards draw a different tide fill: graph blue above datum as well as the amber below it.
+Water above chart datum has no fill: between the curve and the plot floor there is only the opaque water ground, so day and night shading lies on the same dark sea on a tide strip as on a current strip. Where the curve lies below datum, low amber fills the area between datum and the curve, clear at datum and rising to 50% at the bottom of the plot. That area lies above the curve, over the sky, not over the opaque water ground. If the loaded series never reaches datum, draw no fill. If datum lies above the plot, which happens when the whole fitted series is below it, draw no fill either: the amber would cover all the sky over the curve and start partly opaque at the plot's top edge, with no datum line to read it against. Station cards draw a different tide fill: graph blue above datum as well as the amber below it, and no fill when datum lies above the card's plot.
 
 The tide curve is base graph blue while `abs(rate) < 0.6 m/hr`. At and above that floor it follows the absolute rate ramp in §12.4: from 0.6 to 1.0 m/hr the line is solid ramp yellow, and the step from blue is softened only by the gradient between adjacent samples. The past/future opacity split applies on top of the gradient.
 
@@ -618,14 +626,14 @@ A measured slack window is measured around each slack instant on the drawn sampl
 
 Each zero instant draws as a six-unit go-colour stroke along the curve, centred on the instant. Its width is a rendering minimum, not a slack duration. A merged window narrower than a turn dot's five-unit diameter is not drawn and has no magnetic targets, commentary stops, or event times of its own; its zero instant still has a mark and stop. At 18 units an hour that is a window shorter than about 17 minutes. Station cards apply the same minimum at their own scale. Derived gates retain their schematic slack presentation because they have no measured speeds.
 
-Current maxima are drawn as context rather than as marks:
+Current maxima are drawn as context rather than as marks at every station; the reach reading (current-charts §1) adds only the maximum-time row below:
 
 - no peak dot;
 - hang the absolute speed, without unit, below a velocity crest and above a trough, following the curve's approach with flood/ebb sign as the flat-approach fallback;
 - place a true-bearing set arrow nearest the curve; and
 - use foam rather than flood/ebb hue for both value and arrow.
 
-The event-time row contains each drawn window's opening and each zero instant outside every drawn window. When a merged window contains multiple zero instants, print those exact slack times instead of its opening, so a continuous window whose opening is off-screen still has useful times. These times use go green, with the usual past fade. The same selection applies to station cards at their own scale. The row does not contain current-maximum times. Those maxima remain magnetic even though their exact time is not printed on the graph.
+The first event-time row contains each drawn window's opening and each zero instant outside every drawn window. When a merged window contains multiple zero instants, print those exact slack times instead of its opening, so a continuous window whose opening is off-screen still has useful times. These times use go green, with the usual past fade. The same selection applies to station cards at their own scale. Detail strips print maximum ebb and flood times on a separate gray row below slack times, independently thinned, at a reach: a harmonic or fitted station whose model peak for its year stays under the make-way anchor (current-charts §1, §5.4.1). At a narrows, and at every online or derived gate, the row is omitted and the maxima stay in the schedule. Maximum times remain magnetic at every station. Cards omit maximum times.
 
 ### 13.3 Schematic derived current
 
@@ -649,16 +657,15 @@ For every civil day touched by the window:
 - centre `Today`, `Tomorrow`, `Yesterday`, or the short weekday on the daylight that the day's sunrise begins, halfway between that sunrise and the sunset that follows it; use station-local noon when the day has no sunrise or that daylight has no following sunset, so the day name never lands in the night;
 - place the locale's abbreviated month and day (iOS template `MMMd`) beneath it;
 - draw sunrise as the `sunrise` SF Symbol, a space, and its localized station time, in sunrise ink at its true x-coordinate;
-- draw sunset as the `sunset` SF Symbol, a space, and its localized station time, also in sunrise ink (the symbol, not the colour, tells them apart) at its true x-coordinate; and
-- place a seven-unit sun-colour dot centred 14 units below the day row beneath each time.
+- draw sunset as the `sunset` SF Symbol, a space, and its localized station time, also in sunrise ink (the symbol, not the colour, tells them apart) at its true x-coordinate.
 
-The day name is foam at 85% and the date foam at 48%, 17 units below the day name. Day names, dates, sun times, sun dots, and the eclipse glyph do not fade in the past. Day names and sun times share the day row with no collision handling, so on short days they may overprint. The day row, dates, sun dots, and eclipse glyph draw after the track, over its shading.
+The day name is foam at 85% and the date foam at 48%, 17 units below the day name. Sun symbols and times share the date row, without dots. The eclipse glyph sits 14 units below the sun times. Day names, dates, sun times, and the eclipse glyph do not fade in the past. Sun times and dates have no horizontal collision handling, so on very short days they may overprint. Day names, dates, sun times, and eclipse glyphs draw after the track, over its shading.
 
 Sunrise/sunset events are computed for the station coordinate and civil-day bounds; when a civil day has more than one rise or set, the first of each is used. A polar day may lack either event; omit missing marks without inventing a time.
 
-Night shading (`#00101F` at 70%) spans each sunset to the sunrise that follows it; daylight tint (`#A8CAE0` at 8%) spans each sunrise to the sunset that follows it. Pair the sun events by succession, from the time-sorted sunrises and sunsets of every day the strip holds, never by civil day: where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset comes before its sunrise and closes the previous day's daylight. A sun event followed by another of the same kind, or by none, opens no band. Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
+Night shading (`#00101F` at 70%) spans each sunset to the sunrise that follows it; daylight tint (`#A8CAE0` at 22%) spans each sunrise to the sunset that follows it. The daylight tint carries the day-from-night reading, so the run of days shows in the plot's colour alone with the sky's bodies on or off; the night band stays light enough that a current's flood fill still reads through it. Pair the sun events by succession, from the time-sorted sunrises and sunsets of every day the strip holds, never by civil day: where sunset falls after local midnight (western Alaska in summer), a civil day's first sunset comes before its sunrise and closes the previous day's daylight. A sun event followed by another of the same kind, or by none, opens no band. Each band ramps linearly from transparent 0.75 hour outside its sun event to full strength 0.75 hour inside it, so the event itself sits at half strength; a band shorter than 1.5 hours ramps from transparent 0.75 hour outside each event straight to full strength at its centre. Shade is clipped beneath the curve and runs down through the time and day rows. It stays at full strength from the plot top through the first 35% of the distance from the plot top to the bottom of the strip, then fades linearly to transparent at the strip's bottom edge, so it does not end as a hard rectangle behind the time rows.
 
-For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the sun-dot row. Do not add a text label or coloured band to the graph. Greatest eclipse is a magnetic target; the eclipse's other contacts are not (§7).
+For a lunar eclipse with a contact or its greatest eclipse above the station's horizon, and for a solar eclipse reported as visible there, draw only a small `🌘` (6.5 units) at greatest eclipse on the eclipse row below the sun times. Do not add a text label or coloured band to the graph. Greatest eclipse is a magnetic target; the eclipse's other contacts are not (§7).
 
 The backdrop behind the lead responds continuously to `selectedTime` and station coordinates:
 
@@ -678,6 +685,8 @@ The backdrop behind the lead responds continuously to `selectedTime` and station
 Solar eclipse appearance is evaluated for the selected instant and station coordinate. A partial eclipse must leave a visible bite in the sun instead of looking total; the moon must not disappear into the ordinary near-sun glare fade. Solar obscuration changes the backdrop; the strip marks solar eclipses with the same glyph and greatest-eclipse snap target as lunar ones.
 
 The sky is non-interactive and accessibility-hidden. Under Reduce Motion, stars must not twinkle; selected-time movement may still reposition the astronomical scene because that change conveys time rather than decoration.
+
+Settings' "Sun, moon and stars" switch, on by default, turns the bodies off: no sun disc, moon glyph, eclipse silhouette or star field. Everything else in this section stays, so the gradient, its opacity and the ink rule still follow the sun's altitude at the selected instant, and the day and night shading under the curve still marks the run of days. The switch follows the person between devices like the units, and the watch's sky honours it. Flipping it reloads no widget, because none draws the sky. With it off, the first-run tour's stars step stays, since it carries the tour's only swipe lesson, but it does not glide to tonight's stars and its card keeps the swipe wording; the moon step drops, the way it does when the window holds no night. The tour reads the switch when it moves to each step, and a card's wording follows whether that step glided, so a card already on screen when the switch syncs keeps its wording until the next step.
 
 ## 15. Accessibility and non-touch input
 
@@ -805,10 +814,13 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 36. **Slack caps:** Window and green runs replace the underlying stroke, including in the past, and only their ends against the yellow curve have separation gaps; a green run joins its window's blue with none. Fill and sky remain intact.
 37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible, and greater obscuration darkens the backdrop. The strip marks greatest eclipse with the same small `🌘` a lunar eclipse gets, and greatest eclipse is the eclipse's only magnetic target; its other contacts are not.
 38. **Fold:** Unfolding after scrubbing lands on the folded instant, including one weeks from now; folding while home lands on refreshed now. Both directions keep the chosen schedule week. A schedule in the upper half of the viewport returns to view after its data loads; a glimpse at the bottom leaves the chart in view. Scrolling while data loads cancels the pending schedule restoration.
+39. **Reach row:** A harmonic or fitted current whose model peak for its year stays under the make-way anchor draws the maximum-time row; one whose peak reaches it, and every online or derived gate, omits the row. Picking another week or scrolling across springs changes neither.
 
 ## 18. Known iOS deviations from the intended contract
 
-This section lists implementation gaps, not behavior to copy to another platform. No gap is known in the iOS reference.
+This section lists implementation gaps, not behavior to copy to another platform.
+
+The iOS reference draws the maximum-time row at every current with maxima, rather than only at a reach (§13.2). It has no narrows or reach classification yet.
 
 A gap found later is listed here. Fixing one should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
@@ -818,7 +830,7 @@ The living implementation is split by responsibility:
 
 | Concern | iOS source |
 |---|---|
-| Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, schedule list | `Slackwater/TimelineStrip.swift` |
+| Window constants, timeline data and builders, magnet target, vertical geometry, tiled canvas, day/sun/eclipse chrome, alert bands (`AlertSpan`, `alertBandFrames`), schedule list | `Slackwater/TimelineStrip.swift` |
 | Scroll host, opening, taps, press and hold, accessibility actions, resize and fold follow, magnet settle, fixed overlay, commentary and Now pill row, rescale glide | `Slackwater/TimelineScrubber.swift` |
 | Continuous chunks, merging, scroll gate, scale governor | `Slackwater/TimelineChunks.swift` |
 | Detail scaffold: date picker, alert line wiring, shared-link jump, week bar, fold restoration | `Slackwater/Theme.swift` |
