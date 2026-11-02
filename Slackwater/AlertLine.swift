@@ -49,6 +49,35 @@ func alertNextOccurrence(stationID: String, offer: AlertTrigger, after: Date, th
         .map(\.event).first { $0 > after }
 }
 
+/// What the strip's bands are resolved for: the station, its rules, and the loaded window's
+/// edges. Equal requests resolve to equal spans, so a republish that moves neither edge costs
+/// nothing. The query reaches a day and six hours before the window and six hours past it, so
+/// a slack window already open at the start, a reminder for a moment just past the end, and a
+/// `once` rule's nearest-occurrence search all see what they need; `alertBandFrames` clips.
+struct AlertSpanRequest: Equatable, Sendable {
+    let stationID: String
+    let rules: [AlertRule]
+    let start: Date
+    let end: Date
+    var from: Date { start.addingTimeInterval(-(6 * 3_600 + 86_400)) }
+    var to: Date { end.addingTimeInterval(6 * 3_600) }
+}
+
+/// Where the strip tints: one span per occurrence of the station's enabled rules inside the
+/// query, from the reminder time to the event, and across the window where there is one.
+/// Resolved against the bundled record, the way the Rest tap resolves (`alertNextOccurrence`).
+func alertSpans(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertSpan] {
+    let mine = rules.filter { $0.stationID == stationID && $0.enabled }
+    guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
+    let station = WidgetStationLoader.station(from: record)
+    return mine.flatMap { rule in
+        alertOccurrences(rule, station: station, position: record.alertPosition,
+                         from: from, to: to, threshold: threshold)
+            .map { AlertSpan(ruleID: rule.id, fire: $0.fire, event: $0.event, end: $0.end) }
+    }
+    .sorted { $0.event < $1.event }
+}
+
 /// "Set an alert" · "Set alert for low tide · Sat 14:32" · "Alert set · low tide · Sat 14:32" ·
 /// "Alert set · every low tide". The event in a small letter mid-sentence, the moment in the
 /// station's zone.
