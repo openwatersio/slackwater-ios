@@ -8,6 +8,8 @@
 //     `onAppear` and no `.task`, and it draws no `UIViewRepresentable` — a
 //     MapLibre header or a `TimelineScrubber` comes out empty — so it is only
 //     ever pointed at drawing leaves like `TimelineCanvas`.
+//   * REFRESH works in a key window: poll `drawHierarchy` snapshots from a
+//     `UIHostingController`, which runs the mounted view's lifecycle tasks.
 //   * SIZE works: host the view in a `UIHostingController` and ask
 //     `sizeThatFits` — the probe for "how tall does this get at
 //     accessibility5".
@@ -22,6 +24,26 @@
 import SwiftUI
 import UIKit
 @testable import Slackwater
+
+// Prediction completion and its rendered frame can both arrive after the first snapshot.
+@MainActor
+func waitForCardRedraw(_ condition: () throws -> Bool) async rethrows -> Bool {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2 * max(1, perfScale)))
+    repeat {
+        if try condition() { return true }
+        try? await Task.sleep(for: .milliseconds(25))
+    } while ContinuousClock.now < deadline
+    return try condition()
+}
+
+// The lower quarter stays below the header in the fixed card fixtures, even without a graph.
+func cardGraphImage(_ image: UIImage) -> UIImage? {
+    guard let cg = image.cgImage else { return nil }
+    let height = CGFloat(cg.height)
+    guard let crop = cg.cropping(to: CGRect(x: 0, y: height * 0.75,
+                                          width: CGFloat(cg.width), height: height * 0.25)) else { return nil }
+    return UIImage(cgImage: crop)
+}
 
 /// The share of an image's pixels that differ from its most common colour —
 /// "is anything drawn here". The same measure the UI suite takes off a device

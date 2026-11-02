@@ -109,39 +109,62 @@ final class CardRefreshTests: XCTestCase {
             latitude: 48, longitude: -123, timezone: "UTC",
             floodDirection: 90, ebbDirection: 270, meanFlow: 0, tideReference: nil,
             constituents: [.init(name: "M2", amplitude: 2, phase: 0)])
-        let evening = appNow().addingTimeInterval(7 * 86_400)
+        let first = appNow()
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline })
-        let start = evening.addingTimeInterval(-86_400)
+        let start = first.addingTimeInterval(-86_400)
         let offsets = stride(from: 0.0, through: 3 * 86_400, by: 900).map { $0 }
         let online = ChsOnlineWindow(
-            stationID: gate.id, iwlsName: gate.name, timezone: "UTC", fetchedAt: evening,
+            stationID: gate.id, iwlsName: gate.name, timezone: "UTC", fetchedAt: first,
             start: start, end: start.addingTimeInterval(3 * 86_400),
             floodDirection: 90, ebbDirection: 270,
             times: offsets.map { start.timeIntervalSince1970 + $0 },
             speeds: offsets.map { 2 * sin($0 / (6.21 * 3600) * .pi) })
         let derived = DerivedGateRecord(gate: try XCTUnwrap(ChsGateInfo.all.first), port: tide)
         for eager in [false, true] {
-            for card in [AnyView(StationCardView(record: tide, imperial: true, eager: eager)),
-                         AnyView(CurrentCardView(record: current, eager: eager)),
-                         AnyView(DerivedGateCardView(record: derived)),
-                         AnyView(OnlineGateCardView(gate: gate, window: online))] {
-                func page(_ time: Date) -> some View {
-                    card.environment(\.cardRefreshTime, time)
-                        .frame(width: 364, height: 168).background(SN.canvas)
+            for (name, region, card) in [
+                (tide.name, tide.region, AnyView(StationCardView(record: tide, imperial: true, eager: eager))),
+                (current.name, current.region, AnyView(CurrentCardView(record: current, eager: eager))),
+                (derived.gate.name, derived.gate.region, AnyView(DerivedGateCardView(record: derived))),
+                (gate.name, gate.region, AnyView(OnlineGateCardView(gate: gate, window: online)))
+            ] {
+                func page(_ time: Date?) -> AnyView {
+                    AnyView(card.environment(\.cardRefreshTime, time)
+                        .frame(width: 364, height: 168).background(SN.canvas))
                 }
-                let host = UIHostingController(rootView: page(evening))
+                let blank = StationCard(name: name, region: region) { EmptyView() }
+                    .frame(width: 364, height: 168).background(SN.canvas)
+                let host = UIHostingController(rootView: AnyView(blank))
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 364, height: 168))
                 window.rootViewController = host
                 window.makeKeyAndVisible()
                 defer { window.isHidden = true }
-                try await Task.sleep(for: .milliseconds(300))
                 host.view.layoutIfNeeded()
-                let before = snapshot(host.view)
-                host.rootView = page(evening.addingTimeInterval(21_600))
-                try await Task.sleep(for: .milliseconds(300))
-                host.view.layoutIfNeeded()
-                XCTAssertGreaterThan(differingFraction(before, snapshot(host.view)), 0.005,
-                                     "The mounted \(eager ? "eager" : "lazy") card kept its evening reading and curve")
+                let empty = snapshot(host.view)
+                XCTAssertLessThan(inkFraction(try XCTUnwrap(cardGraphImage(empty))), 0.001)
+                host.rootView = page(nil)
+                let loaded = await waitForCardRedraw {
+                    host.view.layoutIfNeeded()
+                    let image = snapshot(host.view)
+                    guard let graph = cardGraphImage(image) else { return false }
+                    return differingFraction(empty, image) > 0.005 && inkFraction(graph) > 0.001
+                }
+                guard loaded else { XCTFail("The \(name) card did not load its initial reading and curve"); continue }
+                var before = snapshot(host.view)
+                for offset in [21_600.0, 43_200.0] {
+                    let beforeGraph = try XCTUnwrap(cardGraphImage(before))
+                    host.rootView = page(first.addingTimeInterval(offset))
+                    let updated = await waitForCardRedraw {
+                        host.view.layoutIfNeeded()
+                        let image = snapshot(host.view)
+                        guard let graph = cardGraphImage(image) else { return false }
+                        return differingFraction(before, image) > 0.005
+                            && differingFraction(empty, image) > 0.005
+                            && differingFraction(beforeGraph, graph) > 0.005
+                            && inkFraction(graph) > 0.001
+                    }
+                    XCTAssertTrue(updated, "The mounted \(eager ? "eager" : "lazy") \(name) card kept its old reading and curve")
+                    before = snapshot(host.view)
+                }
             }
         }
     }
@@ -161,25 +184,56 @@ final class CardRefreshTests: XCTestCase {
             speeds: offsets.map { sin($0 / (6.21 * 3600) * .pi) })
         try ChsModelStore.saveOnline(cached)
         defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id)) }
-        XCTAssertNotNil(ChsModelStore.loadOnline(gate.id)?.block(covering: day))
+        let block = try XCTUnwrap(ChsModelStore.loadOnline(gate.id)?.block(covering: day))
         XCTAssertNil(ChsModelStore.loadOnline(gate.id)?.block(covering: day.addingTimeInterval(86_400)))
-        func page(_ time: Date) -> some View {
-            ChsCurrentGateCardView(gate: gate).environment(\.cardRefreshTime, time)
+        var mounted = false
+        func page(_ time: Date) -> AnyView {
+            AnyView(ChsCurrentGateCardView(gate: gate).environment(\.cardRefreshTime, time)
                 .frame(width: 364, height: 168).background(SN.canvas)
+                .onAppear { mounted = true })
         }
-        let host = UIHostingController(rootView: page(day.addingTimeInterval(43_200)))
+        let populated = OnlineGateCardView(gate: gate, window: block)
+            .environment(\.cardRefreshTime, day.addingTimeInterval(43_200))
+            .frame(width: 364, height: 168).background(SN.canvas)
+        func pending(_ status: CardStatus) -> AnyView {
+            AnyView(ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, status: status)
+                .frame(width: 364, height: 168).background(SN.canvas))
+        }
+        let host = UIHostingController(rootView: pending(.expired))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 364, height: 168))
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
-        try await Task.sleep(for: .milliseconds(300))
         host.view.layoutIfNeeded()
-        let before = snapshot(host.view)
+        let offline = snapshot(host.view)
+        host.rootView = pending(.notQueued)
+        let waiting = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            return differingFraction(offline, snapshot(host.view)) > 0.01
+        }
+        guard waiting else { return XCTFail("The online waiting reference did not render") }
+        let online = snapshot(host.view)
+        host.rootView = AnyView(populated)
+        let referenceLoaded = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            return differingFraction(online, snapshot(host.view)) > 0.01
+        }
+        guard referenceLoaded else { return XCTFail("The populated reference did not render") }
+        let expected = snapshot(host.view)
+        host.rootView = page(day.addingTimeInterval(43_200))
+        let loaded = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            return mounted && differingFraction(expected, snapshot(host.view)) < 0.001
+        }
+        guard loaded else { return XCTFail("The cached online card did not load its reading before rollover") }
         host.rootView = page(day.addingTimeInterval(86_400 + 43_200))
-        try await Task.sleep(for: .milliseconds(300))
-        host.view.layoutIfNeeded()
-        XCTAssertGreaterThan(differingFraction(before, snapshot(host.view)), 0.01,
-                             "The online card kept yesterday's reading after its cached coverage expired")
+        let expired = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            let image = snapshot(host.view)
+            // The idle gate waits online and reports expired coverage offline; neither shows old readings.
+            return [offline, online].contains { differingFraction($0, image) < 0.001 }
+        }
+        XCTAssertTrue(expired, "The online card kept yesterday's reading after its cached coverage expired")
     }
 
     @MainActor
@@ -205,15 +259,17 @@ final class CardRefreshTests: XCTestCase {
         host.view.layoutIfNeeded()
         let empty = snapshot(host.view)
         host.rootView = AnyView(page(start.addingTimeInterval(43_200)))
-        try await Task.sleep(for: .milliseconds(300))
-        host.view.layoutIfNeeded()
-        XCTAssertGreaterThan(differingFraction(empty, snapshot(host.view)), 0.005,
-                             "The valid preview must load before checking expiry")
+        let loaded = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            return differingFraction(empty, snapshot(host.view)) > 0.005
+        }
+        guard loaded else { return XCTFail("The valid preview must load before checking expiry") }
         host.rootView = AnyView(page(start.addingTimeInterval(86_401)))
-        try await Task.sleep(for: .milliseconds(300))
-        host.view.layoutIfNeeded()
-        XCTAssertLessThan(differingFraction(empty, snapshot(host.view)), 0.001,
-                          "An expired preview must not invent a zero-height reading")
+        let expired = await waitForCardRedraw {
+            host.view.layoutIfNeeded()
+            return differingFraction(empty, snapshot(host.view)) < 0.001
+        }
+        XCTAssertTrue(expired, "An expired preview must not invent a zero-height reading")
     }
 
     @MainActor
