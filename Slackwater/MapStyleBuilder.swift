@@ -107,7 +107,7 @@ private let LABEL_FONT = ["Noto Sans Regular"]
 private let LABEL_TEXT = "#ffffff"
 private let LABEL_HALO = CHART_INK   // one shadow tone: pins' rim and text's halo
 
-/// Where the first station text appears: the readings ("3.2 ft", "1.8 kn"),
+/// Where the first station text appears: readings, with units in framed previews,
 /// alone in the 9.5-10.5 band. Below this the pins carry the story by
 /// themselves and the basemap's own geography labels get the ink back.
 /// Also the threshold the DATA reads: under it no gauge or reading is drawn,
@@ -380,7 +380,7 @@ func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textPadding = NSExpression(forConstantValue: 4)
 
-    // The station's reading ("3.2 ft" / "1.8 kn") — tier two, and the ONLY
+    // The station's reading — tier two, and the ONLY
     // text in the 9.5–10.5 band. Several candidate slots per station, tried
     // in order, so a reading blocked on one side takes another before
     // giving up; readings place before names, so a reading that needs a

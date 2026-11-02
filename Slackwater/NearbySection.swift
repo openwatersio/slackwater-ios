@@ -81,7 +81,7 @@ struct NearbySection: View {
         return StationChoiceRow(title: near.name,
                                 caption: near.region.isEmpty ? near.kindLabel
                                     : String(localized: "\(near.region) · \(near.kindLabel)", comment: "Nearby station region and localized type. The first value is catalog data."),
-                                distance: String(localized: "\(formatNm(km)) \(compass16(bearing))", comment: "Nearby station distance and compass bearing. Values are a localized nautical-mile distance and invariant bearing."))
+                                distance: String(localized: "\(formatNm(km)) \(compass16(bearing))", comment: "Two adjacent values: nearby distance and bearing, or map category and unit."))
             // Not a Button: press tracking goes dead below the strip in the
             // iPad split detail column (OpenTideDetailKey, Theme.swift).
             .onTapGesture { open(near) }
