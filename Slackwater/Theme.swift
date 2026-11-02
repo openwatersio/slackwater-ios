@@ -68,8 +68,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @State private var pressedMoment: Date? = nil
     @State private var alertSubject: AlertSheetSubject? = nil
     @ObservedObject private var alertRules = AlertRuleStore.shared
-    @State private var alertSpans: [AlertSpan] = []
-    @State private var spanRequest: AlertSpanRequest?
+    @State private var alertMoments: [AlertMoment] = []
+    @State private var momentRequest: AlertMomentRequest?
+    /// Read only to notice a change: the normalised value is `slackThresholdKn`.
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeedKn = defaultSlackThresholdKn
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -202,8 +205,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.stripPressed, stripPressed)
             .environment(\.stripIsPressed, pressedMoment != nil)
             .environment(\.stripAlertAction, stripAlertAction)
-            .environment(\.stripAlertSpans, alertSpans)
-            .onChange(of: alertRules.rules) { _, _ in refreshAlertSpans() }
+            .environment(\.stripAlertMoments, alertMoments)
+            .onChange(of: alertRules.rules) { _, _ in refreshAlertMoments() }
+            .onChange(of: slackWindowSpeedKn) { _, _ in refreshAlertMoments() }
             // A scrub, fling, return-to-now or shared link after a press drops the line back to
             // Rest; compared by minute so the strip's own settle does not.
             .onChange(of: scrubTime) { _, t in
@@ -235,7 +239,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // no moon tile and no scrubber — nothing to teach — so the tour
             // stays armed and fires on the next detail that does.
             .onChange(of: timeline?.revision, initial: true) { _, _ in
-                refreshAlertSpans()
+                refreshAlertMoments()
                 guard let timeline else { return }
                 let coverage = timeline.start...timeline.end
                 TourCoach.shared.begin(
@@ -404,22 +408,21 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         return { pressedMoment = scrubTime }
     }
 
-    /// The station's alert spans over the loaded window, for the strip's bands. Nothing where
-    /// there is nothing to alert on (no `alertOffer`) or no timeline yet. The window republishes
-    /// on every chunk arrival and right-edge append, so the resolve runs only when the rules or
-    /// the window's edges change, off the main actor, and a result for a request since
-    /// superseded is dropped.
-    private func refreshAlertSpans() {
-        guard alertOffer != nil, let timeline else { alertSpans = []; spanRequest = nil; return }
-        let request = AlertSpanRequest(stationID: favoriteId, rules: alertRules.rules,
-                                       start: timeline.start, end: timeline.end)
-        guard request != spanRequest else { return }
-        spanRequest = request
-        let threshold = slackThresholdKn
+    /// The moments of the station's alerts inside the loaded window, for the strip's markers.
+    /// Nothing where there is nothing to alert on (no `alertOffer`) or no timeline yet. The
+    /// window republishes on every chunk arrival and right-edge append, so the resolve runs only
+    /// when the rules, the window's edges or the slack-window speed change, off the main actor,
+    /// and a result for a request since superseded is dropped.
+    private func refreshAlertMoments() {
+        guard alertOffer != nil, let timeline else { alertMoments = []; momentRequest = nil; return }
+        let request = AlertMomentRequest(stationID: favoriteId, rules: alertRules.rules,
+                                         start: timeline.start, end: timeline.end, threshold: slackThresholdKn)
+        guard request != momentRequest else { return }
+        momentRequest = request
         Task.detached(priority: .userInitiated) {
-            let spans = Slackwater.alertSpans(stationID: request.stationID, rules: request.rules,
-                                              from: request.from, to: request.to, threshold: threshold)
-            await MainActor.run { if spanRequest == request { alertSpans = spans } }
+            let moments = Slackwater.alertMoments(stationID: request.stationID, rules: request.rules,
+                                                  from: request.from, to: request.to, threshold: request.threshold)
+            await MainActor.run { if momentRequest == request { alertMoments = moments } }
         }
     }
 
@@ -549,15 +552,15 @@ private struct StripTrailingBleedKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
-private struct StripAlertSpansKey: EnvironmentKey {
-    static let defaultValue: [AlertSpan] = []
+private struct StripAlertMomentsKey: EnvironmentKey {
+    static let defaultValue: [AlertMoment] = []
 }
 
 extension EnvironmentValues {
-    /// Where the host's alerts will fire, for the strip to tint (docs/scrubber.md §12).
-    var stripAlertSpans: [AlertSpan] {
-        get { self[StripAlertSpansKey.self] }
-        set { self[StripAlertSpansKey.self] = newValue }
+    /// The moments of the host's alerts, for the strip to mark (docs/scrubber.md §12.5).
+    var stripAlertMoments: [AlertMoment] {
+        get { self[StripAlertMomentsKey.self] }
+        set { self[StripAlertMomentsKey.self] = newValue }
     }
 }
 

@@ -794,6 +794,10 @@ struct TimelineGeo {
         maxAbsCur = s.maxAbsCur
     }
 
+    /// An alert marker's bell sits in the gap between the pill row, which ends 6 above the
+    /// pad, and the plot box, 10 below it; its line starts under the bell (docs/scrubber.md §12.5).
+    var alertBellY: CGFloat { padTop + 1 }
+    var alertLineTop: CGFloat { padTop + 8 }
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
     var timeY: CGFloat { bodyBottom + 18 }
@@ -813,33 +817,24 @@ struct TimelineGeo {
 
 // MARK: - The strip content (drawn once; pans under the fixed centerline)
 
-/// Where one of the host's alerts will fire: from the reminder time to the event, and across
-/// the window where there is one. Declared here, not with the alerts, because the watch
-/// compiles this file and knows nothing of rules; it draws no band (docs/scrubber.md §12).
-struct AlertSpan: Hashable, Sendable {
+/// The moment one of the host's alerts is for. Declared here, not with the alerts, because the
+/// watch compiles this file and knows nothing of rules; it draws no marker (docs/scrubber.md §12).
+struct AlertMoment: Hashable, Sendable {
     let ruleID: UUID
-    let fire: Date
     let event: Date
-    let end: Date?
 }
 
-/// One drawn alert band: the tile-clipped x of the reminder time and of the window's close
-/// (or the event, for a moment), and the event's own x for its marker.
-struct AlertBandFrame: Equatable {
-    let x0: CGFloat
-    let x1: CGFloat
-    let eventX: CGFloat
-}
+/// Half the bell's width: a marker this close outside a tile still draws, so a bell astride a
+/// seam gets its other half from the tile that clips it.
+let alertBellHalfWidth: CGFloat = 6
 
-/// The bands that touch `t0…t1`, clipped to the window the data holds: a span whose reminder
-/// time is before the window still tints from the edge.
-func alertBandFrames(_ spans: [AlertSpan], in data: TimelineData, between t0: Date, and t1: Date) -> [AlertBandFrame] {
-    spans.compactMap { s in
-        let stop = s.end ?? s.event
-        guard stop >= max(t0, data.start), s.fire <= min(t1, data.end) else { return nil }
-        return AlertBandFrame(x0: data.x(max(s.fire, data.start)),
-                              x1: data.x(min(stop, data.end)),
-                              eventX: data.x(s.event))
+/// The x of each moment inside the window the data holds whose marker touches `t0…t1`.
+func alertMarkerXs(_ moments: [AlertMoment], in data: TimelineData, between t0: Date, and t1: Date) -> [CGFloat] {
+    let lo = max(data.x(t0) - alertBellHalfWidth, data.x(data.start))
+    let hi = min(data.x(t1) + alertBellHalfWidth, data.x(data.end))
+    return moments.compactMap { m in
+        let x = data.x(m.event)
+        return x >= lo && x <= hi ? x : nil
     }
 }
 
@@ -849,8 +844,8 @@ struct TimelineCanvas: View {
     let imperial: Bool
     let speedUnit: String
     let now: Date
-    /// Where the station's alerts will fire (docs/scrubber.md §12, alert bands).
-    var alertSpans: [AlertSpan] = []
+    /// The moments the station's alerts are for (docs/scrubber.md §12.5, alert markers).
+    var alertMoments: [AlertMoment] = []
 
     /// True set bearings for this station's flood and ebb, so a max's glyph on
     /// the chart is the compass arrow the schedule pill and the readout already
@@ -920,30 +915,25 @@ struct TimelineCanvas: View {
     private func draw(_ ctx: GraphicsContext, from t0: Date, to t1: Date) {
         // Tracks first: their night shade runs down through the axis rows,
         // and the day chrome's labels go over it.
-        let bands = alertBandFrames(alertSpans, in: data, between: t0, and: t1)
-        drawAlertTints(ctx, bands)
         if geo.hasTide { drawTide(ctx, t0, t1) }
         if geo.hasCurrent { drawCurrent(ctx, t0, t1) }
-        drawAlertMarkers(ctx, bands)
+        drawAlertMarkers(ctx, alertMarkerXs(alertMoments, in: data, between: t0, and: t1))
         drawDayChrome(ctx, t0, t1)
     }
 
-    /// Where an alert will fire: a tint from the reminder time across the window, under the
-    /// tracks so the curve, its fill and a slack band keep their own colour over it.
-    private func drawAlertTints(_ ctx: GraphicsContext, _ bands: [AlertBandFrame]) {
-        let top = geo.padTop, bottom = geo.bodyBottom
-        for f in bands {
-            let rect = CGRect(x: f.x0, y: top, width: max(f.x1 - f.x0, 2), height: bottom - top)
-            ctx.fill(Path(rect), with: .color(SN.sun.opacity(0.16)))
-        }
-    }
-
-    /// The moment itself: a bright hairline over the tracks, under the day chrome.
-    private func drawAlertMarkers(_ ctx: GraphicsContext, _ bands: [AlertBandFrame]) {
-        let top = geo.padTop, bottom = geo.bodyBottom
-        for f in bands {
-            ctx.fill(Path(CGRect(x: f.eventX - 0.75, y: top, width: 1.5, height: bottom - top)),
-                     with: .color(SN.sun.opacity(0.9)))
+    /// An alert's moment: a hairline through the plot with a filled bell at its top, in the pad
+    /// between the pill row and the plot, in foam like the strip's own labels: green inside the
+    /// plot is slack evidence and the sun colour is the sun chrome. Over the tracks, under the
+    /// day chrome (docs/scrubber.md §12.5).
+    private func drawAlertMarkers(_ ctx: GraphicsContext, _ xs: [CGFloat]) {
+        let top = geo.alertLineTop, bottom = geo.bodyBottom
+        for x in xs {
+            ctx.fill(Path(CGRect(x: x - 0.75, y: top, width: 1.5, height: bottom - top)),
+                     with: .color(SN.foam.opacity(0.55)))
+            ctx.draw(Text(Image(systemName: "bell.fill"))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(SN.foam.opacity(0.9)),
+                     at: CGPoint(x: x, y: geo.alertBellY), anchor: .center)
         }
     }
 
