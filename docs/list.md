@@ -138,7 +138,7 @@ Each station renders in one group only, by priority: My Location, then Favorites
 
 ## 6. The station card
 
-The list, search results, and the map's preview panel draw the same card. It is one tap target that opens the station's detail.
+The list, search results, the map's preview panel, Nearby, and the station chooser draw the same card. It is one tap target. In the list, search, map preview, and Nearby, tapping opens the station's detail. In the chooser, tapping saves the choice and closes the sheet; choosing a different station opens it, or replaces a removed favorite when choosing a replacement. Nearby and the chooser put the station kind and provider below the card, alongside the distance. The chooser also labels the displayed station "Shown" and outlines the station selected on its map.
 
 ### 6.1 Anatomy
 

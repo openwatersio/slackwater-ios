@@ -950,18 +950,7 @@ struct StationListView: View {
     }
 
     @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
-        switch item {
-        case .tide(let info):
-            activatable(StationCardView(info: info, imperial: imperial, km: km), item)
-        case .current(let info):
-            activatable(CurrentCardView(info: info, km: km), item)
-        case .chs(let info):
-            activatable(ChsCardView(info: info, imperial: imperial, km: km), item)
-        case .chsGate(let gate):
-            activatable(ChsGateCardView(gate: gate, km: km), item)
-        case .chsCurrent(let gate):
-            activatable(ChsCurrentGateCardView(gate: gate, km: km), item)
-        }
+        activatable(StationItemCard(item: item, imperial: imperial, km: km), item)
     }
 
     /// Explains a tombstoned station and offers alternatives near its last location.
@@ -1296,13 +1285,7 @@ struct StationListView: View {
     /// (first frame complete, for the preview's slide-up); the derived-gate
     /// card has no eager path and keeps its fade-in.
     @ViewBuilder private func cardFace(_ item: StationItem, eager: Bool = false) -> some View {
-        switch item {
-        case .tide(let s): StationCardView(info: s, imperial: imperial, eager: eager)
-        case .current(let s): CurrentCardView(info: s, eager: eager)
-        case .chs(let info): ChsCardView(info: info, imperial: imperial, eager: eager)
-        case .chsGate(let gate): ChsGateCardView(gate: gate)
-        case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate, eager: eager)
-        }
+        StationItemCard(item: item, imperial: imperial, eager: eager)
     }
 
     /// A search result: the ordinary card, tapping opens the detail and

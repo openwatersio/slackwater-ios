@@ -200,9 +200,7 @@ struct StationChooserSheet: View {
             onPick(item)
             dismiss()
         } label: {
-            StationChoiceRow(title: item.placeLabel,
-                             caption: item.kindLabel,
-                             distance: distance(item),
+            StationChoiceCard(item: item, distance: distance(item),
                              note: item.id == place.shown
                                 ? String(localized: "Shown", comment: "Marks the station currently displayed.")
                                 : nil,
@@ -227,41 +225,43 @@ struct StationChooserSheet: View {
     }
 }
 
-/// A station row's face: a title, what it measures, and how far — the
-/// chooser's rows and a detail's Nearby rows. Callers own the tap.
-struct StationChoiceRow: View {
-    let title: String
-    let caption: String
+struct StationChoiceCard: View {
+    let item: StationItem
     let distance: String
     /// A leaf mark after the caption, such as the chooser's "Shown".
     var note: String? = nil
     var selected = false
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(SN.paper)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                HStack(spacing: 8) {
-                    MonoLabel(text: caption, color: SN.foam.opacity(0.55), tracking: 1.1)
+        VStack(alignment: .leading, spacing: 6) {
+            StationItemCard(item: item, imperial: units == "imperial")
+                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(selected ? SN.leaf : .clear, lineWidth: 1.5))
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    MonoLabel(text: item.kindLabel, color: SN.foam.opacity(0.55), tracking: 1.1)
                     if let note { MonoLabel(text: note, tracking: 1.1) }
+                    Spacer(minLength: 8)
+                    distanceLabel
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    MonoLabel(text: item.kindLabel, color: SN.foam.opacity(0.55), tracking: 1.1)
+                    if let note { MonoLabel(text: note, tracking: 1.1) }
+                    distanceLabel
                 }
             }
-            Spacer(minLength: 8)
+            .padding(.horizontal, 16)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var distanceLabel: some View {
+        if !distance.isEmpty {
             Text(distance)
                 .font(.caption.monospaced().weight(.medium))
                 .foregroundStyle(SN.foam.opacity(0.85))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(selected ? 0.1 : 0.05),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(selected ? SN.leaf : SN.leaf.opacity(0.16), lineWidth: selected ? 1.5 : 0.5))
-        .contentShape(Rectangle())
     }
 }

@@ -62,8 +62,23 @@ final class SeedCache<Value>: @unchecked Sendable {
 private let tideSeeds = SeedCache<(CardState, StationCardGraph)>()
 private let currentSeeds = SeedCache<(CurrentCardState, StationCardGraph)>()
 
-/// Layout A: kind glyph left, identity (name/region/distance), state right.
-/// Fraunces name, big height numeral.
+struct StationItemCard: View {
+    let item: StationItem
+    let imperial: Bool
+    var km: Double? = nil
+    var eager = false
+
+    var body: some View {
+        switch item {
+        case .tide(let info): StationCardView(info: info, imperial: imperial, km: km, eager: eager)
+        case .current(let info): CurrentCardView(info: info, km: km, eager: eager)
+        case .chs(let info): ChsCardView(info: info, imperial: imperial, km: km, eager: eager)
+        case .chsGate(let gate): ChsGateCardView(gate: gate, km: km)
+        case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate, km: km, eager: eager)
+        }
+    }
+}
+
 struct StationCardView: View {
     let name: String
     let region: String
@@ -179,7 +194,6 @@ struct ChsCardView: View {
     @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
-        // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.state(info.id, at: cardCalculationTime(refreshTime)) {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial, km: km, eager: eager)
