@@ -49,33 +49,45 @@ func alertNextOccurrence(stationID: String, offer: AlertTrigger, after: Date, th
         .map(\.event).first { $0 > after }
 }
 
-/// What the strip's bands are resolved for: the station, its rules, and the loaded window's
-/// edges. Equal requests resolve to equal spans, so a republish that moves neither edge costs
-/// nothing. The query reaches a day and six hours before the window and six hours past it, so
-/// a slack window already open at the start, a reminder for a moment just past the end, and a
-/// `once` rule's nearest-occurrence search all see what they need; `alertBandFrames` clips.
-struct AlertSpanRequest: Equatable, Sendable {
+/// What the strip's markers are resolved for: the station, its rules, the loaded window's
+/// edges, and the slack-window speed, which moves where a window opens. Equal requests resolve
+/// to equal moments, so a republish that moves none of them costs nothing. The query is the
+/// window itself; the strip draws only what its window holds (`alertMarkerXs`).
+struct AlertMomentRequest: Equatable, Sendable {
     let stationID: String
     let rules: [AlertRule]
     let start: Date
     let end: Date
-    var from: Date { start.addingTimeInterval(-(6 * 3_600 + 86_400)) }
-    var to: Date { end.addingTimeInterval(6 * 3_600) }
+    let threshold: Double
+    var from: Date { start }
+    var to: Date { end }
 }
 
-/// Where the strip tints: one span per occurrence of the station's enabled rules inside the
-/// query, from the reminder time to the event, and across the window where there is one.
-/// Resolved against the bundled record, the way the Rest tap resolves (`alertNextOccurrence`).
-func alertSpans(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertSpan] {
+/// How far from its minute a `once` rule's occurrence can lie (`alertOccurrences`).
+let alertOnceReach: TimeInterval = 6 * 3_600
+
+/// Where the strip marks an alert: the event of each occurrence of the station's enabled rules
+/// inside the query, one per minute however many rules share it. Resolved against the bundled
+/// record, the way the Rest tap resolves (`alertNextOccurrence`). A `once` rule is resolved
+/// over the reach either side of its own minute, whatever the query: `alertOccurrences`
+/// filters to its range before it picks the occurrence nearest the minute, so a range cut
+/// short of the one meant would hand the rule to a neighbour inside the range, where a press
+/// sat well off its event (a current strip parks on the slack while the occurrence is the
+/// window's opening). The moment it finds may lie outside the query; the strip clips.
+func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
     let mine = rules.filter { $0.stationID == stationID && $0.enabled }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
     let station = WidgetStationLoader.station(from: record)
-    return mine.flatMap { rule in
-        alertOccurrences(rule, station: station, position: record.alertPosition,
-                         from: from, to: to, threshold: threshold)
-            .map { AlertSpan(ruleID: rule.id, fire: $0.fire, event: $0.event, end: $0.end) }
+    let all = mine.flatMap { rule in
+        let range = rule.once.map { ($0.addingTimeInterval(-alertOnceReach), $0.addingTimeInterval(alertOnceReach)) } ?? (from, to)
+        return alertOccurrences(rule, station: station, position: record.alertPosition,
+                                from: range.0, to: range.1, threshold: threshold)
+            .map { AlertMoment(ruleID: rule.id, event: $0.event) }
     }
     .sorted { $0.event < $1.event }
+    return all.reduce(into: []) { kept, m in
+        if kept.last?.event != m.event { kept.append(m) }
+    }
 }
 
 /// "Set an alert" · "Set alert for low tide · Sat 14:32" · "Alert set · low tide · Sat 14:32" ·

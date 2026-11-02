@@ -112,6 +112,8 @@ import XCTest
             XCTAssertGreaterThan(body.count, atLeast, "\(file): body extraction looks wrong — check the guard above")
         }
         try scan("Slackwater/TimelineStrip.swift", from: "private func drawCurrent(", to: { $0 == "    }" }, atLeast: 40)
+        // An alert marker is not slack evidence: green on it would read as a second slack mark.
+        try scan("Slackwater/TimelineStrip.swift", from: "private func drawAlertMarkers(", to: { $0 == "    }" }, atLeast: 5)
         try scan("Slackwater/StationCardGraph.swift", from: "var body: some View {", to: { $0.contains("func cardWindows(") }, atLeast: 40)
         try scan("Slackwater/CurveDrawing.swift", from: "enum CurveDrawing {", to: { $0 == "}" }, atLeast: 40)
     }
