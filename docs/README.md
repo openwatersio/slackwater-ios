@@ -10,6 +10,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Station detail](detail.md) | Detail page composition, header, tiles, schedule, week picker, provenance, and the waiting, honesty, and unavailable pages |
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
+| [Premium](premium.md) | What is free and what is Premium, and how a new feature is decided |
 | [Alerts](alerts.md) | Station calendars and notification rules: triggers, occurrence resolution, delivery horizons, the free/Premium line, and permissions |
 | [Siri and Shortcuts](siri.md) | Built-in phrases, nearest-place selection, spoken answers, and visual results |
 | [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |

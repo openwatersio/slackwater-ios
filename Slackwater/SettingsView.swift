@@ -94,10 +94,18 @@ struct SettingsView: View {
                         }
                     }
 
-                    section(String(localized: "Sky", comment: "Settings section heading: the sky drawn above a chart.")) {
+                    section(String(localized: "Sky", comment: "Settings section heading: the sky drawn above a chart."), premium: true) {
+                        PremiumRequirement()
                         Toggle(isOn: Binding(
                             get: { skyBodies },
-                            set: { UnitsCloud.shared.set($0, forKey: AppGroup.skyBodiesKey) })
+                            set: { on in
+                                // A refused change leaves the switch where it was: the getter still reads the stored value.
+                                guard skyBodiesSwitchAllowed(to: on, premium: premium.isPremium) else {
+                                    showPremium = true
+                                    return
+                                }
+                                UnitsCloud.shared.set(on, forKey: AppGroup.skyBodiesKey)
+                            })
                         ) {
                             Text("Sun, moon and stars", comment: "Settings switch: draw the sun, moon and stars in the sky above the chart.")
                                 .font(.subheadline.weight(.medium))
