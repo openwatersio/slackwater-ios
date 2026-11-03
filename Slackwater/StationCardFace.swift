@@ -154,6 +154,7 @@ struct StationCard<Trailing: View>: View {
                 // where any builder's last sample lands.
                 if let graph {
                     graph.padding(.top, 54 + statusInset).padding(.horizontal, -3)
+                        .accessibilitySortPriority(-1)
                 } else if placeholder {
                     StationCardPlaceholder(progress: downloadProgress)
                         .padding(.top, 54).padding(.horizontal, -3)

@@ -229,10 +229,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // inviting the reader to find an address themselves.
         XCTAssert(app.descendants(matching: .any)["unavailable-contact"]
                     .firstMatch.exists, "the ask offers no way to get in touch")
-        // The Nearby section is the way out. Rows carry a combined label
-        // ("Santander, Cantabria · Tide · NOAA, 83 nm"), so match a prefix the
-        // way testNearbyFiltersOpensAStationAndOpensTheMap does — Santander is
-        // the nearest station Slackwater may ship to Gijon, 154 km east.
+        // Santander is the nearest shippable station to Gijon, 154 km east.
         let nearby = app.descendants(matching: .any)["nearby"].firstMatch
         XCTAssert(nearby.appears(within: 10), "no Nearby section on the detail page")
         let rows = nearby.descendants(matching: .any).matching(identifier: "nearby-station")

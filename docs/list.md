@@ -138,7 +138,7 @@ Each station renders in one group only, by priority: My Location, then Favorites
 
 ## 6. The station card
 
-The list, search results, and the map's preview panel draw the same card. It is one tap target that opens the station's detail.
+The list, search results, the map's preview panel, Nearby, and the station chooser draw the same card. It is one tap target. In the list, search, map preview, and Nearby, tapping opens the station's detail. In the namesake chooser, tapping saves the choice and closes the sheet; choosing a different station also opens it. When choosing a replacement for a removed favorite, tapping replaces the favorite, closes the sheet, and opens the chosen station without saving a namesake choice. Nearby and the chooser put the station kind and provider below the card, alongside the distance. The chooser also labels the displayed station "Shown" and outlines the station selected on its map.
 
 ### 6.1 Anatomy
 
@@ -221,7 +221,7 @@ The curve announces as "25-hour curve" with a value listing its extremes as "val
 
 ### 6.5 Liveness
 
-Cards compute their readings and curves when they appear. A shared clock refreshes mounted cards immediately when the app becomes active and every 60 seconds while active; the clock pauses while inactive or backgrounded. The list, search results, and map previews receive the same refresh signal. A newly mounted card uses the current time, and a fresh eager map preview keeps its first frame until a later tick. Cached seeds retain their original calculation time. A Canadian tide preview outside its downloaded coverage shows no reading and returns to its pending state. Online current cards recheck coverage for the current local day without requiring a network request. Canadian cards follow their download state live, and a refined fit or a freshly downloaded online window rebuilds its card.
+Cards compute their readings and curves when they appear. A shared clock refreshes mounted cards immediately when the app becomes active and every 60 seconds while active; the clock pauses while inactive or backgrounded. The list, search results, map previews, Nearby, and the station chooser receive the same refresh signal. A newly mounted card uses the current time, and a fresh eager map preview keeps its first frame until a later tick. Cached seeds retain their original calculation time. A Canadian tide preview outside its downloaded coverage shows no reading and returns to its pending state. Online current cards recheck coverage for the current local day without requiring a network request. Canadian cards follow their download state live, and a refined fit or a freshly downloaded online window rebuilds its card.
 
 ## 7. Search
 

@@ -138,7 +138,7 @@ extension TypeScaleTests {
             "Theme.swift:body",
             // The chooser's and Nearby's row distances: formatted in the
             // chooser's `distance` and Nearby's `row`, and consumed by
-            // `StationChoiceRow`'s distance Text, which carries the mono font
+            // `StationChoiceCard`'s distance Text, which carries the mono font
             // (StationChooser.swift). The chooser's pin reads the same string
             // aloud only.
             "StationChooser.swift:distance",
