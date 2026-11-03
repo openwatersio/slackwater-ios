@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 final class DownloadStatusTests: ScreenshotTestCase {
@@ -81,6 +82,16 @@ final class DownloadStatusTests: ScreenshotTestCase {
     }
 
     private func checkDownloadStatus(online: Bool) {
+        let originalOrientation = XCUIDevice.shared.orientation
+        // Landscape leaves the lazy Downloads row outside the accessibility tree.
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCUIDevice.shared.orientation = .landscapeLeft
+        }
+        defer {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                XCUIDevice.shared.orientation = originalOrientation
+            }
+        }
         var args = ["-chsResetModels", "-networkKillSwitch",
                     "-seedOnlineWindow", "chs-sechelt-rapids",
                     "-fixLat", "48.4235", "-fixLon", "-123.3705"]
@@ -107,7 +118,7 @@ final class DownloadStatusTests: ScreenshotTestCase {
         XCTAssertEqual(indicator.value as? String, online ? "Online" : "Offline")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Waiting for signal'")).firstMatch.exists)
         let row = app.descendants(matching: .any)["download-row-chs-sechelt-rapids"].firstMatch
-        scrollTo(row, in: app)
+        scrollTo(row, in: app, within: app.scrollViews["downloads-manager"])
         XCTAssert(row.staticTexts["Expired"].exists)
         XCTAssertEqual(row.buttons["download-update-chs-sechelt-rapids"].exists, online)
         save(app, "download-manager-\(online ? "online" : "offline").png")

@@ -8,7 +8,7 @@ Tides are worldwide. Currents are the United States and Canada. Any copy that de
 
 | What ships               | Count | Where it comes from                                                         |
 | ------------------------ | ----- | --------------------------------------------------------------------------- |
-| Bundled tide stations    | 5,027 | 3,260 NOAA, 1,453 TICON, 205 DMI, 20 Japan Coast Guard, 56 LINZ, 33 Kartverket |
+| Bundled tide stations    | 5,028 | 3,263 NOAA, 1,381 TICON, 205 DMI, 70 JMA, 20 Japan Coast Guard, 56 LINZ, 33 Kartverket |
 | Bundled current stations | 2,556 | NOAA, not every NOAA station (`tools/gen-noaa-currents.mjs` lists the filters) |
 | Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good                        |
 | Canadian current passes  | 23    | CHS: seven fitted models, sixteen downloaded prediction windows; Malibu is an additional derived gate |
@@ -86,7 +86,7 @@ Rules that are easy to break by accident:
 
 - **Placement beats phrasing inside the first 200 characters.** "Works without signal" and "currents across the US and Canada" both sit in the first two sentences, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
 - **Currents are named as the US and Canada every time coverage is claimed.** The opening and the provenance block both say so, and neither can be trimmed for length.
-- **Provenance names every source.** Tides come from NOAA, CHS, Kartverket, LINZ and TICON-4, a research catalogue rather than a national authority. Only stations that publish datums are checked against them, so the copy says "wherever it has them".
+- **Provenance names every source.** Tides come from NOAA, CHS, Kartverket, LINZ, DMI, Japan Coast Guard, Japan Meteorological Agency and TICON-4, a research catalogue. JMA and Japan Coast Guard tidal datums are derived from the prediction constants, so the description makes no claim of independent datum validation for them.
 - **Premium is disclosed while it is on sale.** The paragraph under FREE, NO ACCOUNT, NO ADS names what Premium adds and that it is a yearly subscription or a lifetime purchase (App Review 2.3.2). Every prediction stays free, so the free claims hold either way.
 - **The description ends with Terms of Use and Privacy Policy links while a subscription is on sale.** App Review 3.1.2 requires a link to the Terms of Use in the metadata. slackwater.xyz has no terms page, so it is Apple's standard licence agreement, the same link the purchase sheet carries.
 

@@ -19,6 +19,17 @@ final class TideSourceNoticeTests: XCTestCase {
         XCTAssertTrue(notice.contains("Edited by Open Waters: constituent names, units and phases converted; tidal datums derived."), notice)
     }
 
+    func testJmaCreditKeepsTheSourceEditingAndGaugePositionNotices() {
+        let notice = tideSourceNotice(chartDatum: "CD", source: "Japan Meteorological Agency")
+        XCTAssertTrue(notice.hasPrefix("CD chart datum. "), notice)
+        XCTAssertTrue(notice.contains("data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php"), notice)
+        XCTAssertTrue(notice.contains("Public Data License 1.0"), notice)
+        XCTAssertTrue(notice.contains("digital.go.jp/resources/open_data/public_data_license_v1.0"), notice)
+        XCTAssertTrue(notice.contains("CC BY 4.0: creativecommons.org/licenses/by/4.0/"), notice)
+        XCTAssertTrue(notice.contains("Edited by Open Waters: constituent names, units and phases converted; tidal datums derived."), notice)
+        XCTAssertTrue(notice.contains("TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."), notice)
+    }
+
     func testOtherSourceNoticeIsUnchanged() {
         XCTAssertEqual(tideSourceNotice(chartDatum: "LAT", source: "Kartverket"),
                        "LAT chart datum. Harmonic constants from Kartverket.")

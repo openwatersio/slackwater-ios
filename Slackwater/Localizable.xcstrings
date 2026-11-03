@@ -5004,6 +5004,101 @@
         }
       }
     },
+    "Japanese stations: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), under Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived. Gauge positions: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0." : {
+      "comment" : "Data attribution in About and station detail. Preserve agency names, license names, author names and URLs; Open Waters edited the source data.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanske stationer: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), under Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Redigeret af Open Waters: navne, enheder og faser for tidevandskomponenter er konverteret; tidevandsreferenceniveauer er beregnet. Målerpositioner: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanische Stationen: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), unter Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Bearbeitet von Open Waters: Namen, Einheiten und Phasen der Gezeitenkomponenten umgewandelt; Gezeitenbezugsniveaus abgeleitet. Pegelpositionen: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones japonesas: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), bajo Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Editado por Open Waters: nombres, unidades y fases de los constituyentes convertidos; referencias verticales de marea calculadas. Posiciones de los mareógrafos: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanin asemat: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), lisenssillä Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Open Watersin muokkaama: vuorovesikomponenttien nimet, yksiköt ja vaiheet muunnettu; vuoroveden vertailutasot johdettu. Mittausasemien sijainnit: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stations japonaises : Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), sous Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Modifié par Open Waters : noms, unités et phases des constituantes convertis; références verticales des marées calculées. Positions des marégraphes : TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stáisiúin Seapánacha: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), faoi Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Curtha in eagar ag Open Waters: ainmneacha, aonaid agus pasanna na gcomhábhar tiontaithe; dátamanna taoide díorthaithe. Suíomhanna na dtomhsaire: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stèiseanan Iapanach: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), fo Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Air a dheasachadh le Open Waters: ainmean, aonadan agus ìrean nan co-phàirtean air an tionndadh; dàtaman làin air an obrachadh a-mach. Suidheachaidhean nan innealan-tomhais: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stazioni giapponesi: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), ai sensi di Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Modificato da Open Waters: nomi, unità e fasi delle componenti convertiti; riferimenti verticali di marea derivati. Posizioni dei mareografi: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本の観測点：Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php)。Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/) に基づき使用。Open Waters が編集：分潮名・単位・位相を変換し、潮位基準面を算出。検潮所の位置：TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일본 관측소: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/)에 따라 사용. Open Waters가 편집: 분조 이름, 단위 및 위상 변환, 조위 기준면 산출. 관측소 위치: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanske stasjoner: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), under Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Redigert av Open Waters: navn, enheter og faser for tidevannskomponenter er konvertert; tidevannsreferansenivåer er beregnet. Målerposisjoner: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanse stations: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), onder Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Bewerkt door Open Waters: namen, eenheden en fasen van getijcomponenten omgezet; getijreferentievlakken afgeleid. Posities van getijmeters: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações japonesas: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), sob Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Editado pela Open Waters: nomes, unidades e fases dos constituintes convertidos; referenciais verticais de maré calculados. Posições dos marégrafos: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estações japonesas: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), ao abrigo de Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Editado pela Open Waters: nomes, unidades e fases dos constituintes convertidos; referenciais verticais de maré calculados. Posições dos marégrafos: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanska stationer: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), under Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Bearbetat av Open Waters: namn, enheter och faser för tidvattenkomponenter har konverterats; tidvattnets referensnivåer har beräknats. Mätarpositioner: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+          }
+        }
+      }
+    },
     "LAT · lowest it ever gets" : {
       "comment" : "Figure label for Lowest Astronomical Tide. Keep LAT exact.",
       "localizations" : {
@@ -66229,7 +66324,7 @@
       }
     },
     "Danish stations: harmonic constants fitted from Danish Meteorological Institute (DMI) predictions under CC BY 4.0 (dmi.dk)." : {
-      "comment" : "Data attribution in About. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
+      "comment" : "Data attribution in About and station detail. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -66324,7 +66419,7 @@
       }
     },
     "Japanese stations: Japan Coast Guard, Hydrographic and Oceanographic Department data under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived." : {
-      "comment" : "Data attribution in About. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
+      "comment" : "Data attribution in About and station detail. Preserve agency names, license names and URLs; the Japanese credit describes modifications made by Open Waters.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

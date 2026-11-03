@@ -277,8 +277,14 @@ import notify
     /// `isHittable` is the one live read, taken only once the snapshot puts
     /// the target in view. The container is read through its properties: a
     /// snapshot would copy its whole subtree on every check.
-    func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
-        var container = listContainer(app)
+    func scrollTo(_ el: XCUIElement, in app: XCUIApplication,
+                  within preferredContainer: XCUIElement? = nil) {
+        // A lazy row needs its scroll container before it appears in the accessibility tree.
+        if let preferredContainer, !preferredContainer.appears(within: 5) {
+            XCTFail("preferred scroll container did not appear")
+            return
+        }
+        var container = preferredContainer ?? listContainer(app)
         let reachable = {
             guard let target = try? el.snapshot(), !target.frame.isEmpty, container.exists else { return false }
             var bounds = container.frame.intersection(app.windows.firstMatch.frame)
@@ -286,7 +292,7 @@ import notify
             if container.identifier == "station-list" { bounds.size.height -= 80 }
             return bounds.contains(target.frame) && el.isHittable
         }
-        var inReach = false, pinned = false
+        var inReach = false, pinned = preferredContainer != nil
         for attempt in 0...10 {
             let target = try? el.snapshot()
             if !pinned, let target, let found = scrollContainer(holding: target, in: app) {
@@ -298,7 +304,7 @@ import notify
                 if inReach { break }
             }
             if attempt < 10 {
-                if !container.exists { container = listContainer(app) }
+                if !container.exists, preferredContainer == nil { container = listContainer(app) }
                 // A swipe can carry a short row past the sheet's top edge.
                 if let target, !target.frame.isEmpty, target.frame.minY < container.frame.minY {
                     container.swipeDown(velocity: .slow)
