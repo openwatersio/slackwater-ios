@@ -121,3 +121,7 @@ enum AppGroup {
 func showsSkyBodies(defaults: UserDefaults = AppGroup.defaults) -> Bool {
     defaults.object(forKey: AppGroup.skyBodiesKey) as? Bool ?? true
 }
+
+/// Turning the bodies off is Premium; turning them on never is, so readers honor any stored
+/// off — set before the gate, or before a subscription lapsed — until the person changes it.
+func skyBodiesSwitchAllowed(to on: Bool, premium: Bool) -> Bool { on || premium }

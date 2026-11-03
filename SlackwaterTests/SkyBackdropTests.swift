@@ -6,6 +6,14 @@ import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    /// Turning the bodies off is Premium; turning them back on is free to everyone.
+    func testTurningTheSkyBodiesOffIsPremium() {
+        XCTAssertFalse(skyBodiesSwitchAllowed(to: false, premium: false))
+        XCTAssertTrue(skyBodiesSwitchAllowed(to: false, premium: true))
+        XCTAssertTrue(skyBodiesSwitchAllowed(to: true, premium: false))
+        XCTAssertTrue(skyBodiesSwitchAllowed(to: true, premium: true))
+    }
+
     /// Settings' sun, moon and stars switch empties the sky of its bodies and
     /// nothing else: the sun disc is gone, the day gradient behind it is not.
     @MainActor

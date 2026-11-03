@@ -164,7 +164,7 @@ Two products, entered by hand in App Store Connect; `asc.mjs` does not push them
 
 ### Localizations
 
-Each display name is at most 30 characters and each description at most 45, and a change to either goes through review. The purchase sheet shows the display name beside the price in the device's language, so every app language has a row; a language without one shows the English name. The descriptions name what Premium adds in the app's own terms for each feature ("Alerts", "Favourites calendars", "Lock screen"), so the store and the sheet agree. Spanish and Dutch leave out the Watch to fit.
+Each display name is at most 30 characters and each description at most 45, and a change to either goes through review. The purchase sheet shows the display name beside the price in the device's language, so every app language has a row; a language without one shows the English name. The descriptions name what Premium adds in the app's own terms ("Alerts", "Favourites calendars", "Lock screen"), so the store and the sheet agree. Chart controls are left out to fit; the sheet and the listing description name them. Spanish and Dutch leave out the Watch to fit.
 
 | App Store Connect locale | Premium Yearly        | Premium Lifetime       | Description (both products)                   |
 | ------------------------ | --------------------- | ---------------------- | --------------------------------------------- |
@@ -200,19 +200,19 @@ It saves `support-sheet.png` in `/tmp/slackwater-shots`. Shoot it again whenever
 
 Review notes for Premium Yearly:
 
-> Premium Yearly is a one-year auto-renewable subscription in the Slackwater Premium group. It unlocks lock screen widgets, Apple Watch complications, alerts and station calendars. Every tide and current prediction, the Watch app and the home screen widgets stay free.
+> Premium Yearly is a one-year auto-renewable subscription in the Slackwater Premium group. It unlocks lock screen widgets, Apple Watch complications, alerts, station calendars, and turning off the sun, moon and stars in Settings. Every tide and current prediction, the Watch app and the home screen widgets stay free.
 >
 > To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices and the yearly term, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, or tap Set an alert under a station's timeline. No account is needed.
+> To see it unlocked: in Settings → Calendar, turn on a saved station, tap Set an alert under a station's timeline, or turn off Settings → Sky → Sun, moon and stars. No account is needed.
 
 Review notes for Premium Lifetime:
 
-> Premium Lifetime is a one-time, non-consumable purchase. It unlocks the same features as Premium Yearly permanently, with no renewal: lock screen widgets, Apple Watch complications, alerts and station calendars. It is not shared through Family Sharing. Every tide and current prediction, the Watch app and the home screen widgets stay free.
+> Premium Lifetime is a one-time, non-consumable purchase. It unlocks the same features as Premium Yearly permanently, with no renewal: lock screen widgets, Apple Watch complications, alerts, station calendars, and turning off the sun, moon and stars in Settings. It is not shared through Family Sharing. Every tide and current prediction, the Watch app and the home screen widgets stay free.
 >
 > To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, or tap Set an alert under a station's timeline. No account is needed.
+> To see it unlocked: in Settings → Calendar, turn on a saved station, tap Set an alert under a station's timeline, or turn off Settings → Sky → Sun, moon and stars. No account is needed.
 
 ## Before submission
 

@@ -36,7 +36,7 @@ Nothing Slackwater writes to a calendar ever carries an alarm, for anyone. A sta
 reference layer holding around four events a day; alarms on all of them is the behaviour people
 uninstall over, and iOS Default Alert Times already lets anyone add their own per calendar.
 
-The alert sheet's Save (§7.2), premium requirement buttons, and Settings support button open the dedicated Support Slackwater sheet.
+The alert sheet's Save (§7.2), premium requirement buttons, Settings support button, and a free user's switch-off of Settings' sun, moon and stars ([premium](premium.md)) open the dedicated Support Slackwater sheet.
 Reading an answer in the sheet is free; a free user can ask "when is the next lower low" and see
 it, and is upsold only on saving the alert.
 Settings → Calendar upsells at the point a station is turned on; the list itself, and turning a
@@ -669,7 +669,7 @@ within a minute, for every trigger read off a sampled series — the ones whose 
 with the run's start time. An eclipse is searched from an absolute window rather than the sample
 grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
-Alerts and Calendar identify their Premium requirement at the top. For free users, this message opens the Support Slackwater sheet; supporters see their active tier. Saved alerts with “Notifications are Premium” provide the same link separately from the edit button. Benefits follow each list, while the empty state explains how to add an alert or calendar.
+Alerts, Calendar, and Settings' Sky section identify their Premium requirement at the top. For free users, this message opens the Support Slackwater sheet; supporters see their active tier. Saved alerts with “Notifications are Premium” provide the same link separately from the edit button. Benefits follow each list, while the empty state explains how to add an alert or calendar.
 
 **UI:** the line reads "Set an alert" on a tide detail and a current detail and is absent on an online gate; a long press turns it to "Set alert for …" with the right event, and its tap opens the sheet on that moment; the Rest tap opens the sheet on the next low; saving turns the line to Set; a free user's Save and calendar toggle each open the dedicated Support Slackwater sheet; with Premium, Settings → Calendar turns a station on and asks before turning it off. The sentence field is not driven in UI tests: GitHub-hosted runners have no Apple Intelligence, and the field hides itself there.
 

@@ -28,6 +28,8 @@ struct PremiumView: View {
                                 detail: "See tides and slack windows alongside your plans.", preview: .calendar)
                         benefit("Alerts", symbol: "bell",
                                 detail: "Get notified before the tides and currents you care about.", preview: .alert)
+                        benefit("Chart controls", symbol: "slider.horizontal.3",
+                                detail: "Turn off the sun, moon and stars for a quieter chart.")
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -57,9 +59,9 @@ struct PremiumView: View {
     }
 
     private func benefit(_ title: LocalizedStringKey, symbol: String,
-                         detail: LocalizedStringKey, preview: PremiumFeaturePreview.Feature) -> some View {
+                         detail: LocalizedStringKey, preview: PremiumFeaturePreview.Feature? = nil) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            PremiumFeaturePreview(feature: preview)
+            if let preview { PremiumFeaturePreview(feature: preview) }
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: symbol).frame(width: 24).foregroundStyle(SN.leaf)
                 VStack(alignment: .leading, spacing: 4) {

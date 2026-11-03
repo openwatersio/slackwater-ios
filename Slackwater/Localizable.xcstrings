@@ -1804,6 +1804,101 @@
         }
       }
     },
+    "Chart controls" : {
+      "comment" : "Premium benefit title: settings that change what the station chart draws.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafindstillinger"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagrammoptionen"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controles de la gráfica"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaavion asetukset"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages du graphique"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rialuithe graif"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roghainnean a' ghraif"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlli del grafico"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グラフの表示設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그래프 설정"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafinnstillinger"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafiekopties"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controles do gráfico"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlos do gráfico"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafinställningar"
+          }
+        }
+      }
+    },
     "Closing time unavailable" : {
       "comment" : "Siri place/date parameter or dated prediction answer. Preserve all format arguments; dates and times are already localized.",
       "extractionState" : "manual",
@@ -11431,6 +11526,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tidvattenplats"
+          }
+        }
+      }
+    },
+    "Turn off the sun, moon and stars for a quieter chart." : {
+      "comment" : "Premium benefit: hiding the sun, moon and stars drawn in the sky above the station chart.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slå sol, måne og stjerner fra for en roligere graf."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blende Sonne, Mond und Sterne aus für ein ruhigeres Diagramm."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactiva el sol, la luna y las estrellas para una gráfica más despejada."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piilota aurinko, kuu ja tähdet, niin kaavio rauhoittuu."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquez le soleil, la lune et les étoiles pour un graphique plus épuré."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Múch an ghrian, an ghealach agus na réaltaí le haghaidh graif níos ciúine."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuir dheth a' ghrian, a' ghealach is na reultan airson graf nas sàmhaiche."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattiva sole, luna e stelle per un grafico più pulito."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太陽・月・星を非表示にして、グラフをすっきり表示。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "해, 달, 별을 꺼서 그래프를 더 깔끔하게 보세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slå av sol, måne og stjerner for en roligere graf."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet zon, maan en sterren uit voor een rustigere grafiek."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desligue o sol, a lua e as estrelas para um gráfico mais limpo."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desligue o sol, a lua e as estrelas para um gráfico mais limpo."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stäng av sol, måne och stjärnor för en lugnare graf."
           }
         }
       }

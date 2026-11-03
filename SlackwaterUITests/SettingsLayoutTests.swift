@@ -26,8 +26,10 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             XCTAssertTrue(row.isHittable)
             row.tap()
             XCTAssert(app.navigationBars[page].appears(within: 5))
-            let requirement = app.buttons["Requires Slackwater Premium"].firstMatch
-            guard requirement.appears(within: 5) else {
+            // Settings' Sky section has the same button; the pushed page's is the hittable one.
+            let requirements = app.buttons.matching(identifier: "Requires Slackwater Premium")
+            XCTAssert(requirements.firstMatch.appears(within: 5))
+            guard let requirement = requirements.allElementsBoundByIndex.first(where: \.isHittable) else {
                 XCTFail("The premium requirement must be a button that opens the purchase sheet")
                 return
             }
@@ -51,6 +53,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertTrue(restore.isHittable)
         XCTAssert(app.otherElements["premium-preview-calendar"].exists)
         XCTAssert(app.otherElements["premium-preview-alert"].exists)
+        XCTAssert(app.staticTexts["Chart controls"].exists, "the sheet names chart controls as a benefit")
         save(app, "premium-visuals-bottom.png")
         guard dismissPremium(app) else { return }
         XCTAssert(app.navigationBars["Settings"].appears(within: 5))
@@ -99,6 +102,37 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(kept.appears(within: 5))
         XCTAssertEqual(kept.value as? String, "1", "the switch did not survive the relaunch")
         again.terminate()
+        let clean = launch("-locDenied", "-resetSkyBodies")
+        clean.terminate()
+    }
+
+    /// A free switch-off opens the Support sheet and leaves the bodies on; Premium turns them off.
+    func testTurningTheSkyBodiesOffIsPremium() {
+        let free = launch("-locDenied", "-resetSkyBodies", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        openSettings(free)
+        let toggle = free.switches["settings-sky-bodies"].firstMatch
+        scrollTo(toggle, in: free)
+        XCTAssert(toggle.appears(within: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        save(free, "settings-sky-premium.png")
+        toggle.tap()
+        XCTAssert(free.navigationBars["Support Slackwater"].appears(within: 5),
+                  "a free switch-off must open the purchase sheet")
+        guard dismissPremium(free) else { return }
+        XCTAssertEqual(toggle.value as? String, "1", "a free switch-off must not turn the bodies off")
+        save(free, "settings-sky-refused.png")
+        free.terminate()
+
+        let paid = launch("-locDenied", "-resetSkyBodies", "-seedPremium",
+                          "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        openSettings(paid)
+        let paidToggle = paid.switches["settings-sky-bodies"].firstMatch
+        scrollTo(paidToggle, in: paid)
+        XCTAssert(paidToggle.appears(within: 5))
+        paidToggle.tap()
+        XCTAssert(eventually(within: 5) { paidToggle.value as? String == "0" })
+        XCTAssertFalse(paid.navigationBars["Support Slackwater"].exists)
+        paid.terminate()
         let clean = launch("-locDenied", "-resetSkyBodies")
         clean.terminate()
     }
