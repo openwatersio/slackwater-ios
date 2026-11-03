@@ -18,8 +18,7 @@ jobs:
   # a required check pending forever, whereas a job skipped by `if:` satisfies
   # it. The Required checks gate below absorbs that skipped job.
   #
-  # Fail-safe by construction: it skips only when EVERY changed path is docs or
-  # a top-level .md. A new directory nobody thought about runs the suite.
+  # Fail-safe by construction: only documentation and CLA signature changes skip the app lane.
   changes:
     name: What changed
     runs-on: ubuntu-24.04
@@ -87,13 +86,13 @@ jobs:
 
           # `|| true`: grep -v exits 1 when everything is filtered out, i.e. the
           # docs-only case. Belt and braces alongside `set +e` above.
-          OTHER=$(echo "$FILES" | grep -vE '^docs/|^[^/]*\.md$' || true)
+          OTHER=$(echo "$FILES" | grep -vE '^docs/|^[^/]*\.md$|^\.cla\.json$' || true)
           if [ -n "$OTHER" ]; then
             echo "app=true" >> "$GITHUB_OUTPUT"
             echo "-> app lane RUNS (non-docs paths present)"
           else
             echo "app=false" >> "$GITHUB_OUTPUT"
-            echo "-> app lane SKIPPED (every path is docs/ or a top-level .md)"
+            echo "-> app lane SKIPPED (only documentation or CLA signatures changed)"
           fi
 
   data:
