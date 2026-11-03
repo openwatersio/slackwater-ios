@@ -2377,97 +2377,97 @@
         }
       }
     },
-    "Draw them in the sky above the chart as they stand at the selected time. Off keeps the sky's day and night colors." : {
+    "Draw them in the sky above the chart as they stand at the selected time, and mark sunrise and sunset under each day. Off keeps the sky's day and night colors." : {
       "comment" : "Settings footnote under the sun, moon and stars switch.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tegner dem på himlen over grafen, som de står på det valgte tidspunkt. Fra beholder himlens dag- og natfarver."
+            "value" : "Tegner dem på himlen over grafen, som de står på det valgte tidspunkt, og markerer solopgang og solnedgang under hver dag. Fra beholder himlens dag- og natfarver."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeichnet sie am Himmel über dem Diagramm, so wie sie zur gewählten Zeit stehen. Aus behält die Tag- und Nachtfarben des Himmels."
+            "value" : "Zeichnet sie am Himmel über dem Diagramm, so wie sie zur gewählten Zeit stehen, und markiert Sonnenaufgang und Sonnenuntergang unter jedem Tag. Aus behält die Tag- und Nachtfarben des Himmels."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los dibuja en el cielo sobre la gráfica tal como están a la hora seleccionada. Desactivado conserva los colores de día y de noche del cielo."
+            "value" : "Los dibuja en el cielo sobre la gráfica tal como están a la hora seleccionada y marca la salida y la puesta del sol bajo cada día. Desactivado conserva los colores de día y de noche del cielo."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Piirtää ne kaavion yläpuoliselle taivaalle sellaisina kuin ne ovat valittuna hetkenä. Pois päältä säilyttää taivaan päivä- ja yövärit."
+            "value" : "Piirtää ne kaavion yläpuoliselle taivaalle sellaisina kuin ne ovat valittuna hetkenä ja merkitsee auringonnousun ja -laskun kunkin päivän alle. Pois päältä säilyttää taivaan päivä- ja yövärit."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les dessine dans le ciel au-dessus du graphique, tels qu'ils se trouvent à l'heure choisie. Désactivé conserve les couleurs de jour et de nuit du ciel."
+            "value" : "Les dessine dans le ciel au-dessus du graphique, tels qu'ils se trouvent à l'heure choisie, et indique le lever et le coucher du soleil sous chaque jour. Désactivé conserve les couleurs de jour et de nuit du ciel."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarraingíonn sé iad sa spéir os cionn an ghraif mar a bhíonn siad ag an am roghnaithe. Coinníonn As dathanna lae agus oíche na spéire."
+            "value" : "Tarraingíonn sé iad sa spéir os cionn an ghraif mar a bhíonn siad ag an am roghnaithe, agus marcálann sé éirí agus luí na gréine faoi gach lá. Coinníonn As dathanna lae agus oíche na spéire."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarraingidh e iad san speur os cionn a' ghraif mar a tha iad aig an àm a thagh thu. Cumaidh Dheth dathan latha is oidhche an speura."
+            "value" : "Tarraingidh e iad san speur os cionn a' ghraif mar a tha iad aig an àm a thagh thu, agus comharraichidh e èirigh is laighe na grèine fo gach latha. Cumaidh Dheth dathan latha is oidhche an speura."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Li disegna nel cielo sopra il grafico come si trovano all'ora selezionata. Disattivato mantiene i colori del giorno e della notte del cielo."
+            "value" : "Li disegna nel cielo sopra il grafico come si trovano all'ora selezionata e segna alba e tramonto sotto ogni giorno. Disattivato mantiene i colori del giorno e della notte del cielo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選択した時刻の位置に合わせて、グラフの上の空に描きます。オフにしても空の昼夜の色は残ります。"
+            "value" : "選択した時刻の位置に合わせて、グラフの上の空に描き、各日の下に日の出と日の入りを表示します。オフにしても空の昼夜の色は残ります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "선택한 시각의 위치대로 그래프 위 하늘에 그립니다. 끄면 하늘의 낮과 밤 색은 그대로 유지됩니다."
+            "value" : "선택한 시각의 위치대로 그래프 위 하늘에 그리고, 각 날짜 아래에 일출과 일몰을 표시합니다. 끄면 하늘의 낮과 밤 색은 그대로 유지됩니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tegner dem på himmelen over grafen slik de står på valgt tidspunkt. Av beholder himmelens dag- og nattfarger."
+            "value" : "Tegner dem på himmelen over grafen slik de står på valgt tidspunkt, og markerer soloppgang og solnedgang under hver dag. Av beholder himmelens dag- og nattfarger."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tekent ze aan de lucht boven de grafiek zoals ze op het gekozen moment staan. Uit behoudt de dag- en nachtkleuren van de lucht."
+            "value" : "Tekent ze aan de lucht boven de grafiek zoals ze op het gekozen moment staan, en markeert zonsopkomst en zonsondergang onder elke dag. Uit behoudt de dag- en nachtkleuren van de lucht."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desenha-os no céu acima do gráfico como estão no horário selecionado. Desligado mantém as cores de dia e de noite do céu."
+            "value" : "Desenha-os no céu acima do gráfico como estão no horário selecionado e marca o nascer e o pôr do sol sob cada dia. Desligado mantém as cores de dia e de noite do céu."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desenha-os no céu por cima do gráfico tal como estão à hora selecionada. Desligado mantém as cores de dia e de noite do céu."
+            "value" : "Desenha-os no céu por cima do gráfico tal como estão à hora selecionada e marca o nascer e o pôr do sol por baixo de cada dia. Desligado mantém as cores de dia e de noite do céu."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ritar dem på himlen ovanför grafen som de står vid vald tidpunkt. Av behåller himlens dag- och nattfärger."
+            "value" : "Ritar dem på himlen ovanför grafen som de står vid vald tidpunkt och markerar soluppgång och solnedgång under varje dag. Av behåller himlens dag- och nattfärger."
           }
         }
       }

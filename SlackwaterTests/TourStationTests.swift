@@ -37,6 +37,7 @@ final class TourStationTests: XCTestCase {
     // landing there must not claim the tour back (it would then finish it on
     // its way out, and the linked station would never teach).
     @MainActor func testAHandedOffTourIsClaimedOnlyByTheLinkedStation() {
+        keepSkySwitch()
         let coach = TourCoach()
         coach.replay()
         coach.begin(on: "noaa/9449880", starsAvailable: true, moonAvailable: true)
@@ -53,6 +54,7 @@ final class TourStationTests: XCTestCase {
     }
 
     @MainActor func testALinkReservesTheTourBeforeCanadianPredictionsArrive() {
+        keepSkySwitch()
         let coach = TourCoach()
         coach.replay()
         coach.handOff(to: "noaa/9447130")
@@ -61,5 +63,14 @@ final class TourStationTests: XCTestCase {
         coach.begin(on: "noaa/9447130", starsAvailable: true, moonAvailable: true)
         XCTAssertEqual(coach.station, "noaa/9447130")
         XCTAssertEqual(coach.step, .read)
+    }
+
+    /// `replay()` turns the sky's bodies on in the App Group this simulator shares with the app; put the developer's own choice back.
+    private func keepSkySwitch() {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.skyBodiesKey)
+        addTeardownBlock {
+            if let saved { AppGroup.defaults.set(saved, forKey: AppGroup.skyBodiesKey) }
+            else { AppGroup.defaults.removeObject(forKey: AppGroup.skyBodiesKey) }
+        }
     }
 }

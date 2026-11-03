@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. One snap rule for both scrub hosts (#522).
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
 
 final class TimelineSnapTests: XCTestCase {
     private func friday() throws -> TimelineData {
@@ -39,6 +40,37 @@ final class TimelineSnapTests: XCTestCase {
         let stop = try XCTUnwrap(tl.snapTimes.dropFirst(3).first)
         XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop) + 0.2), stop)
         XCTAssertEqual(tl.magnetTarget(nearX: tl.x(stop)), stop)
+    }
+
+    /// With Settings hiding the sun marks, sunrise and sunset stop being stops, and nothing else does.
+    func testHiddenSunMarksAreNotStops() throws {
+        let tl = try friday()
+        let sun = Set(tl.days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } })
+        let shown = tl.stops(showingSun: true), hidden = tl.stops(showingSun: false)
+        XCTAssertEqual(shown, tl.snapTimes)
+        XCTAssertFalse(sun.isDisjoint(with: shown), "the fixture must hold sun stops")
+        XCTAssertEqual(Set(hidden), Set(tl.snapTimes).subtracting(sun))
+        let rise = try XCTUnwrap(shown.first { sun.contains($0) })
+        XCTAssertEqual(tl.magnetTarget(nearX: tl.x(rise), showingSun: true), rise)
+        XCTAssertNotEqual(tl.magnetTarget(nearX: tl.x(rise), showingSun: false), rise)
+        // Built from the stops that aren't the sun's, so none of those can be in it.
+        XCTAssertTrue(tl.sunOnlyStops.isSubset(of: sun))
+        let others = tl.tideExtremes.map(\.time) + tideFlowArrows(tl.tideRates).map(\.time)
+            + tl.eclipses.map(\.peak) + tl.solarEclipses.map(\.peak)
+        XCTAssertTrue(tl.sunOnlyStops.isDisjoint(with: others))
+    }
+
+    /// Hiding the sun removes only what is sun alone: a stop on a sunrise's own second that isn't
+    /// in `sunOnlyStops`, as a builder leaves a coincident turn, stays.
+    func testAStopOnASunriseSurvivesTheHiddenSun() throws {
+        let tl = try friday()
+        let rise = try XCTUnwrap(tl.days.compactMap(\.sunrise).first { tl.contains($0) })
+        let turn = TideExtreme(time: rise, height: 1, kind: .high)
+        let coincident = TimelineData(tz: tl.tz, anchor: tl.anchor, today: tl.today, start: tl.start, end: tl.end,
+                                      days: tl.days, tidePoints: tl.tidePoints, tideRates: tl.tideRates,
+                                      tideExtremes: [turn], currentPoints: [], currentEvents: [],
+                                      snapTimes: [rise], slackWindows: [], sunOnlyStops: [])
+        XCTAssertEqual(coincident.stops(showingSun: false), [rise])
     }
 
     func testReanchorOnlyOutsideTheWindow() throws {

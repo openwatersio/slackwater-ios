@@ -8,6 +8,7 @@ struct TideDetailView: View {
     let record: TideStationRecord
     var preview: ChsTidePreview? = nil
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsSkyBodies = true
 
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.
@@ -81,7 +82,8 @@ struct TideDetailView: View {
     private var nextStop: CommentaryStop? {
         guard let timeline else { return nil }
         return nextCommentaryStop(tideWaterStop(in: timeline, after: scrubTime),
-                                  sun: timeline.days, after: scrubTime, drawn: timeline.drawnSpan)
+                                  sun: showsSkyBodies ? timeline.days : [],
+                                  after: scrubTime, drawn: timeline.drawnSpan)
     }
     private var commentary: CommentaryContent? {
         nextStop.map { commentaryContent($0, from: scrubTime) }

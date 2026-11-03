@@ -151,10 +151,12 @@ func differingFraction(_ a: UIImage, _ b: UIImage) -> Double {
 /// Rendered at the strip's full 228-hour width so the measure covers the same
 /// span the app draws, not just the viewport a phone opens on.
 @MainActor
-func stripImage(_ data: TimelineData, imperial: Bool = true, now: Date = appNow()) -> UIImage? {
+func stripImage(_ data: TimelineData, imperial: Bool = true, now: Date = appNow(),
+                showsSunMarks: Bool = true) -> UIImage? {
     let geo = TimelineGeo(data: data)
     let renderer = ImageRenderer(content:
-        TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: "kn", now: now)
+        TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: "kn", now: now,
+                       showsSunMarks: showsSunMarks)
             .frame(width: data.totalWidth, height: geo.height)
             .background(SN.canvas))
     return renderer.uiImage

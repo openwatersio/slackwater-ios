@@ -115,6 +115,8 @@ struct TimelineScrubber: UIViewRepresentable {
     var restingPills: [CGRect] = []
     /// The moments of the station's alerts, marked on the canvas.
     var alertMoments: [AlertMoment] = []
+    /// Sunrise and sunset are drawn, and so are stops (`TimelineData.stops`).
+    var showsSun = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -270,7 +272,7 @@ struct TimelineScrubber: UIViewRepresentable {
     private func canvas(tiles: Range<Int>?) -> TimelineCanvas {
         TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                        now: now,
-                       floodDeg: floodDeg, ebbDeg: ebbDeg, tileRange: tiles)
+                       floodDeg: floodDeg, ebbDeg: ebbDeg, showsSunMarks: showsSun, tileRange: tiles)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
@@ -348,6 +350,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let floodDeg: Double?, ebbDeg: Double?
             let tiles: Range<Int>
             let alertMoments: [AlertMoment]
+            let showsSun: Bool
         }
         var canvasKey: CanvasKey?
 
@@ -366,14 +369,14 @@ struct TimelineScrubber: UIViewRepresentable {
                                 now: parent.now, imperial: parent.imperial,
                                 speedUnit: parent.speedUnit,
                                 floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
-                                tiles: tiles, alertMoments: parent.alertMoments)
+                                tiles: tiles, alertMoments: parent.alertMoments, showsSun: parent.showsSun)
             guard key != canvasKey else { return }
             canvasKey = key
             host?.rootView = TimelineCanvas(data: data, geo: geo,
                                             imperial: parent.imperial, speedUnit: parent.speedUnit,
                                             now: parent.now, alertMoments: parent.alertMoments,
                                             floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
-                                            tileRange: tiles)
+                                            showsSunMarks: parent.showsSun, tileRange: tiles)
         }
 
         /// Tell the store whether the offset may be rewritten right now.
@@ -438,12 +441,12 @@ struct TimelineScrubber: UIViewRepresentable {
                 UIAccessibilityCustomAction(name: String(localized: "Next event", comment: "VoiceOver chart action.")) { [weak self, weak sv] _ in
                     guard let self, let sv else { return false }
                     let after = self.parent.scrubTime.addingTimeInterval(1)
-                    return self.jump(sv, to: self.parent.data.snapTimes.first { $0 > after })
+                    return self.jump(sv, to: self.parent.data.stops(showingSun: self.parent.showsSun).first { $0 > after })
                 },
                 UIAccessibilityCustomAction(name: String(localized: "Previous event", comment: "VoiceOver chart action.")) { [weak self, weak sv] _ in
                     guard let self, let sv else { return false }
                     let before = self.parent.scrubTime.addingTimeInterval(-1)
-                    return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
+                    return self.jump(sv, to: self.parent.data.stops(showingSun: self.parent.showsSun).last { $0 < before })
                 },
             ]
             // The press and hold, as an action. A sighted press turns the line under the strip
@@ -771,7 +774,7 @@ struct TimelineScrubber: UIViewRepresentable {
 
         func tap(_ sv: UIScrollView, at p: CGPoint) {
             guard !pillOwns(p, in: sv) else { return }
-            guard let target = tapTarget(x: p.x, y: p.y) else {
+            guard let target = tapTarget(x: p.x, y: p.y, showingSun: parent.showsSun) else {
                 // Left running, the opening or a settle would keep writing `scrubTime` behind the picker.
                 halt(sv)
                 syncGate(sv)
@@ -791,7 +794,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let p = g.location(in: sv)
             // The plot region only, so `tapTarget` always takes its plot branch here — the same
             // magnet the strip settles into: a press near a turn means that turn.
-            guard p.y <= rowSplit, let target = tapTarget(x: p.x, y: p.y) else { return }
+            guard p.y <= rowSplit, let target = tapTarget(x: p.x, y: p.y, showingSun: parent.showsSun) else { return }
             move(sv, to: target, ride: false)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             parent.onLongPress?()
@@ -804,16 +807,18 @@ struct TimelineScrubber: UIViewRepresentable {
         /// from the two rows' own y's: the strip's geometry is all literal points and moves.
         private var rowSplit: CGFloat { (parent.geo.lastTimeY + parent.geo.dayY) / 2 }
 
-        private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
+        func tapTarget(x: CGFloat, y: CGFloat, showingSun: Bool) -> Date? {
             let data = parent.data
             guard y > rowSplit else {
                 // The plot and its axis: the tapped moment, pulled onto a stop
                 // by the same magnet a drag settles into.
-                if let stop = nearest(data.snapTimes, toX: x), stop.dx < Timeline.magnetPts {
+                if let stop = nearest(data.stops(showingSun: showingSun), toX: x), stop.dx < Timeline.magnetPts {
                     return stop.time
                 }
                 return data.time(atX: x)
             }
+            // With Settings hiding the sun marks, the row holds only dates.
+            guard showingSun else { return nil }
             // The day row is a row of labels — each day's date where it is drawn,
             // its sun times where they fall — so a tap goes to the nearest one. A
             // sunrise is a moment on the strip and scrubs there like anything
@@ -841,7 +846,7 @@ struct TimelineScrubber: UIViewRepresentable {
             guard dragSettling, !magneting else { return }
             dragSettling = false
             let center = sv.contentOffset.x + sv.bounds.width / 2
-            guard let target = parent.data.magnetTarget(nearX: center) else { return }
+            guard let target = parent.data.magnetTarget(nearX: center, showingSun: parent.showsSun) else { return }
             let (offset, landing) = reach(sv, target)
             // Already there: no animation, only the exact instant.
             if abs(offset - sv.contentOffset.x) <= 0.5 {
@@ -899,6 +904,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.stripIsPressed) private var pressed
     @Environment(\.stripAlertAction) private var stripAlertAction
     @Environment(\.stripMoveRequests) private var hostMoves
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsSkyBodies = true
     @State private var jumpToken = 0
     @State private var settled = false
     @State private var commentaryFrame: CGRect?
@@ -914,7 +920,8 @@ struct TimelineScrubStrip: View {
                          onAlertAction: stripAlertAction,
                          stationID: stationID,
                          foldPage: foldPage,
-                         restingPills: restingPills, alertMoments: alertMoments)
+                         restingPills: restingPills, alertMoments: alertMoments,
+                         showsSun: showsSkyBodies)
             .frame(height: geo.height)
             // Stretched, not widened: the scroll view keeps its bounds, so the
             // centerline stays at the visible center while the drawing runs

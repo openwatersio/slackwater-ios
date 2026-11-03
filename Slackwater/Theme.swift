@@ -55,9 +55,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// The tour's glide has settled, which swaps the stars copy from the
     /// instruction to the payoff.
     @State private var tourArrived = false
-    /// The current step glided the strip somewhere. A stars step over a sky
-    /// with its bodies switched off does not, and keeps its instruction.
-    @State private var tourGlided = false
     @State private var showPicker = false
     @State private var showingSchedule = false
     @State private var restoreSchedule = false
@@ -183,11 +180,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 // space to land on the real screen position.
                 GeometryReader { overlayGeo in
                     TourMarkLayer(anchors: anchors, proxy: overlayGeo,
-                                  // The stars card's payoff wording needs the glide
-                                  // to tonight's stars behind it; a step that never
-                                  // glided (bodies off) stays on its swipe lesson,
-                                  // whatever the switch does while the card is up.
-                                  stationName: name, arrived: tourArrived && tourGlided,
+                                  stationName: name, arrived: tourArrived,
                                   onNext: tourNext, onSkip: { TourCoach.shared.finish() })
                         .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
                         .allowsHitTesting(TourCoach.shared.station == favoriteId)
@@ -349,26 +342,17 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// already drawing — no almanac search (see `tourStarsTime`).
     private func tourNext() {
         tourArrived = false
-        tourGlided = false
         TourCoach.shared.advance()
         guard let step = TourCoach.shared.step, let timeline else { return }
         let coverage = timeline.start...timeline.end
-        let bodies = showsSkyBodies()
         let target: Date? = switch step {
-        case .stars where bodies: tourStarsTime(days: timeline.days, after: appNow(), within: coverage)
+        case .stars: tourStarsTime(days: timeline.days, after: appNow(), within: coverage)
         case .moon: tourMoonTime(days: timeline.days, after: appNow(), within: coverage)
         default: nil
         }
-        if let target {
-            jump(to: target)
-            tourGlided = true
-        } else if !(step == .stars && !bodies) {
-            return
-        }
-        // A stars step over a sky with its bodies switched off has no glide,
-        // so its card keeps the swipe wording (`tourGlided` stays false). It
-        // keeps the same settle before a swipe counts, so a late write from
-        // the previous step does not advance it.
+        guard let target else { return }
+        jump(to: target)
+        // The settle before a swipe counts, so a late write from the previous step does not advance it.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(600))
             tourArrived = true

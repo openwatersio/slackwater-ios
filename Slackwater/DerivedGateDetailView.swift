@@ -10,6 +10,7 @@ struct DerivedGateDetailView: View {
     let record: DerivedGateRecord
 
     @State private var live = appNow()
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsSkyBodies = true
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window (TimelineChunks.swift). The schematic ±1
     /// shape needs no governed scale — its fit never moves.
@@ -34,7 +35,8 @@ struct DerivedGateDetailView: View {
         let drawn = timeline?.drawnSpan
         return nextCommentaryStop(firstCommentaryStop(slacks, at: \.time, after: scrubTime, drawn: drawn)
                                     .map { commentaryEventStop("Slack", at: $0.time) },
-                                  sun: timeline?.days ?? [], after: scrubTime, drawn: drawn)
+                                  sun: showsSkyBodies ? timeline?.days ?? [] : [],
+                                  after: scrubTime, drawn: drawn)
     }
 
     var body: some View {

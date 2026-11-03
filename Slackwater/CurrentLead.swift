@@ -24,6 +24,8 @@ struct CurrentLead: View {
     /// Where the next maximum stands among its own direction's maxima over the
     /// fortnight. Nil on an online gate, which has no fortnight to rank against.
     var standing: PeakStanding? = nil
+    /// Sunrise and sunset compete for the commentary only while their marks are drawn.
+    var showsSun = true
     @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
 
     private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
@@ -64,7 +66,7 @@ struct CurrentLead: View {
         let water = stops.filter { commentaryCanName($0.time, after: scrubTime, drawn: drawn) }
             .min { $0.time < $1.time }
             .map { commentaryEventStop($0.text, at: $0.time, prefix: tilde) }
-        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime, drawn: drawn)
+        return nextCommentaryStop(water, sun: showsSun ? timeline.days : [], after: scrubTime, drawn: drawn)
     }
 
     var commentary: CommentaryContent? {
@@ -160,8 +162,16 @@ struct CurrentScrubCard: View {
     var scale: TimelineScale? = nil
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsSkyBodies = true
+
+    private var shownLead: CurrentLead {
+        var shown = lead
+        shown.showsSun = showsSkyBodies
+        return shown
+    }
 
     var body: some View {
+        let lead = shownLead
         // Asked once and captured: `nextSignificant` walks every window and
         // event, and the pill's label and its tap target must name the same
         // stop anyway.
