@@ -15,8 +15,11 @@
  * still opens the same water. It is cumulative — this run carries forward
  * what the committed table already recorded, adds any slug the database has
  * retired for the station, and adds the slug this table itself published if
- * the database has since moved it. Nothing here is ever dropped, because the
- * link it serves may be in a message from years ago.
+ * the database has since moved it. The slug of a station that left for the
+ * record `quality.redundant` names moves to that record too, because the two
+ * are separate routes in the database and nothing else carries the link.
+ * An entry goes only when no bundled station can answer it, because the link
+ * it serves may be in a message from years ago.
  *
  * Runs after the catalog generators (see `build:data`), reads local files
  * only, and is regenerated in CI to prove the committed table matches.
@@ -28,7 +31,7 @@ import { join } from "node:path";
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
 import { loadStations } from "@slackwater/database";
-import { here, writeBundle, stationSuccessors, round3 } from "./bundle.mjs";
+import { here, writeBundle, stationSuccessors, redundantChain, round3 } from "./bundle.mjs";
 
 const db = await loadStations();
 
@@ -95,6 +98,17 @@ function narrow(kind, files) {
       if (old && old !== route.slug && !corrected) former[old] = id;
     }
   }
+  // A station that left for the record `quality.redundant` names hands that
+  // record its slugs: the two are separate routes, so neither the database's
+  // former paths nor a shared route carries the link across.
+  const liveSlugs = new Set(Object.values(table));
+  for (const [id, slug] of Object.entries(previous[kind] ?? {})) {
+    if (!table[id] && !liveSlugs.has(slug)) former[slug] = id;
+  }
+  for (const [old, id] of Object.entries(former)) {
+    const heir = table[id] ? undefined : redundantChain(id, { get: db.byId }).find((other) => table[other]);
+    if (heir) former[old] = heir;
+  }
   if (missing.length) {
     throw new Error(`${missing.length} bundled ${kind} station(s) have no published route: ${missing.slice(0, 5).join(", ")}`);
   }
@@ -142,7 +156,8 @@ const size = writeBundle(out, slugs);
  * Resources/station-successors.json and station-tombstones.json — see
  * `stationSuccessors` in bundle.mjs. A departed station is one the previous
  * table slugged and this one does not. Its successor is the bundled id on its
- * database route; its identity, for a tombstone, is what the committed
+ * database route, else the bundled record its `quality.redundant` names; its
+ * identity, for a tombstone, is what the committed
  * station-index.json still says, since gen-station-index runs after this.
  * Gates are not in that index, so gen-chs-gates.mjs writes a departing gate's
  * tombstone before it rewrites the gate catalogs, and this carries it.
@@ -176,8 +191,9 @@ for (const [kind, now] of Object.entries(nowByKind)) {
 
 /**
  * Metres to add to a height above `from`'s chart datum to put it above `to`'s:
- * both records are one gauge, so their mean sea level is the same water, and
- * each record's MSL above its own chart datum is exactly the `datumOffset`
+ * the database publishes both records as one gauge, by a route or by
+ * `quality.redundant`, so their mean sea level is the same water, and each
+ * record's MSL above its own chart datum is exactly the `datumOffset`
  * gen-tides ships. Undefined unless both are harmonic references carrying MSL
  * and their chart datum; a subordinate's heights come from its reference's
  * datum and offsets, and a CHS port is fitted on the device from heights the
@@ -210,15 +226,18 @@ const sameGaugeIds = (id) => [db.byId(id)?.quality?.redundant, ...(duplicatesOf.
 
 /**
  * The bundled station on a departed id's database route, as `{ id, datumShiftM? }`.
- * Without one, the bundled record of the same gauge, so a saved station moves
- * to it rather than being tombstoned when the bundle keeps the other record.
+ * Without one, the bundled record `quality.redundant` leads to, else any bundled
+ * record of the same gauge, so a saved station moves to it rather than being
+ * tombstoned when the bundle keeps the other record.
  */
 const successorOf = (item) => {
   const kind = item.startsWith("current:") || (!routesByKind.tide.has(item) && routesByKind.current.has(item))
     ? "current" : "tide";
   const id = item.replace(/^current:/, "");
   const bundled = (ids) => ids.filter((other) => nowByKind[kind][other]).sort()[0];
-  const twin = bundled(routesByKind[kind].get(id)?.ids ?? []) ?? bundled(sameGaugeIds(id));
+  const twin = bundled(routesByKind[kind].get(id)?.ids ?? []) ??
+    redundantChain(id, { get: db.byId }).find((other) => nowByKind[kind][other]) ??
+    bundled(sameGaugeIds(id));
   if (!twin) return undefined;
   const shift = kind === "tide" ? datumShift(id, twin) : undefined;
   return shift === undefined ? { id: itemId(kind, twin) } : { id: itemId(kind, twin), datumShiftM: shift };

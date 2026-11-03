@@ -194,7 +194,8 @@ private struct SlugTable: Decodable {
 /// under that slug — a newer build's slug, or a station that has since left
 /// the bundle. Never a different station: the database allocates a slug once
 /// and never reuses it, and when it does move one the old slug is kept in
-/// `former` pointing at the same id — so a miss is a dead link and not the
+/// `former` pointing at the same id, or at the record the database publishes
+/// for that gauge once the id has left — so a miss is a dead link and not the
 /// wrong water, and a link from an older build is not a miss at all.
 func stationItem(for link: StationLink) -> StationItem? {
     switch link.kind {

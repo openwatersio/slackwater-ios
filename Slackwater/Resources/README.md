@@ -18,8 +18,9 @@ Do not edit these committed artifacts directly:
 - `slugs.json`, `station-successors.json` and `station-tombstones.json` —
   `tools/gen-slugs.mjs`. The last two say where a saved station id goes once
   its station stops shipping: the bundled station the database publishes as
-  the same one, with the chart-datum shift between the two records where it
-  can be measured, else a tombstone naming where it was. Both are cumulative,
+  the same one (on its route, or named by `quality.redundant`), with the
+  chart-datum shift between the two records where it can be measured, else a
+  tombstone naming where it was. Both are cumulative,
   because a device can skip any number of releases. A departing CHS gate's
   tombstone is written by `tools/gen-chs-gates.mjs`, the last step that still
   sees the gate catalogs as they were.

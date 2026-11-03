@@ -7,6 +7,7 @@ import { loadStations } from "@slackwater/database";
 import { here, stationSuccessors, gateTombstones } from "./bundle.mjs";
 
 const db = await loadStations();
+const stationsById = { get: db.byId };
 
 const res = join(here, "..", "Slackwater", "Resources");
 const read = (file) => JSON.parse(readFileSync(join(res, file), "utf8"));
@@ -244,7 +245,7 @@ test("a saved New Zealand TICON station moves to LINZ's record of the same gauge
 test("no station is tombstoned while the bundle carries another record of its gauge", () => {
   // The database marks two records of one gauge with `quality.redundant`, even
   // when their observations keep them apart as two stations. A saved station
-  // moves to the record the bundle keeps (Ilulissat and Nuuk to DMI's).
+  // moves to the record the bundle keeps (DMI's Ilulissat and Nuuk to TICON's).
   const bundled = new Set(Object.keys(slugs.tide));
   const sameGauge = new Map();
   for (const s of db.all) {
@@ -258,6 +259,62 @@ test("no station is tombstoned while the bundle carries another record of its ga
     .map((t) => t.id);
   assert.deepEqual(stranded, []);
   const successors = read("station-successors.json");
-  assert.equal(successors["ticon/ilulissat-298a-dnk-uhslc_rq"]?.id, "dmi/2991550");
-  assert.equal(successors["ticon/nuuk_godthaab-820-dnk-uhslc_fd"]?.id, "dmi/2991320");
+  assert.equal(successors["dmi/2991550"]?.id, "ticon/ilulissat-298a-dnk-uhslc_rq");
+  assert.equal(successors["dmi/2991320"]?.id, "ticon/nuuk_godthaab-820-dnk-uhslc_fd");
+});
+
+// --- Records that leave because the database calls them duplicates
+
+test("a saved DMI Nuuk moves to the record the database names, though the two have separate routes", () => {
+  const successors = read("station-successors.json");
+  const nuuk = "ticon/nuuk_godthaab-820-dnk-uhslc_fd";
+  assert.equal(stationsById.get("dmi/2991320").quality.redundant, nuuk);
+  assert.notEqual(slugs.tide[nuuk], "nuuk");
+  assert.deepEqual(successors["dmi/2991320"], { id: nuuk, datumShiftM: 0.02 });
+  assert.equal(slugs.former.tide["nuuk"], nuuk, "a shared link to the DMI record must still open Nuuk");
+});
+
+test("a station tombstoned before and shipping again is off the tombstone list", () => {
+  const stones = new Set(read("station-tombstones.json").map((t) => t.id));
+  const shipping = new Set(read("stations.json").map((s) => s.id));
+  for (const id of ["ticon/ilulissat-298a-dnk-uhslc_rq", "ticon/nuuk_godthaab-820-dnk-uhslc_fd"]) {
+    assert.ok(shipping.has(id), id);
+    assert.ok(!stones.has(id), id);
+  }
+});
+
+test("a gauge that went to DMI and came back undoes the height shift it took", () => {
+  // Qaqortoq moved from TICON to DMI in an earlier release. A device that took
+  // that move holds the DMI id with its height shifted by -0.071, and the move
+  // back has to return exactly that, while the TICON id needs no entry at all.
+  const successors = read("station-successors.json");
+  const ticon = "ticon/qaqortoq-299-dnk-uhslc_fd";
+  assert.deepEqual(successors["dmi/2991140"], { id: ticon, datumShiftM: 0.071 });
+  assert.equal(successors[ticon], undefined);
+});
+
+test("a duplicate's datum shift is the difference between what each record shipped", () => {
+  const shipped = new Map(read("stations.json").map((s) => [s.id, s]));
+  const msl = (s) => s.datums.MSL - s.datums[s.chart_datum];
+  // A move along a route can be carried from an earlier release, with the shift
+  // that release measured. A move between two routes is this rule's own.
+  const routeOf = new Map(db.stationRoutes("tide").flatMap((r) => r.stationIds.map((id) => [id, r.slug])));
+  let checked = 0;
+  for (const [old, { id, datumShiftM }] of Object.entries(read("station-successors.json"))) {
+    const from = stationsById.get(old);
+    if (datumShiftM === undefined || !from?.quality?.redundant || routeOf.get(old) === routeOf.get(id)) continue;
+    assert.equal(from.quality.redundant, id, old);
+    assert.ok(Math.abs(datumShiftM - (shipped.get(id).datumOffset - msl(from))) < 0.0006, old);
+    checked++;
+  }
+  assert.ok(checked > 20, `only ${checked} shifts checked`);
+});
+
+test("a shift is never measured onto a subordinate, which has no datum of its own", () => {
+  // The app then asks for the height again rather than keep one on the wrong
+  // datum (docs/alerts.md).
+  const shipped = new Map(read("stations.json").map((s) => [s.id, s]));
+  const onto = Object.entries(read("station-successors.json")).filter(([, s]) => shipped.get(s.id)?.reference);
+  assert.ok(onto.length > 20, `only ${onto.length} moves onto a subordinate`);
+  assert.deepEqual(onto.filter(([, s]) => s.datumShiftM !== undefined).map(([id]) => id), []);
 });
