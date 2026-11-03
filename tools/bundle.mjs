@@ -3,6 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attributionWithCredit, loadStations, PROJECT_CREDIT } from "@slackwater/database";
 
 /** tools/ — every generator resolves its paths from here. */
 export const here = dirname(fileURLToPath(import.meta.url));
@@ -16,7 +17,6 @@ export const here = dirname(fileURLToPath(import.meta.url));
  * every station of every source.
  */
 export async function sourceCredits(stations) {
-  const { attributionWithCredit, PROJECT_CREDIT } = await import("@slackwater/database");
   const credits = new Map();
   for (const s of stations) {
     if (!s.source) continue;
@@ -44,9 +44,8 @@ export async function sourceCredits(stations) {
 
 /** The database's bare-id records by id, in the field names the CHS generators read. */
 export async function curatedRecords() {
-  // Imported lazily: the database is tens of MB and most importers want constants.
-  const { allStations } = await import("@slackwater/database");
-  return Object.fromEntries(allStations.filter((s) => !s.id.includes("/")).map((s) => {
+  const db = await loadStations();
+  return Object.fromEntries(db.all.filter((s) => !s.id.includes("/")).map((s) => {
     const c = s.current ?? {};
     return [s.id, {
       name: s.name,

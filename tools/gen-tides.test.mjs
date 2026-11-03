@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
   undangle, countryOf, sourceCredits,
@@ -19,13 +19,15 @@ import {
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
 
+const db = await loadStations();
+
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "stations.json"), "utf8"));
 
 // The one failure that is a legal problem rather than a quality one, checked
 // independently of the generator that is supposed to prevent it.
 test("no station without commercial-use rights ships", () => {
-  const rights = new Map(allStations.map((s) => [s.id, s.license?.commercial_use]));
+  const rights = new Map(db.all.map((s) => [s.id, s.license?.commercial_use]));
   const bad = stations.filter((s) => rights.get(s.id) !== true);
   assert.deepEqual(bad.map((s) => s.id), []);
 });
@@ -42,7 +44,7 @@ test("every publisher that ships is credited in About", () => {
     "Toitū Te Whenua Land Information New Zealand": "Toitū Te Whenua Land Information New Zealand",
   };
   const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
-  const source = new Map(allStations.map((s) => [s.id, s.source?.name]));
+  const source = new Map(db.all.map((s) => [s.id, s.source?.name]));
   const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
   assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
 });
@@ -50,13 +52,13 @@ test("every publisher that ships is credited in About", () => {
 // stations.tcdb writes each station's notice from these credits, so a credit
 // recovered wrong would mis-credit every station of its source.
 test("each source's credit rebuilds the notice the database publishes", async () => {
-  const credits = await sourceCredits(allStations);
+  const credits = await sourceCredits(db.all);
   assert.equal(credits.get("US National Oceanic and Atmospheric Administration"), null);
   assert.match(credits.get("Toitū Te Whenua Land Information New Zealand"),
     /^This work is based on Toitū Te Whenua Land Information New Zealand data/);
   assert.match(credits.get("TICON-4"), /^Source: Hart-Davis/);
   const shipped = new Set(stations.map((s) => s.id));
-  const sources = new Set(allStations.filter((s) => shipped.has(s.id)).map((s) => s.source.name));
+  const sources = new Set(db.all.filter((s) => shipped.has(s.id)).map((s) => s.source.name));
   assert.deepEqual([...sources].filter((name) => !credits.has(name)), []);
 });
 
@@ -105,7 +107,7 @@ test("no station outside North America carries a derived region", () => {
   // station's own region or country ("Hokkaido"), which is the fallback anyway.
   // Non-derived contexts ("Djakarta, Java" -> "Java") are upstream's own words
   // and are allowed anywhere.
-  const byId = new Map(allStations.map((s) => [s.id, s]));
+  const byId = new Map(db.all.map((s) => [s.id, s]));
   const borrowed = stations
     .filter((s) => {
       const d = byId.get(s.id);
@@ -120,7 +122,7 @@ test("no station outside North America carries a derived region", () => {
 // Names, contexts and aliases are the database's: the name as it is (less a
 // trailing region, see untrail), the context as the region line where it shows.
 test("every station is named from its database record", () => {
-  const byId = new Map(allStations.map((s) => [s.id, s]));
+  const byId = new Map(db.all.map((s) => [s.id, s]));
   for (const s of stations) {
     const d = byId.get(s.id);
     assert.ok(d.name.startsWith(s.name), `${s.id}: "${s.name}" is not "${d.name}"`);
@@ -154,7 +156,7 @@ test("no bundled Canadian station duplicates a CHS station", () => {
   // that is what makes this an independent check and not a restatement.
   // NOAA rows are exempt: their datums are adopted, and Hyder was already
   // shipping when CHS gauges Stewart 1.3 km away.
-  const country = new Map(allStations.map((s) => [s.id, s.country_code]));
+  const country = new Map(db.all.map((s) => [s.id, s.country_code]));
   const ca = stations.filter((s) => s.id.startsWith("ticon/") && country.get(s.id) === "CA");
   const contested = ca.filter((s) => chs.some((c) => km(s, c) <= 10)).map((s) => s.name);
   assert.deepEqual(contested, []);
@@ -179,12 +181,12 @@ test("stations NOAA runs abroad do not ship as US", () => {
 // Task 1 (world coverage): a precondition guard for the datum-validation
 // gate Task 2 adds to gen-tides.mjs, which will read MHW/MLW off the
 // upstream row. Both 0.8.20260722 and 0.9.20260801 already publish these on
-// every commercial-ok TICON row (verified directly against allStations on
+// every commercial-ok TICON row (verified directly against db.all on
 // each version — 4,164/4,164, zero blind), so this test is green today. It
 // exists so that if a future upstream release drops the fields, this fails
 // loudly here instead of Task 2's gate silently passing everything.
 test("every TICON row carries the datums the quality gate reads", () => {
-  const ticon = allStations.filter(
+  const ticon = db.all.filter(
     (s) => s.id.startsWith("ticon/") && s.license?.commercial_use === true);
   assert.ok(ticon.length > 4000, `only ${ticon.length} commercial-ok TICON rows`);
   const blind = ticon.filter(
@@ -199,7 +201,7 @@ test("every TICON row carries the datums the quality gate reads", () => {
 test("the bundle reaches beyond North America", () => {
   // stations.json carries no `country` field (see the map() in gen-tides.mjs)
   // — correlate back to the upstream row by id, same as the licence test above.
-  const country = new Map(allStations.map((s) => [s.id, s.country]));
+  const country = new Map(db.all.map((s) => [s.id, s.country]));
   const countries = new Set(stations.map((s) => country.get(s.id)));
   for (const expected of ["United Kingdom", "France", "Germany", "Netherlands"]) {
     assert.ok(countries.has(expected), `${expected} is missing from the bundle`);
@@ -220,7 +222,7 @@ test("the Solent is in the bundle", () => {
 // marsh platforms named after the nearest town is nine "Abbeville · LA" rows on
 // nine bayou platforms nobody can moor at.
 test("no freshwater-network station ships", () => {
-  const network = new Map(allStations.map((s) => [s.id, networkOf(s)]));
+  const network = new Map(db.all.map((s) => [s.id, networkOf(s)]));
   const fresh = stations.filter((s) => FRESHWATER_NETWORKS.has(network.get(s.id)));
   assert.deepEqual(fresh.map((s) => s.id), []);
 });
@@ -268,7 +270,7 @@ test("no two bundled stations share a name within sight of each other", () => {
 // appears here at 0.0 km.
 test("nothing ships in the water a gate-failing NOAA row was rejected for", () => {
   const bundled = new Set(stations.map((s) => s.id));
-  const rejectedNoaa = allStations.filter(
+  const rejectedNoaa = db.all.filter(
     (s) => s.license?.commercial_use === true
         && s.source?.name === "US National Oceanic and Atmospheric Administration"
         && !passesDatumCheck(s));
@@ -306,11 +308,11 @@ test("no UHSLC gauge ships through both of its feeds", () => {
 test("stations that fail the datum gate are not bundled", () => {
   const bundled = new Set(stations.map((s) => s.id));
   // Subordinates never run the gate: their constituents are the reference's copy.
-  const rejected = allStations.filter(
+  const rejected = db.all.filter(
     (s) => s.license?.commercial_use === true && s.type !== "subordinate"
         && !passesDatumCheck(s) && bundled.has(s.id));
   assert.deepEqual(rejected.map((s) => s.id), []);
-  const soton = allStations.find(
+  const soton = db.all.find(
     (s) => s.name === "Southampton" && s.country === "United Kingdom");
   assert.ok(passesDatumCheck(soton), "Southampton must still pass the datum gate");
   assert.ok(bundled.has(soton.id), "corrected Southampton is missing");
@@ -346,7 +348,7 @@ test("no subordinate carries constituents", () => {
 
 test("published astronomical bounds ship together and never invert", () => {
   const bounded = stations.filter((s) => s.latDatum != null);
-  const source = new Map(allStations.map(s => [s.id, s]));
+  const source = new Map(db.all.map(s => [s.id, s]));
   // DMI publishes LAT without HAT; absence must stay absent rather than invent
   // a complete range. Keep the completeness check for records publishing both.
   const lost = stations.filter(s => {
@@ -435,7 +437,7 @@ test("no unavailable station carries anything but identity", () => {
 });
 
 test("every unavailable station is one upstream states we may not use", () => {
-  const rights = new Map(allStations.map((s) => [s.id, s.license?.commercial_use]));
+  const rights = new Map(db.all.map((s) => [s.id, s.license?.commercial_use]));
   const wrong = unavailable.filter((s) => rights.get(s.id) !== false);
   assert.deepEqual(wrong.map((s) => s.id), []);
 });
@@ -445,7 +447,7 @@ test("every unavailable station is one upstream states we may not use", () => {
 // test here would stay green while the provenance line on the detail page
 // credited the wrong publisher under the wrong licence.
 test("the licence and publisher shown for a station are upstream's own", () => {
-  const raw = new Map(allStations.map((s) => [s.id, s]));
+  const raw = new Map(db.all.map((s) => [s.id, s]));
   const wrong = unavailable.filter((s) => {
     const up = raw.get(s.id);
     return !up || up.license?.type !== s.license || (up.source?.name ?? "") !== s.source;

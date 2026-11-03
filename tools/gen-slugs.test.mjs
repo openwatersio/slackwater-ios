@@ -3,8 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { stationRoutes, stationsById } from "@slackwater/database";
+import { loadStations } from "@slackwater/database";
 import { here, stationSuccessors, gateTombstones } from "./bundle.mjs";
+
+const db = await loadStations();
 
 const res = join(here, "..", "Slackwater", "Resources");
 const read = (file) => JSON.parse(readFileSync(join(res, file), "utf8"));
@@ -221,7 +223,7 @@ test("no database route holds two bundled stations", () => {
   // resolver happens to meet first.
   for (const kind of ["tide", "current"]) {
     const bundled = new Set(Object.keys(slugs[kind]));
-    const doubled = stationRoutes(kind)
+    const doubled = db.stationRoutes(kind)
       .map((r) => r.stationIds.filter((id) => bundled.has(id)))
       .filter((ids) => ids.length > 1);
     assert.deepEqual(doubled, [], kind);
@@ -245,7 +247,7 @@ test("no station is tombstoned while the bundle carries another record of its ga
   // moves to the record the bundle keeps (Ilulissat and Nuuk to DMI's).
   const bundled = new Set(Object.keys(slugs.tide));
   const sameGauge = new Map();
-  for (const s of stationsById.values()) {
+  for (const s of db.all) {
     const target = s.quality?.accepted === false ? s.quality.redundant : undefined;
     if (!target) continue;
     sameGauge.set(s.id, [...(sameGauge.get(s.id) ?? []), target]);
