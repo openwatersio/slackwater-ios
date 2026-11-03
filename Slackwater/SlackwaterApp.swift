@@ -41,7 +41,7 @@ struct SlackwaterApp: App {
         if uiTestQuiet { UIView.setAnimationsEnabled(false) }
         #endif
         // Must come after the seed hooks above: `-resetTour`/`-seedTour`
-        // write `seenTourKey`, and `arm()` reads it.
+        // write the local `seenTourKey`, which `arm()` reads with iCloud's.
         TourCoach.shared.arm()
     }
 

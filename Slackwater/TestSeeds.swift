@@ -18,7 +18,8 @@ import Foundation
     }
     // Same shape as -resetLocationAsk/-seedLocationAsk: a UI test forces or
     // suppresses the first-run tour by writing the persisted flag, because an
-    // arguments-domain value would mask the in-app write.
+    // arguments-domain value would mask the in-app write. Local only: without
+    // -noCloudSync, an iCloud seen flag still keeps the tour away.
     if CommandLine.arguments.contains("-resetTour") {
         UserDefaults.standard.removeObject(forKey: seenTourKey)
     }

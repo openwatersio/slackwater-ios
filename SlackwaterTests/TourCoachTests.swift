@@ -112,4 +112,103 @@ final class TourCoachTests: XCTestCase {
         c.arm()
         XCTAssertTrue(c.armed, "after a guarded finish, arm still works")
     }
+
+    /// A seen flag from iCloud, arriving after launch, stands down the launch tour wherever it
+    /// is, armed, on screen or handed to a linked station, but never a replay the person asked for.
+    func testASeenFlagFromAnotherDeviceStandsDownOnlyTheLaunchTour() {
+        let c = TourCoach.shared
+        c.arm()
+        XCTAssertTrue(c.armed)
+        TourSeen.shared.onSeen()
+        XCTAssertFalse(c.armed, "a returning person setting up a new device does not get the tour")
+
+        c.arm()
+        c.begin(on: "noaa/9449880", starsAvailable: true, moonAvailable: true)
+        c.advance()
+        TourSeen.shared.onSeen()
+        XCTAssertNil(c.step, "a launch tour already on screen stands down")
+        XCTAssertNil(c.station)
+
+        c.arm()
+        c.begin(on: "noaa/9449880", starsAvailable: true, moonAvailable: true)
+        c.handOff(to: "chs-nanaimo-harbour")
+        TourSeen.shared.onSeen()
+        XCTAssertFalse(c.armed, "a launch tour handed to a linked station stands down too")
+
+        c.replay()
+        TourSeen.shared.onSeen()
+        XCTAssertTrue(c.armed, "a replay stays armed")
+        c.begin(on: "noaa/9449880", starsAvailable: true, moonAvailable: true)
+        TourSeen.shared.onSeen()
+        XCTAssertEqual(c.step, .read, "a replay on screen keeps going")
+    }
+}
+
+/// The seen flag follows the person through iCloud.
+@MainActor final class TourSeenTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suite: String!
+    private var cloud: MemoryTourCloud!
+
+    override func setUp() async throws {
+        suite = "TourSeenTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)!
+        cloud = MemoryTourCloud()
+    }
+
+    override func tearDown() async throws {
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    func testAFlagInICloudCountsOnANewDevice() {
+        XCTAssertFalse(TourSeen(defaults: defaults, cloud: MemoryTourCloud()).isSeen)
+        cloud.values[seenTourKey] = true
+        XCTAssertTrue(TourSeen(defaults: defaults, cloud: cloud).isSeen)
+    }
+
+    func testALocalFlagFromBeforeSyncIsUploaded() {
+        defaults.set(true, forKey: seenTourKey)
+        _ = TourSeen(defaults: defaults, cloud: cloud)
+        XCTAssertEqual(cloud.values[seenTourKey] as? Bool, true)
+    }
+
+    func testAFlagAlreadyInICloudIsKeptLocally() {
+        cloud.values[seenTourKey] = true
+        _ = TourSeen(defaults: defaults, cloud: cloud)
+        XCTAssertTrue(TourSeen(defaults: defaults, cloud: nil).isSeen, "signed out, the tour stays seen")
+    }
+
+    func testFinishingMarksBoth() {
+        TourSeen(defaults: defaults, cloud: cloud).markSeen()
+        XCTAssertTrue(defaults.bool(forKey: seenTourKey))
+        XCTAssertEqual(cloud.values[seenTourKey] as? Bool, true)
+    }
+
+    func testAFlagArrivingLaterIsSavedAndAnnouncedOnce() {
+        let seen = TourSeen(defaults: defaults, cloud: cloud)
+        var announced = 0
+        seen.onSeen = { announced += 1 }
+        cloud.notify(); settle()
+        XCTAssertEqual(announced, 0, "a change that carries no seen flag announces nothing")
+        cloud.values[seenTourKey] = true
+        cloud.notify(); cloud.notify(); settle()
+        XCTAssertEqual(announced, 1)
+        XCTAssertTrue(defaults.bool(forKey: seenTourKey))
+    }
+
+    /// The observer runs on the main queue, which may deliver after `post` returns.
+    private func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.2)) }
+}
+
+private final class MemoryTourCloud: NSUbiquitousKeyValueStore {
+    var values: [String: Any] = [:]
+    override func object(forKey key: String) -> Any? { values[key] }
+    override func set(_ value: Any?, forKey key: String) { values[key] = value }
+    override func synchronize() -> Bool { true }
+
+    func notify() {
+        NotificationCenter.default.post(
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: self,
+            userInfo: [NSUbiquitousKeyValueStoreChangeReasonKey: NSUbiquitousKeyValueStoreServerChange])
+    }
 }
