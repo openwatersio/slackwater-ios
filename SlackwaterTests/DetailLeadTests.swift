@@ -426,6 +426,10 @@ import SlackwaterKit
     func testACurrentLeadWalksToTheSunUntilded() {
         let sun = lead(scrub: at(10), provisional: true, days: [sunsetDay])
         XCTAssertEqual(sun.nextSignificant?.time, at(2000), "sunset beats the window's opening")
+        var hidden = sun
+        hidden.showsSun = false
+        XCTAssertEqual(hidden.nextSignificant?.label, "~Slack window",
+                       "with Settings hiding the sun marks, the commentary walks past sunset")
         XCTAssertEqual(
             sun.commentary,
             CommentaryContent(

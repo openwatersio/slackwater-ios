@@ -102,7 +102,7 @@ struct CrownScrubStrip: View {
 
     private func settle() {
         let x = data.x(Self.time(atCrown: crown))
-        guard let target = data.magnetTarget(nearX: x) else { return }
+        guard let target = data.magnetTarget(nearX: x, showingSun: showsSkyBodies()) else { return }
         let move = { scrubTime = target; crown = Self.crown(target) }
         // Already on the stop: the exact instant, with no landing to feel.
         guard abs(data.x(target) - x) > 0.5 else { return move() }

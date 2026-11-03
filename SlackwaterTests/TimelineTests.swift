@@ -819,6 +819,25 @@ private struct FoldPageTestHarness: View {
         }
     }
 
+    /// A tap on a sunrise centres it. With Settings hiding the sun marks the day row holds only
+    /// dates, so the same tap is the date's, and a plot tap beside it takes no hidden stop.
+    @MainActor func testHiddenSunMarksAreNoTapTargets() throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        var scrub = now
+        let strip = TimelineScrubber(data: data, geo: TimelineGeo(data: data), imperial: true, speedUnit: "kn",
+                                     now: now, scrubTime: Binding(get: { scrub }, set: { scrub = $0 }))
+        let co = TimelineScrubber.Coordinator(strip)
+        let rise = try XCTUnwrap(data.visibleDays.compactMap(\.sunrise).first { data.contains($0) })
+        XCTAssertEqual(co.tapTarget(x: data.x(rise), y: strip.geo.sunY, showingSun: true), rise)
+        XCTAssertNil(co.tapTarget(x: data.x(rise), y: strip.geo.sunY, showingSun: false),
+                     "with the sun marks hidden, a day-row tap is the date's")
+        let plotY = strip.geo.tideTop + 30
+        XCTAssertEqual(co.tapTarget(x: data.x(rise) + 3, y: plotY, showingSun: true), rise)
+        XCTAssertNotEqual(co.tapTarget(x: data.x(rise) + 3, y: plotY, showingSun: false), rise,
+                          "a plot tap must not land on a sunrise that isn't drawn")
+    }
+
     /// The schedule window (the anchor's midnight → +7d) spans at least two
     /// local days of tide turns — the rolling multi-day list. Asked of
     /// `scheduleRange`, the one definition the list itself filters on; the

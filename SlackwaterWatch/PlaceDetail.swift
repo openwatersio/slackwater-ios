@@ -137,10 +137,10 @@ struct PlaceDetail: View {
                     scrubTime = scrubTime.addingTimeInterval(step)
                 }
                 .accessibilityAction(named: Text("Next event", comment: "VoiceOver chart action.")) {
-                    if let t = tl.snapTimes.first(where: { $0 > scrubTime.addingTimeInterval(1) }) { scrubTime = t }
+                    if let t = tl.stops(showingSun: showsSkyBodies()).first(where: { $0 > scrubTime.addingTimeInterval(1) }) { scrubTime = t }
                 }
                 .accessibilityAction(named: Text("Previous event", comment: "VoiceOver chart action.")) {
-                    if let t = tl.snapTimes.last(where: { $0 < scrubTime.addingTimeInterval(-1) }) { scrubTime = t }
+                    if let t = tl.stops(showingSun: showsSkyBodies()).last(where: { $0 < scrubTime.addingTimeInterval(-1) }) { scrubTime = t }
                 }
         }
         // Top-aligned: the hours row is the first thing a short screen loses.

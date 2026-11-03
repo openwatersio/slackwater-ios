@@ -237,11 +237,10 @@ extension TimelineData {
 
         // The magnet's stops, assembled the way both monolithic builders do it.
         let sunTimes = days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
-        let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
-                              + eclipses.map(\.peak)
-                              + solarEclipses.map(\.peak)))
-            .filter { $0 >= start && $0 <= end }.sorted()
+        let others = tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
+            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+            + eclipses.map(\.peak) + solarEclipses.map(\.peak)
+        let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
@@ -250,7 +249,8 @@ extension TimelineData {
                             slackWindows: windows,
                             slackCores: cores,
                             slackThreshold: source.threshold,
-                            speedsAreSchematic: source.isSchematic)
+                            speedsAreSchematic: source.isSchematic,
+                            sunOnlyStops: Set(sunTimes).subtracting(others))
     }
 }
 

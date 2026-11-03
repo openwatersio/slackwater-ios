@@ -113,7 +113,7 @@ struct SettingsView: View {
                         }
                         .tint(SN.leaf)
                         .accessibilityIdentifier("settings-sky-bodies")
-                        Text("Draw them in the sky above the chart as they stand at the selected time. Off keeps the sky's day and night colors.", comment: "Settings footnote under the sun, moon and stars switch.")
+                        Text("Draw them in the sky above the chart as they stand at the selected time, and mark sunrise and sunset under each day. Off keeps the sky's day and night colors.", comment: "Settings footnote under the sun, moon and stars switch.")
                     }
 
                     section(String(localized: "Alerts", comment: "Settings section heading."), premium: true) {

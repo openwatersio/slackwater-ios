@@ -284,6 +284,10 @@ struct TimelineData {
     /// True when `currentPoints` is a normalized phase shape, not measured speed.
     var speedsAreSchematic = false
 
+    /// The `snapTimes` that are a sunrise or sunset and nothing else, so hiding the sun marks keeps
+    /// a turn, slack or eclipse that falls on the same instant.
+    var sunOnlyStops: Set<Date> = []
+
     var hasTide: Bool { !tidePoints.isEmpty }
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
@@ -357,10 +361,16 @@ struct TimelineData {
         start.addingTimeInterval(Double(x / Timeline.pph) * 3600)
     }
 
+    /// `snapTimes` without sunrise and sunset when Settings hides their marks, so nothing on the phone
+    /// lands on a mark drawn nowhere.
+    func stops(showingSun: Bool) -> [Date] {
+        showingSun ? snapTimes : snapTimes.filter { !sunOnlyStops.contains($0) }
+    }
+
     /// Includes a stop the rest already sits on, so the phone and the Crown both land on its exact instant.
-    func magnetTarget(nearX x: CGFloat) -> Date? {
+    func magnetTarget(nearX x: CGFloat, showingSun: Bool = true) -> Date? {
         var best: (time: Date, dx: CGFloat)?
-        for t in snapTimes {
+        for t in stops(showingSun: showingSun) {
             let dx = abs(self.x(t) - x)
             if dx < (best?.dx ?? .greatestFiniteMagnitude) { best = (t, dx) }
         }
@@ -588,17 +598,17 @@ struct TimelineData {
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
-        let snaps = Array(Set(currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
-                              + eclipses.map(\.peak)
-                              + solarEclipses.map(\.peak)))
-            .filter { $0 >= start && $0 <= end }.sorted()
+        let others = currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+            + eclipses.map(\.peak) + solarEclipses.map(\.peak)
+        let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
                             start: start, end: end, days: chrome.days,
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
-                            slackWindows: windows, slackCores: cores, slackThreshold: threshold)
+                            slackWindows: windows, slackCores: cores, slackThreshold: threshold,
+                            sunOnlyStops: Set(sunTimes).subtracting(others))
     }
 
     static func build(preview: ChsTidePreview, tide: TideStationRecord, now: Date, anchor: Date) -> TimelineData? {
@@ -611,13 +621,14 @@ struct TimelineData {
         let eclipses = windowEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
         let solar = windowSolarEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
         let sun = chrome.days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
-        let snaps = Array(Set(extremes.map(\.time) + tideFlowArrows(rates).map(\.time) + sun
-                              + eclipses.map(\.peak) + solar.map(\.peak)))
-            .filter { coverage.contains($0) }.sorted()
+        let others = extremes.map(\.time) + tideFlowArrows(rates).map(\.time)
+            + eclipses.map(\.peak) + solar.map(\.peak)
+        let snaps = Array(Set(others + sun)).filter { coverage.contains($0) }.sorted()
         return TimelineData(tz: tide.tz, anchor: anchor, today: chrome.today, start: start, end: end,
                             days: chrome.days, tidePoints: points, tideRates: rates, tideExtremes: extremes,
                             currentPoints: [], currentEvents: [], snapTimes: snaps,
-                            eclipses: eclipses, solarEclipses: solar, slackWindows: [])
+                            eclipses: eclipses, solarEclipses: solar, slackWindows: [],
+                            sunOnlyStops: Set(sun).subtracting(others))
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
@@ -677,11 +688,10 @@ struct TimelineData {
         // there.
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
-        let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-                              + currentSnapTimes(events: currentEvents, windows: windows, cores: cores) + sunTimes
-                              + eclipses.map(\.peak)
-                              + solarEclipses.map(\.peak)))
-            .filter { $0 >= start && $0 <= end }.sorted()
+        let others = tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
+            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+            + eclipses.map(\.peak) + solarEclipses.map(\.peak)
+        let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
@@ -690,7 +700,8 @@ struct TimelineData {
                             slackWindows: windows,
                             slackCores: cores,
                             slackThreshold: threshold,
-                            speedsAreSchematic: gate != nil)
+                            speedsAreSchematic: gate != nil,
+                            sunOnlyStops: Set(sunTimes).subtracting(others))
     }
 }
 
@@ -855,6 +866,8 @@ struct TimelineCanvas: View {
     /// a bearing there would be the schematic-curve mistake in glyph form.
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
+    /// Settings' sun, moon and stars switch keeps the date row's sunrise and sunset.
+    var showsSunMarks = true
 
     /// A `Canvas` renders into ONE backing texture and Metal caps that at
     /// 8192px on a side. The 228-hour strip is `228 * pph` = 4104pt wide,
@@ -1031,7 +1044,7 @@ struct TimelineCanvas: View {
                         .foregroundStyle(SN.foam.opacity(0.48)),
                      at: CGPoint(x: labelX, y: geo.dayY + 17),
                      anchor: .center)
-            for (t, systemImage) in [(day.sunrise, "sunrise"), (day.sunset, "sunset")] {
+            for (t, systemImage) in [(day.sunrise, "sunrise"), (day.sunset, "sunset")] where showsSunMarks {
                 guard let t else { continue }
                 let x = data.x(t)
                 ctx.draw((Text(Image(systemName: systemImage)) + Text(" \(cardTime(t, data.tz))"))

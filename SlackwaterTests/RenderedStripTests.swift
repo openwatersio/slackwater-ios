@@ -193,6 +193,29 @@ final class RenderedStripTests: XCTestCase {
         return Int(p.bytes[i]) + Int(p.bytes[i + 1]) + Int(p.bytes[i + 2])
     }
 
+    /// Settings' sun, moon and stars switch takes the sunrise and sunset times off the date row.
+    @MainActor
+    func testTheSkySwitchHidesTheSunTimes() throws {
+        let record = try XCTUnwrap(TideStationRecord.record(id: TideStationRecord.fridayHarborID))
+        let at = Date(timeIntervalSince1970: 1_790_000_000)
+        let data = TimelineData.build(tide: record, current: nil, now: at, anchor: at)
+        // Sunrise ink is the only warm paint on the date row: dates are foam, the shading blue.
+        func warmPixels(_ shown: Bool) throws -> Int {
+            let p = try pixels(XCTUnwrap(stripImage(data, now: at, showsSunMarks: shown)))
+            let y = Int(TimelineGeo(data: data).sunY)
+            var n = 0
+            for row in (y - 6)...(y + 6) {
+                for x in 0..<p.width {
+                    let i = (row * p.width + x) * 4
+                    if Int(p.bytes[i]) > 110 && Int(p.bytes[i]) > Int(p.bytes[i + 2]) + 50 { n += 1 }
+                }
+            }
+            return n
+        }
+        XCTAssertGreaterThan(try warmPixels(true), 100, "the switch on draws the sun times")
+        XCTAssertEqual(try warmPixels(false), 0, "the switch off draws no sun times")
+    }
+
     /// Where sunset follows local midnight, the afternoon takes the daylight tint and the small
     /// hours the night band, rather than the civil day's sunset shading the whole day as night.
     @MainActor
