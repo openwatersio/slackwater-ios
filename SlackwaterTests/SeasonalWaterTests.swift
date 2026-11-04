@@ -16,7 +16,7 @@ final class SeasonalWaterTests: XCTestCase {
         // so a regeneration that dropped it too would leave every screen silent
         // with nothing failing.
         let flagged = TideStationRecord.all.filter { $0.seasonalDominant == true }
-        XCTAssertEqual(flagged.count, 292)
+        XCTAssertEqual(flagged.count, 293)
     }
 
     /// The database flags a station when its seasonal peak exceeds the

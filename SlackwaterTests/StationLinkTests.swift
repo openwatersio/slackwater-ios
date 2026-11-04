@@ -159,6 +159,17 @@ import XCTest
         XCTAssertEqual(item("https://slackwater.xyz/currents/agate-passage")?.id, "current:noaa/PUG1501")
     }
 
+    func testJapaneseFormerSlugsResolveToTheirCurrentGauges() {
+        for (former, current) in [("ogasawara", "chichijima"),
+                                  ("miyakeshima", "miyakejima-tsubota")] {
+            for instant in ["", "/2026-11-03T09:00+09:00"] {
+                let live = item("https://slackwater.xyz/tides/\(current)\(instant)")
+                XCTAssertNotNil(live)
+                XCTAssertEqual(item("https://slackwater.xyz/tides/\(former)\(instant)")?.id, live?.id)
+            }
+        }
+    }
+
     // MARK: - Minting the link (the share button's half, UI pending #187)
 
     private let vancouver = TimeZone(identifier: "America/Vancouver")!

@@ -34,6 +34,9 @@ struct AboutView: View {
                     Text(
                         "Japanese stations: Japan Coast Guard, Hydrographic and Oceanographic Department data under Government Standard Terms of Use 2.0 (www1.kaiho.mlit.go.jp/copyright.html). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived."
                     )
+                    Text(
+                        "Japanese stations: Japan Meteorological Agency website (data.jma.go.jp/gmd/kaiyou/db/tide/suisan/station2026.php), under Public Data License 1.0 (digital.go.jp/resources/open_data/public_data_license_v1.0; CC BY 4.0: creativecommons.org/licenses/by/4.0/). Edited by Open Waters: constituent names, units and phases converted; tidal datums derived. Gauge positions: TICON-4 (Hart-Davis, Dettmering, Seitz, 2025; doi.org/10.17882/109129), CC BY 4.0."
+                    )
                     // LINZ asks for this credit in writing, never its logo.
                     Text(
                         "New Zealand stations: harmonic constants based on Toitū Te Whenua Land Information New Zealand data, licensed by Toitū Te Whenua Land Information New Zealand for re-use under CC BY 4.0 (linz.govt.nz)."

@@ -322,7 +322,7 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 |---|---|
 | NOAA tide | "<datum> chart datum. NOAA harmonic prediction." |
 | NOAA subordinate tide | "<datum> chart datum. Based on <reference> tides and NOAA's published offsets; computed on this device." |
-| Other tide (TICON-4, Kartverket, LINZ, DMI, Japan Coast Guard) | "<datum> chart datum. Harmonic constants from <publisher>." DMI and Japan Coast Guard use their full source and editing notices. The publisher comes from the station database's `source.name`. |
+| Other tide (TICON-4, Kartverket, LINZ, DMI, Japan Coast Guard, Japan Meteorological Agency) | "<datum> chart datum. Harmonic constants from <publisher>." DMI and both Japanese agencies use their full source and editing notices. JMA also credits the TICON-4 gauge positions. The publisher comes from the station database's `source.name`. |
 | Canadian tide | "<datum> chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." |
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |

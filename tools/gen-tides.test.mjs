@@ -38,6 +38,7 @@ test("every publisher that ships is credited in About", () => {
   const credits = {
     "US National Oceanic and Atmospheric Administration": "NOAA",
     "TICON-4": "TICON-4",
+    "Japan Meteorological Agency": "Japan Meteorological Agency",
     "Danish Meteorological Institute": "Danish Meteorological Institute",
     "Japan Coast Guard, Hydrographic and Oceanographic Department": "Japan Coast Guard",
     "Kartverket / Norwegian Mapping Authority, Hydrographic Service": "© Kartverket",
@@ -47,6 +48,18 @@ test("every publisher that ships is credited in About", () => {
   const source = new Map(db.all.map((s) => [s.id, s.source?.name]));
   const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
   assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
+});
+
+test("JMA About and detail credits keep the same full license and editing notice", () => {
+  const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
+  const detail = readFileSync(join(here, "..", "Slackwater", "TideDetailView.swift"), "utf8");
+  const notice = about.match(/"(Japanese stations: Japan Meteorological Agency[^"\n]+)"/)?.[1];
+  assert.ok(notice);
+  for (const part of ["Public Data License 1.0", "CC BY 4.0: creativecommons.org/licenses/by/4.0/",
+    "Edited by Open Waters:", "Gauge positions: TICON-4", "doi.org/10.17882/109129"]) {
+    assert.ok(notice.includes(part), part);
+  }
+  assert.ok(detail.includes(`String(localized: "${notice}")`));
 });
 
 // stations.tcdb writes each station's notice from these credits, so a credit

@@ -300,6 +300,10 @@ Neither the unavailable section nor the removed-station card says *why* the stat
 
 When the station database publishes a departed station's gauge under another bundled record, the saved id moves to that record at launch (`Resources/station-successors.json`): favorites keep their slot and iCloud star time, recents keep their order, calendar subscriptions keep their calendar, alert rules keep scheduling (a tide-height rule moves by the datum shift between the two records, or stops and asks to be set again when there is none; alerts.md §6), and widget, watch and `slackwater://station/<id>` lookups resolve the old id to the new station. Only this device's favorites move at load; iCloud's copy moves when it is reconciled, so a star removed on another device stays removed and the older of two stamps survives.
 
+Same-name place filtering alone never establishes gauge identity. When it drops a distinct nearby gauge, the saved id gets a tombstone rather than a redirect to that other gauge. Maizuru's Japan Coast Guard and JMA gauges are separate sites about 6.8 km apart.
+
+This migration is one-way across app versions. A device with an older catalog retains a migrated favorite's cloud ID but shows a "Station removed" card that invites deletion. Removing that card unstars the id in iCloud and removes the favorite from updated devices too. Update every device that shares favorites before using migrated favorites; leave unfamiliar removed cards in place until then. An older build installed on an updated device also cannot schedule notifications for alert rules already moved to the new ids.
+
 A favorite or deep-linked station with no successor stays in place as a removed-station card:
 
 - title: the station's last known name, from its tombstone (`chs-tombstones.json` or `station-tombstones.json`), or "Station removed";
