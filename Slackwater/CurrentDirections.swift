@@ -24,8 +24,7 @@ final class DoddMapFlowProvider: Sendable {
             return StationMapFlow(
                 center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
                 speedKn: abs(reading.signedKn),
-                bearingDeg: reading.signedKn >= 0 ? reading.floodDirection
-                    : (reading.floodDirection + 180).truncatingRemainder(dividingBy: 360))
+                bearingDeg: reading.signedKn >= 0 ? reading.floodDirection : reading.ebbDirection)
         }
     }
 
@@ -39,13 +38,12 @@ final class DoddMapFlowProvider: Sendable {
 
     func flow(at date: Date) -> StationMapFlow? { flowAtDate(date) }
 
+    /// Ebb flow takes the gate's published ebb bearing, which need not be the flood's reciprocal.
     private static func flow(gate: CurrentStationRecord, signedKn: Double) -> StationMapFlow {
         StationMapFlow(
             center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
             speedKn: abs(signedKn),
-            bearingDeg: signedKn >= 0
-                ? gate.floodDirection
-                : (gate.floodDirection + 180).truncatingRemainder(dividingBy: 360))
+            bearingDeg: signedKn >= 0 ? gate.floodDirection : gate.ebbDirection)
     }
 }
 

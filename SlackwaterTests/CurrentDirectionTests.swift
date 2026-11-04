@@ -1,5 +1,6 @@
 import CoreLocation
 import MapLibre
+import SlackwaterKit
 import XCTest
 import Synchronization
 @testable import Slackwater
@@ -9,7 +10,8 @@ final class CurrentDirectionTests: XCTestCase {
     private let gate = CurrentStationRecord(
         id: "chs-dodd-narrows", name: "Dodd Narrows", region: "Nanaimo", aliases: [],
         latitude: 49.1344, longitude: -123.8171, timezone: "America/Vancouver",
-        floodDirection: 21, ebbDirection: 201, meanFlow: 0, tideReference: nil, constituents: [])
+        // Dodd's published bearings, which are not reciprocal: 355's reciprocal would be 175.
+        floodDirection: 355, ebbDirection: 155, meanFlow: 0, tideReference: nil, constituents: [])
 
     private func cell(_ bearing: Double = 73) -> FillCell {
         FillCell(polygon: [
@@ -36,7 +38,7 @@ final class CurrentDirectionTests: XCTestCase {
         XCTAssertTrue(features[0] is MLNPolygonFeature)
     }
 
-    func testDoddUsesAbsoluteSpeedAndReciprocalEbbBearing() throws {
+    func testDoddUsesAbsoluteSpeedAndPublishedEbbBearing() throws {
         let evaluations = Mutex(0)
         let provider = DoddMapFlowProvider(gate: gate, signedSpeed: { _ in
             evaluations.withLock { $0 += 1 }
@@ -45,7 +47,7 @@ final class CurrentDirectionTests: XCTestCase {
         let flow = try XCTUnwrap(provider.flow(at: date))
         XCTAssertEqual(evaluations.withLock { $0 }, 1)
         XCTAssertEqual(flow.speedKn, 6)
-        XCTAssertEqual(flow.bearingDeg, 201)
+        XCTAssertEqual(flow.bearingDeg, 155)
         XCTAssertEqual(flow.center.latitude, gate.latitude, accuracy: 1e-12)
         XCTAssertEqual(flow.center.longitude, gate.longitude, accuracy: 1e-12)
     }
@@ -54,7 +56,22 @@ final class CurrentDirectionTests: XCTestCase {
         let flow = try XCTUnwrap(DoddMapFlowProvider(
             gate: gate, signedSpeed: { _ in 6 }).flow(at: date))
         XCTAssertEqual(flow.speedKn, 6)
-        XCTAssertEqual(flow.bearingDeg, 21)
+        XCTAssertEqual(flow.bearingDeg, 355)
+    }
+
+    func testFittedGateReadingCarriesBothPublishedBearings() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { !$0.isOnline && $0.recipe == ChsCurrentFit.stamp })
+        let model = ChsCurrentModel(
+            stationID: gate.id, iwlsID: "abc", iwlsName: gate.name, fittedAt: .now,
+            fitStartMs: 1, fitEndMs: 2, fitDays: gate.fitDays, recipe: ChsCurrentFit.stamp,
+            floodDirection: 355, ebbDirection: 155, offset: 0, rms: 0.1,
+            constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
+        try ChsModelStore.saveCurrent(model)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.currentUrl(gate.id)) }
+        let reading = try XCTUnwrap(gate.cachedReading(at: date))
+        XCTAssertEqual(reading.floodDirection, 355)
+        XCTAssertEqual(reading.ebbDirection, 155)
+        XCTAssertTrue(reading.signedKn.isFinite)
     }
 
     func testDoddProductionUsesOnlineCacheAndNeverExtrapolates() throws {
@@ -68,12 +85,13 @@ final class CurrentDirectionTests: XCTestCase {
         let now = appNow(), t = now.timeIntervalSince1970
         let window = ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
                                      fetchedAt: now, start: now, end: now.addingTimeInterval(900),
-                                     floodDirection: 21, ebbDirection: 201,
+                                     // Dodd's IWLS metadata: the ebb is 20° off the flood's reciprocal.
+                                     floodDirection: 355, ebbDirection: 155,
                                      times: [t, t + 900], speeds: [2, -6])
         try ChsModelStore.saveOnline(window)
         let flow = try XCTUnwrap(DoddMapFlowProvider().flow(at: now.addingTimeInterval(450)))
         XCTAssertEqual(flow.speedKn, 2, accuracy: 1e-9)
-        XCTAssertEqual(flow.bearingDeg, 201)
+        XCTAssertEqual(flow.bearingDeg, 155)
         XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(901)))
         XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(-1)))
     }
