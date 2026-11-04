@@ -10,6 +10,52 @@ import UIKit
 
 let seenTourKey = "slackwater.seenTour"
 
+/// Whether this person has finished the tour on any of their devices. The flag follows them
+/// through iCloud, so a new device stands its tour down once iCloud answers; it only ever turns true.
+@MainActor final class TourSeen {
+    static let shared = TourSeen()
+
+    private let defaults: UserDefaults
+    private let cloud: NSUbiquitousKeyValueStore?
+    private var observer: NSObjectProtocol?
+    /// A seen flag arrived from another device.
+    var onSeen: () -> Void = {}
+
+    init(defaults: UserDefaults = .standard, cloud: NSUbiquitousKeyValueStore? = FavoritesCloud.store) {
+        self.defaults = defaults
+        self.cloud = cloud
+        guard let cloud else { return }
+        observer = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.cloudSeen, !self.defaults.bool(forKey: seenTourKey) else { return }
+                self.defaults.set(true, forKey: seenTourKey)
+                self.onSeen()
+            }
+        }
+        cloud.synchronize()
+        // A tour finished before the flag synced was only ever written here.
+        if defaults.bool(forKey: seenTourKey), !cloudSeen { cloud.set(true as Any?, forKey: seenTourKey) }
+        // Kept locally too, so the tour stays seen after a sign-out or an older build.
+        if cloudSeen { defaults.set(true, forKey: seenTourKey) }
+    }
+
+    isolated deinit {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    private var cloudSeen: Bool { cloud?.object(forKey: seenTourKey) as? Bool == true }
+
+    var isSeen: Bool { defaults.bool(forKey: seenTourKey) || cloudSeen }
+
+    func markSeen() {
+        defaults.set(true, forKey: seenTourKey)
+        cloud?.set(true as Any?, forKey: seenTourKey)
+    }
+}
+
 @MainActor @Observable final class TourCoach {
     /// `TourStep` lives in TourAnchor.swift so the anchors compile without
     /// this UIKit-using class; the name here is what the rest of the app says.
@@ -25,6 +71,8 @@ let seenTourKey = "slackwater.seenTour"
 
     /// First launch has armed the tour but no detail has claimed it yet.
     private(set) var armed = false
+    /// The tour is launch's, armed, begun or handed off, not a replay the person asked for.
+    private var armedAtLaunch = false
     /// `.stars` and `.moon` are independent: `tourStarsTime` and
     /// `tourMoonTime` can each resolve to nil on their own (a moon only ever
     /// up in daylight, say), so one flag per step — never a single
@@ -37,9 +85,19 @@ let seenTourKey = "slackwater.seenTour"
     private var skipsStars: Bool { !starsAvailable || UIAccessibility.isVoiceOverRunning }
     private var skipsMoon: Bool { !moonAvailable || UIAccessibility.isVoiceOverRunning }
 
-    /// Called once on launch. A tour that has already been seen does not arm.
+    /// Called once on launch. A tour already seen, here or on another of the person's devices, does not arm.
     func arm() {
-        armed = !UserDefaults.standard.bool(forKey: seenTourKey)
+        armed = !TourSeen.shared.isSeen
+        armedAtLaunch = armed
+        // iCloud usually answers a fresh install after the tour has begun, so the launch tour
+        // stands down wherever it is.
+        TourSeen.shared.onSeen = { [weak self] in
+            guard let self, self.armedAtLaunch else { return }
+            self.step = nil
+            self.station = nil
+            self.armed = false
+            self.reservedFor = nil
+        }
     }
 
     /// Set by `handOff(to:)`: the only station that may claim the armed tour.
@@ -69,6 +127,7 @@ let seenTourKey = "slackwater.seenTour"
         step = nil
         station = nil
         armed = true
+        armedAtLaunch = false
         reservedFor = nil
     }
 
@@ -89,8 +148,8 @@ let seenTourKey = "slackwater.seenTour"
         if let next = next(after: step) { self.step = next } else { finish() }
     }
 
-    /// Skip, or leaving the detail. One way: the seen flag is written here and
-    /// nowhere else, and there is no resume-later state by design. A guard
+    /// Skip, or leaving the detail. One way: this is the only place a tour marks
+    /// itself seen, and there is no resume-later state by design. A guard
     /// ensures this runs only when a tour is actually showing (step != nil);
     /// a stray call when no tour is running would suppress it forever.
     func finish() {
@@ -98,7 +157,8 @@ let seenTourKey = "slackwater.seenTour"
         step = nil
         station = nil
         armed = false
-        UserDefaults.standard.set(true, forKey: seenTourKey)
+        armedAtLaunch = false
+        TourSeen.shared.markSeen()
     }
 
     private func next(after step: Step) -> Step? {
