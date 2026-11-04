@@ -726,13 +726,55 @@ import notify
     ///
     /// That is the hosted lane's one stable failure (#331): the same test, the
     /// same line, on unrelated branches, passing on the Mac Studio every time.
+    ///
+    /// The chevron tap itself can land and do nothing on a hosted runner
+    /// (#816): the event is synthesized at the chevron's centre on a sheet
+    /// that has been still for seconds, and the header never moves. So retap,
+    /// bounded like `openSearch`. Unlike the search FAB the chevron stays
+    /// hittable after a step, so a retap after a tap that merely landed late
+    /// steps twice. That is why the wait is for the adjacent month by name,
+    /// not for any change, and the header is read again once it has stopped
+    /// changing: an overshoot fails here, with both months in the message,
+    /// instead of at a day cell several lines on.
     func stepMonth(_ app: XCUIApplication, _ direction: String) {
         let header = app.buttons["Month"].firstMatch
         XCTAssert(header.appears(within: 5), "the picker has no month header")
+        let chevron = app.buttons[direction].firstMatch
+        XCTAssert(waitFor(chevron, "exists == true AND isHittable == true", timeout: 5),
+                  "the picker's \(direction) button never became hittable")
         let before = header.value as? String ?? ""
-        app.buttons[direction].firstMatch.tap()
-        XCTAssert(waitFor(header, "value != '\(before)'", timeout: 10),
-                  "\(direction) did not move the picker off \(before)")
+        let after = adjacentMonth(before, direction)
+        let landed = after.map { "value == '\($0)'" } ?? "value != '\(before)'"
+        for _ in 0..<3 {
+            chevron.tap()
+            // A tap that lands just after the wait gives up is still one step.
+            let moved = waitFor(header, landed, timeout: 10)
+            let now = settled { header.value as? String ?? "" }
+            if now == after || (after == nil && moved) { return }
+            guard now == before else {
+                XCTFail("\(direction) moved the picker from \(before) to \(now), not \(after ?? "the adjacent month")")
+                return
+            }
+        }
+        XCTFail("\(direction) did not move the picker off \(before)")
+    }
+
+    /// The header one step from `before`, or nil when the header does not
+    /// read as the runner locale's "month year", in which case `stepMonth`
+    /// settles for any change.
+    private func adjacentMonth(_ before: String, _ direction: String) -> String? {
+        let step: Int
+        switch direction {
+        case "Previous Month": step = -1
+        case "Next Month": step = 1
+        default: return nil
+        }
+        let format = DateFormatter()
+        format.setLocalizedDateFormatFromTemplate("yMMMM")
+        guard let month = format.date(from: before),
+              let moved = Calendar.current.date(byAdding: .month, value: step, to: month)
+        else { return nil }
+        return format.string(from: moved)
     }
 
     /// Tap a day cell once the calendar has stopped moving under it. Hittable,
