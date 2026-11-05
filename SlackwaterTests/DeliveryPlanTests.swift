@@ -223,6 +223,38 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertTrue(plan.liveActivities.isEmpty)
     }
 
+    func testFreeDayDropsANotificationFiringAtItsEnd() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 3_600)
+        let o = occurrence(rule, eventIn: 2 * 3_600)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [o], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: o.fire)
+
+        XCTAssertEqual(plan.notifications, [])
+    }
+
+    func testFreeDayDropsALiveActivityWhoseEventIsAtItsEnd() {
+        let rule = AlertRule(stationID: "a", trigger: .slackWindowOpens, lead: 900)
+        let o = occurrence(rule, eventIn: 3_600)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [o], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: o.event)
+
+        XCTAssertEqual(plan.notifications, [o])
+        XCTAssertTrue(plan.liveActivities.isEmpty)
+    }
+
+    func testAnEndedFreeDayPlansNoNotifications() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 900)
+        let o = occurrence(rule, eventIn: 3_600)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [o], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: now)
+
+        XCTAssertEqual(plan.notifications, [])
+        XCTAssertTrue(plan.liveActivities.isEmpty)
+    }
+
     func testPurchasedPremiumIsUncapped() {
         let rule = AlertRule(stationID: "a", trigger: .slack)
         let far = occurrence(rule, eventIn: 30 * 3_600)

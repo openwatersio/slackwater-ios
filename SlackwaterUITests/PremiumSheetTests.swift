@@ -60,7 +60,8 @@ final class PremiumSheetTests: ScreenshotTestCase {
     }
 
     func testUsedFreeDayShowsNextDate() {
-        let app = launch("-locDenied", "-seedFreeDayUsed", "-seedPremiumSheet")
+        // A one-second free day, so the seeded day has ended even on the 1st of the month.
+        let app = launch("-locDenied", "-freeDayLength", "1", "-seedFreeDayUsed", "-seedPremiumSheet")
         let freeDay = element(app, "premium-free-day")
         scrollTo(freeDay, in: app)
         XCTAssertTrue(freeDay.label.contains("next free day"), freeDay.label)
