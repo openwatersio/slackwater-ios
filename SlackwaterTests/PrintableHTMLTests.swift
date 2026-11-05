@@ -61,6 +61,26 @@ final class PrintableHTMLTests: XCTestCase {
         XCTAssertFalse(noonRow.contains("night"))
     }
 
+    /// The peak goes with the event, so the Height column never holds a time.
+    func testAWeekEclipseRowCarriesItsPeakInTheEventCell() {
+        let e = ScheduleEntry(time: at(11, 2, 1, 30), pill: .eclipse, value: "3:12 AM")
+        let html = printableHTML(page(kind: .tide(heightUnit: "ft"), days: [printDay(11, 2, [e])]),
+                                 setFormat: "compass")
+        let row = html.components(separatedBy: "<tr").first { $0.contains("Lunar eclipse") }!
+        XCTAssertTrue(row.contains("<td>Lunar eclipse (peak 3:12 AM)</td><td>—</td></tr>"), row)
+        let solar = ScheduleEntry(time: at(11, 2, 9), pill: .solarEclipse, value: "10:05 AM")
+        let gate = printableHTML(page(kind: .derivedGate, days: [printDay(11, 2, [solar])]), setFormat: "compass")
+        XCTAssertTrue(gate.contains("<td>Solar eclipse (peak 10:05 AM)</td></tr>"))
+    }
+
+    func testMonthTimesHaveSpaceBetweenThemToWrapAt() {
+        let a = ScheduleEntry(time: at(11, 2, 3), pill: .slack), b = ScheduleEntry(time: at(11, 2, 9), pill: .slack)
+        let html = printableHTML(page(span: .month, range: at(11, 1)..<at(12, 1), kind: .derivedGate,
+                                      days: [printDay(11, 2, [a, b])]), setFormat: "compass")
+        XCTAssertTrue(html.contains("</span> <span class=\"t"))
+        XCTAssertTrue(html.contains(".mday td + td { white-space: normal; }"))
+    }
+
     func testAMonthPageHasOneRowPerDay() {
         let days = (1...30).map { printDay(11, $0, [ScheduleEntry(time: at(11, $0, 9), pill: .slack)]) }
         let html = printableHTML(page(span: .month, range: at(11, 1)..<at(12, 1),

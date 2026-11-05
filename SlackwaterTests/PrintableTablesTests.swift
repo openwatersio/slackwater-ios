@@ -1,4 +1,5 @@
 // Slackwater — GPL v3. Printable tables: spans, day rows, night and coverage.
+import Almanac
 import XCTest
 @testable import Slackwater
 
@@ -80,6 +81,42 @@ final class PrintableTablesTests: XCTestCase {
         XCTAssertNotNil(printCoverageNote(range: r, covered: [a, c], tz: tz))
     }
 
+    /// A preview's coverage starts `Timeline.backHours` before today (`ChsFitService`), so the
+    /// note on a week anchored at today names only the days from today on.
+    func testAPreviewsCoverageNoteNamesOnlyDaysOnThePage() throws {
+        let anchor = day(11, 4)
+        let start = anchor.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = start.addingTimeInterval(7 * 24 * 3600)
+        let steps = Int(end.timeIntervalSince(start) / ChsGrid.tideSeconds)
+        let preview = ChsTidePreview(stationID: "chs-test", fetchedAt: start, samples: (0...steps).map {
+            .init(time: start.addingTimeInterval(Double($0) * ChsGrid.tideSeconds),
+                  height: 2 + sin(Double($0) * .pi / 25))
+        })
+        let coverage = try XCTUnwrap(preview.coverage)
+        // As TideDetailView hands it to the sheet.
+        let covered = [coverage.lowerBound..<coverage.upperBound]
+        let note = printCoverageNote(range: printRange(.week, anchor: anchor, tz: tz), covered: covered,
+                                     tz: tz, locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(note?.replacingOccurrences(of: "\u{2009}", with: " "), "Predictions available Nov 4 – 8 only.")
+    }
+
+    func testAnOnlineBlockOutsideTheMonthIsNotListed() {
+        let r = printRange(.month, anchor: day(11, 18), tz: tz)
+        let en = Locale(identifier: "en_US")
+        func note(_ covered: [Range<Date>]) -> String? {
+            printCoverageNote(range: r, covered: covered, tz: tz, locale: en)?
+                .replacingOccurrences(of: "\u{2009}", with: " ")
+        }
+        XCTAssertEqual(note([day(10, 20)..<day(10, 25), day(11, 4)..<day(11, 11)]),
+                       "Predictions available Nov 4 – 10 only.")
+        // A block that straddles the month's first midnight lists only its November days.
+        XCTAssertEqual(note([day(10, 30)..<day(11, 3)]), "Predictions available Nov 1 – 2 only.")
+        XCTAssertEqual(note([day(10, 20)..<day(10, 25), day(12, 2)..<day(12, 5)]),
+                       "No predictions available for these days.")
+        // Coverage that runs past both ends is full coverage.
+        XCTAssertNil(note([day(10, 20)..<day(12, 5)]))
+    }
+
     private func nights(_ days: [TimelineDay]) -> [Range<Date>] {
         printNightSpans(timelines: [timeline(days: days)])
     }
@@ -124,7 +161,7 @@ final class PrintableTablesTests: XCTestCase {
         tl.tideExtremes
             .filter { tl.scheduleRange.contains($0.time) }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
-                                 value: String(format: "%.2f ft", $0.height)) }
+                                 value: "\(formatHeight($0.height, imperial: true)) ft") }
             .sorted { $0.time < $1.time }
     }
     private func config(_ source: PrintableSource) -> PrintableConfig {
@@ -192,6 +229,33 @@ final class PrintableTablesTests: XCTestCase {
         XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
     }
 
+    /// A chunk keeps an eclipse by its peak and `eclipseEntries` keeps it by its start, so an
+    /// eclipse that starts before a week seam and peaks after it needs the earlier week's chunk to
+    /// run past the seam. Found in the bundle: a place and an eclipse whose start and peak fall
+    /// on different local days, printed across two weeks that meet at the peak's midnight.
+    func testAnEclipseAcrossAWeekSeamIsPrintedOnce() throws {
+        var zones = Set<String>()
+        let from = day(1, 1), to = day(1, 1).addingTimeInterval(15 * 365 * 86_400)
+        for rec in TideStationRecord.all where zones.insert(rec.timezone).inserted {
+            let src = TimelineSource.tide(rec)
+            let zone = src.tz
+            guard let observer = try? Observer(latitudeDeg: rec.latitude, longitudeDeg: rec.longitude) else { continue }
+            guard let e = visibleEclipses(from: from, to: to, observer: observer)
+                .first(where: { dayLocal($0.start, zone) != dayLocal($0.peak, zone) }) else { continue }
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = zone
+            let seam = dayLocal(e.peak, zone)
+            let range = c.date(byAdding: .day, value: -7, to: seam)!..<c.date(byAdding: .day, value: 7, to: seam)!
+            let tls = printTimelines(.computed(src), range: range, tz: zone, now: e.start)
+            XCTAssertEqual(tls.count, 2)
+            let days = printDays(timelines: tls, entries: eclipseEntries, range: range, covered: nil, tz: zone)
+            let rows = days.flatMap(\.entries).filter { $0.pill == .eclipse }
+            XCTAssertEqual(rows.map(\.time), [e.start], "\(rec.id) eclipse peaking \(e.peak)")
+            return
+        }
+        XCTFail("no bundled place sees an eclipse across a local midnight")
+    }
+
     func testAFetchedSourceWhoseTimelineIsNilBuildsNoDays() {
         let covered = [day(11, 4)..<day(11, 11)]
         let src = PrintableSource.fetched(covered: covered, timeline: { _ in nil })
@@ -215,6 +279,10 @@ final class PrintSourceLabelTests: XCTestCase {
     func testCHSPrintsItsNameWithoutTheAppsKey() {
         XCTAssertEqual(printSourceLabel(id: "chs-sechelt-rapids"), "CHS")
         XCTAssertEqual(printSourceLabel(id: "chs-malibu-rapids"), "CHS")
+    }
+
+    func testADerivedGatePrintsItsEstimateFromThePortsTides() {
+        XCTAssertEqual(printDerivedSourceLabel(portName: "Point Atkinson"), "Estimated from Point Atkinson tides")
     }
 
     func testAnotherPublisherPrintsTheNameTheTcdbGives() {

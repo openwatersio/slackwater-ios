@@ -57,7 +57,7 @@ final class PrintableSheetTests: XCTestCase {
         tl.tideExtremes
             .filter { tl.scheduleRange.contains($0.time) }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
-                                 value: String(format: "%.2f ft", $0.height)) }
+                                 value: "\(formatHeight($0.height, imperial: true)) ft") }
             .sorted { $0.time < $1.time }
     }
 
@@ -126,6 +126,88 @@ final class PrintableSheetTests: XCTestCase {
             for span in [PrintSpan.week, .month] {
                 XCTAssertEqual(try pdf(config, span, paper, zone: zone).pageCount, 1, "gate \(span) on \(name)")
             }
+        }
+    }
+
+    /// Every day's last max-ebb time and speed, the right-most text on its row, must be in the
+    /// PDF whole and sit inside the printable rect. WebKit clips a table wider than the page at
+    /// the printable rect's right edge, so text past it is cut off or missing.
+    private func assertLastEbbsInside(_ doc: PDFDocument, _ days: [PrintDay], zone: TimeZone, paper: CGSize,
+                                      _ label: String, file: StaticString = #filePath, line: UInt = #line) {
+        let right = paper.width - 36
+        for d in days {
+            guard let last = d.entries.last(where: { $0.pill == .ebb }) else { continue }
+            // The PDF's text layer has a plain space where the formatter puts a narrow no-break one.
+            let text = "\(chartTime(last.time, zone)) \(last.value ?? "")".replacingOccurrences(of: "\u{202F}", with: " ")
+            let found = doc.findString(text, withOptions: [])
+            XCTAssertFalse(found.isEmpty, "\(label): \(text) is missing from the PDF", file: file, line: line)
+            for sel in found {
+                for p in sel.pages {
+                    XCTAssertLessThanOrEqual(sel.bounds(for: p).maxX, right + 1,
+                                             "\(label): \(text) runs past the printable rect", file: file, line: line)
+                }
+            }
+        }
+    }
+
+    /// A busy current month: five slacks and four floods and ebbs a day in km/h, with an eclipse
+    /// note widening the Day column. With every cell nowrap, the table is wider than WebKit will
+    /// shrink to fit Letter's 540 pt printable width, and the Max ebb column runs off the page.
+    func testABusyCurrentMonthWrapsInsideThePrintableWidth() throws {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = tz
+        func at(_ d: Int, _ h: Int, _ m: Int) -> Date {
+            c.date(from: DateComponents(year: 2026, month: 11, day: d, hour: h, minute: m))!
+        }
+        let days = (1...30).map { d -> PrintDay in
+            var entries = [1, 6, 11, 16, 21].map { ScheduleEntry(time: at(d, $0, 10 + d), pill: .slack) }
+            entries += [3, 8, 13, 18].map { ScheduleEntry(time: at(d, $0, 20 + d), pill: .flood, value: "12.3 km/h", arrowDeg: 90) }
+            // Each day's last ebb carries its own speed, so the search below finds that row only.
+            entries += [4, 9, 14].map { ScheduleEntry(time: at(d, $0, d), pill: .ebb, value: "11.8 km/h", arrowDeg: 270) }
+            entries.append(ScheduleEntry(time: at(d, 23, d), pill: .ebb, value: "\(d + 10).8 km/h", arrowDeg: 270))
+            if d == 3 { entries.append(ScheduleEntry(time: at(d, 2, 0), pill: .eclipse, value: "3:12 AM")) }
+            return PrintDay(start: at(d, 0, 0), sunrise: at(d, 7, 0), sunset: at(d, 16, 45),
+                            entries: entries.sorted { $0.time < $1.time })
+        }
+        let page = PrintablePage(span: .month, range: day(1)..<c.date(byAdding: .month, value: 1, to: day(1))!,
+                                 tz: tz, kind: .current(floodDeg: 90, ebbDeg: 270),
+                                 facts: PrintFacts(name: "Deception Pass (Narrows)", region: "Washington",
+                                                   units: "kilometres per hour", datum: nil, source: "NOAA PUG1515",
+                                                   link: URL(string: "https://slackwater.xyz/s/x")),
+                                 days: days, nights: [], covered: nil,
+                                 printedAt: Date(timeIntervalSince1970: 1_793_000_000))
+        let doc = try XCTUnwrap(PDFDocument(data: printablePDF(html: printableHTML(page, setFormat: "compass"),
+                                                               paper: letter)))
+        assertLastEbbsInside(doc, days, zone: tz, paper: letter, "busy month")
+    }
+
+    /// The real Deception Pass month in km/h, on both papers.
+    func testACurrentMonthInKilometresPerHourStaysInsideThePrintableWidth() throws {
+        let rec = try XCTUnwrap(CurrentStationRecord.all.first { $0.name == "Deception Pass (Narrows)" })
+        let flood = rec.floodDirection, ebb = rec.ebbDirection
+        let config = PrintableConfig(source: .computed(.current(rec, threshold: defaultSlackThresholdKn)),
+                                     kind: .current(floodDeg: flood, ebbDeg: ebb),
+                                     facts: PrintFacts(name: rec.name, region: rec.region, units: "kilometres per hour",
+                                                       datum: nil, source: "NOAA", link: URL(string: "https://slackwater.xyz/s/x")),
+                                     entries: { scheduleEntries($0, floodDeg: flood, ebbDeg: ebb, speedUnit: "kmh") })
+        let zone = rec.tz
+        let tls = printTimelines(config.source, range: printRange(.month, anchor: day(1), tz: zone), tz: zone, now: day(4))
+        let page = printablePage(config, span: .month, anchor: day(1), tz: zone, timelines: tls,
+                                 printedAt: Date(timeIntervalSince1970: 1_793_000_000))
+        for (name, paper) in [("Letter", letter), ("A4", a4)] {
+            let doc = try XCTUnwrap(PDFDocument(data: printablePDF(html: printableHTML(page, setFormat: "compass"),
+                                                                   paper: paper)))
+            assertLastEbbsInside(doc, page.days, zone: zone, paper: paper, "Deception Pass km/h on \(name)")
+        }
+    }
+
+    /// Letting month cells wrap stops WebKit shrinking a wide table to fit, so a usual current
+    /// month has to fit one sheet on its own: November at Deception Pass, four slacks most days.
+    func testACurrentMonthFitsOnePageOnLetterAndA4() throws {
+        let config = try currentConfig()
+        let zone = try XCTUnwrap(CurrentStationRecord.all.first { $0.name == "Deception Pass (Narrows)" }?.tz)
+        for (name, paper) in [("Letter", letter), ("A4", a4)] {
+            XCTAssertEqual(try pdf(config, .month, paper, zone: zone).pageCount, 1, "current month on \(name)")
         }
     }
 

@@ -50,7 +50,12 @@ tr { break-inside: avoid; page-break-inside: avoid; }
 tr.day td { font-weight: bold; background: #f2f2f2; }
 .night { background: #e8ecf2; }
 .note { margin-left: 6pt; font-size: 8pt; }
-.mday .t { display: inline-block; margin-right: 6pt; white-space: nowrap; }
+/* Top, not middle: WebKit's print layout offset some cells of a middle-aligned month row. */
+.mday td { padding: 1pt 3pt; vertical-align: top; }
+.mday td + td { white-space: normal; }
+.cur .mday td { font-size: 8.5pt; }
+.mday .t { display: inline-block; white-space: nowrap; }
+.mday .t + .t { margin-left: 3pt; }
 .foot { margin-top: 6pt; font-size: 8pt; break-inside: avoid; page-break-inside: avoid; page-break-before: avoid; }
 """
 
@@ -141,10 +146,17 @@ private func weekTable(_ page: PrintablePage, setFormat: String) -> String {
         for e in day.entries {
             let night = printIsNight(e.time, nights: page.nights)
             out += night ? "<tr class=\"night\">" : "<tr>"
-            out += "<td>\(htmlEscape(chartTime(e.time, tz)))</td><td>\(htmlEscape(eventWord(e.pill)))</td>"
+            let isEclipse = e.pill == .eclipse || e.pill == .solarEclipse
+            // An eclipse row's value is its peak time, which belongs with the event, not under Height.
+            var event = eventWord(e.pill)
+            if isEclipse, let peak = e.value {
+                event = String(localized: "\(event) (peak \(peak))",
+                               comment: "Event on a printed week table for a lunar or solar eclipse. The first value is the event name, “Lunar eclipse” or “Solar eclipse”. The second is the time of greatest eclipse, such as “3:12 AM”. The row’s own time is when the eclipse begins.")
+            }
+            out += "<td>\(htmlEscape(chartTime(e.time, tz)))</td><td>\(htmlEscape(event))</td>"
             switch page.kind {
             case .tide:
-                out += "<td>\(htmlEscape(e.value ?? "—"))</td>"
+                out += "<td>\(htmlEscape(isEclipse ? "—" : (e.value ?? "—")))</td>"
             case .current:
                 let isMax = e.pill == .flood || e.pill == .ebb
                 out += "<td>\(htmlEscape(isMax ? (e.value ?? "—") : "—"))</td>"
@@ -173,7 +185,9 @@ private func monthTable(_ page: PrintablePage) -> String {
     case .current: columns = [(slack, [.slack]), (flood, [.flood]), (ebb, [.ebb])]
     case .derivedGate: columns = [(slack, [.slack])]
     }
-    var out = "<table><thead><tr>\(th(dayH))\(columns.map { th($0.head) }.joined())</tr></thead><tbody>\n"
+    // A current month is the widest page; its rows print a size smaller so a usual month fits one sheet unwrapped.
+    let cls = if case .current = page.kind { " class=\"cur\"" } else { "" }
+    var out = "<table\(cls)><thead><tr>\(th(dayH))\(columns.map { th($0.head) }.joined())</tr></thead><tbody>\n"
     let dayFmt = localizedFormatter("EEEMMMd", tz)
     for day in page.days {
         var label = htmlEscape(dayFmt.string(from: day.start))
@@ -188,7 +202,8 @@ private func monthTable(_ page: PrintablePage) -> String {
                 let cls = printIsNight(e.time, nights: page.nights) ? "t night" : "t"
                 return "<span class=\"\(cls)\">\(text)</span>"
             }
-            out += "<td>\(cell.joined())</td>"
+            // A space between times gives a busy cell somewhere to wrap.
+            out += "<td>\(cell.joined(separator: " "))</td>"
         }
         out += "</tr>\n"
     }

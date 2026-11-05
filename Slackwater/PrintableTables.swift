@@ -113,13 +113,20 @@ private func mergedCoverage(_ covered: [Range<Date>]) -> [Range<Date>] {
 }
 
 /// nil when `covered` is nil or contains all of `range`. Otherwise
-/// "Predictions available Nov 4 – 10 only." with ranges joined by ", ".
+/// "Predictions available Nov 4 – 10 only." with ranges joined by ", ",
+/// naming only the days inside `range`: a preview's coverage starts two days
+/// before today, and stored online blocks can lie wholly outside a month.
 func printCoverageNote(range: Range<Date>, covered: [Range<Date>]?, tz: TimeZone,
                        locale: Locale = .autoupdatingCurrent) -> String? {
     guard let covered else { return nil }
-    let merged = mergedCoverage(covered)
-    if merged.contains(where: { $0.lowerBound <= range.lowerBound && $0.upperBound >= range.upperBound }) {
-        return nil
+    let merged = mergedCoverage(covered).compactMap { r -> Range<Date>? in
+        let lower = max(r.lowerBound, range.lowerBound), upper = min(r.upperBound, range.upperBound)
+        return lower < upper ? lower..<upper : nil
+    }
+    if merged.contains(where: { $0 == range }) { return nil }
+    if merged.isEmpty {
+        return String(localized: "No predictions available for these days.",
+                      comment: "Note on a printed tide or current table when the predictions on this device cover none of the printed days.")
     }
     let formatter = DateIntervalFormatter()
     formatter.locale = locale
@@ -145,6 +152,14 @@ func printSourceLabel(id: String, publisher: String? = nil) -> String {
     return id
 }
 
+/// A derived gate's printed source. Its slack times are Slackwater's estimate
+/// from a reference port's tides, not anything CHS publishes, so the header
+/// names the port instead of a publisher.
+func printDerivedSourceLabel(portName: String) -> String {
+    String(localized: "Estimated from \(portName) tides",
+           comment: "Source on a printed slack table for a pass where CHS publishes no current predictions. Slackwater estimates the slack times from high and low water at a nearby tide station. The value is that tide station’s name, such as “Point Atkinson”.")
+}
+
 // MARK: - Sources and building a page
 
 enum PrintableSource {
@@ -167,15 +182,20 @@ struct PrintableConfig {
 
 /// One TimelineData per week anchor in `range` (`printWeekAnchors`). Pure and synchronous;
 /// the sheet calls it off the main actor.
+///
+/// Each computed chunk runs one local day past its week. A chunk keeps an eclipse by its peak
+/// and `eclipseEntries` keeps it by its start, so an eclipse that starts on a week's last day
+/// and peaks after midnight needs that day to reach the page. Entries still filter to each
+/// timeline's `scheduleRange`, and `printDays` drops the duplicates at the seam.
 func printTimelines(_ source: PrintableSource, range: Range<Date>, tz: TimeZone, now: Date) -> [TimelineData] {
     let anchors = printWeekAnchors(range, tz: tz)
     switch source {
     case .computed(let src):
         let cal = localCalendar(tz)
         return anchors.map { w in
-            let end = cal.date(byAdding: .day, value: 7, to: w)!
+            let end = cal.date(byAdding: .day, value: 8, to: w)!
             return TimelineData.merged([TimelineChunk.build(src, index: 0, start: w, end: end)],
-                                       source: src, anchor: w, today: now)
+                                       source: src, anchor: w, today: dayLocal(now, tz))
         }
     case .fetched(_, let timeline):
         return anchors.compactMap(timeline)
