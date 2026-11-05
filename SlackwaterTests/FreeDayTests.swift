@@ -51,4 +51,30 @@ final class FreeDayTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "freeDayLength")
         XCTAssertEqual(FreeDay.length, 86_400)
     }
+
+    func testEntryDatesIncludeTheFreeDayEnd() {
+        let now = date("2026-11-05T12:10:00Z"), end = date("2026-11-05T15:47:00Z")
+        let dates = widgetEntryDates(now: now, freeDayEnd: end)
+        XCTAssertTrue(dates.contains(end)); XCTAssertEqual(dates.first, now); XCTAssertEqual(dates, dates.sorted())
+    }
+    func testEntryDatesWithoutAFreeDayAreTheStride() {
+        XCTAssertEqual(widgetEntryDates(now: date("2026-11-05T12:00:00Z"), freeDayEnd: nil).count, 48)
+    }
+    func testEntryDatesIgnoreAnEndOutsideTheWindow() {
+        let now = date("2026-11-05T12:00:00Z")
+        XCTAssertEqual(widgetEntryDates(now: now, freeDayEnd: now.addingTimeInterval(-60)).count, 48)
+        XCTAssertEqual(widgetEntryDates(now: now, freeDayEnd: now.addingTimeInterval(86_400)).count, 48)
+    }
+    func testEntryDatesDoNotRepeatAnEndOnTheStride() {
+        let now = date("2026-11-05T12:00:00Z")
+        XCTAssertEqual(widgetEntryDates(now: now, freeDayEnd: now.addingTimeInterval(3_600)).count, 48)
+    }
+    func testStoredFreeDayReadsTheStartAndIsNilWhenAbsent() {
+        let defaults = UserDefaults(suiteName: "FreeDayTests.stored")!
+        defaults.removePersistentDomain(forName: "FreeDayTests.stored")
+        XCTAssertNil(storedFreeDay(defaults))
+        let start = date("2026-11-05T12:00:00Z")
+        defaults.set(start, forKey: AppGroup.freeDayStartKey)
+        XCTAssertEqual(storedFreeDay(defaults), FreeDay(start: start))
+    }
 }

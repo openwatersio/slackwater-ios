@@ -42,3 +42,18 @@ func freeDayRunning(_ day: FreeDay?, at date: Date) -> Bool {
 func premiumActive(purchased: Bool, freeDay: FreeDay?, at date: Date) -> Bool {
     purchased || freeDayRunning(freeDay, at: date)
 }
+
+func storedFreeDay(_ defaults: UserDefaults) -> FreeDay? {
+    (defaults.object(forKey: AppGroup.freeDayStartKey) as? Date).map { FreeDay(start: $0) }
+}
+
+/// The timeline's entry times, plus the free day's end when it falls inside, so
+/// the locked view takes over at that instant with the app closed.
+func widgetEntryDates(now: Date, freeDayEnd: Date?,
+                      span: TimeInterval = 86_400, step: TimeInterval = 1_800) -> [Date] {
+    var dates = stride(from: 0.0, to: span, by: step).map { now.addingTimeInterval($0) }
+    if let freeDayEnd, now < freeDayEnd, freeDayEnd < now.addingTimeInterval(span), !dates.contains(freeDayEnd) {
+        dates.append(freeDayEnd)
+    }
+    return dates.sorted()
+}
