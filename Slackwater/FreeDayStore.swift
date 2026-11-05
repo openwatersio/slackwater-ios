@@ -79,8 +79,9 @@ extension NSUbiquitousKeyValueStore: FreeDayCloud {
     }
     #endif
 
+    // The App Group first: setting `lastStart` reloads widgets, which read the App Group.
     private func record(_ start: Date) {
-        lastStart = start
         defaults.set(start, forKey: Self.key)
+        lastStart = start
     }
 }

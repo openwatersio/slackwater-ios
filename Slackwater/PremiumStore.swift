@@ -52,6 +52,10 @@ final class PremiumStore: ObservableObject {
         freeDay = FreeDayStore.shared.current
         isPremium = premiumActive(purchased: hasPurchased, freeDay: freeDay, at: appNow())
         scheduleFreeDayEnd()
+        // A free day this launch adopted from iCloud reaches the App Group before the sink
+        // below exists, so widgets drawn locked on this device would stay locked until their
+        // next refresh. A running free day reloads them; a plain launch does not.
+        if isPremium != hasPurchased { WidgetCenter.shared.reloadAllTimelines() }
         // @Published emits before the property changes, so take the value it hands over.
         freeDayWatch = FreeDayStore.shared.$lastStart.dropFirst().sink { [weak self] start in
             guard let self else { return }
