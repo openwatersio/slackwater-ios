@@ -199,4 +199,37 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertEqual(plan.notifications.first?.fire, now, "the fire time is clamped to now")
         XCTAssertEqual(plan.liveActivities.map(\.event), [inside.event])
     }
+
+    func testFreeDayDropsNotificationsFiringAfterItsEnd() {
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let inside = occurrence(rule, eventIn: 3_600), outside = occurrence(rule, eventIn: 30 * 3_600)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [outside, inside], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: now.addingTimeInterval(24 * 3_600))
+
+        XCTAssertEqual(plan.notifications.map(\.fire), [inside.fire])
+        XCTAssertEqual(plan.overflow, [], "past the end is not deliverable, so it is not overflow either")
+    }
+
+    func testFreeDayDropsLiveActivitiesWhoseEventIsAfterItsEnd() {
+        let end = now.addingTimeInterval(24 * 3_600)
+        let rule = AlertRule(stationID: "a", trigger: .slackWindowOpens, lead: 900)
+        let o = occurrence(rule, eventIn: 24 * 3_600 + 600)   // fires 5 minutes before the end
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [o], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: end)
+
+        XCTAssertEqual(plan.notifications, [o])
+        XCTAssertTrue(plan.liveActivities.isEmpty)
+    }
+
+    func testPurchasedPremiumIsUncapped() {
+        let rule = AlertRule(stationID: "a", trigger: .slack)
+        let far = occurrence(rule, eventIn: 30 * 3_600)
+
+        let plan = deliveryPlan(rules: [rule], occurrences: [far], calendarOccurrences: [],
+                                now: now, premium: true, premiumEnds: nil)
+
+        XCTAssertEqual(plan.notifications, [far])
+    }
 }

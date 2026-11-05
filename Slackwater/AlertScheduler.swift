@@ -137,6 +137,7 @@ struct AlertStatusSnapshot: Equatable {
         let rules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium
+        let premiumEnds = PremiumStore.shared.hasPurchased ? nil : FreeDayStore.shared.current?.end
         let imperial = heightUnits() != "metric"
 
         let subscriptions = StationCalendarStore.shared.subscriptions.map(\.stationID)
@@ -146,7 +147,7 @@ struct AlertStatusSnapshot: Equatable {
         }.value
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
                                 calendarOccurrences: resolved.calendarOccurrences,
-                                now: now, premium: premium)
+                                now: now, premium: premium, premiumEnds: premiumEnds)
         // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
         let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             .merging(resolved.calendarRules) { mine, _ in mine }

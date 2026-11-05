@@ -34,9 +34,11 @@ func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOc
 /// separate sources: `calendarOccurrences` come from a station's subscription (spec §5.1) and
 /// are free at any tier; `occurrences` come from rules, and rules are Premium. The calendar
 /// keeps an event until it happens; a notification is gone once its fire time passes.
+/// `premiumEnds` is a free day's end: nothing is planned to fire after it, and no Live Activity
+/// whose event lands after it, since iOS would deliver them with the app closed and Premium over.
 func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
                   calendarOccurrences: [AlertOccurrence],
-                  now: Date, premium: Bool) -> DeliveryPlan {
+                  now: Date, premium: Bool, premiumEnds: Date? = nil) -> DeliveryPlan {
     let calendar = calendarOccurrences
         .filter { $0.event > now && $0.event <= now.addingTimeInterval(AlertHorizon.calendar) }
         .sorted { $0.event < $1.event }
@@ -72,11 +74,15 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
         .filter { o in
             guard let rule = live[o.ruleID], o.fire >= now,
                   o.fire <= now.addingTimeInterval(AlertHorizon.notifications) else { return false }
+            if let premiumEnds, o.fire >= premiumEnds { return false }
             return seen.insert(Perceived(stationID: rule.stationID, trigger: rule.trigger,
                                          event: o.event, fire: o.fire)).inserted
         }
     let planned = Array(notifications.prefix(AlertHorizon.notificationLimit))
-    let candidates = planned.filter { o in (live[o.ruleID]?.lead ?? .infinity) <= AlertHorizon.liveActivityLead }
+    let candidates = planned.filter { o in
+        (live[o.ruleID]?.lead ?? .infinity) <= AlertHorizon.liveActivityLead
+            && premiumEnds.map { o.event < $0 } ?? true
+    }
     return DeliveryPlan(calendar: calendar, notifications: planned, liveActivities: candidates,
                         overflow: Array(notifications.dropFirst(AlertHorizon.notificationLimit)))
 }
