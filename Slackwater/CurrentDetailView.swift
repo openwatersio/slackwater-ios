@@ -326,7 +326,7 @@ struct CurrentDetailView: View {
             kind: .current(floodDeg: flood, ebbDeg: ebb),
             facts: PrintFacts(name: record.name, region: record.region,
                               units: printableUnitName(speedUnitLabel(speedUnit)), datum: nil,
-                              source: record.id,
+                              source: printSourceLabel(id: record.id),
                               link: shareURL(forStationID: record.itemId, at: nil, tz: tz)),
             entries: { scheduleEntries($0, floodDeg: flood, ebbDeg: ebb, speedUnit: speedUnit) })
     }

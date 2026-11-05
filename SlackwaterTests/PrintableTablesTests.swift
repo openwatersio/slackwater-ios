@@ -205,3 +205,34 @@ final class PrintableTablesTests: XCTestCase {
         XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
     }
 }
+
+final class PrintSourceLabelTests: XCTestCase {
+    func testNOAAPrintsItsName() {
+        XCTAssertEqual(printSourceLabel(id: "noaa/9449880"), "NOAA 9449880")
+        XCTAssertEqual(printSourceLabel(id: "noaa/PUG1515", publisher: "NOAA CO-OPS"), "NOAA PUG1515")
+    }
+
+    func testCHSPrintsItsNameWithoutTheAppsKey() {
+        XCTAssertEqual(printSourceLabel(id: "chs-sechelt-rapids"), "CHS")
+        XCTAssertEqual(printSourceLabel(id: "chs-malibu-rapids"), "CHS")
+    }
+
+    func testAnotherPublisherPrintsTheNameTheTcdbGives() {
+        XCTAssertEqual(printSourceLabel(id: "kartverket/ANX", publisher: "Kartverket"), "Kartverket ANX")
+    }
+
+    func testAnUnnamedPublisherFallsBackToTheID() {
+        XCTAssertEqual(printSourceLabel(id: "dmi/26239"), "dmi/26239")
+        XCTAssertEqual(printSourceLabel(id: "odd-key"), "odd-key")
+    }
+
+    /// Bundled records, read as the tide detail builds the label.
+    func testBundledRecordsPrintTheirPublisher() throws {
+        let friday = try XCTUnwrap(TideStationRecord.record(id: "noaa/9449880"))
+        XCTAssertEqual(printSourceLabel(id: friday.id, publisher: friday.source), "NOAA 9449880")
+        let andenes = try XCTUnwrap(TideStationRecord.record(id: "kartverket/ANX"))
+        let publisher = try XCTUnwrap(andenes.source, "the tcdb names no publisher for Andenes")
+        XCTAssertTrue(publisher.contains("Kartverket"), publisher)
+        XCTAssertEqual(printSourceLabel(id: andenes.id, publisher: andenes.source), "\(publisher) ANX")
+    }
+}

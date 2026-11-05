@@ -132,6 +132,19 @@ func printCoverageNote(range: Range<Date>, covered: [Range<Date>]?, tz: TimeZone
                   comment: "Note on a printed tide or current table when official predictions cover only part of the printed span. The value is a comma-separated list of date ranges in the place’s time zone, such as “Nov 4 – 10, Nov 15 – 17”.")
 }
 
+/// The printed header's source: the publisher by name, then the station's own ID.
+/// "NOAA 9449880" for `noaa/9449880`; "Kartverket ANX" for `kartverket/ANX` when the
+/// tcdb names its publisher. A CHS place prints "CHS" alone: its key (`chs-sechelt-rapids`)
+/// is this app's, and the bundle carries no CHS station code. Anything else prints its ID.
+func printSourceLabel(id: String, publisher: String? = nil) -> String {
+    if id.hasPrefix("chs-") { return "CHS" }
+    let parts = id.split(separator: "/", maxSplits: 1).map(String.init)
+    guard parts.count == 2 else { return id }
+    if parts[0] == "noaa" { return "NOAA \(parts[1])" }
+    if let publisher, !publisher.isEmpty { return "\(publisher) \(parts[1])" }
+    return id
+}
+
 // MARK: - Sources and building a page
 
 enum PrintableSource {

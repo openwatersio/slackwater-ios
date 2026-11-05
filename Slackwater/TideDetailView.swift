@@ -397,7 +397,8 @@ struct TideDetailView: View {
         }
         let facts = PrintFacts(name: record.name, region: record.region,
                                units: printableUnitName(unit),
-                               datum: record.chartDatum, source: record.id,
+                               datum: record.chartDatum,
+                               source: printSourceLabel(id: record.id, publisher: record.source),
                                link: shareURL(forStationID: record.id, at: nil, tz: tz))
         return PrintableConfig(source: source, kind: .tide(heightUnit: unit), facts: facts,
                                entries: scheduleEntries, moreHint: moreHint)

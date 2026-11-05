@@ -252,7 +252,7 @@ struct OnlineGateDetailView: View {
             kind: .current(floodDeg: flood, ebbDeg: ebb),
             facts: PrintFacts(name: gate.name, region: gate.region,
                               units: printableUnitName(speedUnitLabel(speedUnit)), datum: nil,
-                              source: gate.id,
+                              source: printSourceLabel(id: gate.id),
                               link: shareURL(forStationID: gate.id, at: nil, tz: tz)),
             entries: { scheduleEntries($0, floodDeg: flood, ebbDeg: ebb, speedUnit: speedUnit) },
             moreHint: String(localized: "To print more days, close this and download more below the schedule.",

@@ -58,7 +58,7 @@ struct DerivedGateDetailView: View {
                             printable: PrintableConfig(
                                 source: .computed(.gate(record)), kind: .derivedGate,
                                 facts: PrintFacts(name: gate.name, region: gate.region, units: "", datum: nil,
-                                                  source: gate.id,
+                                                  source: printSourceLabel(id: gate.id),
                                                   link: shareURL(forStationID: gate.id, at: nil, tz: tz)),
                                 entries: scheduleEntries),
                             above: { EmptyView() },
