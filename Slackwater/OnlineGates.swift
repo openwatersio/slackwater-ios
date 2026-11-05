@@ -260,8 +260,10 @@ extension ChsOnlineStore {
     }
 
     /// The block whose reach the person cares about: the one covering today,
-    /// else the latest. A later block alone would name a date past a gap.
+    /// else the latest that began by today, which reads as expired. A later
+    /// block would name a date past a gap, so with only those it is nil and
+    /// reads as not downloaded.
     func reachBlock(today: Date) -> ChsOnlineWindow? {
-        block(covering: today) ?? blocks.last
+        block(covering: today) ?? blocks.last { $0.start <= today }
     }
 }

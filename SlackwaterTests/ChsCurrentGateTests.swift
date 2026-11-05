@@ -368,7 +368,10 @@ final class ChsCurrentGateTests: XCTestCase {
         let later = block(today.addingTimeInterval(60 * 86_400), today.addingTimeInterval(90 * 86_400))
         XCTAssertEqual(store(fetchedYesterday, later).reachBlock(today: today)?.end, fetchedYesterday.end,
                        "the date shown is today's block, never one past a gap")
-        XCTAssertEqual(store(later).reachBlock(today: today)?.end, later.end)
+        XCTAssertNil(store(later).reachBlock(today: today), "a future week alone says nothing about today")
+        let past = block(span.start.addingTimeInterval(-40 * 86_400), span.start.addingTimeInterval(-10 * 86_400))
+        XCTAssertEqual(store(past, later).reachBlock(today: today)?.end, past.end,
+                       "an older copy that ran out reads as expired")
     }
 
     // MARK: - Merging (the 30-day fetch, unioned on save)

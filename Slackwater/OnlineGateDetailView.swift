@@ -41,6 +41,9 @@ struct OnlineGateDetailView: View {
     /// The last day `fetchNow` actually fetched from, so a week it could not
     /// supply is never asked for again on its own.
     @State private var requestedFrom: Date?
+    /// The block the Offline available card reports: today's, whatever week
+    /// is on screen. Re-picked in `rebuild()`, never per body evaluation.
+    @State private var reach: ChsOnlineWindow?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -346,7 +349,8 @@ struct OnlineGateDetailView: View {
             StationDetailRow("Prediction", "CHS-published predictions downloaded for offline use; not computed on this device")
             StationDetailRow("On-device fit unavailable", gate.onlineExplanation(speedUnit: speedUnit))
             if let window {
-                StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz))")
+                // The card's last day, not the raw last sample a week later.
+                StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.offlineValidUntil, tz))")
             }
         }
     }
@@ -373,7 +377,7 @@ struct OnlineGateDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SN.paper)
                 Spacer(minLength: 8)
-                OnlineDownloadLines(gate: gate, window: window)
+                OnlineDownloadLines(gate: gate, window: reach)
                     .font(.footnote)
                     .multilineTextAlignment(.trailing)
             }
@@ -383,7 +387,7 @@ struct OnlineGateDetailView: View {
                     .foregroundStyle(SN.foam.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                OnlineDownloadAction(gate: gate, window: window) {
+                OnlineDownloadAction(gate: gate, window: reach) {
                     guard net.online, ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
                     fetchNow(from: todayLocal(tz))
                 }
@@ -501,6 +505,7 @@ struct OnlineGateDetailView: View {
     /// stale window. Nil when no block covers the anchor: that is the
     /// honesty card's cue, and the picker's way back stays on screen.
     private func rebuild() {
+        reach = ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(tz))
         guard let window, window.covers(anchor: anchor) else { timeline = nil; return }
         timeline = TimelineData.build(onlinePoints: window.points, tz: tz,
                                       lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,

@@ -347,7 +347,7 @@ struct OfflineManagerList: View {
             guard $0.isOnline else { return false }
             if service.isFetchingOnline($0.id) { return true }
             let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
-            return km <= ChsFitService.autoFitRadiusKm || onlineWindow($0) != nil
+            return km <= ChsFitService.autoFitRadiusKm || ChsModelStore.loadOnline($0.id)?.blocks.isEmpty == false
         }
     }
     private var downloads: [ManagedDownload] {
