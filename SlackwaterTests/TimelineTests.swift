@@ -250,6 +250,35 @@ private struct FoldPageTestHarness: View {
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
     }
 
+    func testTimelineReadsClampOutsideTheSeries() {
+        let start = Date(timeIntervalSince1970: 1_780_000_000)
+        let h = { (hours: Double) in start.addingTimeInterval(hours * 3600) }
+        let d = TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: h(2), days: [],
+                             tidePoints: [TidePoint(time: start, height: 1.0), TidePoint(time: h(1), height: 2.0),
+                                          TidePoint(time: h(2), height: 1.5)],
+                             tideRates: [TideRatePoint(time: start, rate: 0.4), TideRatePoint(time: h(2), rate: -0.6)],
+                             tideExtremes: [],
+                             currentPoints: [CurrentPoint(time: start, speed: -1.2), CurrentPoint(time: h(2), speed: 0.8)],
+                             currentEvents: [], snapTimes: [], slackWindows: [])
+        XCTAssertEqual(d.heightAt(h(-1)), 1.0)
+        XCTAssertEqual(d.heightAt(h(3)), 1.5)
+        XCTAssertEqual(d.heightAt(h(1)), 2.0)
+        XCTAssertEqual(d.heightAt(h(0.5)), 1.5, accuracy: 0.000001)
+        XCTAssertEqual(d.heightAt(h(1.5)), 1.75, accuracy: 0.000001)
+        XCTAssertEqual(d.rateAt(h(-1)), 0.4)
+        XCTAssertEqual(d.rateAt(h(3)), -0.6)
+        XCTAssertEqual(d.rateAt(h(1)), -0.1, accuracy: 0.000001)
+        XCTAssertEqual(d.velocityAt(h(-1)), -1.2)
+        XCTAssertEqual(d.velocityAt(h(3)), 0.8)
+        XCTAssertEqual(d.velocityAt(h(0.5)), -0.7, accuracy: 0.000001)
+        let empty = TimelineData(tz: .gmt, anchor: start, today: start, start: start, end: h(2), days: [],
+                                 tidePoints: [], tideRates: [], tideExtremes: [], currentPoints: [],
+                                 currentEvents: [], snapTimes: [], slackWindows: [])
+        XCTAssertEqual(empty.heightAt(h(1)), 0)
+        XCTAssertEqual(empty.rateAt(h(1)), 0)
+        XCTAssertEqual(empty.velocityAt(h(1)), 0)
+    }
+
     func testTideChevronCentersAreMagneticStops() {
         let fastest = TideStationRecord.all.max {
             $0.constituents.reduce(0) { $0 + $1.amplitude }

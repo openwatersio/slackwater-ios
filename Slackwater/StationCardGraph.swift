@@ -407,12 +407,7 @@ func cardCores(points: [CurrentPoint], slacks: [Date], threshold: Double = slack
 }
 
 func cardSpeed(_ points: [CurrentPoint], at time: Date) -> Double? {
-    guard let first = points.first, let last = points.last,
-          time >= first.time, time <= last.time else { return nil }
-    guard let i = points.firstIndex(where: { $0.time >= time }), i > 0 else { return first.speed }
-    let a = points[i - 1], b = points[i]
-    let fraction = time.timeIntervalSince(a.time) / b.time.timeIntervalSince(a.time)
-    return a.speed + (b.speed - a.speed) * fraction
+    points.speed(at: time)
 }
 
 extension TideStationRecord {
