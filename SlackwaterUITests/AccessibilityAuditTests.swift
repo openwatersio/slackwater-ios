@@ -94,6 +94,14 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
         try audit(app, "tide detail")
     }
 
+    func testPremiumSheetPassesTheAudit() throws {
+        let app = launch("-locDenied", "-seedPremiumSheet")
+        XCTAssert(app.otherElements["premium-preview-alerts"].appears(within: 10))
+        try audit(app, "premium sheet")
+        scrollTo(app.buttons["Restore purchase"], in: app)
+        try audit(app, "premium sheet end")
+    }
+
     func testCurrentDetailPassesTheAudit() throws {
         let app = launch("-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openSearch(app, "deception")

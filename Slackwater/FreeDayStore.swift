@@ -71,6 +71,12 @@ extension NSUbiquitousKeyValueStore: FreeDayCloud {
     #if DEBUG
     /// UI-test seeds only: a start `start(now:)` would refuse.
     func seed(lastStart: Date) { record(lastStart) }
+
+    /// UI-test reset only. The iCloud copy is the caller's: `cloud` is nil under -noCloudSync.
+    func reset() {
+        lastStart = nil
+        defaults.removeObject(forKey: Self.key)
+    }
     #endif
 
     private func record(_ start: Date) {

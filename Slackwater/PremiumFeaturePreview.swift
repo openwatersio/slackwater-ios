@@ -165,6 +165,13 @@ private struct SkyStripExample: View {
                     .offset(x: proxy.size.width / 2 - center)
             }
             .frame(width: proxy.size.width, height: height, alignment: .topLeading)
+            // Any crop cuts the labels nearest the pane's edges; fading them out keeps a half
+            // label from reading as a broken time.
+            .mask {
+                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
+                                       .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
+                               startPoint: .leading, endPoint: .trailing)
+            }
             .background(alignment: .top) {
                 ZStack(alignment: .top) {
                     SN.canvas

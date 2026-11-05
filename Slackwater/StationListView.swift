@@ -33,7 +33,8 @@ struct StationListView: View {
     @State private var showSettings = false
     @State private var showDownloads = false
     @ObservedObject private var premium = PremiumStore.shared
-    @State private var showPremium = false
+    @State private var showPremium = seedsPremiumSheet
+    @State private var premiumOpening = seededPremiumFeature
     @State private var searching = false
     @State private var results: [StationItem] = []
     @State private var completedSearch: SearchInput?
@@ -210,8 +211,8 @@ struct StationListView: View {
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, { openChsRoute($0) }) }
-        .sheet(isPresented: $showPremium) {
-            PremiumView()
+        .sheet(isPresented: $showPremium, onDismiss: { premiumOpening = nil }) {
+            PremiumView(opening: premiumOpening)
         }
         .onOpenURL(perform: handleDeepLink)
         .onContinueUserActivity(stationActivityType) { activity in

@@ -85,7 +85,7 @@ final class AlertLineUITests: ScreenshotTestCase {
         XCTAssert(app.buttons["alert-sheet-save"].appears(within: 5))
         app.buttons["alert-sheet-save"].tap()
 
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
     }
@@ -184,7 +184,7 @@ final class AlertLineUITests: ScreenshotTestCase {
         save(app, "alert-sentence.png")
 
         app.buttons["alert-sheet-save"].tap()
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
     }
 
     /// Not retried: a first swipe swallowed after the sheet is the bug this guards. Hosted

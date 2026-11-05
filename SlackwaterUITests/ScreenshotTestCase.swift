@@ -56,8 +56,9 @@ import notify
                              "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
         if !args.contains("-resetLocationAsk") { result.append("-seedLocationAsk") }
-        // Opt out only when a relaunch is asserting persisted preferences.
-        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent", "-resetSkyBodies"] }
+        // Opt out only when a relaunch is asserting persisted preferences. The fixed clock
+        // keeps a free day an earlier test started running, so it is reset with them.
+        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent", "-resetSkyBodies", "-resetFreeDay"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
         }

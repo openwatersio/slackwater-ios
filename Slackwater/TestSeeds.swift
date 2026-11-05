@@ -108,6 +108,12 @@ import Foundation
         _ = ChsFitService.shared
         seedOnline(stationID: id, offsetDays: -2, spanDays: Int(Timeline.onlineFetchDays) + 2)
     }
+    // Clears the iCloud copy even under -noCloudSync, as -resetTour does: a cold launch
+    // without the test's arguments would otherwise adopt an earlier test's free day.
+    if CommandLine.arguments.contains("-resetFreeDay") {
+        FreeDayStore.shared.reset()
+        NSUbiquitousKeyValueStore.default.removeObject(forKey: AppGroup.freeDayStartKey)
+    }
     if CommandLine.arguments.contains("-seedFreeDay") {
         FreeDayStore.shared.seed(lastStart: appNow())
     }
@@ -248,4 +254,16 @@ let seededScrubInstant: Date? = UserDefaults.standard.string(forKey: "scrubInsta
     .flatMap { ISO8601DateFormatter().date(from: $0) }
 #else
 let seededScrubInstant: Date? = nil
+#endif
+
+/// `-seedPremiumSheet [feature]`: the list presents the Premium sheet on launch, open on that
+/// feature's card (a `PremiumFeature` raw value) or the first.
+#if DEBUG
+let seedsPremiumSheet = CommandLine.arguments.contains("-seedPremiumSheet")
+let seededPremiumFeature: PremiumFeature? = CommandLine.arguments.firstIndex(of: "-seedPremiumSheet")
+    .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? CommandLine.arguments[$0 + 1] : nil }
+    .flatMap(PremiumFeature.init(rawValue:))
+#else
+let seedsPremiumSheet = false
+let seededPremiumFeature: PremiumFeature? = nil
 #endif
