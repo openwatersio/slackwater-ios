@@ -11,7 +11,8 @@ struct FreeDayButton: View {
             let now = appNow()
             Group {
                 if let day = freeDay.current, freeDayRunning(day, at: now) {
-                    Text("Free day until \(Text(day.end, style: .time))")
+                    // The weekday too: the day ends tomorrow, so a bare time reads as already past.
+                    Text("Free day until \(day.end.formatted(.dateTime.weekday(.abbreviated).hour().minute()))")
                         .foregroundStyle(SN.leaf)
                 } else if freeDayAvailable(lastStart: freeDay.lastStart, now: now, calendar: .current) {
                     Button { freeDay.start() } label: {

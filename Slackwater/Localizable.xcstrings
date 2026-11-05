@@ -4658,7 +4658,7 @@
       }
     },
     "Free day until %@" : {
-      "comment" : "Premium sheet, while the month's free day is running. The value is the time of day it ends. A free day is one free day of Premium a month, not a subscription trial; do not use the word for a trial.",
+      "comment" : "Premium sheet, while the month's free day is running. The value is the abbreviated weekday and time it ends, such as “Thu 10:00 PM”. A free day is one free day of Premium a month, not a subscription trial; do not use the word for a trial.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -4681,7 +4681,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ilmainen päivä klo %@ asti"
+            "value" : "Ilmainen päivä %@ asti"
           }
         },
         "fr-CA" : {
@@ -4705,7 +4705,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Giorno gratuito fino alle %@"
+            "value" : "Giorno gratuito fino a %@"
           }
         },
         "ja" : {
