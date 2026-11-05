@@ -3,12 +3,13 @@ import SwiftUI
 
 struct PremiumRequirement: View {
     var title: LocalizedStringKey = "Requires Slackwater Premium"
+    var feature: PremiumFeature?
     @ObservedObject private var premium = PremiumStore.shared
     @State private var showPremium = false
 
     var body: some View {
         Group {
-            if premium.isPremium {
+            if premium.hasPurchased {
                 Label("Slackwater Premium", systemImage: "sparkles")
             } else {
                 Button { showPremium = true } label: {
@@ -20,7 +21,7 @@ struct PremiumRequirement: View {
         }
         .font(.footnote.weight(.semibold))
         .foregroundStyle(SN.leaf)
-        .sheet(isPresented: $showPremium) { PremiumView() }
+        .sheet(isPresented: $showPremium) { PremiumView(opening: feature) }
     }
 }
 

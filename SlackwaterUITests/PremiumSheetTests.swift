@@ -124,6 +124,73 @@ final class PremiumSheetTests: ScreenshotTestCase {
         save(app, "premium-sheet-xxl-bottom.png")
     }
 
+    private func openSettingsRow(_ app: XCUIApplication, _ id: String) {
+        openSettings(app)
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        let row = app.buttons[id].firstMatch
+        scrollTo(row, in: app)
+        row.tap()
+    }
+
+    func testSkySwitchOpensOnSkyCard() {
+        let app = launch("-locDenied")
+        openSettings(app)
+        let toggle = app.switches["settings-sky-bodies"].firstMatch
+        scrollTo(toggle, in: app)
+        toggle.tap()
+        let card = element(app, "premium-card-sky")
+        XCTAssert(card.appears(within: 5))
+        XCTAssert(waitFor(card, "isHittable == true"))
+    }
+
+    func testCalendarOpensOnCalendarsCard() {
+        let tide = "noaa/9444900"
+        let app = launch("-locDenied", "-resetCalendars", "-seedFavorites", tide)
+        openSettingsRow(app, "settings-calendar-row")
+        XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
+        app.switches["calendar-station-\(tide)"].tap()
+        let card = element(app, "premium-card-calendars")
+        XCTAssert(card.appears(within: 5))
+        XCTAssert(waitFor(card, "isHittable == true"))
+    }
+
+    func testAlertRemindMeOpensOnAlertsCard() {
+        let app = launch("-resetAlerts")
+        openFridayHarbor(app)
+        let line = element(app, "alert-line")
+        XCTAssert(line.appears(within: 5))
+        line.tap()
+        XCTAssert(app.buttons["alert-sheet-save"].appears(within: 5))
+        app.buttons["alert-sheet-save"].tap()
+        let card = element(app, "premium-card-alerts")
+        XCTAssert(card.appears(within: 5))
+        XCTAssert(waitFor(card, "isHittable == true"))
+    }
+
+    /// A calendar a free day turned on keeps its row after the day ends, and says it stopped.
+    func testEndedFreeDayCalendarSaysItStoppedAndOpensCalendars() {
+        let tide = "noaa/9444900"
+        let app = launch("-locDenied", "-resetCalendars", "-seedFavorites", tide,
+                         "-seedFreeDayCalendar", tide)
+        openSettingsRow(app, "settings-calendar-row")
+        let status = element(app, "calendar-stopped-\(tide)")
+        XCTAssert(status.appears(within: 5))
+        XCTAssertTrue(status.label.contains("Stopped"), status.label)
+        save(app, "calendar-free-day-ended.png")
+        status.tap()
+        let card = element(app, "premium-card-calendars")
+        XCTAssert(card.appears(within: 5))
+        XCTAssert(waitFor(card, "isHittable == true"))
+    }
+
+    func testPremiumRowReadsNotPurchasedDuringAFreeDay() {
+        let app = launch("-locDenied", "-seedFreeDay")
+        let row = app.buttons["Support Slackwater"].firstMatch
+        scrollTo(row, in: app)
+        XCTAssert(row.exists)
+        XCTAssertFalse(app.staticTexts["You have Premium — thank you."].exists)
+    }
+
     /// `scrollTo` counts an element under the pinned button as in reach; swipe until the end shows.
     private func scrollToEnd(_ app: XCUIApplication) {
         let terms = app.descendants(matching: .any)["Terms of Use"].firstMatch

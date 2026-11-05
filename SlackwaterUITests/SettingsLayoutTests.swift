@@ -46,7 +46,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "settings-premium-section.png")
         support.tap()
         XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
-        XCTAssert(app.otherElements["premium-preview-alerts"].appears(within: 5))
+        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
         save(app, "premium-visuals-top.png")
         let restore = app.buttons["Restore purchase"]
         scrollTo(restore, in: app)

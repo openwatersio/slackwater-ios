@@ -662,7 +662,7 @@ struct StationListView: View {
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         #if PREMIUM_ENABLED
-        case "premium": showPremium = true
+        case "premium": premiumOpening = .lockScreen; showPremium = true
         #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
@@ -1051,12 +1051,13 @@ struct StationListView: View {
                 #if PREMIUM_ENABLED
                     Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
                     Button {
+                        premiumOpening = nil
                         showPremium = true
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles").frame(width: 28)
-                                .foregroundStyle(premium.isPremium ? SN.leaf : SN.foam)
-                            if premium.isPremium {
+                                .foregroundStyle(premium.hasPurchased ? SN.leaf : SN.foam)
+                            if premium.hasPurchased {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter."))
                                     Text("You have Premium — thank you.")
