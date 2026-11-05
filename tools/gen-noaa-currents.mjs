@@ -3,10 +3,9 @@
  *
  * Source: the NOAA current records in @slackwater/database, the same release
  * gen-tides.mjs reads. The database's own source workspace extracts them from
- * NOAA CO-OPS (public domain), keeps the reviewed bundle, and asserts the
- * cross-flow bound there: a station whose perpendicular flow exceeds half its
- * axis peak is refused at extraction, not here. Every station ships its flood
- * axis; a harmonic station that publishes cross-flow also ships its minor axis
+ * NOAA CO-OPS (public domain) and keeps the reviewed bundle. Every station
+ * ships its flood axis; where a harmonic station publishes cross-flow, the
+ * database carries its minor-axis constants and the bundle ships them
  * (bundle.mjs minorAxis), so SlackwaterKit reads its set as a vector.
  *
  * Filters, all inherited from slackwater-web's build-currents.mjs, all still

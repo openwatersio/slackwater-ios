@@ -581,7 +581,7 @@ reading.
 it" does not.* Until this is answered, a rotary station is better shown as a
 table than as a chart that implies an axis it does not have.
 
-What ships today: the strip stays rectilinear on the major axis, and the readings carry the vector. Speed and set come from the kit's minor-axis prediction, and 869 of the bundled NOAA harmonic stations carry those constants. At a major-axis slack the lead reads `Slack` with the crossing flow beside it. The chart form stays open.
+What ships today: the strip stays rectilinear on the major axis, and the readings carry the vector. Speed and set come from the kit's minor-axis prediction on the bundled NOAA harmonic records that carry minor-axis constants. At a major-axis slack the lead reads `Slack` with the crossing flow beside it. The chart form stays open.
 
 ---
 
