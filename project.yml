@@ -85,6 +85,7 @@ targetTemplates:
       # degrade. The list's sync rule above is what prevents that.
       - path: Slackwater/Resources/unavailable-stations.json
       - Slackwater/AppGroup.swift
+      - Slackwater/FreeDay.swift
       - Slackwater/Units.swift
       - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
