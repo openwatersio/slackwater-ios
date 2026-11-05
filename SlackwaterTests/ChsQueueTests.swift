@@ -231,6 +231,9 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: false, online: true))
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true),
                        "the retry skips a gate covering today, so its backoff ends in no fetch")
+        XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.fetching, queued: false, covered: false, online: true))
+        XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.fetching, queued: false, covered: true, online: true),
+                       "the daily refresh of a station that already works starts no background task")
     }
 
     @MainActor
@@ -540,7 +543,9 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
-    func testCachedCoverageDoesNotHideAnOnlineRefresh() throws {
+    /// Refreshes run daily while online, so one for a station that already
+    /// covers today must not raise the strip or a background task each time.
+    func testARefreshOfACoveredStationIsQuiet() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
@@ -557,7 +562,10 @@ final class ChsQueueTests: XCTestCase {
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
         XCTAssertNotNil(ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)))
         service.beginOnlineFetch(gate)
-        XCTAssertTrue(service.onlineDownloads.active, "cached predictions must not hide an in-flight refresh")
+        let count = service.onlineDownloads
+        XCTAssertFalse(count.active)
+        XCTAssertFalse(count.inFlight)
+        XCTAssertEqual(count.ready, count.total, "a station mid-refresh still works, so it stays ready")
     }
 
     @MainActor

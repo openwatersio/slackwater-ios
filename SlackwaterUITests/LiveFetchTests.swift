@@ -49,8 +49,9 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "the live fetch did not render the strip")
         XCTAssert(provenance.label.contains("CHS-published"),
                   "the fetched footer must say CHS-published — never claim an on-device computation")
-        XCTAssert(provenance.label.range(of: "available through [A-Z][a-z]{2} \\d{1,2}",
-                                          options: .regularExpression) != nil,
-                  "provenance must carry a real available-through date, not a placeholder")
+        let reach = app.descendants(matching: .any)["download-status-chs-sechelt-rapids"]
+            .staticTexts.matching(NSPredicate(format: "label MATCHES %@",
+                                              "Through [A-Z][a-z]{2} \\d{1,2}")).firstMatch
+        XCTAssert(reach.exists, "the offline copy must carry a real date, not a placeholder")
     }
 }

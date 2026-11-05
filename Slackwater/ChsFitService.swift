@@ -593,7 +593,9 @@ final class ChsFitService: ObservableObject {
     nonisolated static func onlineDownloadIsActive(_ state: OnlineFetchState, queued: Bool,
                                                    covered: Bool, online: Bool) -> Bool {
         switch state {
-        case .fetching: true
+        // A refresh of a station that already covers today is quiet: no
+        // counter, strip or background task for a station that already works.
+        case .fetching: !covered
         // The retry timer re-enters `prefetchOnlineGates`, which skips a gate
         // already covering today. A covered gate's backoff (a failed "Update
         // now", or a later week's fetch) ends in no fetch, so nothing waits on it.
@@ -623,7 +625,7 @@ final class ChsFitService: ObservableObject {
                 moving = moving || held || Self.onlineDownloadIsActive(state, queued: queued,
                     covered: covered, online: true)
             }
-            if covered, state != .fetching {
+            if covered {
                 ready += 1
                 completed += requests
                 continue
@@ -839,6 +841,10 @@ final class ChsFitService: ObservableObject {
         if onlineDesired[gate.id] != nil { prefetchOnlineGates([gate]) }
     }
 
+    /// An opened station refreshes the way the download set does, even when
+    /// nothing else would have queued it.
+    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate]) }
+
     func fetchOnline(_ gate: ChsCurrentGateInfo) {
         guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
         Self.startOnlineWork(for: gate) { _ = try? await Self.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz)) }
@@ -943,10 +949,9 @@ final class ChsFitService: ObservableObject {
         Task {
             while !onlinePending.isEmpty {
                 let gate = onlinePending.removeFirst()
-                // A covering window already on disk is the common case after
-                // the first launch — nothing to fetch, and the fetch is the
-                // expensive part, so check before spending it.
-                if ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil { continue }
+                // At most one refresh a day: the fetch is the expensive part.
+                if ChsModelStore.loadOnline(gate.id)?.needsRefresh(
+                    today: todayLocal(gate.tz), lowData: Connectivity.shared.constrained) == false { continue }
                 _ = try? await Self.fetchOnlineWindow(for: gate, from: nil, automatic: true)
             }
             onlineRunning = false

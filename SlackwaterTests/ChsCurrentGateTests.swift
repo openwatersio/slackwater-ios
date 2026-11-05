@@ -310,23 +310,51 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .offline)
     }
 
-    func testOnlineDownloadValidityUsesRelativeCalendarDays() {
+    /// A date in the station's zone, never a count of days left.
+    func testOnlineDownloadValidityNamesTheLastDate() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "America/Vancouver")!
         let now = cal.date(from: DateComponents(year: 2026, month: 8, day: 25, hour: 13))!
 
         XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 36, to: now)!,
                                               now: now, calendar: cal),
-                       "Available offline for 36 more days")
-        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 3, to: now)!,
+                       "Through Sep 30")
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: 2, to: now)!,
                                               now: now, calendar: cal),
-                       "Expires in 3 days")
-        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 1, to: now)!,
-                                              now: now, calendar: cal),
-                       "Expires in 1 day")
+                       "Through Aug 25")
+        // 23:30 in Vancouver is already the next day in UTC: the date is the station's.
+        let lateEvening = cal.date(from: DateComponents(year: 2026, month: 8, day: 27, hour: 23, minute: 30))!
+        XCTAssertEqual(onlineDownloadValidity(end: lateEvening, now: now, calendar: cal),
+                       "Through Aug 27")
+        XCTAssertEqual(onlineDownloadValidity(end: lateEvening, now: now, calendar: cal, standalone: true),
+                       "Offline through Aug 27", "a sentence with no title above it says what the date is for")
         XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: -1, to: now)!,
                                               now: now, calendar: cal),
                        "Expired")
+    }
+
+    /// Online, a copy fetched before today is refreshed even though it still
+    /// covers today; Low Data Mode waits until today is missing.
+    func testAnOnlineCopyRefreshesOncePerDay() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        let today = todayLocal(tz)
+        let span = Timeline.window(anchor: today)
+        func store(fetchedAt: Date, start: Date = span.start, end: Date = span.end) -> ChsOnlineStore {
+            ChsOnlineStore(stationID: "chs-test-refresh", blocks: [
+                ChsOnlineWindow(stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
+                                fetchedAt: fetchedAt, start: start, end: end,
+                                floodDirection: 0, ebbDirection: 180,
+                                times: [start.timeIntervalSince1970, end.timeIntervalSince1970],
+                                speeds: [0, 0])])
+        }
+        let yesterday = today.addingTimeInterval(-3600)
+        XCTAssertFalse(store(fetchedAt: today.addingTimeInterval(60)).needsRefresh(today: today))
+        XCTAssertTrue(store(fetchedAt: yesterday).needsRefresh(today: today))
+        XCTAssertFalse(store(fetchedAt: yesterday).needsRefresh(today: today, lowData: true))
+        let behind = store(fetchedAt: yesterday, start: span.start.addingTimeInterval(-40 * 86_400),
+                           end: span.start.addingTimeInterval(-10 * 86_400))
+        XCTAssertTrue(behind.needsRefresh(today: today, lowData: true),
+                      "a copy that no longer covers today downloads even in Low Data Mode")
     }
 
     // MARK: - Merging (the 30-day fetch, unioned on save)

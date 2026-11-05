@@ -244,4 +244,12 @@ extension ChsOnlineStore {
     func block(covering anchor: Date) -> ChsOnlineWindow? {
         blocks.first { $0.covers(anchor: anchor) }
     }
+
+    /// An online refresh replaces any copy fetched before `today`, so the
+    /// stored month stays a full month ahead and never runs down while the
+    /// app has signal. Low Data Mode fetches only a station missing today.
+    func needsRefresh(today: Date, lowData: Bool = false) -> Bool {
+        guard let block = block(covering: today) else { return true }
+        return !lowData && block.fetchedAt < today
+    }
 }
