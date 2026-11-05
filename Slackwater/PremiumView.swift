@@ -25,9 +25,9 @@ struct PremiumView: View {
                                     detail: "Tides and currents at a glance on your lock screen.", preview: .lockScreen)
                         }
                         benefit("Favourites calendars", symbol: "calendar",
-                                detail: "See tides and slack windows alongside your plans.", preview: .calendar)
+                                detail: "See tides and slack windows alongside your plans.", preview: .calendars)
                         benefit("Alerts", symbol: "bell",
-                                detail: "Get notified before the tides and currents you care about.", preview: .alert)
+                                detail: "Get notified before the tides and currents you care about.", preview: .alerts)
                         benefit("Chart controls", symbol: "slider.horizontal.3",
                                 detail: "Turn off the sun, moon and stars for a quieter chart.")
                     }
@@ -59,7 +59,7 @@ struct PremiumView: View {
     }
 
     private func benefit(_ title: LocalizedStringKey, symbol: String,
-                         detail: LocalizedStringKey, preview: PremiumFeaturePreview.Feature? = nil) -> some View {
+                         detail: LocalizedStringKey, preview: PremiumFeature? = nil) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let preview { PremiumFeaturePreview(feature: preview) }
             HStack(alignment: .top, spacing: 12) {

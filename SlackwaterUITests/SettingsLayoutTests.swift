@@ -51,8 +51,8 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         let restore = app.buttons["Restore purchase"]
         scrollTo(restore, in: app)
         XCTAssertTrue(restore.isHittable)
-        XCTAssert(app.otherElements["premium-preview-calendar"].exists)
-        XCTAssert(app.otherElements["premium-preview-alert"].exists)
+        XCTAssert(app.otherElements["premium-preview-calendars"].exists)
+        XCTAssert(app.otherElements["premium-preview-alerts"].exists)
         XCTAssert(app.staticTexts["Chart controls"].exists, "the sheet names chart controls as a benefit")
         save(app, "premium-visuals-bottom.png")
         guard dismissPremium(app) else { return }
