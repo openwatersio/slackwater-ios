@@ -1,8 +1,8 @@
 import SwiftUI
 import SlackwaterKit
 
-/// The curve on a station card: one swing of history behind now and three
-/// ahead, tide height or signed current speed as a line, and a dot with
+/// The curve on a station card: four swings weighted toward the future (see
+/// `backWindow`/`forwardWindow`), tide height or signed current speed as a line, and a dot with
 /// value/time labels at each extreme. It is the card's only carrier of the
 /// coming extremes, so it reads them out to VoiceOver rather than hiding.
 ///
