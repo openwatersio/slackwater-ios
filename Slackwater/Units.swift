@@ -4,6 +4,7 @@
 // so a setting changed in the app is visible to the widget's next timeline
 // build (see AppGroup.migrateIfNeeded).
 import Foundation
+import SlackwaterKit
 
 // MARK: - Units (mirrors slackwater-web src/units.ts)
 
@@ -57,7 +58,7 @@ let setFormatKey = "slackwater.setFormat"
 
 /// The set as a compass point ("SW") or a three-digit true bearing ("225°").
 func formatSet(_ deg: Double, format: String) -> String {
-    guard format == "degrees" else { return compass16(deg) }
+    guard format == "degrees" else { return compassPoint(deg) }
     let d = (Int(deg.rounded()) % 360 + 360) % 360
     return String(format: "%03d°", d)
 }

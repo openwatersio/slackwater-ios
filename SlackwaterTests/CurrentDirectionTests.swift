@@ -106,7 +106,45 @@ final class CurrentDirectionTests: XCTestCase {
         XCTAssertEqual(window.signedSpeed(at: now), 2)
     }
 
+    func testDoddDrawsNoArrowAtZeroSpeed() {
+        XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in 0 }).flow(at: date))
+    }
+
     func testDoddOmitsMissingModel() {
         XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in nil }).flow(at: date))
+    }
+
+    // MARK: - Minor axis
+
+    /// The water at one instant, as the kit reads it.
+    private func point(_ record: CurrentStationRecord, at t: Date) -> CurrentPoint {
+        record.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first!
+    }
+
+    /// Kodiak's cross-flow is the strongest NOAA publishes (minor about 0.8 of
+    /// major): at a major-axis slack the water still runs, and it has a set.
+    func testARotaryStationStillRunsAtItsMajorAxisSlack() throws {
+        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let slacks = kodiak.engineStation.events(from: date, to: date.addingTimeInterval(86_400))
+            .filter { $0.kind == .slack }
+        XCTAssertFalse(slacks.isEmpty)
+        for slack in slacks {
+            let p = point(kodiak, at: slack.time)
+            XCTAssertEqual(p.speed, 0, accuracy: 0.01, "\(slack.time)")
+            XCTAssertGreaterThan(p.magnitude, 0.05, "\(slack.time)")
+            XCTAssertNotNil(p.direction, "\(slack.time)")
+        }
+    }
+
+    /// Pollock Rip publishes no cross-flow, so its reading is the signed major-axis speed and a published bearing.
+    func testAOneAxisStationReadsAlongItsPublishedBearings() throws {
+        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        XCTAssertNil(pollock.minorConstituents)
+        for hour in stride(from: 0, to: 12, by: 2) {
+            let p = point(pollock, at: date.addingTimeInterval(Double(hour) * 3600))
+            XCTAssertNotEqual(p.speed, 0)
+            XCTAssertEqual(p.magnitude, abs(p.speed), "hour \(hour)")
+            XCTAssertEqual(p.direction, p.speed > 0 ? pollock.floodDirection : pollock.ebbDirection, "hour \(hour)")
+        }
     }
 }

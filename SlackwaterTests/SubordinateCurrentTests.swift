@@ -42,6 +42,27 @@ final class SubordinateCurrentTests: XCTestCase {
         XCTAssertNotEqual(currentPinState(bonita, at: day, speedUnit: "kn").state, "unknown")
     }
 
+    /// Golden Gate publishes a minor axis, but a subordinate is a reduction of
+    /// its reference's major-axis events, so Bonita's curve is the same with
+    /// the reference's minor axis or without it.
+    func testAReferencesMinorAxisLeavesTheSubordinateUnchanged() {
+        XCTAssertNotNil(goldenGate.minorConstituents)
+        var oneAxis = goldenGate
+        oneAxis.minorConstituents = nil
+        oneAxis.minorMeanFlow = nil
+        oneAxis.azimuth = nil
+        let end = day.addingTimeInterval(86_400)
+        let shipped = bonita.engineStation.speeds(from: day, to: end, step: 600)
+        let baseline = bonita.engineStation(referenceRecord: oneAxis).speeds(from: day, to: end, step: 600)
+        XCTAssertEqual(shipped.count, baseline.count)
+        for (s, b) in zip(shipped, baseline) {
+            XCTAssertEqual(s.time, b.time)
+            XCTAssertEqual(s.speed, b.speed, "\(s.time)")
+            XCTAssertEqual(s.magnitude, b.magnitude, "\(s.time)")
+            XCTAssertEqual(s.direction, b.direction, "\(s.time)")
+        }
+    }
+
     /// The pin's per-reference shortcut must agree with the engine's own
     /// per-station search at every hour of a day.
     func testPinColourMatchesExactSearchForASubordinate() {

@@ -2,6 +2,7 @@
 import CoreLocation
 import Foundation
 import MapLibre
+import SlackwaterKit
 import UIKit
 
 let CURRENT_DIRECTION_MIN_ZOOM = 9.0
@@ -21,10 +22,10 @@ final class DoddMapFlowProvider: Sendable {
         flowAtDate = { date in
             guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == "chs-dodd-narrows" }),
                   let reading = gate.cachedReading(at: date) else { return nil }
-            return StationMapFlow(
+            return Self.flow(
                 center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
-                speedKn: abs(reading.signedKn),
-                bearingDeg: reading.signedKn >= 0 ? reading.floodDirection : reading.ebbDirection)
+                signedKn: reading.signedKn, flood: reading.floodDirection,
+                ebb: reading.ebbDirection, at: date)
         }
     }
 
@@ -32,18 +33,22 @@ final class DoddMapFlowProvider: Sendable {
     init(gate: CurrentStationRecord, signedSpeed: @escaping @Sendable (Date) -> Double?) {
         flowAtDate = { date in
             guard let signedKn = signedSpeed(date) else { return nil }
-            return Self.flow(gate: gate, signedKn: signedKn)
+            return Self.flow(
+                center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
+                signedKn: signedKn, flood: gate.floodDirection, ebb: gate.ebbDirection, at: date)
         }
     }
 
     func flow(at date: Date) -> StationMapFlow? { flowAtDate(date) }
 
-    /// Ebb flow takes the gate's published ebb bearing, which need not be the flood's reciprocal.
-    private static func flow(gate: CurrentStationRecord, signedKn: Double) -> StationMapFlow {
-        StationMapFlow(
-            center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
-            speedKn: abs(signedKn),
-            bearingDeg: signedKn >= 0 ? gate.floodDirection : gate.ebbDirection)
+    /// The kit's vector reading takes the gate's published flood or ebb bearing by sign, which
+    /// need not be reciprocal; a zero vector has no direction and draws no arrow.
+    private static func flow(center: CLLocationCoordinate2D, signedKn: Double,
+                             flood: Double, ebb: Double, at date: Date) -> StationMapFlow? {
+        guard let vector = [CurrentPoint(time: date, speed: signedKn)]
+            .vector(at: date, flood: flood, ebb: ebb),
+              let bearing = vector.direction else { return nil }
+        return StationMapFlow(center: center, speedKn: vector.magnitude, bearingDeg: bearing)
     }
 }
 

@@ -258,7 +258,7 @@ import SlackwaterKit
         let card = WidgetCard.build(record, now: now)
         let expectedReading = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
         let staleReading = staleStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
-        guard case .current(let signed, _, _, _, _) = card.reading else {
+        guard case .current(_, _, let signed, _, _, _) = card.reading else {
             return XCTFail("Expected current reading")
         }
         XCTAssertEqual(signed, expectedReading, accuracy: 0.000_001)

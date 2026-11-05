@@ -85,9 +85,9 @@ final class FillFieldTests: XCTestCase {
             .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
         let coordinate = try XCTUnwrap(field.cells(at: date).first?.polygon.first)
         let vector = try XCTUnwrap(field.sample(at: coordinate, time: date))
-        XCTAssertEqual(vector.speedKn, hypot(u, v), accuracy: 1e-9)
+        XCTAssertEqual(vector.magnitude, hypot(u, v), accuracy: 1e-9)
         let rawBearing = atan2(u, v) * 180 / .pi
-        XCTAssertEqual(vector.bearingDeg,
+        XCTAssertEqual(try XCTUnwrap(vector.direction),
                        (rawBearing.truncatingRemainder(dividingBy: 360) + 360)
                            .truncatingRemainder(dividingBy: 360), accuracy: 1e-9)
         XCTAssertNil(field.sample(at: .init(latitude: 10, longitude: 10), time: date))

@@ -208,6 +208,13 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// A non-primary bin carried only as a subordinate's reference (#269):
     /// harmonic shape, in `all` and `byId`, never in `StationItem.all`.
     var referenceOnly: Bool? = nil
+    /// NOAA's minor (cross-flow) axis, on a harmonic record that publishes one:
+    /// its constituents, its mean (knots, positive 90° clockwise of `azimuth`)
+    /// and the major-axis azimuth it is measured from. Absent on a one-axis
+    /// station and on every subordinate.
+    var minorConstituents: [Con]? = nil
+    var minorMeanFlow: Double? = nil
+    var azimuth: Double? = nil
 
     var isSubordinate: Bool { reference != nil }
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
@@ -229,7 +236,9 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// The constituent model itself; a CHS-fitted gate is always harmonic.
     var harmonicStation: CurrentStation {
         CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                       floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow)
+                       floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow,
+                       minorConstituents: minorConstituents?.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
+                       minorMeanFlow: minorMeanFlow ?? 0, azimuth: azimuth)
     }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
@@ -288,12 +297,6 @@ protocol CurrentPredicting: Sendable {
 extension CurrentStation: CurrentPredicting {}
 extension SubordinateStation: CurrentPredicting {}
 
-/// The set the water flows toward at signed velocity `v` — rectilinear pass
-/// stations are bimodal, so the sign fixes the bearing (web chs/current.ts).
-extension CurrentStationRecord {
-    func setDegrees(signed: Double) -> Double { signed >= 0 ? floodDirection : ebbDirection }
-}
-
 enum CurrentPhase {
     case flood, ebb, slack
 
@@ -323,27 +326,39 @@ func currentPhase(signed: Double, inWindow: Bool) -> CurrentPhase {
     inWindow ? .slack : signed >= 0 ? .flood : .ebb
 }
 
+/// The set a current reading shows, given the water's direction from the kit (the published bearing for its sign on a one-axis point, nil for a zero vector). At `Slack` there is no flood or ebb to point at, so the set shows only while the water still crosses the major axis fast enough to print above zero in `speedUnit`; a one-axis station never crosses, so its slack shows none. The lead, the card, the widget and the watch all ask this.
+func currentSet(direction: Double?, isSlack: Bool, speed: Double, magnitude: Double, speedUnit: String) -> Double? {
+    guard isSlack else { return direction }
+    let crossing = max(0, magnitude * magnitude - speed * speed).squareRoot()
+    return formatSpeed(crossing, unit: speedUnit) == formatSpeed(0, unit: speedUnit) ? nil : direction
+}
+
 func schematicCurrentPhase(signed: Double) -> CurrentPhase {
     // Derived gates use a dimensionless schematic, not a speed in knots.
     abs(signed) < 0.15 ? .slack : signed > 0 ? .flood : .ebb
 }
 
 
-private let points16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-                        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-
-func compass16(_ deg: Double) -> String {
-    let d = (deg.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-    return points16[Int((d / 22.5).rounded()) % 16]
-}
-
 // Speed formatting lives in Theme.swift (formatSpeed(_:unit:)) — the engine
 // always speaks knots; the display unit is the slackwater.speedUnit setting.
 
-/// What a current list card shows: signed velocity now + the next slack/max.
+/// What a current list card shows: the water now and the next slack/max.
 struct CurrentCardState {
+    /// The major-axis speed, flood positive: the word and the colour.
     let signed: Double
+    /// The water's full speed: the printed value.
+    let magnitude: Double
+    /// Where the water is going, the published bearing for its sign on a one-axis station; nil for a zero vector.
+    let direction: Double?
     let next: CurrentEvent?
+
+    /// The card's reading of `point`, whose set falls back to `flood` or `ebb` by its sign through the kit.
+    init(point: CurrentPoint, flood: Double?, ebb: Double?, next: CurrentEvent?) {
+        signed = point.speed
+        magnitude = point.magnitude
+        direction = [point].vector(at: point.time, flood: flood, ebb: ebb)?.direction
+        self.next = next
+    }
 }
 
 extension CurrentStationRecord {
@@ -352,10 +367,10 @@ extension CurrentStationRecord {
     }
 
     func cardState(at now: Date, station: any CurrentPredicting) -> CurrentCardState {
-        let signed = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
+        let point = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first ?? CurrentPoint(time: now, speed: 0)
         // 30h forward guarantees a "next" exists, like the tide cards.
         let next = station.events(from: now, to: now.addingTimeInterval(30 * 3600)).first { $0.time > now }
-        return CurrentCardState(signed: signed, next: next)
+        return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }
 

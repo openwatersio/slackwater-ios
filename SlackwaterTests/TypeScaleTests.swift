@@ -170,7 +170,11 @@ extension TypeScaleTests {
             // `LeadCard`'s one value Text, which carries the mono trait and
             // the Dynamic-Type-scaled size (Theme.swift).
             "TideDetailView.swift:lead",
-            "CurrentLead.swift:body",
+            "CurrentLead.swift:currentLeadReading",
+            // The list card's and widget's current value: formatted where it is
+            // known and consumed by `ConditionsItem`'s value Text, which carries
+            // `.title3.monospacedDigit()` (StationCardFace.swift).
+            "StationCardFace.swift:currentCardFace",
             // An alert's event name: its in-app readers are the rule summaries in the Alerts
             // screen and the alert sheet, and the line under the strip, whose Texts carry the
             // mono trait (AlertsView.swift, AlertSheet.swift, AlertLine.swift); its other reader
@@ -193,7 +197,6 @@ extension TypeScaleTests {
             // A fast tide's rate in words, for the lead's and the strip's
             // VoiceOver labels; the visible rate is `tideRateReading`.
             "TideDetailView.swift:spokenTideRate",
-            "CurrentLead.swift:spoken",
             // Alert copy is shown by Notification Center and Calendar, never by a Text of
             // ours. The call lives in `alertCopy`, whose signature spans two lines, so the
             // text walk climbs past it to `leadAmount` just above — the key has to match
@@ -203,6 +206,8 @@ extension TypeScaleTests {
             // station's zone is known, consumed by the widget's one `Text(liveActivityMoment(a))`
             // (AlertLiveActivity.swift), which carries the mono trait.
             "AlertLiveActivityAttributes.swift:liveActivityMoment",
+            // The slack set rule compares the crossing flow as it would print against zero; nothing is shown.
+            "CurrentStation.swift:currentSet",
         ]
         // Nor is anything in this file: its readings are GeoJSON properties
         // that MapLibre rasterizes from the basemap style's own fontstack,

@@ -398,7 +398,7 @@ extension DerivedGateRecord {
 /// The card's runs: one window per slack from the SHARED `slackWindow`
 /// predicate against the effective threshold, merged where they touch.
 func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [WindowRun] {
-    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
+    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
 }
 
 /// The slack inside the card's windows at `threshold`, measured the same way.
@@ -407,12 +407,7 @@ func cardCores(points: [CurrentPoint], slacks: [Date], threshold: Double = slack
 }
 
 func cardSpeed(_ points: [CurrentPoint], at time: Date) -> Double? {
-    guard let first = points.first, let last = points.last,
-          time >= first.time, time <= last.time else { return nil }
-    guard let i = points.firstIndex(where: { $0.time >= time }), i > 0 else { return first.speed }
-    let a = points[i - 1], b = points[i]
-    let fraction = time.timeIntervalSince(a.time) / b.time.timeIntervalSince(a.time)
-    return a.speed + (b.speed - a.speed) * fraction
+    points.speed(at: time)
 }
 
 extension TideStationRecord {
@@ -468,7 +463,8 @@ extension CurrentStationRecord {
                                  spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs(event.speed), unit: unit)) \(speedUnitLabel(unit))",
                                  timeText: cardTime(event.time, tz),
                                  high: maxHangToward(speed: event.speed, before: before) > 0,
-                                 deg: setDegrees(signed: event.speed))
+                                 // The curve keeps the major axis: a max sets along the published bearing.
+                                 deg: event.speed >= 0 ? floodDirection : ebbDirection)
                 },
             now: now,
             forward: end.timeIntervalSince(now),

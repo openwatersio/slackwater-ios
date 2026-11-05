@@ -80,6 +80,26 @@ export const byNameThenId = (a, b) =>
  *  (0.79 arrives as 0.7900000214576721). */
 export const round3 = (v) => Number(v.toFixed(3));
 
+/**
+ * A current record's minor axis, in SlackwaterKit's CurrentStation field
+ * names: the cross-flow constituents, the cross-flow mean and the major-axis
+ * azimuth the cross-flow is measured from (positive is 90 degrees clockwise of
+ * it). Empty unless the record publishes cross-flow, so a one-axis station
+ * ships exactly as before. A mean cross-flow with no constituents of its own
+ * still ships, with an empty list.
+ */
+export function minorAxis(current) {
+  const minor = current.minor_constituents ?? [];
+  const flow = current.minor_mean_flow ?? 0;
+  if (minor.length === 0 && flow === 0) return {};
+  return {
+    minorConstituents: minor.map((k) =>
+      ({ name: k.name, amplitude: round3(k.amplitude), phase: round3(k.phase) })),
+    minorMeanFlow: round3(flow),
+    azimuth: round3(current.azimuth),
+  };
+}
+
 /** "6.6 nm SSE of" -> "6.6 nm SSE". */
 export const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
 

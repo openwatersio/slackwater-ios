@@ -48,7 +48,8 @@ struct WidgetSnapshot: Equatable {
 
         case .current(let s, _, let name):
             let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
-            let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
+            // The water's full speed, as the card prints it.
+            let speed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.magnitude ?? 0
             let ev = s.events(from: now, to: now.addingTimeInterval(172_800))
                 .first { $0.time > now }
             let next = ev.map {
@@ -62,7 +63,7 @@ struct WidgetSnapshot: Equatable {
             }
             return .init(stationName: name, tz: tz, next: next,
                          curveKind: .current,
-                         value: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                         value: "\(formatSpeed(speed, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
 
         case .derived(let s, _, let name):
             let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
@@ -114,7 +115,7 @@ struct WidgetCard {
             let inside = graph.windows.first { $0.holdsSlack(at: now) }
             let countdownEnd = inside.flatMap { $0.end.timeIntervalSince(now) <= 7_200 ? $0.end : nil }
             return .init(name: r.name, region: r.region,
-                         reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
+                         reading: .current(magnitude: state.magnitude, direction: state.direction, speed: state.signed,
                                            unit: speedUnit, inWindow: graph.isSlack(at: now)),
                          graph: graph, nextSlack: nil,
                          locationMark: locationMark, countdownEnd: countdownEnd)

@@ -422,7 +422,7 @@ struct TimelineData {
     }
 
     private static func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {
-        mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+        mergeWindows(windows.map { SlackWindow(start: $0.start, end: $0.end) }.sorted { $0.start < $1.start }).runs
     }
 
     private func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {
@@ -444,35 +444,17 @@ struct TimelineData {
 
     /// Linear interpolation over the drawn 10-min samples — the centerline dots
     /// must ride the curve as rendered (prototype _ser reads the same series).
-    func heightAt(_ t: Date) -> Double { interp(tidePoints, \.time, \.height, t) }
+    func heightAt(_ t: Date) -> Double { clamped(tidePoints, t, \.time, \.height, tidePoints.height(at: t)) }
     /// Metres per hour under the centerline, signed like `tideRates`.
-    func rateAt(_ t: Date) -> Double { interp(tideRates, \.time, \.rate, t) }
-    func velocityAt(_ t: Date) -> Double { interp(currentPoints, \.time, \.speed, t) }
+    func rateAt(_ t: Date) -> Double { clamped(tideRates, t, \.time, \.rate, tideRates.rate(at: t)) }
+    func velocityAt(_ t: Date) -> Double { clamped(currentPoints, t, \.time, \.speed, currentPoints.speed(at: t)) }
 
-    /// Binary search, and no intermediate array. These are the hottest calls
-    /// in the app: the riding dots, the lead readout and the commentary all
-    /// ask for a value under the centerline on every scrub frame. Mapping the
-    /// series into tuples first allocated a copy of the WHOLE window per
-    /// call — affordable when the window was a fixed 228 hours, and the first
-    /// thing to bite once it grows without bound.
-    ///
-    /// Same answers as the linear walk it replaces, boundaries included:
-    /// before the series it returns the first value, after it the last, and
-    /// exactly on a sample that sample's own value.
-    private func interp<T>(_ pts: [T], _ time: KeyPath<T, Date>, _ value: KeyPath<T, Double>,
-                           _ t: Date) -> Double {
+    /// The kit's reading, or outside the series the nearest end's value (0 when empty): the dots hold at the edge rather than vanish.
+    private func clamped<T>(_ pts: [T], _ t: Date, _ time: KeyPath<T, Date>, _ value: KeyPath<T, Double>,
+                            _ reading: Double?) -> Double {
+        if let reading { return reading }
         guard let first = pts.first, let last = pts.last else { return 0 }
-        if t <= first[keyPath: time] { return first[keyPath: value] }
-        if t >= last[keyPath: time] { return last[keyPath: value] }
-        var lo = 0, hi = pts.count - 1
-        while lo + 1 < hi {
-            let m = (lo + hi) / 2
-            if pts[m][keyPath: time] <= t { lo = m } else { hi = m }
-        }
-        let a = pts[lo], b = pts[hi]
-        let span = b[keyPath: time].timeIntervalSince(a[keyPath: time])
-        let frac = span > 0 ? t.timeIntervalSince(a[keyPath: time]) / span : 0
-        return a[keyPath: value] + (b[keyPath: value] - a[keyPath: value]) * frac
+        return t < first[keyPath: time] ? first[keyPath: value] : last[keyPath: value]
     }
 
     /// Everything both `build` overloads need before touching tide/current/
