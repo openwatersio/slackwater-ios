@@ -22180,7 +22180,7 @@
       }
     },
     "%lld of %lld" : {
-      "comment" : "Completed and total station downloads.",
+      "comment" : "Position out of a total: station downloads completed of total, or the Premium card shown of all cards.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -67388,7 +67388,7 @@
       }
     },
     "Support Slackwater" : {
-      "comment" : "Main list button and purchase sheet title.",
+      "comment" : "Button that opens the Premium sheet, on the main list and in Settings.",
       "localizations" : {
         "da" : {
           "stringUnit" : {

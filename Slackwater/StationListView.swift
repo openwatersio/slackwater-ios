@@ -1066,7 +1066,7 @@ struct StationListView: View {
                                 }
                                 .padding(.vertical, 8)
                             } else {
-                                Text(String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
+                                Text(String(localized: "Support Slackwater", comment: "Button that opens the Premium sheet, on the main list and in Settings."))
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
