@@ -175,8 +175,8 @@ func standingFacts(_ standing: TideStanding, latDatum: Double?, hatDatum: Double
     var out: [StandingFact] = []
 
     if let next = standing.nextMoreExtreme {
-        // Calendar days in the station's zone, as `onlineDownloadValidity`
-        // counts them — "in 12 days" across a DST change is still 12 days.
+        // Calendar days in the station's zone: "in 12 days" across a DST
+        // change is still 12 days.
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: standing.selected.time),
                                       to: cal.startOfDay(for: next.time)).day ?? 0
         out.append(StandingFact(

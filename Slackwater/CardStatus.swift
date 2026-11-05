@@ -96,16 +96,17 @@ enum CardStatus: Equatable {
     }
 }
 
-/// Calendar-day copy for cached official predictions. The station's data
-/// source is irrelevant here; people only need to know how long the local
-/// copy remains useful.
-func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current) -> String {
-    guard end > now else { return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.") }
-    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
-                                       to: calendar.startOfDay(for: end)).day ?? 0
-    if days <= 0 { return String(localized: "Expires today", comment: "Offline-download expiry status.") }
-    if days <= 3 { return String(localized: "Expires in \(days) days", comment: "Offline-download expiry. The integer is a number of calendar days; vary by plural.") }
-    return String(localized: "Available offline for \(days) more days", comment: "Offline-download validity. The integer is a number of calendar days; vary by plural.")
+/// How far the stored copy of official predictions reaches. A date, never a
+/// count of days left: a countdown reads as a free trial running out.
+/// `standalone` is for a sentence with no "Offline available" title above it.
+/// Days, not instants: "Through Nov 26" holds all of Nov 26 in `calendar`'s zone.
+func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current,
+                            standalone: Bool = false) -> String {
+    guard calendar.startOfDay(for: end) >= calendar.startOfDay(for: now) else { return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.") }
+    let date = end.formatted(Date.FormatStyle(timeZone: calendar.timeZone).month(.abbreviated).day())
+    return standalone
+        ? String(localized: "Offline through \(date)", comment: "How far downloaded predictions reach without a connection. The value is a localized short date, such as Nov 26.")
+        : String(localized: "Through \(date)", comment: "How far downloaded predictions reach, under the title Offline available or in the Downloads list. The value is a localized short date, such as Nov 26.")
 }
 
 /// Compact status used in the reading slot for automatic work and below the

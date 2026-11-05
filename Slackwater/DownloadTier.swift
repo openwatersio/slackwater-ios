@@ -129,12 +129,14 @@ struct OnlineDownloads: Equatable {
     /// Keeps the background task alive. Offline, a gate with nothing covering
     /// today counts: the task waits for signal rather than ending.
     var active = false
-    /// A fetch is running, queued, or waiting out a retry, the same states that
-    /// keep a fitted job `.pending`. The strip shows this, not `active`, so a
-    /// gate merely waiting for signal doesn't hide the offer.
+    /// A gate with nothing covering today is fetching, queued, or waiting out a
+    /// retry, the same states that keep a fitted job `.pending`. The strip
+    /// shows this, not `active`, so a gate merely waiting for signal doesn't
+    /// hide the offer. A covered gate's daily refresh never counts.
     var inFlight = false
-    /// A gate is fetching, queued to fetch next, or held by a caller about to
-    /// fetch it (`ChsFitService.onlineHolds`), whatever its last fetch did.
+    /// A gate with nothing covering today is fetching, queued to fetch next,
+    /// or held by a caller about to fetch it (`ChsFitService.onlineHolds`),
+    /// whatever its last fetch did.
     var moving = false
     /// A gate with nothing covering today is sitting out a retry backoff, and
     /// no caller holds it to fetch now.

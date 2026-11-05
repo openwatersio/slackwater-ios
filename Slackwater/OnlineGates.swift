@@ -114,6 +114,9 @@ extension ChsFitService {
             } catch {
                 if Task.isCancelled {
                     onlineFetchCancelled(gate)
+                } else if automatic,
+                          ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil {
+                    noteOnlineRefreshFailure(gate.id)
                 } else {
                     noteOnlineFailure(gate.id, error: Self.reason(error),
                                       permanent: ChsError.isPermanent(error))
@@ -243,5 +246,24 @@ extension ChsOnlineStore {
     /// across a gap.
     func block(covering anchor: Date) -> ChsOnlineWindow? {
         blocks.first { $0.covers(anchor: anchor) }
+    }
+
+    /// A coverage question, like `covers`: the block covering `today` should
+    /// reach a full fetch ahead, so the stored month never runs down while the
+    /// app has signal. Half a day of slack absorbs a fetch clamped to its last
+    /// sample; yesterday's fetch falls a whole day short. Low Data Mode
+    /// fetches only a station missing today.
+    func needsRefresh(today: Date, lowData: Bool = false) -> Bool {
+        guard let block = block(covering: today) else { return true }
+        let reach = today.addingTimeInterval((Timeline.onlineFetchDays - 0.5) * 86_400)
+        return !lowData && block.end < reach
+    }
+
+    /// The block whose reach the person cares about: the one covering today,
+    /// else the latest that began by today, which reads as expired. A later
+    /// block would name a date past a gap, so with only those it is nil and
+    /// reads as not downloaded.
+    func reachBlock(today: Date) -> ChsOnlineWindow? {
+        block(covering: today) ?? blocks.last { $0.start <= today }
     }
 }

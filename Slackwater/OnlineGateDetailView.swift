@@ -38,6 +38,12 @@ struct OnlineGateDetailView: View {
     /// downloads. The week on screen stays put until it lands (`extend`).
     @State private var pendingAnchor: Date?
     @State private var pendingFetchAnchor: Date?
+    /// The last day `fetchNow` actually fetched from, so a week it could not
+    /// supply is never asked for again on its own.
+    @State private var requestedFrom: Date?
+    /// The block the Offline available card reports: today's, whatever week
+    /// is on screen. Re-picked in `rebuild()`, never per body evaluation.
+    @State private var reach: ChsOnlineWindow?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -169,7 +175,11 @@ struct OnlineGateDetailView: View {
                 if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
                 rebuild()
                 RecentsStore.shared.record(gate.id)
-                if window?.covers(anchor: anchor) != true, net.online { fetchNow(from: anchor) }
+                if window?.covers(anchor: anchor) != true, net.online {
+                    fetchNow(from: anchor)
+                } else {
+                    ChsFitService.shared.refreshOnline(gate)
+                }
                 if pairedTide == nil, nearbyTide == nil,
                    let n = StationItem.nearest(.tide, toLat: gate.latitude, lon: gate.longitude),
                    n.km <= nearbyStationRadiusKm {
@@ -195,8 +205,13 @@ struct OnlineGateDetailView: View {
                     // A completed fetch can cover today while leaving the week at the strip's edge uncovered.
                     let resumePending = onlineGateShouldResumePendingFetch(
                         from: fetchState, to: state, pendingFetchActive: pendingFetchAnchor != nil)
+                    // A fetch this view did not ask for (the daily refresh)
+                    // made `fetchNow` drop a week picked meanwhile; ask once.
+                    let fetchPicked = fetchState == .fetching && state == .idle && !resumePending
+                        && timeline == nil && net.online && requestedFrom != anchor
                     fetchState = state
                     if resumePending { fetchPending() }
+                    if fetchPicked { fetchNow(from: anchor) }
                 }
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
@@ -304,6 +319,7 @@ struct OnlineGateDetailView: View {
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
         guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
+        requestedFrom = from
         ChsFitService.startOnlineWork(for: gate) {
             if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {
                 window = fresh
@@ -333,26 +349,60 @@ struct OnlineGateDetailView: View {
             StationDetailRow("Prediction", "CHS-published predictions downloaded for offline use; not computed on this device")
             StationDetailRow("On-device fit unavailable", gate.onlineExplanation(speedUnit: speedUnit))
             if let window {
-                StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz))")
+                // The card's last day, not the raw last sample a week later.
+                StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.offlineValidUntil, tz))")
             }
         }
     }
 
     private func provenance(_ window: ChsOnlineWindow) -> some View {
-        DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
-            Text("CHS-published predictions downloaded \(monthDay(window.fetchedAt, tz)); available through \(monthDay(window.end, tz)). Not computed on this device.")
-                .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
-                .multilineTextAlignment(.center)
-                .accessibilityIdentifier("online-provenance")
-            HStack(spacing: 16) {
+        VStack(spacing: 20) {
+            offlineCard(window)
+            DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
+                Text("CHS-published predictions downloaded \(monthDay(window.fetchedAt, tz)). Not computed on this device.")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("online-provenance")
+            }
+        }
+    }
+
+    /// Its own card, apart from the disclaimer: the connection, the reach of
+    /// the stored copy and Update now are about this device, not the data.
+    private func offlineCard(_ window: ChsOnlineWindow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 DownloaderConnectionIndicator()
+                Text("Offline available")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SN.paper)
                 Spacer(minLength: 8)
-                OnlineDownloadStatus(gate: gate, window: window) {
+                OnlineDownloadLines(gate: gate, window: reach)
+                    .font(.footnote)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack(alignment: .center, spacing: 12) {
+                Text("Slackwater keeps about a month on this device and refreshes it whenever you're online.")
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                OnlineDownloadAction(gate: gate, window: reach) {
                     guard net.online, ChsFitService.shared.prepareOnlineUpdate(gate) else { return }
                     fetchNow(from: todayLocal(tz))
                 }
+                .font(.footnote)
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+        // The same id as the Downloads row's control: the card is this station's whole download status.
+        .accessibilityIdentifier("download-status-\(gate.id)")
     }
 
     // MARK: - Download status
@@ -409,16 +459,14 @@ struct OnlineGateDetailView: View {
 
     private var expectation: String {
         // "About a month", not "about a week": one fetch is
-        // `Timeline.onlineFetchDays` forward of the anchor. The footer two
-        // views up prints the real covers-to date, and the two lines sat on
-        // one screen contradicting each other.
+        // `Timeline.onlineFetchDays` forward of the anchor.
         var lines = [net.online
             ? String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation.")
             : String(localized: "Connect for a moment to download about a month of predictions.", comment: "Offline-prediction download explanation while offline.")]
         // Deliberate: a disk read per body evaluation, but this only renders
         // on the honesty path — re-pick into state if it ever shows in a trace.
-        if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
-            let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
+        if let window = ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(tz)) {
+            let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar, standalone: true)
             lines.append(String(localized: "\(validity).", comment: "Offline-prediction validity sentence. The value is a localized expiry phrase."))
         }
         if case .deferred = fetchState {
@@ -457,6 +505,7 @@ struct OnlineGateDetailView: View {
     /// stale window. Nil when no block covers the anchor: that is the
     /// honesty card's cue, and the picker's way back stays on screen.
     private func rebuild() {
+        reach = ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(tz))
         guard let window, window.covers(anchor: anchor) else { timeline = nil; return }
         timeline = TimelineData.build(onlinePoints: window.points, tz: tz,
                                       lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,

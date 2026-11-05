@@ -189,10 +189,30 @@ struct DownloaderConnectionIndicator: View {
     }
 }
 
+/// The Downloads row's status: the reach and activity lines over the action.
+/// A station's own card lays the two parts out apart.
 struct OnlineDownloadStatus: View {
     let gate: ChsCurrentGateInfo
     let window: ChsOnlineWindow?
     let update: () -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 5) {
+            OnlineDownloadLines(gate: gate, window: window)
+            OnlineDownloadAction(gate: gate, window: window, update: update)
+        }
+        .font(.footnote)
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("download-status-\(gate.id)")
+    }
+}
+
+/// How far the stored copy reaches, and any download, queue or failure line.
+struct OnlineDownloadLines: View {
+    let gate: ChsCurrentGateInfo
+    let window: ChsOnlineWindow?
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -231,6 +251,21 @@ struct OnlineDownloadStatus: View {
                 Text(activity)
                     .foregroundStyle(activityTint)
             }
+        }
+    }
+}
+
+/// Update now (Download before the first fetch), or progress while one runs.
+/// Only online, where it can succeed.
+struct OnlineDownloadAction: View {
+    let gate: ChsCurrentGateInfo
+    let window: ChsOnlineWindow?
+    let update: () -> Void
+    @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
+
+    var body: some View {
+        Group {
             if net.online {
                 if service.onlineState(gate.id) == .fetching {
                     StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
@@ -253,13 +288,7 @@ struct OnlineDownloadStatus: View {
                 }
             }
         }
-        .font(.footnote)
-        .multilineTextAlignment(.trailing)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("download-status-\(gate.id)")
     }
-
 }
 
 // MARK: - The manager
@@ -318,7 +347,7 @@ struct OfflineManagerList: View {
             guard $0.isOnline else { return false }
             if service.isFetchingOnline($0.id) { return true }
             let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
-            return km <= ChsFitService.autoFitRadiusKm || onlineWindow($0) != nil
+            return km <= ChsFitService.autoFitRadiusKm || ChsModelStore.loadOnline($0.id)?.blocks.isEmpty == false
         }
     }
     private var downloads: [ManagedDownload] {
@@ -365,6 +394,9 @@ struct OfflineManagerList: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Canadian tides and currents").font(.headline)
             Text("Canadian data requirements mean we download tide and current predictions individually.")
+                .font(.subheadline)
+                .foregroundStyle(SN.foam.opacity(0.75))
+            Text("Station data is always free.")
                 .font(.subheadline)
                 .foregroundStyle(SN.foam.opacity(0.75))
             Text("Choose any combination. Slackwater will take care of the downloads.")
@@ -583,7 +615,7 @@ struct OfflineManagerList: View {
     }
 
     private func onlineWindow(_ gate: ChsCurrentGateInfo) -> ChsOnlineWindow? {
-        ChsModelStore.loadOnline(gate.id)?.blocks.last
+        ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(gate.tz))
     }
 
     private func remainingDays(_ gate: ChsCurrentGateInfo) -> Int? {

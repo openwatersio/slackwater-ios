@@ -99,6 +99,10 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
+    /// The station-local day of each gate's last automatic fetch. A station
+    /// that still covers today refreshes at most once on that day, so a
+    /// failing or short refresh never turns into a retry loop.
+    private var onlineRefreshedOn: [String: Date] = [:]
     /// Published because the download count's total reads it: a gate desired
     /// while offline joins the total without any fetch state changing.
     @Published private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
@@ -593,10 +597,12 @@ final class ChsFitService: ObservableObject {
     nonisolated static func onlineDownloadIsActive(_ state: OnlineFetchState, queued: Bool,
                                                    covered: Bool, online: Bool) -> Bool {
         switch state {
-        case .fetching: true
-        // The retry timer re-enters `prefetchOnlineGates`, which skips a gate
-        // already covering today. A covered gate's backoff (a failed "Update
-        // now", or a later week's fetch) ends in no fetch, so nothing waits on it.
+        // A refresh of a station that already covers today is quiet: no
+        // counter, strip or background task for a station that already works.
+        case .fetching: !covered
+        // The retry timer re-enters `prefetchOnlineGates`, where a gate already
+        // covering today gets at most its one quiet refresh of the day, so
+        // nothing waits on a covered gate's backoff.
         case .deferred: !covered
         case .failed: false
         case .idle: !covered && (queued || !online)
@@ -623,7 +629,7 @@ final class ChsFitService: ObservableObject {
                 moving = moving || held || Self.onlineDownloadIsActive(state, queued: queued,
                     covered: covered, online: true)
             }
-            if covered, state != .fetching {
+            if covered {
                 ready += 1
                 completed += requests
                 continue
@@ -811,6 +817,30 @@ final class ChsFitService: ObservableObject {
         }
     }
 
+    /// An automatic refresh failed on a station whose copy still covers today:
+    /// nothing is wrong that a person can act on, so no failure line and no
+    /// retry. Tomorrow's refresh tries again.
+    func noteOnlineRefreshFailure(_ id: String) {
+        onlineRetryTimers[id]?.cancel()
+        onlineRetryTimers[id] = nil
+        releaseRequest(id)
+        onlineStates[id] = .idle
+        onlineAttempts[id] = 0
+    }
+
+    /// Whether the queue should fetch this gate now: always when today is not
+    /// covered, otherwise once a day while the copy reaches less than a month.
+    func onlineRefreshDue(_ gate: ChsCurrentGateInfo) -> Bool {
+        let today = todayLocal(gate.tz)
+        guard let store = ChsModelStore.loadOnline(gate.id), store.block(covering: today) != nil else { return true }
+        return onlineRefreshedOn[gate.id] != today
+            && store.needsRefresh(today: today, lowData: Connectivity.shared.constrained)
+    }
+
+    func markOnlineRefresh(_ gate: ChsCurrentGateInfo) {
+        onlineRefreshedOn[gate.id] = todayLocal(gate.tz)
+    }
+
     /// Idle releases pending-week retries, so preserve the state until the new fetch starts.
     func prepareOnlineUpdate(_ gate: ChsCurrentGateInfo) -> Bool {
         retainRequests([gate.id])
@@ -838,6 +868,10 @@ final class ChsFitService: ObservableObject {
         onlineStates.removeValue(forKey: gate.id)
         if onlineDesired[gate.id] != nil { prefetchOnlineGates([gate]) }
     }
+
+    /// An opened station refreshes the way the download set does, even when
+    /// nothing else would have queued it.
+    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate]) }
 
     func fetchOnline(_ gate: ChsCurrentGateInfo) {
         guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
@@ -871,6 +905,7 @@ final class ChsFitService: ObservableObject {
         onlineAttempts = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]
+        onlineRefreshedOn = [:]
         requestedDownloads.subtract(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
         AppGroup.defaults.set(requestedDownloads.sorted(), forKey: AppGroup.requestedDownloadsKey)
         onlinePending = []
@@ -943,10 +978,8 @@ final class ChsFitService: ObservableObject {
         Task {
             while !onlinePending.isEmpty {
                 let gate = onlinePending.removeFirst()
-                // A covering window already on disk is the common case after
-                // the first launch — nothing to fetch, and the fetch is the
-                // expensive part, so check before spending it.
-                if ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil { continue }
+                guard onlineRefreshDue(gate) else { continue }
+                markOnlineRefresh(gate)
                 _ = try? await Self.fetchOnlineWindow(for: gate, from: nil, automatic: true)
             }
             onlineRunning = false
