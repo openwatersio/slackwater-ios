@@ -27,7 +27,8 @@ struct PremiumRequirement: View {
 struct PremiumFeaturePreview: View {
     let feature: PremiumFeature
     @State private var example: (snapshot: WidgetSnapshot, graph: StationCardGraph,
-                                 complication: ComplicationReading?, sky: SkyState)?
+                                 complication: ComplicationReading?,
+                                 strip: (data: TimelineData, sky: SkyState, at: Date)?)?
 
     var body: some View {
         VStack {
@@ -63,9 +64,11 @@ struct PremiumFeaturePreview: View {
                             .font(.footnote.monospacedDigit())
                         }
                     } else if feature == .sky {
-                        HStack(spacing: 12) {
-                            skyPane(example.sky, bodies: true, caption: "With sky")
-                            skyPane(example.sky, bodies: false, caption: "Without sky")
+                        if let strip = example.strip {
+                            HStack(spacing: 12) {
+                                skyPane(strip, bodies: true, caption: "With sky")
+                                skyPane(strip, bodies: false, caption: "Without sky")
+                            }
                         }
                     } else if let next = example.snapshot.next {
                         HStack(alignment: .top, spacing: 12) {
@@ -109,20 +112,29 @@ struct PremiumFeaturePreview: View {
                 guard let record = WidgetStationLoader.loadRecord(id: "noaa/9444900") else { return nil }
                 let now = appNow()
                 let station = WidgetStationLoader.station(from: record)
-                var place = (latitude: 48.12, longitude: -122.76)
-                if case .tide(let info, _) = record { place = (info.latitude, info.longitude) }
+                var strip: (data: TimelineData, sky: SkyState, at: Date)?
+                // A fixed late afternoon, so the sun, the moon and the gradient show whenever the sheet opens.
+                if feature == .sky, case .tide(let info, _) = record {
+                    var cal = Calendar(identifier: .gregorian)
+                    cal.timeZone = info.tz
+                    if let at = cal.date(from: DateComponents(year: 2026, month: 6, day: 22, hour: 19, minute: 0)) {
+                        let data = TimelineData.build(tide: info, current: nil, now: at, anchor: cal.startOfDay(for: at))
+                        strip = (data, SkyState(time: at, latitude: info.latitude, longitude: info.longitude,
+                                                days: data.days, eclipses: data.eclipses), at)
+                    }
+                }
                 return (WidgetSnapshot.build(station, now: now),
                         record.accessoryGraph(at: now),
                         ComplicationReading.build(station, now: now),
-                        SkyState(time: now, latitude: place.latitude, longitude: place.longitude))
+                        strip)
             }.value
         }
     }
 
-    private func skyPane(_ sky: SkyState, bodies: Bool, caption: LocalizedStringKey) -> some View {
+    private func skyPane(_ strip: (data: TimelineData, sky: SkyState, at: Date), bodies: Bool,
+                         caption: LocalizedStringKey) -> some View {
         VStack(spacing: 6) {
-            SkyBackdrop(sky: sky, plotDepth: 30, bodies: bodies)
-                .frame(height: 110)
+            SkyStripExample(data: strip.data, sky: strip.sky, at: strip.at, bodies: bodies)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             Text(caption).font(.caption)
         }
@@ -130,52 +142,52 @@ struct PremiumFeaturePreview: View {
     }
 }
 
+/// The chart strip's own canvas over its sky, cropped to the curve and its hours as the watch
+/// crops it: Settings' switch, set either way for the pane.
+private struct SkyStripExample: View {
+    let data: TimelineData
+    let sky: SkyState
+    let at: Date
+    let bodies: Bool
+    private static let padTop: CGFloat = 110
+    private static let plotDepth: CGFloat = 50
+
+    var body: some View {
+        let geo = TimelineGeo(data: data, padTop: Self.padTop, plotDepth: Self.plotDepth)
+        let height = geo.timeY + 10
+        GeometryReader { proxy in
+            let center = data.x(at)
+            let first = max(Int((center - proxy.size.width) / TimelineCanvas.tileWidth), 0)
+            // The canvas is two tiles wide: the sky takes the pane's width, not the canvas's.
+            ZStack(alignment: .topLeading) {
+                TimelineCanvas(data: data, geo: geo, imperial: heightUnits() != "metric", speedUnit: "kn",
+                               now: at, showsSunMarks: bodies, tileRange: first..<(first + 2))
+                    .offset(x: proxy.size.width / 2 - center)
+            }
+            .frame(width: proxy.size.width, height: height, alignment: .topLeading)
+            .background(alignment: .top) {
+                ZStack(alignment: .top) {
+                    SN.canvas
+                    SkyBackdrop(sky: sky, plotDepth: geo.bodyBottom - geo.bodyTop, bodies: bodies)
+                        .frame(height: geo.bodyBottom)
+                }
+            }
+            .clipped()
+        }
+        .frame(height: height)
+    }
+}
+
 /// The watch's circular complication, as the phone can draw it: the line three hours either
 /// side of now, dim before now, thicker through slack, a dot at now, the value beneath.
 private struct WatchCircularExample: View {
     let reading: ComplicationReading
-    private let past = 0.35
-
     var body: some View {
         VStack(spacing: 0) {
-            Canvas { context, size in
-                let pts = reading.samples
-                guard pts.count > 1 else { return }
-                var lo = pts.map(\.value).min()!, hi = pts.map(\.value).max()!
-                if reading.kind == .current { lo = min(lo, 0); hi = max(hi, 0) }
-                if hi - lo < 1e-6 { hi = lo + 1 }
-                let x = { (h: Double) in (h + 3) / 6 * size.width }
-                let y = { (v: Double) in size.height - (v - lo) / (hi - lo) * size.height }
-                let line = max(2, size.height * 0.08)
-                func path(_ part: [ComplicationReading.Sample]) -> Path {
-                    var p = Path()
-                    for (i, s) in part.enumerated() {
-                        let pt = CGPoint(x: x(s.hours), y: y(s.value))
-                        if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
-                    }
-                    return p
-                }
-                let ink = reading.runsAreSlack ? SN.go : SN.slackWindow
-                for run in reading.slackRuns {
-                    let part = pts.filter { run.contains($0.hours) }
-                    for (half, opacity) in [(part.filter { $0.hours <= 0 }, past),
-                                            (part.filter { $0.hours >= 0 }, 1.0)] where half.count > 1 {
-                        context.stroke(path(half), with: .color(ink.opacity(opacity)),
-                                       style: StrokeStyle(lineWidth: line * 2.3, lineCap: .round))
-                    }
-                }
-                let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
-                context.stroke(path(pts.filter { $0.hours <= 0 }), with: .color(.white.opacity(past)), style: style)
-                context.stroke(path(pts.filter { $0.hours >= 0 }), with: .color(.white), style: style)
-                if let now = pts.min(by: { abs($0.hours) < abs($1.hours) }) {
-                    let r = line * 1.6
-                    context.fill(Path(ellipseIn: CGRect(x: x(0) - r, y: y(now.value) - r, width: r * 2, height: r * 2)),
-                                 with: .color(.white))
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .frame(maxHeight: .infinity)
+            ComplicationLineCanvas(reading: reading, hours: -3...3, fullColor: true)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .frame(maxHeight: .infinity)
             Text(verbatim: reading.valueText)
                 .font(.system(.body, design: .rounded).weight(.bold).monospacedDigit())
         }
@@ -183,3 +195,4 @@ private struct WatchCircularExample: View {
         .background(SN.cardFill, in: Circle())
     }
 }
+

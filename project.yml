@@ -102,6 +102,7 @@ targetTemplates:
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
       - Slackwater/ComplicationReading.swift
+      - Slackwater/ComplicationLineCanvas.swift
       - Slackwater/AccessoryWidgetContent.swift
       - Slackwater/DayCurveContentView.swift
       - Slackwater/NextEventContentView.swift

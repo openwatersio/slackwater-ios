@@ -4,7 +4,7 @@
 import SwiftUI
 import WidgetKit
 
-private let pastOpacity = 0.35
+private let pastOpacity = complicationPastOpacity
 /// The app's slack-window colour, for faces that draw full colour.
 private let slackColor = SN.slackWindow
 
@@ -52,68 +52,14 @@ struct CircularView: View {
     }
 }
 
-/// The line over `hours`, scaled to its own extremes (and zero, for a
-/// current), dim before now, thick where a current is slack, with a dot at now.
+/// The shared line, tinted by the face's rendering mode.
 struct ComplicationLine: View {
     let reading: ComplicationReading
     let hours: ClosedRange<Double>
-    /// Tinted faces get thickness alone; a full-colour face also gets the
-    /// app's slack colour.
     @Environment(\.widgetRenderingMode) private var mode
     var body: some View {
-        Canvas { context, size in
-            let pts = reading.samples.filter { hours.contains($0.hours) }
-            guard pts.count > 1 else { return }
-            var lo = pts.map(\.value).min()!, hi = pts.map(\.value).max()!
-            if reading.kind == .current { lo = min(lo, 0); hi = max(hi, 0) }
-            if hi - lo < 1e-6 { hi = lo + 1 }
-            let x = { (h: Double) in (h - hours.lowerBound) / (hours.upperBound - hours.lowerBound) * size.width }
-            let y = { (v: Double) in size.height - (v - lo) / (hi - lo) * size.height }
-            let line = max(2, size.height * 0.08)
-            func path(_ part: [ComplicationReading.Sample]) -> Path {
-                var p = Path()
-                for (i, s) in part.enumerated() {
-                    let pt = CGPoint(x: x(s.hours), y: y(s.value))
-                    if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
-                }
-                return p
-            }
-            let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
-            if reading.kind == .current {
-                var zero = Path()
-                zero.move(to: CGPoint(x: 0, y: y(0)))
-                zero.addLine(to: CGPoint(x: size.width, y: y(0)))
-                context.stroke(zero, with: .color(.primary.opacity(pastOpacity)),
-                               style: StrokeStyle(lineWidth: line / 2, dash: [line, line]))
-            }
-            let ink: Color = mode == .fullColor ? (reading.runsAreSlack ? SN.go : slackColor) : .primary
-            for run in reading.slackRuns {
-                if reading.runsAreSlack, run.lowerBound == run.upperBound {
-                    var mark = Path()
-                    let centre = x(run.lowerBound)
-                    mark.move(to: CGPoint(x: centre - line, y: y(0)))
-                    mark.addLine(to: CGPoint(x: centre + line, y: y(0)))
-                    context.stroke(mark, with: .color(ink.opacity(run.lowerBound < 0 ? pastOpacity : 1)),
-                                   style: StrokeStyle(lineWidth: line * 2.3, lineCap: .round))
-                    continue
-                }
-                let part = pts.filter { run.contains($0.hours) }
-                for (half, opacity) in [(part.filter { $0.hours <= 0 }, pastOpacity),
-                                        (part.filter { $0.hours >= 0 }, 1.0)] where half.count > 1 {
-                    context.stroke(path(half), with: .color(ink.opacity(opacity)),
-                                   style: StrokeStyle(lineWidth: line * 2.3, lineCap: .round))
-                }
-            }
-            context.stroke(path(pts.filter { $0.hours <= 0 }), with: .color(.primary.opacity(pastOpacity)), style: style)
-            context.stroke(path(pts.filter { $0.hours >= 0 }), with: .color(.primary), style: style)
-            if let nowValue = pts.min(by: { abs($0.hours) < abs($1.hours) })?.value {
-                let r = line * 1.6
-                let dot = CGRect(x: x(0) - r, y: y(nowValue) - r, width: r * 2, height: r * 2)
-                context.fill(Path(ellipseIn: dot.insetBy(dx: -line * 0.6, dy: -line * 0.6)), with: .color(.black))
-                context.fill(Path(ellipseIn: dot), with: .color(.primary))
-            }
-        }
-        .widgetAccentable()
+        ComplicationLineCanvas(reading: reading, hours: hours, fullColor: mode == .fullColor)
+            .widgetAccentable()
     }
 }
 
