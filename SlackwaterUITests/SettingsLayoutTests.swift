@@ -356,7 +356,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "support-footer.png")
         support.tap()
         XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
-        XCTAssert(app.otherElements["premium-preview-alerts"].appears(within: 5), "The first card's example must load before showing purchase controls")
+        XCTAssert(app.otherElements["premium-preview-print"].appears(within: 5), "The first card's example must load before showing purchase controls")
         scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
         // App Review 3.1.2 rejects a subscription sheet without both policy links.

@@ -2,12 +2,13 @@
 import SwiftUI
 
 enum PremiumFeature: String, CaseIterable, Identifiable {
-    case alerts, calendars, lockScreen, watch, sky
+    case print, alerts, calendars, lockScreen, watch, sky
 
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
         switch self {
+        case .print: "Print your week"
         case .alerts: "Alerts"
         case .calendars: "Calendars"
         case .lockScreen: "Lock screen"
@@ -18,6 +19,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
 
     var detail: LocalizedStringKey {
         switch self {
+        case .print: "A week of tides and currents on paper or as a PDF, for the boat, the dock or the fridge."
         case .alerts: "A reminder before the slack or tide you're waiting for, right on your lock screen."
         case .calendars: "Tides and slack windows in your calendar, next to your plans."
         case .lockScreen: "The next tide without unlocking your phone."
@@ -28,6 +30,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .print: "printer"
         case .alerts: "bell"
         case .calendars: "calendar"
         case .lockScreen: "lock.iphone"
@@ -39,6 +42,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     /// The comparison table's row label.
     var tableLabel: LocalizedStringKey {
         switch self {
+        case .print: "Print and PDF"
         case .alerts: "Alerts"
         case .calendars: "Calendars"
         case .lockScreen: "Lock screen widgets"

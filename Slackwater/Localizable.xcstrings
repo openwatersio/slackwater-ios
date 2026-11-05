@@ -983,6 +983,101 @@
         }
       }
     },
+    "A week of tides and currents on paper or as a PDF, for the boat, the dock or the fridge." : {
+      "comment" : "Premium sheet card for printable tables: a week of predictions printed or saved as a PDF, to keep on the boat, at the dock or on the fridge.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En uge med tidevand og strøm på papir eller som PDF, til båden, broen eller køleskabet."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Woche Gezeiten und Strömungen auf Papier oder als PDF, für das Boot, den Steg oder den Kühlschrank."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una semana de mareas y corrientes en papel o en PDF, para el barco, el pantalán o la nevera."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viikon vuorovedet ja virtaukset paperilla tai PDF:nä, veneeseen, laiturille tai jääkaapin oveen."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une semaine de marées et de courants sur papier ou en PDF, pour le bateau, le quai ou le frigo."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seachtain taoidí agus sruthanna ar pháipéar nó mar PDF, don bhád, don ché nó don chuisneoir."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seachdain de sheòlan-mara is de shruthan air pàipear no mar PDF, airson a’ bhàta, a’ chidhe no a’ chiste-fhuachaidh."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una settimana di maree e correnti su carta o in PDF, per la barca, il pontile o il frigorifero."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1週間分の潮汐と潮流を紙やPDFで。船にも、桟橋にも、冷蔵庫にも。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일주일치 조석과 조류를 종이나 PDF로. 배에, 부두에, 냉장고에."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En uke med tidevann og strøm på papir eller som PDF, til båten, brygga eller kjøleskapet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een week getijden en stromingen op papier of als pdf, voor de boot, de steiger of de koelkast."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma semana de marés e correntes no papel ou em PDF, para o barco, o píer ou a geladeira."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma semana de marés e correntes em papel ou em PDF, para o barco, o pontão ou o frigorífico."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En vecka med tidvatten och strömmar på papper eller som PDF, för båten, bryggan eller kylskåpet."
+          }
+        }
+      }
+    },
     "Against this station's own ends" : {
       "comment" : "Range sheet section: where this turn sits between the station's floor and ceiling.",
       "localizations" : {
@@ -8709,6 +8804,196 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Premiumfunktioner"
+          }
+        }
+      }
+    },
+    "Print and PDF" : {
+      "comment" : "Premium sheet comparison table row: printing a week or month of predictions, or saving it as a PDF.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Udskrift og PDF"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drucken und PDF"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impresión y PDF"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tulostus ja PDF"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impression et PDF"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Priontáil agus PDF"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clò-bhualadh is PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stampa e PDF"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "印刷とPDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인쇄 및 PDF"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utskrift og PDF"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afdrukken en pdf"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impressão e PDF"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impressão e PDF"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utskrift och PDF"
+          }
+        }
+      }
+    },
+    "Print your week" : {
+      "comment" : "Premium sheet card title for printable tables: a week of tide or current predictions to print or save as a PDF.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Udskriv din uge"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drucke deine Woche"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprime tu semana"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tulosta viikkosi"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprimez votre semaine"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Priontáil do sheachtain"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clò-bhuail do sheachdain"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stampa la tua settimana"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1週間分を印刷"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 주를 인쇄하세요"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skriv ut uken din"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Druk je week af"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprima sua semana"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprima a sua semana"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skriv ut din vecka"
           }
         }
       }

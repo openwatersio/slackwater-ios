@@ -5,8 +5,8 @@ import XCTest
 
 final class PremiumTests: XCTestCase {
     func testCarouselOrder() {
-        XCTAssertEqual(PremiumFeature.carousel(for: .mobile), [.alerts, .calendars, .lockScreen, .watch, .sky])
-        XCTAssertEqual(PremiumFeature.carousel(for: .mac), [.alerts, .calendars, .watch, .sky])
+        XCTAssertEqual(PremiumFeature.carousel(for: .mobile), [.print, .alerts, .calendars, .lockScreen, .watch, .sky])
+        XCTAssertEqual(PremiumFeature.carousel(for: .mac), [.print, .alerts, .calendars, .watch, .sky])
     }
 
     func testSelectedPlanMissingFromAPartialLoadIsUnavailable() {

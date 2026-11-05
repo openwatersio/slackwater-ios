@@ -29,13 +29,16 @@ struct PremiumFeaturePreview: View {
     let feature: PremiumFeature
     @State private var example: (snapshot: WidgetSnapshot, graph: StationCardGraph,
                                  complication: ComplicationReading?,
-                                 strip: (data: TimelineData, sky: SkyState, at: Date)?)?
+                                 strip: (data: TimelineData, sky: SkyState, at: Date)?,
+                                 page: PrintablePage?)?
 
     var body: some View {
         VStack {
             if let example {
                 VStack(alignment: .leading, spacing: 12) {
-                    if feature == .lockScreen {
+                    if feature == .print {
+                        if let page = example.page { PrintedWeekExample(page: page) }
+                    } else if feature == .lockScreen {
                         if let next = example.snapshot.next {
                             Label {
                                 Text("\(next.label) \(cardTime(next.time, example.snapshot.tz)) · \(example.snapshot.stationName)")
@@ -124,10 +127,25 @@ struct PremiumFeaturePreview: View {
                                                 days: data.days, eclipses: data.eclipses), at)
                     }
                 }
+                var page: PrintablePage?
+                if feature == .print, case .tide(let info, _) = record {
+                    let imperial = heightUnits() != "metric"
+                    let config = PrintableConfig(
+                        source: .computed(.tide(info)), kind: .tide(heightUnit: heightUnit(imperial: imperial)),
+                        facts: PrintFacts(name: info.name, region: info.region,
+                                          units: printableUnitName(heightUnit(imperial: imperial)),
+                                          datum: info.chartDatum,
+                                          source: printSourceLabel(id: info.id, publisher: info.source), link: nil),
+                        entries: { tideScheduleEntries($0, imperial: imperial) })
+                    let range = printRange(.week, anchor: now, tz: info.tz)
+                    page = printablePage(config, span: .week, anchor: now, tz: info.tz,
+                                         timelines: printTimelines(config.source, range: range, tz: info.tz, now: now),
+                                         printedAt: now)
+                }
                 return (WidgetSnapshot.build(station, now: now),
                         record.accessoryGraph(at: now),
                         ComplicationReading.build(station, now: now),
-                        strip)
+                        strip, page)
             }.value
         }
     }
@@ -194,6 +212,85 @@ func skyPaneLeft(width: CGFloat, center: CGFloat, turns: [CGFloat], margin: CGFl
         if clear(centred + shift) { return centred + shift }
     }
     return centred
+}
+
+/// The top of the printed week: its heading, then the first day's rows, set as `printableHTML`
+/// sets them on paper. The page itself is HTML for the print renderer, so this redraws its rows.
+private struct PrintedWeekExample: View {
+    let page: PrintablePage
+    private static let dayFill = Color(white: 0.95)
+    private static let nightFill = Color(red: 0xe8 / 255, green: 0xec / 255, blue: 0xf2 / 255)
+
+    var body: some View {
+        let tz = page.tz
+        let day = page.days.first
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: page.facts.name)
+                .font(.subheadline.weight(.bold))
+            Text(verbatim: [page.facts.region, tz.abbreviation(for: page.range.lowerBound) ?? tz.identifier,
+                            page.facts.units, page.facts.datum ?? "", page.facts.source]
+                .filter { !$0.isEmpty }.joined(separator: " · "))
+                .font(.caption2)
+                .lineLimit(1)
+                .padding(.bottom, 4)
+            Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+                GridRow {
+                    Text(String(localized: "Time", comment: "Column header of a printed tide or current table: the time of day."))
+                    Text(String(localized: "Event", comment: "Column header of a printed tide or current table: what happens at that time."))
+                    Text(String(localized: "Height", comment: "Column header of a printed tide table: the water height."))
+                }
+                .font(.caption.weight(.semibold))
+                .modifier(PrintedCell())
+                rule
+                if let day {
+                    GridRow {
+                        Group {
+                            if let rise = day.sunrise, let set = day.sunset {
+                                Text(verbatim: "\(localizedFormatter("EEEMMMd", tz).string(from: day.start))   ☀︎ \(chartTime(rise, tz)) – \(chartTime(set, tz))")
+                            } else {
+                                Text(verbatim: "\(localizedFormatter("EEEMMMd", tz).string(from: day.start))   ☀︎ —")
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .modifier(PrintedCell(fill: Self.dayFill))
+                        .gridCellColumns(3)
+                    }
+                    rule
+                    ForEach(day.entries.prefix(4), id: \.id) { e in
+                        GridRow {
+                            Text(verbatim: chartTime(e.time, tz))
+                            Text(verbatim: eventWord(e.pill))
+                            Text(verbatim: e.value ?? "—")
+                        }
+                        .font(.caption.monospacedDigit())
+                        .modifier(PrintedCell(fill: printIsNight(e.time, nights: page.nights) ? Self.nightFill : .clear))
+                        rule
+                    }
+                }
+            }
+        }
+        .foregroundStyle(.black)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 6))
+        .dynamicTypeSize(.medium)
+    }
+
+    private var rule: some View {
+        Rectangle().fill(.black).frame(height: 0.5).gridCellUnsizedAxes(.horizontal)
+    }
+}
+
+/// A printed cell's padding, filling its column so a shaded row shades edge to edge.
+private struct PrintedCell: ViewModifier {
+    var fill: Color = .clear
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(fill)
+    }
 }
 
 /// The watch's circular complication, as the phone can draw it: the line three hours either

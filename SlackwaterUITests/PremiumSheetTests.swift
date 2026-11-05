@@ -8,11 +8,11 @@ final class PremiumSheetTests: ScreenshotTestCase {
 
     func testOpensOnFirstCardWithoutAFeature() {
         let app = launch("-locDenied", "-seedPremiumSheet")
-        let card = element(app, "premium-card-alerts")
+        let card = element(app, "premium-card-print")
         XCTAssert(card.appears(within: 5))
         XCTAssert(waitFor(card, "isHittable == true"))
         XCTAssertFalse(element(app, "premium-card-sky").isHittable)
-        save(app, "premium-sheet-alerts.png")
+        save(app, "premium-sheet-print.png")
     }
 
     func testOpensOnTheNamedFeature() {
@@ -71,7 +71,7 @@ final class PremiumSheetTests: ScreenshotTestCase {
 
     func testPurchasedHidesPlansAndFreeDay() {
         let app = launch("-locDenied", "-seedPremium", "-seedPremiumSheet")
-        XCTAssert(element(app, "premium-card-alerts").appears(within: 5))
+        XCTAssert(element(app, "premium-card-print").appears(within: 5))
         XCTAssert(app.staticTexts["You have Premium — thank you."].firstMatch.exists)
         XCTAssertFalse(element(app, "premium-plan-yearly").exists)
         XCTAssertFalse(element(app, "premium-free-day").exists)
@@ -85,7 +85,7 @@ final class PremiumSheetTests: ScreenshotTestCase {
         // The whole table can sit taller than the space above the pinned button; its last row can't.
         scrollTo(table.descendants(matching: .any)["Sky controls"].firstMatch, in: app)
         for label in ["Every tide and current, every date, offline", "Home screen widgets", "The watch app",
-                      "Alerts", "Calendars", "Lock screen widgets", "Watch complications", "Sky controls"] {
+                      "Print and PDF", "Alerts", "Calendars", "Lock screen widgets", "Watch complications", "Sky controls"] {
             XCTAssert(table.descendants(matching: .any)
                 .matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch.exists, label)
         }
@@ -100,7 +100,7 @@ final class PremiumSheetTests: ScreenshotTestCase {
 
     func testSwipesThroughEveryCard() {
         let app = launch("-locDenied", "-seedPremiumSheet")
-        for feature in ["alerts", "calendars", "lockScreen", "watch", "sky"] {
+        for feature in ["print", "alerts", "calendars", "lockScreen", "watch", "sky"] {
             let card = element(app, "premium-card-\(feature)")
             XCTAssert(waitFor(card, "isHittable == true"), feature)
             XCTAssert(element(app, "premium-preview-\(feature)").appears(within: 10), feature)
@@ -112,7 +112,7 @@ final class PremiumSheetTests: ScreenshotTestCase {
     func testLargestTextKeepsTheButtonWhole() {
         let app = launch("-locDenied", "-seedPremiumSheet",
                          "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL")
-        XCTAssert(element(app, "premium-preview-alerts").appears(within: 10))
+        XCTAssert(element(app, "premium-preview-print").appears(within: 10))
         let buy = element(app, "premium-buy")
         XCTAssert(buy.label.contains("Get Premium"), buy.label)
         save(app, "premium-sheet-xxl-top.png")
@@ -150,6 +150,18 @@ final class PremiumSheetTests: ScreenshotTestCase {
         XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
         app.switches["calendar-station-\(tide)"].tap()
         let card = element(app, "premium-card-calendars")
+        XCTAssert(card.appears(within: 5))
+        XCTAssert(waitFor(card, "isHittable == true"))
+    }
+
+    func testPrintableTablesOpensOnPrintCard() {
+        let app = launch("-locDenied")
+        openFridayHarbor(app)
+        let row = app.buttons["printable-tables-row"].firstMatch
+        XCTAssert(row.appears(within: 10))
+        scrollTo(row, in: app)
+        row.tap()
+        let card = element(app, "premium-card-print")
         XCTAssert(card.appears(within: 5))
         XCTAssert(waitFor(card, "isHittable == true"))
     }

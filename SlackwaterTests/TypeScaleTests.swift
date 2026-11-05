@@ -105,7 +105,7 @@ extension TypeScaleTests {
             // too: a `#Preview {` line is no declaration, so the walk climbs
             // to the nearest one above it — previewGraph.
             "StationCard.swift:previewGraph",
-            "TideDetailView.swift:scheduleEntries",
+            "TideDetailView.swift:tideScheduleEntries",
             // The swing figure's lit-bar label: each sheet hands SwingFigure
             // its `swingLabel`, and the figure's one consuming Text
             // (SwingFigure.swift) carries `.caption2.monospacedDigit()`.

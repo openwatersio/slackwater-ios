@@ -96,7 +96,7 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
 
     func testPremiumSheetPassesTheAudit() throws {
         let app = launch("-locDenied", "-seedPremiumSheet")
-        XCTAssert(app.otherElements["premium-preview-alerts"].appears(within: 10))
+        XCTAssert(app.otherElements["premium-preview-print"].appears(within: 10))
         try audit(app, "premium sheet")
         scrollTo(app.buttons["Restore purchase"], in: app)
         try audit(app, "premium sheet end")

@@ -29,11 +29,11 @@ final class PrintableTablesUITests: ScreenshotTestCase {
                         XCUIElement.ElementType.button.rawValue)).firstMatch
     }
 
-    func testAFreeUserGetsTheSupportSheet() {
+    func testAFreeUserGetsThePremiumSheet() {
         let app = launch("-locDenied")
         openFridayHarbor(app)
         openSheet(app)
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         XCTAssertFalse(app.buttons["printable-share"].exists)
     }
 
