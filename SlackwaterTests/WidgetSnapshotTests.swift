@@ -474,7 +474,7 @@ import SlackwaterKit
         let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
         let station = kodiak.engineStation
         let slacks = station.events(from: day, to: day.addingTimeInterval(86_400)).filter { $0.kind == .slack }
-        var crossing = 0, still = 0
+        var crossing = 0
         for slack in slacks {
             let p = try XCTUnwrap(station.speeds(from: slack.time, to: slack.time.addingTimeInterval(1), step: 1).first)
             let f = face(WidgetCard.build(.current(kodiak, station: station), now: slack.time).reading)
@@ -484,7 +484,6 @@ import SlackwaterKit
                 let word = p.speed >= 0 ? "Flooding" : "Ebbing"
                 XCTAssertEqual(f, [word, value, p.magnitude < 0.05 ? "•" : set, "\(value) kn, \(word), setting \(set)"], "\(slack.time)")
             } else if value == "0.0" {
-                still += 1
                 XCTAssertEqual(f, ["Slack", "0.0", "•", "0.0 kn, slack"], "\(slack.time)")
             } else {
                 crossing += 1
@@ -540,6 +539,59 @@ import SlackwaterKit
         XCTAssertEqual(face(1.5, 40, 1.2, slack: false), CurrentCardFace(value: "1.5", markedSet: 40, spoken: "1.5 kn, Flooding, setting NE"))
         XCTAssertEqual(face(0.04, 230, -0.03, slack: false), CurrentCardFace(value: "0.0", markedSet: nil, spoken: "0.0 kn, Ebbing, setting SW"))
         XCTAssertEqual(face(1.5, nil, 1.2, slack: false), CurrentCardFace(value: "1.5", markedSet: nil, spoken: "1.5 kn, Flooding"))
+    }
+
+    /// The card a state reads as, with the set format the tests pin.
+    private func face(_ state: CurrentCardState, inWindow: Bool = false) -> [String] {
+        face(.current(magnitude: state.magnitude, direction: state.direction, speed: state.signed, unit: "kn", inWindow: inWindow))
+    }
+
+    /// Dodd Narrows floods 355° and ebbs 155°, which is not the flood's reciprocal (175°): a one-axis card sets along the published bearing for its sign, never the flood turned around.
+    func testAOneAxisCardSetsAlongThePublishedBearingNotTheReciprocal() {
+        let t = day
+        let ebbing = CurrentCardState(point: CurrentPoint(time: t, speed: -1.2), flood: 355, ebb: 155, next: nil)
+        XCTAssertEqual(ebbing.direction, 155)
+        XCTAssertEqual(face(ebbing), ["Ebbing", "1.2", "SSE", "1.2 kn, Ebbing, setting SSE"])
+        XCTAssertEqual(currentCardFace(magnitude: ebbing.magnitude, direction: ebbing.direction, speed: ebbing.signed,
+                                       unit: "kn", inWindow: false, setFormat: "compass").markedSet, 155)
+        let flooding = CurrentCardState(point: CurrentPoint(time: t, speed: 1.2), flood: 355, ebb: 155, next: nil)
+        XCTAssertEqual(flooding.direction, 355)
+        XCTAssertEqual(face(flooding), ["Flooding", "1.2", "N", "1.2 kn, Flooding, setting N"])
+        XCTAssertEqual(currentCardFace(magnitude: flooding.magnitude, direction: flooding.direction, speed: flooding.signed,
+                                       unit: "kn", inWindow: false, setFormat: "compass").markedSet, 355)
+    }
+
+    /// An online gate's fetched samples, ten minutes apart from `day`, flooding 355° and ebbing 155°. The flood's last 0.2 kn turns to a 0.6 kn ebb a quarter of the way to the next sample, so the slack the samples derive lies 150 s after the 0.2.
+    private var doddWindow: ChsOnlineWindow {
+        let speeds = [1.0, 0.6, 0.2, -0.6, -1.2, -0.8]
+        let times = speeds.indices.map { day.addingTimeInterval(Double($0) * 600).timeIntervalSince1970 }
+        return ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
+                               start: day, end: Date(timeIntervalSince1970: times.last!),
+                               floodDirection: 355, ebbDirection: 155, times: times, speeds: speeds)
+    }
+
+    /// The online card reads its nearest sample's speed, and an ebb sample sets along the published ebb bearing.
+    func testTheOnlineCardStateSetsAlongThePublishedEbb() {
+        let window = doddWindow
+        let ebb = day.addingTimeInterval(4 * 600)
+        let state = window.cardState(at: ebb)
+        XCTAssertEqual(state.signed, -1.2)
+        XCTAssertEqual(state.magnitude, 1.2)
+        XCTAssertEqual(state.direction, 155)
+        XCTAssertEqual(face(state), ["Ebbing", "1.2", "SSE", "1.2 kn, Ebbing, setting SSE"])
+    }
+
+    /// Within a second of a slack the samples derive, the online card says Slack over its nearest sample's 0.2 kn. That water runs along the axis, so no crossing flow prints and the card shows the slack dot and speaks no set.
+    func testTheOnlineCardAtADerivedSlackShowsTheDot() throws {
+        let window = doddWindow
+        let slack = try XCTUnwrap(sampleEvents(window.points).first { $0.kind == .slack }).time
+        XCTAssertEqual(slack, day.addingTimeInterval(2 * 600 + 150))
+        let now = slack.addingTimeInterval(0.5)
+        let state = window.cardState(at: now)
+        XCTAssertEqual(state.signed, 0.2, "the nearest sample")
+        let graph = window.cardGraph(at: now, unit: "kn")
+        XCTAssertTrue(graph.isSlack(at: now))
+        XCTAssertEqual(face(state, inWindow: graph.isSlack(at: now)), ["Slack", "0.2", "•", "0.2 kn, slack"])
     }
 }
 

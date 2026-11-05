@@ -327,6 +327,13 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: at(3600), point: faint).reading.glyph, slackGlyph)
     }
 
+    /// Inside a slack core the water can still run 0.3 kn along the axis and 0.5 kn in all. The lead prints the full 0.5, not the 0.4 crossing it, and that crossing flow, printing above zero, shows the set in the go colour.
+    func testARotaryLeadAtSlackKeepsTheFullSpeedWhileTheAxisStillRuns() {
+        let running = CurrentPoint(time: at(3550), speed: 0.3, magnitude: 0.5, direction: 95)
+        XCTAssertEqual(lead(scrub: at(3550), point: running).reading,
+                       reading("Slack", "0.5", set: 95, "E", tint: .slack, spoken: "Slack 0.5 knots E"))
+    }
+
     /// Kodiak's cross-flow runs at up to about 0.8 of its major axis, so at two of its three slacks on this day the engine-exact lead still has a speed and a set; at the third the crossing flow prints 0.0 and the lead claims no set.
     func testKodiakAtItsSlacksShowsTheCrossingFlow() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
