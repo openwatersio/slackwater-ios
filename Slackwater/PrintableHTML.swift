@@ -38,20 +38,20 @@ func htmlEscape(_ s: String) -> String {
 }
 
 private let printCSS = """
-body { font-family: -apple-system, system-ui, sans-serif; color: #000; background: #fff; margin: 0; font-size: 11pt; }
-h1 { font-size: 18pt; margin: 0 0 4pt; }
-.meta { margin: 0 0 8pt; font-size: 10pt; }
-.coverage { margin: 0 0 8pt; font-size: 10pt; font-weight: bold; }
+body { font-family: -apple-system, system-ui, sans-serif; color: #000; background: #fff; margin: 0; font-size: 9pt; line-height: 1.15; }
+h1 { font-size: 14pt; margin: 0 0 2pt; }
+.meta { margin: 0 0 4pt; font-size: 8.5pt; }
+.coverage { margin: 0 0 4pt; font-size: 8.5pt; font-weight: bold; }
 table { width: 100%; border-collapse: collapse; }
 thead { display: table-header-group; }
-th { text-align: left; border-bottom: 1px solid #000; padding: 3pt 4pt; }
-td { padding: 2pt 4pt; border-bottom: 1px solid #000; }
-tr { break-inside: avoid; }
+th { text-align: left; border-bottom: 1px solid #000; padding: 1.5pt 4pt; white-space: nowrap; }
+td { padding: 1pt 4pt; border-bottom: 1px solid #000; white-space: nowrap; }
+tr { break-inside: avoid; page-break-inside: avoid; }
 tr.day td { font-weight: bold; background: #f2f2f2; }
 .night { background: #e8ecf2; }
-.note { margin-left: 6pt; font-size: 9pt; }
-.mday .t { display: inline-block; margin-right: 8pt; white-space: nowrap; }
-.foot { margin-top: 12pt; font-size: 9pt; }
+.note { margin-left: 6pt; font-size: 8pt; }
+.mday .t { display: inline-block; margin-right: 6pt; white-space: nowrap; }
+.foot { margin-top: 6pt; font-size: 8pt; break-inside: avoid; page-break-inside: avoid; page-break-before: avoid; }
 """
 
 func printableHTML(_ page: PrintablePage, setFormat: String) -> String {

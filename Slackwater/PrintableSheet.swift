@@ -7,10 +7,12 @@ import UIKit
 /// The page as a PDF: the HTML through `UIMarkupTextPrintFormatter`, paginated by
 /// `UIPrintPageRenderer`, so a saved file and a printed sheet break at the same rows.
 /// Letter where Locale.current.measurementSystem == .us, else A4; 36 pt margins.
-@MainActor func printablePDF(html: String) -> Data {
-    let paper = Locale.current.measurementSystem == .us
-        ? CGRect(x: 0, y: 0, width: 612, height: 792)
-        : CGRect(x: 0, y: 0, width: 595.28, height: 841.89)
+/// `paper` overrides the locale's choice; tests use it to print both sizes.
+@MainActor func printablePDF(html: String, paper size: CGSize? = nil) -> Data {
+    let paper = size.map { CGRect(origin: .zero, size: $0) }
+        ?? (Locale.current.measurementSystem == .us
+            ? CGRect(x: 0, y: 0, width: 612, height: 792)
+            : CGRect(x: 0, y: 0, width: 595.28, height: 841.89))
     let formatter = UIMarkupTextPrintFormatter(markupText: html)
     let renderer = UIPrintPageRenderer()
     renderer.addPrintFormatter(formatter, startingAtPageAt: 0)
