@@ -117,6 +117,12 @@ import Foundation
     if CommandLine.arguments.contains("-seedFreeDay") {
         FreeDayStore.shared.seed(lastStart: appNow())
     }
+    // -seedFreeDayCalendar <id>: a subscription a free day turned on, as it reads once that
+    // day has ended. After -resetCalendars, which the store applies when first read.
+    if let i = CommandLine.arguments.firstIndex(of: "-seedFreeDayCalendar"),
+       CommandLine.arguments.indices.contains(i + 1) {
+        StationCalendarStore.shared.subscribe(CommandLine.arguments[i + 1], notify: false, freeDay: true)
+    }
     // This month's free day, used and over: a day ago, or the month's first instant when that
     // falls in last month. On the 1st that start is still running until midnight.
     if CommandLine.arguments.contains("-seedFreeDayUsed") {

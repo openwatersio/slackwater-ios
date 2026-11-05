@@ -58,6 +58,11 @@ func publishingStations(_ subs: [StationCalendar], premium: Bool) -> [String] {
     subs.filter { premium || !$0.freeDay }.map(\.stationID)
 }
 
+/// A calendar a free day turned on, read after that day ended: kept, but no longer publishing.
+func calendarStopped(_ sub: StationCalendar, premium: Bool) -> Bool {
+    sub.freeDay && !premium
+}
+
 /// Which series a station reads in — the half of its calendar's title that keeps a tide
 /// station and a current station of the same name apart.
 enum StationCalendarKind {

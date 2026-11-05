@@ -180,6 +180,9 @@ final class StationCalendarTests: XCTestCase {
         let subs = [StationCalendar(stationID: "a"), StationCalendar(stationID: "b", freeDay: true)]
         XCTAssertEqual(publishingStations(subs, premium: true), ["a", "b"])
         XCTAssertEqual(publishingStations(subs, premium: false), ["a"])
+        XCTAssertTrue(calendarStopped(StationCalendar(stationID: "b", freeDay: true), premium: false))
+        XCTAssertFalse(calendarStopped(StationCalendar(stationID: "b", freeDay: true), premium: true))
+        XCTAssertFalse(calendarStopped(StationCalendar(stationID: "a"), premium: false))
     }
 
     @MainActor func testPurchaseClearsFreeDayMarks() {
