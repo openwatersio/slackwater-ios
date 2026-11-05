@@ -69,20 +69,48 @@ final class PrintableTablesTests: XCTestCase {
         XCTAssertNil(printCoverageNote(range: r, covered: [r], tz: tz))
     }
 
-    private func printDay(rise: Date?, set: Date?) -> PrintDay {
-        PrintDay(start: day(11, 4), sunrise: rise, sunset: set, entries: [])
+    func testAdjacentCoverageOneSampleApartIsFullCoverage() {
+        let r = day(11, 1)..<day(11, 8)
+        let gap = ChsOnlineWindow.sampleInterval
+        let a = day(11, 1)..<day(11, 4)
+        let b = a.upperBound.addingTimeInterval(gap)..<day(11, 8)
+        XCTAssertNil(printCoverageNote(range: r, covered: [b, a], tz: tz))
+        // A wider hole still reports, with the two ranges kept apart.
+        let c = a.upperBound.addingTimeInterval(gap + 1)..<day(11, 8)
+        XCTAssertNotNil(printCoverageNote(range: r, covered: [a, c], tz: tz))
+    }
+
+    private func nights(_ days: [TimelineDay]) -> [Range<Date>] {
+        printNightSpans(timelines: [timeline(days: days)])
+    }
+    private func sunDay(_ d: Int, rise: Date?, set: Date?) -> TimelineDay {
+        TimelineDay(offset: d, start: day(11, d), sunrise: rise, sunset: set, moonrise: nil, moonset: nil)
     }
     func testNightIsOutsideSunriseToSunset() {
-        let d = printDay(rise: day(11, 4, 6, 40), set: day(11, 4, 17))
-        XCTAssertTrue(printIsNight(day(11, 4, 5), in: d))
-        XCTAssertFalse(printIsNight(day(11, 4, 12), in: d))
-        XCTAssertTrue(printIsNight(day(11, 4, 20), in: d))
+        let n = nights([sunDay(3, rise: day(11, 3, 6, 40), set: day(11, 3, 17)),
+                        sunDay(4, rise: day(11, 4, 6, 41), set: day(11, 4, 17))])
+        XCTAssertTrue(printIsNight(day(11, 4, 5), nights: n))
+        XCTAssertFalse(printIsNight(day(11, 4, 12), nights: n))
+        XCTAssertTrue(printIsNight(day(11, 3, 20), nights: n))
     }
-    /// The strip pairs sun events into `sunSpans` (TimelineStrip.swift, `sunSpans`) and shades
-    /// only the `!daylight` spans; a day with neither event yields no span, so it is not shaded.
-    func testADayWithNoSunEventsFollowsTheStrip() {
-        let d = printDay(rise: nil, set: nil)
-        XCTAssertFalse(printIsNight(day(11, 4, 2), in: d))
-        XCTAssertFalse(printIsNight(day(11, 4, 12), in: d))
+    /// `TimelineData.sunSpans` pairs a sunset with the next sunrise even when the sunset falls after
+    /// local midnight, before its own civil day's sunrise. `rise..<set` built from one day would trap.
+    func testASunsetAfterMidnightBeforeThatDaysSunriseDoesNotTrapAndPairsAsTheStripDoes() {
+        let n = nights([sunDay(4, rise: day(11, 4, 9), set: day(11, 4, 0, 30)),
+                        sunDay(5, rise: day(11, 5, 9), set: day(11, 5, 0, 30))])
+        XCTAssertEqual(n, [day(11, 4, 0, 30)..<day(11, 4, 9), day(11, 5, 0, 30)..<day(11, 5, 9)])
+        XCTAssertTrue(printIsNight(day(11, 4, 3), nights: n))
+        XCTAssertFalse(printIsNight(day(11, 4, 12), nights: n))
+    }
+    /// A day with neither event (or one) yields no span in `sunSpans`, so the strip leaves it unshaded.
+    func testADayWithNoSunEventsOrOneIsNotNight() {
+        XCTAssertEqual(nights([sunDay(4, rise: nil, set: nil)]), [])
+        XCTAssertEqual(nights([sunDay(4, rise: day(11, 4, 7), set: nil)]), [])
+        XCTAssertFalse(printIsNight(day(11, 4, 2), nights: []))
+    }
+    func testNightsFromOverlappingWeekTimelinesMerge() {
+        let d = [sunDay(3, rise: day(11, 3, 7), set: day(11, 3, 17)), sunDay(4, rise: day(11, 4, 7), set: day(11, 4, 17))]
+        let merged = printNightSpans(timelines: [timeline(days: d), timeline(days: d)])
+        XCTAssertEqual(merged, [day(11, 3, 17)..<day(11, 4, 7)])
     }
 }

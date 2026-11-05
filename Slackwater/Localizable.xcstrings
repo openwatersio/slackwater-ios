@@ -45028,6 +45028,101 @@
         }
       }
     },
+    "Predictions available %@ only." : {
+      "comment" : "Note on a printed tide or current table when official predictions cover only part of the printed span. The value is a comma-separated list of date ranges in the place’s time zone, such as “Nov 4 – 10, Nov 15 – 17”.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prognoser kun tilgængelige for %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhersagen nur verfügbar für %@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones disponibles solo para %@."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ennusteet saatavilla vain: %@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévisions disponibles seulement pour %@."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níl tuar ar fáil ach do %@."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chan eil ro-aithrisean ri fhaighinn ach airson %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsioni disponibili solo per %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予測は%@のみ利用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예측은 %@에 대해서만 제공됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prognoser er bare tilgjengelige for %@."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorspellingen alleen beschikbaar voor %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsões disponíveis apenas para %@."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsões disponíveis apenas para %@."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prognoser är bara tillgängliga för %@."
+          }
+        }
+      }
+    },
     "Predictions available through %@" : {
       "comment" : "Date through which downloaded official tide predictions remain usable. The value is a date in the place’s time zone.",
       "localizations" : {

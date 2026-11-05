@@ -70,14 +70,46 @@ func printDays(timelines: [TimelineData], entries: (TimelineData) -> [ScheduleEn
     }
 }
 
-/// True when `t` falls outside its day's sunrise..<sunset.
+/// The nights to shade, as the strip draws them: every `!daylight` span of each
+/// timeline's `sunSpans`, deduped, sorted and merged across week timelines.
 ///
-/// A day missing either sun event is never night, as on the strip: `sunSpans`
-/// (TimelineStrip.swift) only pairs a sunrise with a sunset, and `nightShade`
-/// tints only the night spans, so an unpaired day is left unshaded.
-func printIsNight(_ t: Date, in day: PrintDay) -> Bool {
-    guard let rise = day.sunrise, let set = day.sunset else { return false }
-    return !(rise..<set).contains(t)
+/// `sunSpans` pairs a sunrise with the adjacent sunset, so a sunset that falls
+/// after local midnight, before its civil day's sunrise, is handled the same
+/// way here. A day with no pair contributes nothing, as on the strip.
+func printNightSpans(timelines: [TimelineData]) -> [Range<Date>] {
+    let nights = timelines.flatMap { $0.sunSpans }.filter { !$0.daylight && $0.start < $0.end }
+        .map { $0.start..<$0.end }
+        .sorted { $0.lowerBound < $1.lowerBound }
+    var out: [Range<Date>] = []
+    for n in nights {
+        if let last = out.last, n.lowerBound <= last.upperBound {
+            out[out.count - 1] = last.lowerBound..<max(last.upperBound, n.upperBound)
+        } else {
+            out.append(n)
+        }
+    }
+    return out
+}
+
+/// True when `t` falls inside one of `nights` (from `printNightSpans`).
+func printIsNight(_ t: Date, nights: [Range<Date>]) -> Bool {
+    nights.contains { $0.contains(t) }
+}
+
+/// Covered ranges sorted, with any that overlap or sit within one official
+/// sample of each other joined: online blocks requested to abut arrive one
+/// sample apart (`ChsOnlineWindow.sampleInterval`).
+private func mergedCoverage(_ covered: [Range<Date>]) -> [Range<Date>] {
+    var out: [Range<Date>] = []
+    for r in covered.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+        if let last = out.last,
+           r.lowerBound.timeIntervalSince(last.upperBound) <= ChsOnlineWindow.sampleInterval {
+            out[out.count - 1] = last.lowerBound..<max(last.upperBound, r.upperBound)
+        } else {
+            out.append(r)
+        }
+    }
+    return out
 }
 
 /// nil when `covered` is nil or contains all of `range`. Otherwise
@@ -85,7 +117,8 @@ func printIsNight(_ t: Date, in day: PrintDay) -> Bool {
 func printCoverageNote(range: Range<Date>, covered: [Range<Date>]?, tz: TimeZone,
                        locale: Locale = .autoupdatingCurrent) -> String? {
     guard let covered else { return nil }
-    if covered.contains(where: { $0.lowerBound <= range.lowerBound && $0.upperBound >= range.upperBound }) {
+    let merged = mergedCoverage(covered)
+    if merged.contains(where: { $0.lowerBound <= range.lowerBound && $0.upperBound >= range.upperBound }) {
         return nil
     }
     let formatter = DateIntervalFormatter()
@@ -93,6 +126,8 @@ func printCoverageNote(range: Range<Date>, covered: [Range<Date>]?, tz: TimeZone
     formatter.timeZone = tz
     formatter.dateTemplate = "MMMd"
     // Ranges are half-open at local midnight; name the last day inside.
-    let parts = covered.map { formatter.string(from: $0.lowerBound, to: $0.upperBound.addingTimeInterval(-1)) }
-    return "Predictions available \(parts.joined(separator: ", ")) only."
+    let parts = merged.map { formatter.string(from: $0.lowerBound, to: $0.upperBound.addingTimeInterval(-1)) }
+    let list = parts.joined(separator: ", ")
+    return String(localized: "Predictions available \(list) only.",
+                  comment: "Note on a printed tide or current table when official predictions cover only part of the printed span. The value is a comma-separated list of date ranges in the place’s time zone, such as “Nov 4 – 10, Nov 15 – 17”.")
 }
