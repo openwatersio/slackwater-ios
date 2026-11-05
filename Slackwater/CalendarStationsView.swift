@@ -185,7 +185,7 @@ struct CalendarStationsView: View {
     /// by any bundled tide or current station, which always has a next high/low or slack window
     /// inside that window.
     private func subscribeAndVerify(_ stationID: String) async {
-        calendars.subscribe(stationID, notify: false)
+        calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()
         guard calendars.calendarID(for: stationID) == nil else { return }
         calendars.unsubscribe(stationID)

@@ -154,6 +154,53 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(Set(groups.keys), ["a"])
     }
 
+    func testAStoppedStationIsEmptiedWithoutAPlan() {
+        // A free day's calendar after the day ends: it was never resolved, and its events go.
+        let groups = calendarWriteGroups([entry("b")], subscribed: ["a"], live: ["a", "b"],
+                                         skipping: [], stopped: ["b"])
+
+        XCTAssertEqual(Set(groups.keys), ["a", "b"])
+        XCTAssertEqual(groups["b"]?.count, 0)
+    }
+
+    func testAStoppedStationTurnedOffIsNotWritten() {
+        let groups = calendarWriteGroups([], subscribed: [], live: [], skipping: [], stopped: ["b"])
+
+        XCTAssertTrue(groups.isEmpty, "turned off since: no calendar to empty")
+    }
+
+    // MARK: free day calendars
+
+    func testOldSubscriptionsDecodeUnmarked() {
+        let json = #"[{"stationID":"noaa/9444900","calendarID":"x"}]"#.data(using: .utf8)!
+        XCTAssertEqual(try JSONDecoder().decode([StationCalendar].self, from: json).first?.freeDay, false)
+    }
+
+    func testFreeDayCalendarStopsWithoutPremium() {
+        let subs = [StationCalendar(stationID: "a"), StationCalendar(stationID: "b", freeDay: true)]
+        XCTAssertEqual(publishingStations(subs, premium: true), ["a", "b"])
+        XCTAssertEqual(publishingStations(subs, premium: false), ["a"])
+    }
+
+    @MainActor func testPurchaseClearsFreeDayMarks() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d)
+        store.subscribe("a", freeDay: true)
+        XCTAssertEqual(store.subscriptions.first?.freeDay, true)
+
+        store.clearFreeDayMarks()
+
+        XCTAssertEqual(store.subscriptions.first?.freeDay, false)
+        XCTAssertEqual(StationCalendarStore(defaults: d).subscriptions.first?.freeDay, false)
+    }
+
+    @MainActor func testAFreeDayMarkSurvivesARoundTrip() {
+        let d = defaults()
+        StationCalendarStore(defaults: d).subscribe("a", freeDay: true)
+
+        XCTAssertEqual(StationCalendarStore(defaults: d).subscriptions.first?.freeDay, true)
+    }
+
     @MainActor func testASubscribedStationWithoutACalendarYetReturnsNilID() {
         let store = StationCalendarStore(defaults: defaults())
         store.subscribe("a")

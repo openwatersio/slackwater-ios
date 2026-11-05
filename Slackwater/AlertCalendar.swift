@@ -14,14 +14,20 @@ import os
 /// deleted — one the app holds no id for and can never remove again. A station turned on in the
 /// gap is missing from `subscribed` instead, has no plan, and waits for the pass its own toggle
 /// starts.
+///
+/// `stopped` is a subscription this run withholds, a free day's after the day ends. It is
+/// emptied rather than left out, and its calendar and id stay so buying fills the same one.
 func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Set<String>,
-                         skipping: Set<String>) -> [String: [AlertEntry]] {
+                         skipping: Set<String>, stopped: Set<String> = []) -> [String: [AlertEntry]] {
     var groups: [String: [AlertEntry]] = [:]
     for stationID in subscribed where live.contains(stationID) && !skipping.contains(stationID) {
         groups[stationID] = []
     }
     for entry in entries where groups[entry.stationID] != nil {
         groups[entry.stationID]?.append(entry)
+    }
+    for stationID in stopped.intersection(live) where groups[stationID] == nil {
+        groups[stationID] = []
     }
     return groups
 }
@@ -135,7 +141,8 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     /// changes a subscription is what triggers a reschedule, so a run with a subscription change
     /// in flight is the normal case, and each side of the disagreement is wrong to write for its
     /// own reason.
-    static func apply(_ entries: [AlertEntry], subscribed: [String], skipping: Set<String> = [], now: Date) {
+    static func apply(_ entries: [AlertEntry], subscribed: [String], skipping: Set<String> = [],
+                      stopped: Set<String> = [], now: Date) {
         guard authorized else { return }
         // The store is long-lived and caches what it has already seen. Without a reset, a
         // calendar another device created and synced since this process last asked stays
@@ -145,7 +152,8 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
         CurrentCalendarInvalidations.retry { clearInvalidatedCurrent($0, now: now) }
         let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
-                                                        live: live, skipping: skipping) {
+                                                        live: live, skipping: skipping,
+                                                        stopped: stopped) {
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
             // Nothing planned and no calendar yet: don't make an empty one.

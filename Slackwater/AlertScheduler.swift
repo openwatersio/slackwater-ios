@@ -140,7 +140,9 @@ struct AlertStatusSnapshot: Equatable {
         let premiumEnds = PremiumStore.shared.hasPurchased ? nil : FreeDayStore.shared.current?.end
         let imperial = heightUnits() != "metric"
 
-        let subscriptions = StationCalendarStore.shared.subscriptions.map(\.stationID)
+        let stored = StationCalendarStore.shared.subscriptions
+        let subscriptions = publishingStations(stored, premium: premium)
+        let stopped = Set(stored.map(\.stationID)).subtracting(subscriptions)
 
         let resolved = await Task.detached(priority: .utility) {
             resolveAlerts(rules, subscriptions: subscriptions, now: now, threshold: threshold)
@@ -168,7 +170,8 @@ struct AlertStatusSnapshot: Equatable {
         }
 
         AlertCalendar.apply(entries(plan.calendar, includeLead: false, includePlace: false),
-                            subscribed: subscriptions, skipping: resolved.unresolvedStations, now: now)
+                            subscribed: subscriptions, skipping: resolved.unresolvedStations,
+                            stopped: stopped, now: now)
         // Candidates first: an occurrence the system takes as a scheduled activity is delivered by
         // that activity's start alert, so it leaves the notification list for this run (spec §5.3).
         let kinds = resolved.kinds, stations = resolved.stations

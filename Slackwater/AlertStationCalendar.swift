@@ -34,10 +34,28 @@ enum CurrentCalendarInvalidations {
 }
 
 /// One station's calendar. `calendarID` is empty until EventKit has made or adopted it.
+/// `freeDay` marks one turned on during a free day: it stops publishing when the day ends.
 struct StationCalendar: Codable, Equatable, Identifiable {
     var stationID: String
     var calendarID: String = ""
+    var freeDay: Bool = false
     var id: String { stationID }
+}
+
+extension StationCalendar {
+    // Subscriptions saved before `freeDay` existed have no such key.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stationID = try c.decode(String.self, forKey: .stationID)
+        calendarID = try c.decodeIfPresent(String.self, forKey: .calendarID) ?? ""
+        freeDay = try c.decodeIfPresent(Bool.self, forKey: .freeDay) ?? false
+    }
+}
+
+/// The stations whose calendars publish this run. A free day's calendars stop with it; one
+/// turned on while Premium was bought keeps publishing after a lapse (docs/alerts.md §5.1).
+func publishingStations(_ subs: [StationCalendar], premium: Bool) -> [String] {
+    subs.filter { premium || !$0.freeDay }.map(\.stationID)
 }
 
 /// Which series a station reads in — the half of its calendar's title that keeps a tide
@@ -133,10 +151,17 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     /// Idempotent: subscribing to a station already on keeps the calendar it already has.
     /// `notify: false` is for a caller that drives its own reschedule and awaits the result —
     /// firing `onChange` too would start a second, unawaited pass over the same work.
-    func subscribe(_ stationID: String, notify: Bool = true) {
+    func subscribe(_ stationID: String, notify: Bool = true, freeDay: Bool = false) {
         guard !subscriptions.contains(where: { $0.stationID == stationID }) else { return }
-        subscriptions.append(StationCalendar(stationID: stationID))
+        subscriptions.append(StationCalendar(stationID: stationID, freeDay: freeDay))
         persist(notify: notify)
+    }
+
+    /// A purchase keeps what a free day turned on, through any later lapse.
+    func clearFreeDayMarks() {
+        guard subscriptions.contains(where: \.freeDay) else { return }
+        for i in subscriptions.indices { subscriptions[i].freeDay = false }
+        persist()
     }
 
     func unsubscribe(_ stationID: String) {

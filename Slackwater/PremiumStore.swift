@@ -129,8 +129,10 @@ final class PremiumStore: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         #if os(iOS)
         // Notifications are what the tier decides: gaining Premium schedules them, losing it
-        // clears them. Station calendars publish at any tier and are left exactly as they are
-        // (docs/alerts.md §6). The watch has no alerts.
+        // clears them. Station calendars keep publishing after a lapse (docs/alerts.md §6),
+        // except a free day's, which stop with it unless a purchase claims them. The watch has
+        // no alerts.
+        if purchasedChanged && hasPurchased { StationCalendarStore.shared.clearFreeDayMarks() }
         AlertScheduler.requestReschedule()
         #endif
     }
