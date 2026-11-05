@@ -1,6 +1,8 @@
 // Slackwater — GPL v3. Slackwater Premium (spec §3): one tier, two SKUs —
 // yearly + lifetime. StoreKit 2. The verified entitlement is cached into the
 // App Group so the widget process can gate without touching StoreKit.
+// Premium is that purchase or the month's free day while it runs.
+import Combine
 import Foundation
 import StoreKit
 import WidgetKit
@@ -23,19 +25,39 @@ final class PremiumStore: ObservableObject {
     nonisolated static let lifetimeID = "io.openwaters.slackwater.premium.lifetime.v2"
     private nonisolated static let ids = [yearlyID, lifetimeID]
 
+    /// What StoreKit says. The sheet needs it apart from `isPremium`.
+    @Published private(set) var hasPurchased: Bool
     @Published private(set) var isPremium: Bool
     @Published private(set) var products: [Product] = []
 
     private var updatesTask: Task<Void, Never>?
+    private var freeDayWatch: AnyCancellable?
+    private var freeDay: FreeDay?
+    private var freeDayEnd: Task<Void, Never>?
 
     private init() {
-        isPremium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        let purchased = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        hasPurchased = purchased
+        isPremium = purchased
         #if DEBUG
         // UI-test hook, like TestSeeds' -seed* arguments: -seedPremium holds the tier on for
         // the run. Without the early return, refreshEntitlement would set it back to what the
         // simulator's empty StoreKit account owns.
-        if CommandLine.arguments.contains("-seedPremium") { isPremium = true; return }
+        if CommandLine.arguments.contains("-seedPremium") {
+            hasPurchased = true
+            isPremium = true
+            return
+        }
         #endif
+        freeDay = FreeDayStore.shared.current
+        isPremium = premiumActive(purchased: hasPurchased, freeDay: freeDay, at: appNow())
+        scheduleFreeDayEnd()
+        // @Published emits before the property changes, so take the value it hands over.
+        freeDayWatch = FreeDayStore.shared.$lastStart.dropFirst().sink { [weak self] start in
+            guard let self else { return }
+            self.freeDay = start.map(FreeDay.init(start:))
+            self.update(purchasedChanged: false)
+        }
         updatesTask = Task { [weak self] in
             for await _ in Transaction.updates { await self?.refreshEntitlement() }
         }
@@ -88,11 +110,22 @@ final class PremiumStore: ObservableObject {
                 owned.insert(t.productID)
             }
         }
-        let premium = Self.isPremium(owned: owned)
-        guard premium != isPremium || AppGroup.defaults.object(forKey: AppGroup.premiumKey) == nil
+        let purchased = Self.isPremium(owned: owned)
+        guard purchased != hasPurchased || AppGroup.defaults.object(forKey: AppGroup.premiumKey) == nil
         else { return }
-        isPremium = premium
-        Self.cache(premium, into: AppGroup.defaults)
+        hasPurchased = purchased
+        Self.cache(purchased, into: AppGroup.defaults)
+        update(purchasedChanged: true)
+    }
+
+    /// A purchase change reloads even when `isPremium` holds, as buying during a free day
+    /// does: the alert horizon and widgets stop ending with the free day.
+    private func update(purchasedChanged: Bool) {
+        let premium = premiumActive(purchased: hasPurchased, freeDay: freeDay, at: appNow())
+        let flipped = premium != isPremium
+        if flipped { isPremium = premium }
+        scheduleFreeDayEnd()
+        guard flipped || purchasedChanged else { return }
         WidgetCenter.shared.reloadAllTimelines()
         #if os(iOS)
         // Notifications are what the tier decides: gaining Premium schedules them, losing it
@@ -100,5 +133,19 @@ final class PremiumStore: ObservableObject {
         // (docs/alerts.md §6). The watch has no alerts.
         AlertScheduler.requestReschedule()
         #endif
+    }
+
+    /// Ends the free day on time while the app runs. The continuous clock counts time the
+    /// app spends suspended, so a wake after the end updates at once.
+    private func scheduleFreeDayEnd() {
+        freeDayEnd?.cancel()
+        freeDayEnd = nil
+        guard !hasPurchased, let freeDay, freeDayRunning(freeDay, at: appNow()) else { return }
+        let wait = freeDay.end.timeIntervalSince(appNow())
+        freeDayEnd = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(wait), clock: .continuous)
+            guard !Task.isCancelled else { return }
+            self?.update(purchasedChanged: false)
+        }
     }
 }

@@ -108,6 +108,16 @@ import Foundation
         _ = ChsFitService.shared
         seedOnline(stationID: id, offsetDays: -2, spanDays: Int(Timeline.onlineFetchDays) + 2)
     }
+    if CommandLine.arguments.contains("-seedFreeDay") {
+        FreeDayStore.shared.seed(lastStart: appNow())
+    }
+    // This month's free day, used and over: a day ago, or the month's first instant when that
+    // falls in last month. On the 1st that start is still running until midnight.
+    if CommandLine.arguments.contains("-seedFreeDayUsed") {
+        let now = appNow()
+        let monthStart = Calendar.current.dateInterval(of: .month, for: now)?.start ?? now
+        FreeDayStore.shared.seed(lastStart: max(now - FreeDay.length, monthStart))
+    }
 }
 
 private func resetSeedDownloadChoices() {

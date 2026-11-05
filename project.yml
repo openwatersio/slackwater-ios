@@ -295,6 +295,7 @@ targets:
       - Slackwater/OnlineGates.swift
       - Slackwater/NearestWidgetStation.swift
       - Slackwater/PremiumStore.swift
+      - Slackwater/FreeDayStore.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.
