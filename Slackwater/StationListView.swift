@@ -646,7 +646,7 @@ struct StationListView: View {
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
-    /// both routes: locked accessory widgets → premium (the Support Slackwater sheet), home widgets
+    /// both routes: locked accessory widgets → premium (the Premium sheet), home widgets
     /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
     /// rather than inline because user activities and alert taps route
     /// through it too.

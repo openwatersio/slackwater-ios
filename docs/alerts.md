@@ -36,7 +36,7 @@ Nothing Slackwater writes to a calendar ever carries an alarm, for anyone. A sta
 reference layer holding around four events a day; alarms on all of them is the behaviour people
 uninstall over, and iOS Default Alert Times already lets anyone add their own per calendar.
 
-The alert sheet's Save (§7.2), premium requirement buttons, Settings support button, and a free user's switch-off of Settings' sun, moon and stars ([premium](premium.md)) open the dedicated Support Slackwater sheet.
+The alert sheet's Save (§7.2), premium requirement buttons, Settings support button, and a free user's switch-off of Settings' sun, moon and stars ([premium](premium.md)) open the Premium sheet.
 Reading an answer in the sheet is free; a free user can ask "when is the next lower low" and see
 it, and is upsold only on saving the alert.
 Settings → Calendar upsells at the point a station is turned on; the list itself, and turning a
@@ -214,7 +214,9 @@ event produce one entry.
 confirmation naming the station and the number of events that will disappear; nothing synced
 vanishes off the user's Mac without them having read that sentence.
 
-**A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the dedicated Support Slackwater sheet and changes nothing. Without Premium the toggles read off and do the same.
+**A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the Premium sheet and changes nothing. Without Premium the toggles read off and do the same.
+
+**A free day's calendars stop when it ends.** A station turned on during a free day ([premium](premium.md#free-day)) is marked as the free day's (`StationCalendar.freeDay`). Once the day ends, the next reschedule removes the events Slackwater wrote to that calendar and stops publishing it; the calendar and the subscription stay, and the row in Settings → Calendar reads "Stopped — needs Premium", which opens the Premium sheet. Buying Premium clears the marks, so the calendar fills again on the next run and keeps publishing through any later lapse. Calendar events cannot expire on their own, so the removal waits for the first run after the end; what the free day wrote reaches at most 90 days ahead.
 
 A rejected CHS current model is an explicit invalidation, rather than a temporary missing prediction. The app records the affected place when rejecting its stored model. A place that remains fitted keeps the unusable file until a replacement lands, preserving its queued refit across launches; a fitted-to-online transition removes its file and chunk cache. Once Calendar grants full access, the app removes only that place's future generated events, identified by its own station URLs. It leaves events already underway, personal events without those URLs, and the subscription itself in place. A durable pending set survives model deletion and denied Calendar access; an EventKit failure keeps the entry for retry. A missing online window alone never invalidates a calendar.
 
@@ -330,8 +332,7 @@ thread, plans, and hands the plan to thin writers.
 
 **Plan rules**
 
-- Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier.
-  The tier gates turning a station on (§7.4), not what an existing subscription publishes.
+- Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier. The tier gates turning a station on (§7.4), not what an existing subscription publishes, except a calendar turned on during a free day: without Premium it publishes nothing and its future events are removed (§5.1).
 - Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64. A rule set
   inside its own lead — 15 minutes before a low with the 30-minute lead — has its reminder time
   behind it and its moment ahead: `fire` is moved to now, so it is delivered now rather than
@@ -342,6 +343,7 @@ thread, plans, and hands the plan to thin writers.
   notification.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
+- During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
 - Rules whose `once` is in the past are removed.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
@@ -468,7 +470,7 @@ control edits that draft:
 - **Sun**: Any time, Daylight, Golden hour, Blue hour. "Low tide at golden hour" is a low that
   falls inside the morning or evening golden hour.
 - **On**, and **Delete**, for an existing rule.
-- **Save.** Without Premium it opens the dedicated Support Slackwater sheet and nothing is written.
+- **Save.** Without Premium it opens the Premium sheet and nothing is written.
   Notification permission is requested on the first save, never at launch; a denial still saves
   the rule, and the Alerts screen says why it is quiet.
 
@@ -566,7 +568,7 @@ toggle each — the same row idiom the Alerts row uses. The section's own line
 says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
 - Online gates are listed but unavailable, with the reason (§8).
-- Without Premium, turning a station on opens the dedicated Support Slackwater sheet and nothing changes; turning one off works at any tier (§5.1).
+- Without Premium, turning a station on opens the Premium sheet and nothing changes; turning one off works at any tier (§5.1).
 - Denied calendar access leaves the toggles off and says so, with a link to Settings.
 
 ### 7.5 Alerts screen
@@ -669,9 +671,9 @@ within a minute, for every trigger read off a sampled series — the ones whose 
 with the run's start time. An eclipse is searched from an absolute window rather than the sample
 grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
-Alerts, Calendar, and Settings' Sky section identify their Premium requirement at the top. For free users, this message opens the Support Slackwater sheet; supporters see their active tier. Saved alerts with “Notifications are Premium” provide the same link separately from the edit button. Benefits follow each list, while the empty state explains how to add an alert or calendar.
+Alerts, Calendar, and Settings' Sky section identify their Premium requirement at the top. For free users, this message opens the Premium sheet; supporters see their active tier. Saved alerts with “Notifications are Premium” provide the same link separately from the edit button. Benefits follow each list, while the empty state explains how to add an alert or calendar.
 
-**UI:** the line reads "Set an alert" on a tide detail and a current detail and is absent on an online gate; a long press turns it to "Set alert for …" with the right event, and its tap opens the sheet on that moment; the Rest tap opens the sheet on the next low; saving turns the line to Set; a free user's Save and calendar toggle each open the dedicated Support Slackwater sheet; with Premium, Settings → Calendar turns a station on and asks before turning it off. The sentence field is not driven in UI tests: GitHub-hosted runners have no Apple Intelligence, and the field hides itself there.
+**UI:** the line reads "Set an alert" on a tide detail and a current detail and is absent on an online gate; a long press turns it to "Set alert for …" with the right event, and its tap opens the sheet on that moment; the Rest tap opens the sheet on the next low; saving turns the line to Set; a free user's Save and calendar toggle each open the Premium sheet; with Premium, Settings → Calendar turns a station on and asks before turning it off. The sentence field is not driven in UI tests: GitHub-hosted runners have no Apple Intelligence, and the field hides itself there.
 
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; two stations' calendars land separately and open the app at the event; a comfort-speed
