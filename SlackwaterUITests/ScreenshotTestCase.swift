@@ -194,6 +194,12 @@ import notify
         XCTFail("the indicator did not open the downloads manager")
     }
 
+    // Hosted runners can drop a short tap on a downloads choice after the sheet reopens.
+    func tapDownloadChoice(_ choice: XCUIElement) {
+        settleLayout(choice)
+        choice.press(forDuration: 0.15)
+    }
+
     func openSettings(_ app: XCUIApplication) {
         let button = app.buttons["Settings"].firstMatch
         scrollTo(button, in: app)
@@ -344,8 +350,8 @@ import notify
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
             .press(forDuration: 0.05, thenDragTo:
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
-                // Hosted runners can collapse a fast drag into a pan with no movement.
-                withVelocity: .slow, thenHoldForDuration: 0)
+                // Hosted runners can recognize the pan late; keep moving long enough to scroll before lifting.
+                withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0)
         XCTAssertFalse(app.descendants(matching: .any)["alert-sheet"].exists, "scrubbing opened the alert sheet")
     }
 

@@ -9,13 +9,13 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
         let row = app.descendants(matching: .any)["download-row-chs-great-bras-dor"].firstMatch
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
         row.staticTexts["Great Bras d'Or"].tap()
         XCTAssert(app.descendants(matching: .any)["detail-title"].firstMatch.appears(within: 10))
         goBack(app)
         openDownloads(app)
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == false"))
         XCTAssert(row.staticTexts["Downloading…"].exists, "opening the gate must retain a fetch already in flight")
     }
@@ -25,7 +25,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
         let row = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
         let readyPreview = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '~'"))
         app.buttons["Done"].tap()
@@ -34,7 +34,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         // Search alone does not promote a download; opening its detail does.
         app.buttons["Close search"].firstMatch.tap()
         openDownloads(app)
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(row.disappears(within: 5))
 
         app.terminate()
@@ -52,9 +52,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.terminate()
         app.launch()
         openDownloads(app)
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == true"))
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == false"))
         XCTAssert(row.staticTexts["Downloading…"].exists, "a directly opened partial download stays protected after relaunch")
     }
@@ -64,19 +64,19 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let currents = app.buttons["download-all-currents"].firstMatch
         let row = app.descendants(matching: .any)["download-row-chs-johnstone-strait-central"].firstMatch
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(row.staticTexts["Downloading…"].appears(within: 10))
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == false"))
         XCTAssert(row.disappears(within: 5), "the active deselected download must leave the queue")
 
-        currents.tap()
+        tapDownloadChoice(currents)
         releaseFixture(token, "chs-johnstone-strait-central-first-chunk")
         let completed = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '1 of ' AND label ENDSWITH ' ready'"))
         XCTAssert(completed.firstMatch.appears(within: 30),
                   "selecting again must restart the cancelled worker")
         // Deselecting removes the unfinished rows above the completed one.
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == false"))
         XCTAssert(row.staticTexts["Available offline"].exists, "deselection must retain completed predictions")
 
@@ -294,7 +294,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         // and promotion, not tier gating, so pull the whole fixture set in.
         let everything = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
         XCTAssert(everything.appears(within: 5))
-        everything.tap()
+        tapDownloadChoice(everything)
         XCTAssert(waitFor(everything, "isSelected == true"), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch

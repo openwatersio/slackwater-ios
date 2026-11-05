@@ -79,7 +79,7 @@ final class DownloadStatusTests: ScreenshotTestCase {
                           "-chsFitOnly", "chs-great-bras-dor",
                           "-fixLat", "42.3601", "-fixLon", "-71.0589"])
         openDownloads(app)
-        app.buttons["download-all-currents"].firstMatch.tap()
+        tapDownloadChoice(app.buttons["download-all-currents"].firstMatch)
         let held = app.descendants(matching: .any)["download-row-chs-great-bras-dor"].firstMatch
         XCTAssert(held.staticTexts["Downloading…"].appears(within: 10))
         app.buttons["Done"].tap()

@@ -25,7 +25,8 @@ selectors.uniq.each do |selector|
   raise "stale selector #{selector}" unless tests.any? { |test| matches.call(test, selector) }
 end
 # A class or method introduced tomorrow must still run exactly once.
-(tests + ["SlackwaterUITests/NewTests/testNew", "SlackwaterUITests/SettingsLayoutTests/testNew"]).each do |test|
+(tests + ["SlackwaterUITests/NewTests/testNew", "SlackwaterUITests/SettingsLayoutTests/testNew",
+          "SlackwaterUITests/PrintableTablesUITests/testNew"]).each do |test|
   owners = shards.select do |shard|
     only = shard.fetch("only", "").split(",")
     skip = shard.fetch("skip", "").split(",")
@@ -52,4 +53,4 @@ run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
   raise "unrelated PRs share a slot" if group.call("pull_request", 1, "refs/pull/1/merge") == group.call("pull_request", 2, "refs/pull/2/merge")
 end
 puts "main groups preserve pending siblings; PR groups cancel obsolete attempts"
-puts "#{tests.size} test methods run exactly once across five shards; new classes and Settings methods reach rest"
+puts "#{tests.size} test methods run exactly once across five shards; new classes and split-class methods reach rest"

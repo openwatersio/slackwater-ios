@@ -593,21 +593,28 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
     // The riding dot: initial centering must happen at the first layout, not
     // the first magnet settle. Honest check: the very FIRST scrub must move the
-    // centerline readout with the gesture — if `scrubTime` stays frozen until
-    // the settle recomputes everything, the dot floats off the curve. The read
-    // lands mid-deceleration, before any settle.
+    // native selection during the gesture and the readout afterward — if `scrubTime` stays frozen until
+    // the settle recomputes everything, the dot floats off the curve.
     func testM43FirstScrubDotRidesCurve() throws {
-        let app = launch("-scrubTrace", "\(shotDir)/first-scrub-\(UUID().uuidString).log")
+        let tracePath = "\(shotDir)/first-scrub-\(UUID().uuidString).log"
+        let app = launch("-scrubTrace", tracePath)
         openFridayHarbor(app)
 
         // First frame after appearance — no scrub, no settle yet.
         XCTAssert(leadReading(app).appears(within: 5))
         let before = scrubClock(app)
 
-        // The FIRST drag on a fresh detail: the readout must move during the
-        // gesture itself (read mid-deceleration, pre-settle), not only after
-        // the magnet settles.
         scrubStrip(app)
+        // XCUITest waits for idle before querying; the native trace observes selection during the drag.
+        XCTAssert(eventually(within: 5) {
+            let trace = (try? String(contentsOfFile: tracePath, encoding: .utf8)) ?? ""
+            let times = trace.split(separator: "\n").filter { $0.contains(" dragging=true ") }
+                .compactMap { line -> String? in
+                    guard let time = line.components(separatedBy: " time=").dropFirst().first else { return nil }
+                    return time.components(separatedBy: " ").first
+                }
+            return Set(times).count > 1
+        }, "the native trace did not show selection moving during the first drag")
         let after = scrubClock(app)
         if before == after {
             save(app, "first-scrub-frozen.png")
