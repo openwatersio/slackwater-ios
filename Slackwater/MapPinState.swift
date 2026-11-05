@@ -182,7 +182,8 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      : pinRampHex(forSpeedKn: abs(signed)),
         reading: detailed ? formatSpeed(abs(signed), unit: speedUnit) : nil,
         unit: detailed ? speedUnitLabel(speedUnit) : nil,
-        bearing: station.setDegrees(signed: signed))
+        // Pins keep the major axis: the published bearing for the sign, as React's do.
+        bearing: signed >= 0 ? station.floodDirection : station.ebbDirection)
 }
 
 /// 1,549 subordinate current pins hang off 50 references, so the reference is

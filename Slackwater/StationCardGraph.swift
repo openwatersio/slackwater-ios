@@ -463,7 +463,8 @@ extension CurrentStationRecord {
                                  spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs(event.speed), unit: unit)) \(speedUnitLabel(unit))",
                                  timeText: cardTime(event.time, tz),
                                  high: maxHangToward(speed: event.speed, before: before) > 0,
-                                 deg: setDegrees(signed: event.speed))
+                                 // The curve keeps the major axis: a max sets along the published bearing.
+                                 deg: event.speed >= 0 ? floodDirection : ebbDirection)
                 },
             now: now,
             forward: end.timeIntervalSince(now),

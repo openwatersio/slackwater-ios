@@ -2,6 +2,7 @@
 // window fetch, its on-disk store, and the readings a card and a strip take
 // off a fetched window.
 import Foundation
+import SlackwaterKit
 
 extension ChsFitService {
     /// The span one fetch covers: `Timeline.window`'s start for the anchor —
@@ -235,9 +236,10 @@ extension ChsOnlineWindow {
     /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
     /// card rendering doesn't need to know which kind of gate it's reading.
     func cardState(at now: Date) -> CurrentCardState {
-        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
+        let point = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }
+            ?? CurrentPoint(time: now, speed: 0)
         let next = sampleEvents(points).first { $0.time > now }
-        return CurrentCardState(signed: signed, next: next)
+        return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }
 

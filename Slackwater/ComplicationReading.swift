@@ -81,7 +81,7 @@ struct ComplicationReading: Equatable {
             let points = s.speeds(from: from, to: end, step: step)
             let samples = points.map { Sample(hours: hours($0.time), value: $0.speed) }
                 .filter { span.contains($0.hours) }
-            let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
+            let point = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first ?? CurrentPoint(time: now, speed: 0)
             // The card's windows, so the complication's slack is the app's slack.
             let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
             // Slack is the core inside the window, as on the card's reading.
@@ -90,11 +90,12 @@ struct ComplicationReading: Equatable {
             // With the window off the face thickens slack itself; like the widget, it counts down only a window.
             let off = slackWindowIsOff(slackThresholdKn)
             let runs = off ? slacks.map { hours($0)...hours($0) } : windows
-            let phase = currentPhase(signed: signed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
+            let phase = currentPhase(signed: point.speed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
             let symbol = phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
+            // The value is the water's full speed; the word and symbol keep the major axis's phase.
             return ComplicationReading(
-                kind: .current, valueText: formatSpeed(abs(signed), unit: speedUnit),
+                kind: .current, valueText: formatSpeed(point.magnitude, unit: speedUnit),
                 word: phase.word,
                 symbol: symbol,
                 samples: samples,

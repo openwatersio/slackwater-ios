@@ -9,7 +9,7 @@ struct ScrubReading: Equatable {
     let value: String?
     let unit: String?
     let symbol: String?
-    /// A current's set as a compass point ("SW") or bearing ("225°"); nil for tides and at slack.
+    /// A current's set as a compass point ("SW") or bearing ("225°"); nil for tides, for a zero vector, and at a slack unless the water still crosses the major axis.
     let set: String?
     let next: String?
 
@@ -36,13 +36,14 @@ struct ScrubReading: Equatable {
         let schematic = data.speedsAreSchematic
         // The strip's slack, so the Crown reads what the line draws green; a shape has no speeds to measure.
         let phase = schematic ? schematicCurrentPhase(signed: v) : currentPhase(signed: v, inWindow: data.isSlack(at: t))
-        let bearing: Double? = switch phase {
-        case .flood: floodDeg
-        case .ebb: ebbDeg
-        case .slack: nil
-        }
+        // The water's speed and set from the kit; past the series' ends, where `velocityAt` holds the edge, the held speed along the published bearing for its sign.
+        let water = data.currentPoints.vector(at: t, flood: floodDeg, ebb: ebbDeg)
+            ?? [CurrentPoint(time: t, speed: v)].vector(at: t, flood: floodDeg, ebb: ebbDeg)
+        let magnitude = water?.magnitude ?? abs(v)
+        let bearing = currentSet(direction: water?.direction, isSlack: phase == .slack, speed: v,
+                                 magnitude: magnitude, speedUnit: speedUnit)
         return ScrubReading(title: phase.word,
-                            value: schematic ? nil : formatSpeed(abs(v), unit: speedUnit),
+                            value: schematic ? nil : formatSpeed(magnitude, unit: speedUnit),
                             unit: schematic ? nil : speedUnitLabel(speedUnit), symbol: nil,
                             set: bearing.map { formatSet($0, format: setFormat) },
                             next: next.map { currentLine($0, data, speedUnit) })

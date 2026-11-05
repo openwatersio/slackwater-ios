@@ -74,6 +74,53 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(bounds?.hi, 0.9)
     }
 
+    /// 2026-08-10 12:00 UTC, the day the detail lead's Kodiak and Pollock Rip tests read.
+    private let day = Date(timeIntervalSince1970: 1_786_363_200)
+
+    /// Pollock Rip has no cross-flow constants, so its complication reads exactly as before vectors: the unsigned major-axis speed, every third hour and at each of the day's events.
+    func testAOneAxisCurrentReadsAsItAlwaysHas() throws {
+        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        XCTAssertNil(pollock.minorConstituents, "the fixture is one-axis")
+        let station = WidgetStation.current(pollock.engineStation, tz: utc, name: pollock.name)
+        let events = pollock.engineStation.events(from: day, to: day.addingTimeInterval(86_400))
+        let instants = (0..<8).map { day.addingTimeInterval(Double($0) * 3 * 3600 + 7) } + events.map(\.time)
+        let readings = try instants.map { t in
+            let r = try XCTUnwrap(ComplicationReading.build(station, now: t))
+            return [r.valueText, r.word, r.symbol]
+        }
+        XCTAssertEqual(readings, [
+            ["0.1", "Ebbing", "arrow.down.right"], ["1.4", "Ebbing", "arrow.down.right"],
+            ["0.2", "Flooding", "arrow.up.right"], ["1.6", "Flooding", "arrow.up.right"],
+            ["0.1", "Flooding", "arrow.up.right"], ["1.6", "Ebbing", "arrow.down.right"],
+            ["0.1", "Ebbing", "arrow.down.right"], ["2.0", "Flooding", "arrow.up.right"],
+            ["1.4", "Ebbing", "arrow.down.right"], ["0.0", "Slack", "arrow.left.arrow.right"],
+            ["1.6", "Flooding", "arrow.up.right"], ["0.0", "Slack", "arrow.left.arrow.right"],
+            ["1.6", "Ebbing", "arrow.down.right"], ["0.0", "Slack", "arrow.left.arrow.right"],
+            ["2.1", "Flooding", "arrow.up.right"],
+        ])
+    }
+
+    /// Kodiak's complication prints the water's full speed, at its events as anywhere else; away from them its word and symbol keep following the signed speed.
+    func testARotaryCurrentShowsTheWatersFullSpeed() throws {
+        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        XCTAssertNotNil(kodiak.minorConstituents, "the fixture is rotary")
+        let engine = kodiak.engineStation
+        let station = WidgetStation.current(engine, tz: utc, name: kodiak.name)
+        let hours = (0..<24).map { day.addingTimeInterval(Double($0) * 3600 + 7) }
+        let events = engine.events(from: day, to: day.addingTimeInterval(86_400)).map(\.time)
+        var departs = 0
+        for t in hours + events {
+            let p = try XCTUnwrap(engine.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first)
+            let r = try XCTUnwrap(ComplicationReading.build(station, now: t))
+            XCTAssertEqual(r.valueText, formatSpeed(p.magnitude, unit: "kn"), "\(t)")
+            if hours.contains(t) {
+                XCTAssertEqual([r.word, r.symbol], p.speed >= 0 ? ["Flooding", "arrow.up.right"] : ["Ebbing", "arrow.down.right"], "\(t)")
+            }
+            if r.valueText != formatSpeed(abs(p.speed), unit: "kn") { departs += 1 }
+        }
+        XCTAssertGreaterThan(departs, 0, "the day's water leaves the major axis")
+    }
+
     func testValueTextCarriesNoUnit() throws {
         let saved = AppGroup.defaults.string(forKey: unitsKey)
         defer { AppGroup.defaults.set(saved, forKey: unitsKey) }

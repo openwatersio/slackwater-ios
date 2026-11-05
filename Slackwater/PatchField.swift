@@ -176,9 +176,9 @@ final class PatchField: Sendable {
     /// All shipped cells at `date`, optionally culled to `bbox` (see
     /// `FillBBox.overlaps(verts:)`). Each patch's anchor is evaluated once
     /// per call, not once per cell. `speedKn = |signed| × scale`;
-    /// `bearingDeg` follows `setDegrees(signed:)`'s semantics applied to
-    /// the cell's own axis: the cell's stored bearing when the anchor sets
-    /// with it, the reciprocal when it sets against it.
+    /// `bearingDeg` takes the bearing for the sign, as a one-axis station's
+    /// set does, on the cell's own axis: the cell's stored bearing when the
+    /// anchor sets with it, the reciprocal when it sets against it.
     func cells(at date: Date, in bbox: FillBBox? = nil) -> [FillCell] {
         var out: [FillCell] = []
         for patch in header.patches {

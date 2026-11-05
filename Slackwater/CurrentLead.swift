@@ -163,13 +163,12 @@ struct CurrentLeadReading: Equatable {
     var glyph: String { setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up" }
 }
 
-/// The value is the water's full speed and the set its direction. A one-axis point takes the published flood or ebb bearing for its sign through the kit, and a zero vector has no set. At `Slack` the lead points only at water still crossing the major axis fast enough to print above zero, in the go colour; a one-axis station never crosses, so its slack keeps the slack glyph.
+/// The value is the water's full speed and the set its direction. A one-axis point takes the published flood or ebb bearing for its sign through the kit, and a zero vector has no set. At `Slack` the lead points only at water still crossing the major axis fast enough to print above zero, in the go colour (`currentSet`); a one-axis station never crosses, so its slack keeps the slack glyph.
 func currentLeadReading(_ state: String, isSlack: Bool, point: CurrentPoint, floodDeg: Double?, ebbDeg: Double?, speedUnit: String, setFormat: String) -> CurrentLeadReading {
     let value = formatSpeed(point.magnitude, unit: speedUnit)
     let direction = [point].vector(at: point.time, flood: floodDeg, ebb: ebbDeg)?.direction
-    let crossing = max(0, point.magnitude * point.magnitude - point.speed * point.speed).squareRoot()
-    let still = isSlack && formatSpeed(crossing, unit: speedUnit) == formatSpeed(0, unit: speedUnit)
-    let setDegrees = still ? nil : direction
+    let setDegrees = currentSet(direction: direction, isSlack: isSlack, speed: point.speed,
+                                magnitude: point.magnitude, speedUnit: speedUnit)
     let set = setDegrees.map { formatSet($0, format: setFormat) }
     let words = spokenReading(state, value, unit: speedUnitLabel(speedUnit))
     return CurrentLeadReading(state: state, value: value, setDegrees: setDegrees, set: set,

@@ -420,8 +420,9 @@ struct OnlineGateCardView: View {
                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
         StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
             ConditionsItem(reading: .current(
-                signed: state.signed,
-                deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection,
+                magnitude: state.magnitude,
+                direction: state.direction,
+                speed: state.signed,
                 unit: speedUnit,
                 inWindow: graph.isSlack(at: now)))
         }
@@ -511,10 +512,11 @@ struct CurrentCardView: View {
                     statusDetail: provisional.flatMap { cardStatusDetail(id: $0.id, status: cardStatus(id: $0.id)) },
                     downloadProgress: provisional.flatMap { ChsFitService.shared.queue.job($0.id)?.downloadProgress },
                     graph: graph) {
-            if let state, let record {
+            if let state {
                 ConditionsItem(reading: .current(
-                    signed: state.signed,
-                    deg: record.setDegrees(signed: state.signed),
+                    magnitude: state.magnitude,
+                    direction: state.direction,
+                    speed: state.signed,
                     unit: speedUnit,
                     tilde: provisional != nil || bounded,
                     inWindow: graph?.isSlack(at: cardCalculationTime(refreshTime)) ?? false))
@@ -617,7 +619,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
                     "\(formatSpeed(abs($0), unit: "kn")) kn"
                 }
             ) {
-                ConditionsItem(reading: .current(signed: 1.0, deg: 140, unit: "kn"))
+                ConditionsItem(reading: .current(magnitude: 1.0, direction: 140, speed: 1.0, unit: "kn"))
             }
             // Now exactly at a crest: the now dot and an extreme dot coincide.
             StationCard(
@@ -640,7 +642,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
                     "\(formatSpeed(abs($0), unit: "kn")) kn"
                 }
             ) {
-                ConditionsItem(reading: .current(signed: 2.2, deg: 320, unit: "kn"))
+                ConditionsItem(reading: .current(magnitude: 2.2, direction: 320, speed: 2.2, unit: "kn"))
             }
             StationCard(
                 name: "Taumatawhakatangihangakoauauotamateaturipukakapikimaungahoronukupokaiwhenuakitanatahu",
