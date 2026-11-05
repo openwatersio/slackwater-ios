@@ -84,7 +84,8 @@ enum AlertTrigger: Codable, Equatable {
   never stored: once it has become a rule, the rule is the whole record (§7.3).
 - `tideCrossing` stores metres, the engine's unit, and displays in the user's units. `rising` is
   the direction of the curve at the moment the user pressed.
-- Lead defaults to 30 minutes. Lead, the sun window and `once` are edited in the alert sheet,
+- A rule made from the sheet or a sentence starts with a 30-minute lead (`alertNewRuleLead`);
+  the struct's own default is 0. Lead, the sun window and `once` are edited in the alert sheet,
   from the line that made the rule or from the Alerts screen (§7.2).
 - Rules are JSON in the App Group suite under `slackwater.alertRules`, device-local. They do not
   sync through iCloud the way favourites do: two devices holding one rule would buzz twice. A rule
@@ -136,9 +137,9 @@ and daylight rules still write `daylightOnly` so an older build reads them; a go
 rule leaves it out, so that build cannot decode the rule and keeps it byte-for-byte (§3) rather
 than firing it at any hour and saving it that way.
 
-`once` filters the result to the occurrence on that minute: at most one, and none at all if a later
-engine version moves the event further than a minute, in which case the rule quietly finds nothing
-until §6 removes it.
+`once` filters the result to the occurrence nearest the stored minute, within six hours
+(`alertOnceReach`, §3): at most one, and none at all if nothing lies within six hours, in which case
+the rule quietly finds nothing until §6 removes it.
 
 A window's opening depends on `slackThresholdKn`, which describes the user's boat, so changing the
 threshold changes every `.slackWindowOpens` occurrence (§6).
@@ -192,10 +193,13 @@ turned on. Write-only access is authorized only "to save new items" (`EKTypes.h`
 back or remove what it wrote, so a comfort-speed change would strand the old windows in someone's
 calendar.
 
-**Finding the calendar.** By stored identifier first. Failing that, by exact title across the same
-sources it would create in, because the calendar syncs: without the title match a second device
+**Finding the calendar.** By stored identifier first. Failing that, a same-titled calendar in one
+of the sources it would create in is adopted only when it already holds one of this app's own
+future events for that station (`owns`); a title match alone is never adopted, because station
+names collide. The title match matters because the calendar syncs: without it a second device
 turning the same station on creates a duplicate calendar with the same name and the user sees every
-event twice. The comfort speed syncs through iCloud with the units, so devices on one account
+event twice. The title carries the series, "*Name* Tides" or "*Name* Currents"
+(`stationCalendarTitle`), so a place that is both a tide and a current station gets two calendars. The comfort speed syncs through iCloud with the units, so devices on one account
 write the same slack windows. Two devices that do not share it, and are set to *different* comfort
 speeds, rewrite each other's slack windows on every foreground. That is a setting describing one
 boat, and the events are otherwise identical on both devices.
@@ -205,14 +209,17 @@ the default for new events to iCloud to the device. If all three refuse, the tog
 stays off rather than silently doing nothing.
 
 **Keeping it.** An event is identified by its content: a stored event is a planned one when their
-titles agree and their start and end are each within 90 seconds. A reschedule fetches the
+titles and alarm offsets agree and their start and end are each within 90 seconds, so an event
+written by an older build with a different alarm is replaced. A reschedule fetches the
 calendar's events from now forward, removes those the plan no longer contains, and adds the
 missing ones, so an event already under way is left alone and two triggers that produce the same
 event produce one entry.
 
 **Turning it off** deletes that station's calendar, and with it the events, through one
 confirmation naming the station and the number of events that will disappear; nothing synced
-vanishes off the user's Mac without them having read that sentence.
+vanishes off the user's Mac without them having read that sentence. If Calendar access has since
+been revoked, the toggle drops the subscription without the confirmation and says the calendar
+itself cannot be removed from here: delete it by hand in Calendar.
 
 **A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the Premium sheet and changes nothing. Without Premium the toggles read off and do the same.
 
@@ -277,13 +284,14 @@ start into two faces:
 
 | | Counting down | Stale, after `event` |
 |---|---|---|
-| Island compact | tide or current glyph · `14:32` · timer to the event | glyph · timer to `end` ("open 38m"), or the height for a tide |
+| Island compact | tide or current glyph · timer to the event | glyph · timer to `end` ("open 38m"), or the event's time in the station's zone when there is no `end` |
 | Island expanded, Lock Screen | "Race Passage · Slack window" · timer · a six-hour slice of the curve with the window shaded and the moment marked (`AlertCurveView`, absent on a derived gate) · "14:32–15:10, under 0.5 kn" | "Open" · timer to close · the same slice and line |
 | Minimal | glyph | glyph |
 
 The attributes carry the slice as 37 samples at ten minutes, three hours either side of the
 event, in the engine's units; the face scales to the slice's own range, so a flat current reads
-as a flat line.
+as a flat line, and a window longer than three hours is clamped to the slice's right edge. The
+Lock Screen face draws on the app's canvas color with white foreground.
 
 A tide extreme, a peak and a derived slack have no `end`: the stale face names the moment and
 the height, and the activity is ended on the next run. `noWindow` never shows "Open". The tap
@@ -292,8 +300,8 @@ opens the station at the event through the same URL every delivery carries.
 The attributes carry the notification's own title and body line, so the Island and the banner
 never disagree and the widget never links the rule types (its target does not link Almanac,
 which `AlertRule` needs through `SunWindow`), plus the facts the timers draw from: `event`,
-`end`, `noWindow`, `heightM`, the units, the station kind for the glyph, the rule id and the
-occurrence key for the sweep, and the URL.
+`end`, `noWindow`, `heightM`, the units, the station's time zone for the stale face, the station
+kind for the glyph, the rule id and the occurrence key for the sweep, and the URL.
 
 A run from the background (a fit finishing, a tier change) may find the system refusing to
 schedule; the sweep has already ended that run's pending activities, and every candidate is
@@ -314,12 +322,15 @@ built.
 ```swift
 struct DeliveryPlan: Equatable {
     var calendar: [AlertOccurrence]        // from station subscriptions
-    var notifications: [AlertOccurrence]   // from rules
+    var notifications: [AlertOccurrence]   // from rules, the soonest 64
     var liveActivities: [AlertOccurrence]  // candidates: the short-lead subset of `notifications` (§5.3)
+    var overflow: [AlertOccurrence]        // eligible notifications past the 64th, in order
 }
 
-func deliveryPlan(rules: [AlertRule], subscriptions: [StationCalendar],
-                  occurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan
+func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
+                  calendarOccurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan
+
+func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOccurrence]
 
 @MainActor final class AlertScheduler {
     nonisolated static func requestReschedule()
@@ -327,8 +338,12 @@ func deliveryPlan(rules: [AlertRule], subscriptions: [StationCalendar],
 ```
 
 `deliveryPlan` is pure. A reschedule loads rules and subscriptions, resolves stations through
-`WidgetStationLoader.loadRecord(id:)`, builds occurrences from now out to each horizon off the main
-thread, plans, and hands the plan to thin writers.
+`WidgetStationLoader.loadRecord(id:)`, builds rule and subscription occurrences from now out to the
+90-day calendar horizon off the main thread (`resolveAlerts`), plans — the 14-day notification cut
+happens inside `deliveryPlan` — and hands the plan to thin writers. Besides its own triggers, a
+reschedule also rides the widget-reload hook: the comfort speed slider settling, a CHS fit
+finishing and the entitlement changing all call `WidgetReload.trigger()`, which the app wires to
+`requestReschedule()`.
 
 **Plan rules**
 
@@ -336,11 +351,15 @@ thread, plans, and hands the plan to thin writers.
 - Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64. A rule set
   inside its own lead — 15 minutes before a low with the 30-minute lead — has its reminder time
   behind it and its moment ahead: `fire` is moved to now, so it is delivered now rather than
-  never. The sheet says so under Remind me.
+  never. The sheet says so in the When section: "The reminder time has passed; the countdown
+  starts now" for a lead of 30 minutes or less, "The reminder time has passed" for a longer one.
 - Live Activities: the candidates are the notification occurrences with a lead of 30 minutes or
-  less, in fire order (§5.3). The writer places as many as the system takes, and the ones it
-  placed leave the notification writer's list in that run; one it cannot place stays a
-  notification.
+  less, in fire order (§5.3). The writer places as many as the system takes; an activity it kept
+  from the last run counts as placed and is never re-requested. The notification writer then gets
+  `plannedNotifications`: the eligible list with the placed occurrences removed and cut to 64
+  again, so an activity never costs a notification slot — the 65th-eligible occurrence moves up
+  from `overflow`. One the writer cannot place stays a notification. The writer filters by the
+  clock, not the pass start, so a slow resolve never requests an activity whose event has passed.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
@@ -356,9 +375,10 @@ holds 90 days regardless. Notifications hold for 14 days past the last time the 
 and the Alerts screen shows each rule's "Scheduled through" date, so the horizon is visible
 rather than a silent stop.
 
-**Rule states** (Alerts screen): Scheduled through *date* · Waiting for station data (a CHS
-station not yet fitted) · Notifications off in Settings · Premium needed · Off · Set the height
-again (below).
+**Rule states** (Alerts screen), in the order they are tested: Off · Waiting for station data (a
+CHS station not yet fitted) · Notifications are Premium (rendered as a `PremiumRequirement` link)
+· Notifications are off in Settings · Nothing coming up · Scheduled through *date* · Set the
+height again (below).
 
 **A rule's station replaced by another record** (`Resources/station-successors.json`, list.md
 §9.3) moves to the new record at launch. A tide-height rule's height is measured from a chart
@@ -393,7 +413,7 @@ alert is visible while scrubbing and a return from its Live Activity lands under
 |---|---|---|
 | Rest | "Set an alert" — `bell`, `SN.foam` at 62 % | Opens the sheet on the centerline's offer, bound to its next occurrence, with the sentence field focused |
 | Pressed | "Set alert for low tide · Sat 14:32" — the resolved trigger's `alertEventName` and the parked moment in the station's zone | Opens the sheet on that moment |
-| Set | "Alert set · low tide · Sat 14:32" — `bell.fill` in `SN.leaf` | Opens the sheet on the existing rule, whose Delete removes it |
+| Set | "Alert set · low tide · Sat 14:32", or "Alert set · every low tide" for a repeating rule — `bell.fill` in `SN.leaf` | Opens the sheet on the existing rule, whose Delete Alert removes it |
 
 Pressed is the strip's own state: a long press parks a moment and the line names it until the
 strip moves off that moment, by scrub, fling, return-to-now or a shared link, when it drops back to
@@ -467,7 +487,7 @@ control edits that draft:
   opened from the Alerts screen that already repeats offers only "Every …": there is no moment
   left to bind back to, and the Alerts screen has no strip to pick one from.
 - **Remind me**: at the time, 15 min, 30 min, 1 h, 3 h, 1 day. A new rule starts at 30 min.
-- **Sun**: Any time, Daylight, Golden hour, Blue hour. "Low tide at golden hour" is a low that
+- **Sun**: Any time, In daylight, Golden hour, Blue hour. "Low tide at golden hour" is a low that
   falls inside the morning or evening golden hour.
 - **On**, and **Delete**, for an existing rule.
 - **Save.** Without Premium it opens the Premium sheet and nothing is written.
@@ -503,7 +523,7 @@ occurrence. It never does arithmetic, never sees a date, and never answers a que
     var day: AlertRelativeDay?        // nil means the first occurrence from now
 }
 
-enum AlertSentenceOutcome { case rule(AlertRule, boundMoment: Date?), nothingAhead, notOffered, failed }
+enum AlertSentenceOutcome { case rule(AlertRule, boundMoment: Date?), nothingAhead(namedDay: Bool), notOffered, failed }
 ```
 
 `alertSentenceParse` runs the model and hands back the engine's trigger; `alertSentenceOutcome`
@@ -519,9 +539,9 @@ without a model.
   station's zone. Swift resolves the day through `Calendar` with the station's `timeZone`,
   then searches `alertOccurrences` across that day — 23, 24 or 25 hours long, and today starts
   now — or, with no day named, from now across the notification horizon (§6), for the first
-  occurrence, and that minute becomes `once`. A day count from the model is clamped to the
-  horizon. A singular sentence with nothing in its window reads "Nothing in the next 14 days",
-  or "Nothing that day" when a day was named, and the draft is left as it was. A repeating sentence still
+  occurrence, and that minute becomes `once`. A day count from the model is clamped to 0…14. A
+  singular sentence with nothing in its window reads "Nothing in the next 14 days", or "Nothing
+  that day" when a day was named (`nothingAhead(namedDay:)`), and the draft is left as it was. A repeating sentence still
   binds that moment, so the Repeat menu offers both choices. A lead in the sentence lands on the
   nearest of the sheet's six.
 - **Instructions are a fixed paragraph per station kind**: what the place is, what each trigger
@@ -563,11 +583,13 @@ such before Save.
 
 ### 7.4 Settings → Calendar
 
-A section directly after Alerts, `NavigationLink` to a list of the user's saved stations with a
-toggle each — the same row idiom the Alerts row uses. The section's own line
-says what is on: "Friday Harbor", "3 stations", or a hint when none is.
+A section directly after Alerts, `NavigationLink` to "Favourites calendars": a list of the
+user's favorite stations, plus any still-subscribed station that has since been un-favorited (the
+subscription outlives the favorite), with a toggle each — the same row idiom the Alerts row uses.
+The section's own line says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
-- Online gates are listed but unavailable, with the reason (§8).
+- Online gates are listed but unavailable and disabled, reading "Needs a download before it can
+  publish" (§8).
 - Without Premium, turning a station on opens the Premium sheet and nothing changes; turning one off works at any tier (§5.1).
 - Denied calendar access leaves the toggles off and says so, with a link to Settings.
 
@@ -575,7 +597,7 @@ says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
 A Settings row, "Alerts", lists rules by station with their state (§6). Tap opens the alert
 sheet (§7.2) on that rule; swipe deletes. A free user who has never subscribed has none to list; rules left by a lapsed
-subscription stay, read "Premium needed", and deliver again the moment the entitlement returns.
+subscription stay, read "Notifications are Premium", and deliver again the moment the entitlement returns.
 
 ## 8. Station coverage
 
@@ -714,8 +736,8 @@ findable entry; then the sentence, a field and a parser on top of a sheet that a
   (§14), so this is an opt-in share from the sheet's "can't alert on …" line into the feedback
   channel, never a log. The word list in `alertSentenceOutOfScope` is the first, hand-kept
   signal.
-- `.tidePercentile` — "lowest low of the season" — on `Ranking.swift` (slackwater-engine v0.8.0)
-  and the station LAT/HAT bounds, once the #217 range UI brings both into the app. Suppressed
+- `.tidePercentile` — "lowest low of the season" — on SlackwaterKit's ranking and the station
+  LAT/HAT bounds. Suppressed
   where the constituent set has no Sa/Ssa amplitude.
 - "Hey Siri, tell Slackwater to …": an App Intent with a free-text parameter that runs the same
   parser against the nearest station, beside `NextLowTideIntent` in `TideShortcuts.swift`.
@@ -725,8 +747,8 @@ findable entry; then the sentence, a field and a parser on top of a sheet that a
 
 ## 13. Launch blockers
 
-Inherited from widgets-premium §8: the seller entity and revenue split, and the Premium SKUs not
-yet on sale. Every delivery in this document is Premium, so none of it ships before the SKUs do.
+The Premium line is [premium.md](premium.md). Every delivery in this document is Premium, so none
+of it ships in a build without the SKUs on sale.
 
 ## 14. Out of scope
 

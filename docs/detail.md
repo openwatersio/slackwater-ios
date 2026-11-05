@@ -61,7 +61,7 @@ Sections, top to bottom:
 |---|---|---|---|---|---|
 | 1 | Header | ✓ | ✓ | ✓ | ✓ |
 | 2 | Scrubber card | ✓ | ✓ | ✓ | when a window is downloaded |
-| 3 | Download notice | while a preview is showing | while an early model is showing | | |
+| 3 | Download notice | while a preview is showing | while an early model is showing | | while an edge re-anchor's block downloads (§12.3) |
 | 4 | Summary tiles | Range, Moon | Next max, Moon | Shape only, Moon | Next max, Moon |
 | 5 | Station links (§7) | Nearby current | Tide at port, or nearby tide | Tide at port | Tide at port, or nearby tide |
 | 6 | Schedule card | ✓ | ✓ | ✓ | when a window is downloaded |
@@ -166,7 +166,7 @@ Title "Next max", with Done. It opens with the speed and "The hardest the water 
 
 **"Is this beyond normal?"** One bar per whole station-local day across the fortnight, each carrying that day's hardest maximum *in the selected direction*, on one scale. The selected day is marked and the next harder day flagged ahead of it. The bars slide and the Moon's phases are drawn under them exactly as on the Range sheet (§6.4), because a maximum's speed beats with the Moon the way a swing does; the lit bar's label prints the speed in the reader's unit. Labelled "Each bar is one day's hardest flood." or "…hardest ebb.", with "Springs follow the new and full moon." appended on the same evidence rule as the Range sheet. Captioned "The hardest flood of the fortnight." or "Harder than all but N of this fortnight's M.", the latter tapping through to that maximum.
 
-Slack is a zero instant, so the sheet does not compare slack durations around the selected maximum.
+Beneath the ranking fact the sheet may add a slack fact from the loaded timeline's slack runs (`slackFact`, `CurrentStanding.swift`): "Slack runs N minutes around it, against about M here usually." or "…longer than the M usual here." It appears only when the timeline holds at least three slack runs and the run nearest the maximum differs from their median by more than 10% and rounds to a different whole minute. Slack itself is a zero instant; the durations are those of the measured windows around it, so a station whose slack cores are empty gets no slack fact.
 
 **"When this gate runs hardest"** is twelve whole calendar months, drawn as the envelope that direction's monthly maxima trace — its strongest and its weakest — with the solstices and equinoxes ruled and the reader's own month ruled solid, as on the Range sheet. Captioned "Hardest around <month>.", with ", near the solstice" or ", near the equinox" appended on the same rule the Range sheet uses.
 
@@ -183,7 +183,7 @@ There is deliberately **no section measured against the station's own ends**, as
 
 The tile opens the Moon sheet.
 
-### 6.6 Moon sheet
+### 6.7 Moon sheet
 
 Title "Moon", with Done. From top to bottom:
 
@@ -221,7 +221,7 @@ The schedule starts at the anchor, the station-local midnight of the schedule we
 The anchor is today's midnight when a page opens. It moves:
 
 - to a picked day (§9);
-- to the selected day after the scrubber has rested for 600 ms outside the current window, on tide, current, and derived-gate pages (scrubber §4.2); the online gate does not follow; and
+- to the selected day after the scrubber has rested for 600 ms outside the current window, on tide, current, and derived-gate pages (scrubber §4.2); the online gate follows by `Timeline.edgeReanchor` instead — a rest of 600 ms within half a viewport plus one hour of either window end moves the anchor to that day, at once when a stored block covers it and after the download otherwise; and
 - back to today when Now is activated.
 
 ### 8.2 Events
@@ -253,7 +253,7 @@ The Sun card matches Moon's size. At accessibility text sizes, Moon and Sun stac
 
 #### Sun activity sheet
 
-The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
+The sheet uses the selected place’s coordinates and local calendar day, including 23- and 25-hour days. Events run chronologically from astronomical, nautical, and civil dawn through sunrise, solar noon, sunset, and the three dusk stages. Native symbols accompany explicit event labels. Each event row carries an `info.circle` button, its own tap target so it never jumps the timeline, that opens a 280-unit popover (scaled with text size) explaining that moment. Missing events appear last with “—”. At accessibility text sizes, each time moves below its label.
 
 Previous event and Next event links in the popup jump the timeline to the nearest sunrise or sunset strictly before or after the selected instant and close the popup. Their event names, day labels, and times identify the destination across midnight. Solar noon and twilight events are available through the sheet. A direction with no sunrise or sunset in the loaded timeline has no link, including during polar day or night; navigation uses only the loaded timeline.
 
@@ -297,7 +297,7 @@ Tapping a row moves the scrubber to that event, using the scrubber's programmati
 
 The last row of the schedule card, below the days and behind a divider like theirs, is "Printable tables": a printer symbol, the label, `sparkles` beside it, and a trailing chevron. It is one button with the identifier `printable-tables-row`. Every kind shows it whenever the schedule card is shown, and where the card is hidden the row is hidden with it. An online gate with nothing stored has no schedule card, so no row. One brief exception: when a Canadian preview port (§12.1.1) receives a preview with no predictions in it, the previous preview's schedule stays up until the page rebuilds its timeline, and the row is missing until then.
 
-Premium is checked on every tap. Without Premium, the tap opens the Support Slackwater sheet ([premium](premium.md)) and nothing else.
+Premium is checked on every tap. Without Premium, the tap opens the Premium sheet ([premium](premium.md)) and nothing else.
 
 With Premium, the tap opens a sheet titled "Printable tables": a Week and Month switch at the top, then a preview of the page on white, with Done and a share button in the toolbar. The sheet opens on Week, and the switch keeps its position only while the sheet is open.
 
@@ -348,6 +348,7 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 | NOAA subordinate tide | "<datum> chart datum. Based on <reference> tides and NOAA's published offsets; computed on this device." |
 | Other tide (TICON-4, Kartverket, LINZ, DMI, Japan Coast Guard, Japan Meteorological Agency) | "<datum> chart datum. Harmonic constants from <publisher>." DMI and both Japanese agencies use their full source and editing notices. JMA also credits the TICON-4 gauge positions. The publisher comes from the station database's `source.name`. |
 | Canadian tide | "<datum> chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." |
+| Canadian tide, preview showing (§12.1.1) | "Official CHS tide predictions, downloaded to this device. Heights are above LLWLT chart datum." Station details' Prediction reads "Official CHS predictions". |
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |
 | Canadian current | "Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets N°T." |
@@ -416,6 +417,8 @@ A bounded full model keeps the same bound sentence after downloading completes, 
 ### 12.3 Online honesty card
 
 An online gate whose downloaded windows do not cover the week shows this card in place of its footer, then the link "Try <nearest gate with a model> instead".
+
+A gate that still covers the week on screen but is downloading the next block for an edge re-anchor (§8, scrubber §4.2) keeps its scrubber and footer and shows an amber *extending* card in the download-notice slot above the tiles (`online-extending-card`), titled by the same download state as the table below with the headline "Downloads cover about a month and can be refreshed at any time." and the same action.
 
 | State | Title | Action |
 |---|---|---|
@@ -498,7 +501,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 5. **Opening:** the schedule starts at today, today's day is open, and the row nearest now is highlighted.
 6. **One open day:** opening Wednesday closes Today; tapping Wednesday again closes it.
 7. **Row tap:** tapping a row moves the scrubber to that event, and the highlight lands on that row.
-8. **Re-anchor:** scrubbing past the end of the week and resting 600 ms moves the schedule to the selected day without moving the graph. The online gate's schedule stays put.
+8. **Re-anchor:** scrubbing past the end of the week and resting 600 ms moves the schedule to the selected day without moving the graph. On the online gate, resting near either end of the downloaded window moves the schedule to that day once a block covers it, and shows the extending card (§12.3) while one downloads.
 9. **DST week:** the schedule still shows seven local days, each with its station-local date.
 10. **Eclipses:** lunar rows show 🌘 and "Eclipse"; solar rows show a sun and "Solar Eclipse".
 
@@ -533,7 +536,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 
 ### Footer
 
-30. **A Norwegian tide:** Andenes's footer names Kartverket, not TICON-4.
+31. **A Norwegian tide:** Andenes's footer names Kartverket, not TICON-4.
 
 ### Printable tables
 
@@ -556,13 +559,14 @@ Fixing one of these should update this section and add or amend a conformance sc
 |---|---|
 | Shared page composition, schedule card, week bar and picker, footer, station details, station links | `Slackwater/Theme.swift` |
 | Header, share link | `Slackwater/DetailHeader.swift`, `Slackwater/DeepLink.swift` |
-| Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/TideStation.swift` |
+| Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/RangeOutlook.swift`, `Slackwater/TideStation.swift` |
+| Sun card, Sun activity sheet, golden and blue hours | `Slackwater/SunSummaryCard.swift`, `Slackwater/SunDetailSheet.swift`, `Slackwater/SunOrbitView.swift`, `Slackwater/SunWindows.swift` |
 | Next max tile and sheet | `Slackwater/CurrentLead.swift`, `Slackwater/CurrentDetailView.swift`, `Slackwater/MaxDetailSheet.swift`, `Slackwater/CurrentStanding.swift`, `Slackwater/CurrentStandingStore.swift` |
 | Range sheet's three sections | `Slackwater/TideStanding.swift`, `Slackwater/TideStandingStore.swift`, `Slackwater/SwingFigure.swift`, `Slackwater/StandingFigure.swift`, `Slackwater/YearFigure.swift` |
 | Current page, Next max | `Slackwater/CurrentDetailView.swift`, `Slackwater/CurrentLead.swift` |
 | Derived gate | `Slackwater/DerivedGateDetailView.swift` |
 | Online gate and its honesty card | `Slackwater/OnlineGateDetailView.swift`, `Slackwater/OnlineGates.swift` |
-| Canadian routing, waiting page, amber cards | `Slackwater/ChsDetailView.swift`, `Slackwater/CardStatus.swift` |
+| Canadian routing, waiting page, amber cards, bound sentence | `Slackwater/ChsDetailView.swift`, `Slackwater/CardStatus.swift`, `Slackwater/ChsCurrentCopy.swift` |
 | Unavailable page | `Slackwater/UnavailableDetailView.swift` |
 | Schedule rows, day disclosure, pills | `Slackwater/TimelineStrip.swift` (`MultiDaySchedule`) |
 | Summary tiles, Moon phase and tide labels, week label | `Slackwater/DetailPieces.swift` |
