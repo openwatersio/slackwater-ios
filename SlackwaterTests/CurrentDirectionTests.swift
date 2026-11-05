@@ -106,6 +106,10 @@ final class CurrentDirectionTests: XCTestCase {
         XCTAssertEqual(window.signedSpeed(at: now), 2)
     }
 
+    func testDoddDrawsNoArrowAtZeroSpeed() {
+        XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in 0 }).flow(at: date))
+    }
+
     func testDoddOmitsMissingModel() {
         XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in nil }).flow(at: date))
     }
