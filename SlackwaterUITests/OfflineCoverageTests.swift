@@ -27,13 +27,13 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssertFalse(within25.isSelected)
         XCTAssertFalse(within150.isSelected)
         XCTAssertFalse(currents.isSelected)
-        within25.tap()
+        tapDownloadChoice(within25)
         XCTAssert(waitFor(within25, "isSelected == true"))
-        within150.tap()
+        tapDownloadChoice(within150)
         XCTAssert(waitFor(within150, "isSelected == true"))
         let farGate = app.descendants(matching: .any)["download-row-chs-blackney-passage"].firstMatch
         XCTAssertFalse(farGate.exists)
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == true"))
         XCTAssert(farGate.appears(within: 5), "all currents must include gates beyond 150 km")
         save(app, "canadian-download-checklist-selected.png")
@@ -46,15 +46,15 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(currents.isSelected)
         XCTAssert(farGate.appears(within: 5), "unfinished downloads must resume after relaunch")
 
-        currents.tap()
+        tapDownloadChoice(currents)
         XCTAssert(waitFor(currents, "isSelected == false"), "all currents must be reversible")
         XCTAssert(farGate.disappears(within: 5), "deselected unfinished downloads must leave the queue")
-        within150.tap()
+        tapDownloadChoice(within150)
         XCTAssert(waitFor(within150, "isSelected == false"), "the 150 km choice must be reversible")
         XCTAssert(within25.isSelected)
-        within150.tap()
+        tapDownloadChoice(within150)
         XCTAssert(waitFor(within150, "isSelected == true"))
-        within25.tap()
+        tapDownloadChoice(within25)
         XCTAssert(waitFor(within25, "isSelected == false"), "the 25 km choice must be reversible")
         XCTAssertFalse(within150.isSelected, "150 km cannot stay selected when its nested 25 km set is turned off")
         XCTAssert(nearby.isSelected)
@@ -285,7 +285,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let row = app.buttons["download-row-chs-selkirk-water"].firstMatch
         XCTAssert(row.appears(within: 5))
         let manager = app.scrollViews["downloads-manager"].firstMatch
-        manager.buttons["download-all-currents"].tap()
+        tapDownloadChoice(manager.buttons["download-all-currents"])
         for _ in 0..<4 {
             manager.swipeUp(velocity: .slow)
             if row.frame.maxY < manager.frame.minY { break }
