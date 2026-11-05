@@ -131,3 +131,55 @@ func printCoverageNote(range: Range<Date>, covered: [Range<Date>]?, tz: TimeZone
     return String(localized: "Predictions available \(list) only.",
                   comment: "Note on a printed tide or current table when official predictions cover only part of the printed span. The value is a comma-separated list of date ranges in the place’s time zone, such as “Nov 4 – 10, Nov 15 – 17”.")
 }
+
+// MARK: - Sources and building a page
+
+enum PrintableSource {
+    /// Bundled and downloaded models: predicts any range.
+    case computed(TimelineSource)
+    /// Data already on the device only. `timeline(w)` builds the week anchored at local midnight `w`
+    /// from that data, or nil. Never fetches.
+    case fetched(covered: [Range<Date>], timeline: @Sendable (Date) -> TimelineData?)
+}
+
+struct PrintableConfig {
+    let source: PrintableSource
+    let kind: PrintKind
+    let facts: PrintFacts
+    /// The detail's schedule closure, without eclipses; the builder adds `eclipseEntries`.
+    let entries: (TimelineData) -> [ScheduleEntry]
+    /// Sheet-only line after the coverage note, saying where to download more; nil for computed sources.
+    var moreHint: String? = nil
+}
+
+/// One TimelineData per week anchor in `range` (`printWeekAnchors`). Pure and synchronous;
+/// the sheet calls it off the main actor.
+func printTimelines(_ source: PrintableSource, range: Range<Date>, tz: TimeZone, now: Date) -> [TimelineData] {
+    let anchors = printWeekAnchors(range, tz: tz)
+    switch source {
+    case .computed(let src):
+        let cal = localCalendar(tz)
+        return anchors.map { w in
+            let end = cal.date(byAdding: .day, value: 7, to: w)!
+            return TimelineData.merged([TimelineChunk.build(src, index: 0, start: w, end: end)],
+                                       source: src, anchor: w, today: now)
+        }
+    case .fetched(_, let timeline):
+        return anchors.compactMap(timeline)
+    }
+}
+
+func printablePage(_ config: PrintableConfig, span: PrintSpan, anchor: Date, tz: TimeZone,
+                   timelines: [TimelineData], printedAt: Date) -> PrintablePage {
+    let range = printRange(span, anchor: anchor, tz: tz)
+    let covered: [Range<Date>]?
+    switch config.source {
+    case .computed: covered = nil
+    case .fetched(let c, _): covered = c
+    }
+    let days = printDays(timelines: timelines, entries: { config.entries($0) + eclipseEntries($0) },
+                         range: range, covered: covered, tz: tz)
+    return PrintablePage(span: span, range: range, tz: tz, kind: config.kind, facts: config.facts,
+                         days: days, nights: printNightSpans(timelines: timelines),
+                         covered: covered, printedAt: printedAt)
+}

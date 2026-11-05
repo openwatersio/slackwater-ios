@@ -113,4 +113,95 @@ final class PrintableTablesTests: XCTestCase {
         let merged = printNightSpans(timelines: [timeline(days: d), timeline(days: d)])
         XCTAssertEqual(merged, [day(11, 3, 17)..<day(11, 4, 7)])
     }
+
+    // MARK: - Sources and building a page
+
+    private var friday: TideStationRecord { TideStationRecord.record(id: TideStationRecord.fridayHarborID)! }
+    private let printedAt = Date(timeIntervalSince1970: 1_793_000_000)
+
+    /// The tide detail's schedule filter, reproduced: `TideDetailView.scheduleEntries` is private.
+    private func tideEntries(_ tl: TimelineData) -> [ScheduleEntry] {
+        tl.tideExtremes
+            .filter { tl.scheduleRange.contains($0.time) }
+            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
+                                 value: String(format: "%.2f ft", $0.height)) }
+            .sorted { $0.time < $1.time }
+    }
+    private func config(_ source: PrintableSource) -> PrintableConfig {
+        PrintableConfig(source: source, kind: .tide(heightUnit: "ft"),
+                        facts: PrintFacts(name: "Friday Harbor", region: "WA", units: "feet", datum: "MLLW",
+                                          source: "NOAA", link: nil),
+                        entries: tideEntries)
+    }
+    private func weekTimeline(_ source: TimelineSource, _ w: Date) -> TimelineData {
+        let end = cal.date(byAdding: .day, value: 7, to: w)!
+        return TimelineData.merged([TimelineChunk.build(source, index: 0, start: w, end: end)],
+                                   source: source, anchor: w, today: w)
+    }
+
+    func testAComputedNovemberMonthHasARowForEveryDay() {
+        let src = PrintableSource.computed(.tide(friday))
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertEqual(page.days.count, 30)
+        XCTAssertEqual(page.days.first?.start, day(11, 1))
+        XCTAssertEqual(page.days.last?.start, day(11, 30))
+        for d in page.days {
+            XCTAssertFalse(d.entries.isEmpty)
+            for e in d.entries { XCTAssertEqual(cal.startOfDay(for: e.time), d.start) }
+        }
+        XCTAssertNil(page.covered)
+        XCTAssertFalse(page.nights.isEmpty)
+    }
+
+    func testAComputedWeekMatchesTheScheduleForThatAnchor() {
+        let src = PrintableSource.computed(.tide(friday))
+        let anchor = day(11, 12)
+        let tls = printTimelines(src, range: printRange(.week, anchor: anchor, tz: tz), tz: tz, now: day(11, 4))
+        XCTAssertEqual(tls.count, 1)
+        let page = printablePage(config(src), span: .week, anchor: anchor, tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        let ref = weekTimeline(.tide(friday), anchor)
+        let expected = (tideEntries(ref) + eclipseEntries(ref)).sorted { $0.time < $1.time }
+            .filter { page.range.contains($0.time) }
+        XCTAssertFalse(expected.isEmpty)
+        XCTAssertEqual(page.days.flatMap(\.entries).map(\.id), expected.map(\.id))
+    }
+
+    func testAFetchedSourcePrintsOnlyItsCoveredDays() {
+        let covered = [day(11, 4)..<day(11, 11)]
+        let tsrc = TimelineSource.tide(friday)
+        let tzCopy = tz
+        let src = PrintableSource.fetched(covered: covered, timeline: { w in
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = tzCopy
+            let end = c.date(byAdding: .day, value: 7, to: w)!
+            return TimelineData.merged([TimelineChunk.build(tsrc, index: 0, start: w, end: end)],
+                                       source: tsrc, anchor: w, today: w)
+        })
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        XCTAssertEqual(tls.count, 5)
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertFalse(page.days.isEmpty)
+        for d in page.days { XCTAssertTrue(d.start >= day(11, 4) && d.start <= day(11, 10), "\(d.start)") }
+        XCTAssertEqual(page.covered, covered)
+        XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
+    }
+
+    func testAFetchedSourceWhoseTimelineIsNilBuildsNoDays() {
+        let covered = [day(11, 4)..<day(11, 11)]
+        let src = PrintableSource.fetched(covered: covered, timeline: { _ in nil })
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        XCTAssertTrue(tls.isEmpty)
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertTrue(page.days.isEmpty)
+        XCTAssertEqual(page.covered, covered)
+        XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
+    }
 }
