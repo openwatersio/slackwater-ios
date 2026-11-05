@@ -76,7 +76,11 @@ struct OnlineGateDetailView: View {
     @State private var timeline: TimelineData?
 
     private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow, ink: Color = .white) -> CurrentLead {
-        CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: tl.velocityAt(scrubTime),
+        // The fetched samples are one-axis, so the kit gives the published bearing by the speed's sign.
+        let vector = tl.currentPoints.vector(at: scrubTime, flood: window.floodDirection, ebb: window.ebbDirection)
+        let point = CurrentPoint(time: scrubTime, speed: tl.velocityAt(scrubTime),
+                                 magnitude: vector?.magnitude, direction: vector?.direction)
+        return CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, point: point,
                     floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
                     speedUnit: speedUnit, tz: tz, ink: ink)
     }

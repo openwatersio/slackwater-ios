@@ -159,11 +159,15 @@ import SlackwaterKit
             ])
     }
 
-    private func lead(scrub: Date, signed: Double = 1, provisional: Bool = false,
+    /// A lead over the fixture day, flooding north and ebbing south. `signed` makes a one-axis point, as a station without cross-flow constants predicts; `point` stands in for a rotary one.
+    private func lead(scrub: Date, signed: Double = 1, point: CurrentPoint? = nil, provisional: Bool = false,
                       days: [TimelineDay] = [], timeline tl: TimelineData? = nil) -> CurrentLead {
-        CurrentLead(timeline: tl ?? timeline(days: days), scrubTime: scrub, now: t0, signed: signed,
+        CurrentLead(timeline: tl ?? timeline(days: days), scrubTime: scrub, now: t0,
+                    point: point ?? CurrentPoint(time: scrub, speed: signed),
                     floodDeg: 0, ebbDeg: 180, speedUnit: "kn", tz: utc, provisional: provisional)
     }
+
+    private let slackGlyph = "arrow.right.and.line.vertical.and.arrow.left"
 
     /// Sunset at 12:33, inside the fixture day and ahead of the 1:00 window.
     private var sunsetDay: TimelineDay {
@@ -185,7 +189,7 @@ import SlackwaterKit
     }
 
     /// The strip's spoken value is the lead in words: the state, then the
-    /// magnitude with its unit written out (§ 15), never "kn", then the set outside slack.
+    /// magnitude with its unit written out (§ 15), never "kn", then the set wherever the lead shows one.
     func testSpokenLeadNamesStateAndUnitInFull() {
         XCTAssertEqual(lead(scrub: at(0)).spoken, "Max flood 1.0 knots N")
         XCTAssertEqual(lead(scrub: at(3600)).spoken, "Slack 1.0 knots", "slack claims no set")
@@ -253,6 +257,124 @@ import SlackwaterKit
         assertNext(at(3500), at(3600), "Slack", "the slack owns the closing instant", in: tl)
         XCTAssertEqual(lead(scrub: at(3600), signed: 0, timeline: tl).spoken, "Slack 0.0 knots")
         assertNext(at(3600), at(6000), "Max ebb", "parked on the slack, the commentary advances", in: tl)
+    }
+
+    // MARK: - The lead's speed and set
+
+    private func reading(_ state: String, _ value: String, set: Double?, _ text: String?,
+                         tint: CurrentPhase, spoken: String) -> CurrentLeadReading {
+        CurrentLeadReading(state: state, value: value, setDegrees: set, set: text, tint: tint, spoken: spoken)
+    }
+
+    /// A station without cross-flow constants reads exactly as it always has: the unsigned major-axis speed, the published bearing for its sign in the flood or ebb colour, and at slack the slack glyph in the go colour with no set.
+    func testAOneAxisLeadReadsAsItAlwaysHas() {
+        XCTAssertEqual(lead(scrub: at(1000), signed: 1.2).reading,
+                       reading("Flooding", "1.2", set: 0, "N", tint: .flood, spoken: "Flooding 1.2 knots N"))
+        XCTAssertEqual(lead(scrub: at(5000), signed: -1.3).reading,
+                       reading("Ebbing", "1.3", set: 180, "S", tint: .ebb, spoken: "Ebbing 1.3 knots S"))
+        XCTAssertEqual(lead(scrub: t0, signed: 2.4).reading,
+                       reading("Max flood", "2.4", set: 0, "N", tint: .flood, spoken: "Max flood 2.4 knots N"))
+        XCTAssertEqual(lead(scrub: at(6000), signed: -1.8).reading,
+                       reading("Max ebb", "1.8", set: 180, "S", tint: .ebb, spoken: "Max ebb 1.8 knots S"))
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0).reading,
+                       reading("Slack", "0.0", set: nil, nil, tint: .slack, spoken: "Slack 0.0 knots"))
+        XCTAssertEqual(lead(scrub: at(3500), signed: 0.1).reading,
+                       reading("Slack", "0.1", set: nil, nil, tint: .slack, spoken: "Slack 0.1 knots"),
+                       "along the axis there is no crossing flow to point at")
+        XCTAssertEqual(lead(scrub: at(1000), signed: 1.2).reading.glyph, "arrow.up")
+        XCTAssertEqual(lead(scrub: at(3600), signed: 0).reading.glyph, slackGlyph)
+    }
+
+    /// Pollock Rip predicted by the engine, through a day of events and hours: the reading the lead built before vectors, from the signed speed and the published bearings, is the one it builds now.
+    func testAnEngineOneAxisStationReadsAsItAlwaysHas() throws {
+        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let station = pollock.engineStation
+        let events = station.events(from: t0, to: t0.addingTimeInterval(86_400))
+        let hours = (0..<24).map { (time: t0.addingTimeInterval(Double($0) * 3600 + 7), slack: false) }
+        let instants = events.map { (time: $0.time, slack: $0.kind == .slack) } + hours
+        XCTAssertTrue(events.contains { $0.kind == .slack })
+        for instant in instants {
+            let p = try XCTUnwrap(station.speeds(from: instant.time, to: instant.time.addingTimeInterval(1), step: 1).first)
+            let state = instant.slack ? "Slack" : p.speed >= 0 ? "Flooding" : "Ebbing"
+            let value = formatSpeed(abs(p.speed), unit: "kn")
+            let bearing: Double? = instant.slack ? nil : p.speed >= 0 ? pollock.floodDirection : pollock.ebbDirection
+            let set = bearing.map { formatSet($0, format: "compass") }
+            let words = "\(state) \(value) knots"
+            XCTAssertEqual(currentLeadReading(state, isSlack: instant.slack, point: p,
+                                              floodDeg: pollock.floodDirection, ebbDeg: pollock.ebbDirection,
+                                              speedUnit: "kn", setFormat: "compass"),
+                           reading(state, value, set: bearing, set,
+                                   tint: instant.slack ? .slack : p.speed >= 0 ? .flood : .ebb,
+                                   spoken: set.map { "\(words) \($0)" } ?? words),
+                           "\(instant.time)")
+        }
+    }
+
+    /// At a major-axis slack the word stays Slack, and the lead shows what the water is still doing across the channel: its full speed, and its arrow and set in the go colour, since there is no flood or ebb to colour by.
+    func testARotaryLeadAtSlackShowsTheCrossingFlow() {
+        let crossing = CurrentPoint(time: at(3600), speed: 0, magnitude: 0.6, direction: 95)
+        XCTAssertEqual(lead(scrub: at(3600), point: crossing).reading,
+                       reading("Slack", "0.6", set: 95, "E", tint: .slack, spoken: "Slack 0.6 knots E"))
+        XCTAssertEqual(lead(scrub: at(3600), point: crossing).reading.glyph, "arrow.up")
+        AppGroup.defaults.set("degrees", forKey: setFormatKey)
+        XCTAssertEqual(lead(scrub: at(3600), point: crossing).spoken, "Slack 0.6 knots 095°")
+        AppGroup.defaults.set("compass", forKey: setFormatKey)
+
+        let faint = CurrentPoint(time: at(3600), speed: 0, magnitude: 0.03, direction: 95)
+        XCTAssertEqual(lead(scrub: at(3600), point: faint).reading,
+                       reading("Slack", "0.0", set: nil, nil, tint: .slack, spoken: "Slack 0.0 knots"),
+                       "a crossing flow that prints as 0.0 claims no set")
+        XCTAssertEqual(lead(scrub: at(3600), point: faint).reading.glyph, slackGlyph)
+    }
+
+    /// Kodiak's cross-flow runs at up to about 0.8 of its major axis, so at two of its three slacks on this day the engine-exact lead still has a speed and a set; at the third the crossing flow prints 0.0 and the lead claims no set.
+    func testKodiakAtItsSlacksShowsTheCrossingFlow() throws {
+        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let slacks = kodiak.engineStation.events(from: t0, to: t0.addingTimeInterval(86_400)).filter { $0.kind == .slack }
+        var crossing = 0, still = 0
+        for slack in slacks {
+            let p = try XCTUnwrap(kodiak.engineStation.speeds(from: slack.time, to: slack.time.addingTimeInterval(1), step: 1).first)
+            let r = currentLeadReading("Slack", isSlack: true, point: p, floodDeg: kodiak.floodDirection,
+                                       ebbDeg: kodiak.ebbDirection, speedUnit: "kn", setFormat: "compass")
+            let direction = try XCTUnwrap(p.direction)
+            XCTAssertEqual(r.value, formatSpeed(p.magnitude, unit: "kn"), "\(slack.time)")
+            XCTAssertEqual(r.tint, .slack, "\(slack.time)")
+            if r.value == "0.0" {
+                still += 1
+                XCTAssertNil(r.setDegrees, "\(slack.time)")
+                XCTAssertEqual(r.spoken, "Slack 0.0 knots", "\(slack.time)")
+            } else {
+                crossing += 1
+                XCTAssertEqual(r.setDegrees, direction, "\(slack.time)")
+                XCTAssertEqual(r.set, compassPoint(direction), "\(slack.time)")
+                XCTAssertEqual(r.spoken, "Slack \(r.value) knots \(compassPoint(direction))", "\(slack.time)")
+            }
+        }
+        XCTAssertEqual(crossing, 2, "two of the day's slacks still run across the channel")
+        XCTAssertEqual(still, 1)
+    }
+
+    /// Outside slack the value is the water's full speed and the set its own direction, not the published bearing, in the flood or ebb colour by the signed speed.
+    func testARotaryLeadOutsideSlackFollowsTheWater() {
+        let flooding = CurrentPoint(time: at(1000), speed: 1.2, magnitude: 1.5, direction: 40)
+        XCTAssertEqual(lead(scrub: at(1000), point: flooding).reading,
+                       reading("Flooding", "1.5", set: 40, "NE", tint: .flood, spoken: "Flooding 1.5 knots NE"))
+        let ebbing = CurrentPoint(time: at(5000), speed: -1.0, magnitude: 1.4, direction: 230)
+        XCTAssertEqual(lead(scrub: at(5000), point: ebbing).reading,
+                       reading("Ebbing", "1.4", set: 230, "SW", tint: .ebb, spoken: "Ebbing 1.4 knots SW"))
+        let max = CurrentPoint(time: t0, speed: 2.4, magnitude: 2.5, direction: 20)
+        XCTAssertEqual(lead(scrub: t0, point: max).reading.spoken, "Max flood 2.5 knots NNE")
+    }
+
+    /// Water with no known set claims none: the slack glyph in the go colour, whatever the word.
+    func testALeadWithNoSetShowsTheSlackGlyph() {
+        let unknown = CurrentPoint(time: at(1000), speed: 1.2, magnitude: 1.5, direction: nil)
+        XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading,
+                       reading("Flooding", "1.5", set: nil, nil, tint: .slack, spoken: "Flooding 1.5 knots"))
+        XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading.glyph, slackGlyph)
+        XCTAssertEqual(lead(scrub: at(1000), signed: 0).reading,
+                       reading("Flooding", "0.0", set: nil, nil, tint: .slack, spoken: "Flooding 0.0 knots"),
+                       "a zero vector has no set")
     }
 
     /// Every kind of stop the commentary can walk to, in the order the day

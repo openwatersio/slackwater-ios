@@ -337,7 +337,7 @@ The lead prints the station-local date and clock without a weekday or relative d
 
 The lead is a centred column overlaid at the top of the strip, and it takes no touches (§6.3): 12 units of top padding, then the state row (word and glyph 6 apart; set arrow and set 4 apart), the value row, then the date and time row, with 4 units between rows. The eyebrow row is footnote semibold. Its state word is medium weight at 85% of the chrome ink, except a fast tide's rate (§9.1). The value, its unit, and the clock line use the chrome ink at full opacity, except that a provisional value and its unit use the attention colour (§9.2). The clock line is caption size with tabular digits.
 
-VoiceOver reads the lead as one combined element: the state word, the set (compass point or bearing) on a measured current outside slack, the value without a provisional `~` (§9.2), and the unit. The eyebrow glyph is hidden from VoiceOver, because the word and the set already say what it shows and a set arrow's symbol name is its unrotated one. The date and clock are its value, with the padding figure space removed.
+VoiceOver reads the lead as one combined element: the state word, the set (compass point or bearing) on a measured current wherever the lead shows one (§9.2), including at slack while the water still crosses the channel, the value without a provisional `~` (§9.2), and the unit. The eyebrow glyph is hidden from VoiceOver, because the word and the set already say what it shows and a set arrow's symbol name is its unrotated one. The date and clock are its value, with the padding figure space removed.
 
 ### 9.1 Tide lead
 
@@ -362,7 +362,7 @@ Glyph colour:
 
 ### 9.2 Measured-current lead
 
-The value is the absolute speed at `selectedTime`; the phase carries its sign. Predicted stations (harmonic, subordinate, or fitted) use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator; a speed prints without a sign only when it rounds to zero, below 0.05 in the display unit. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
+The value is SlackwaterKit's full speed of the water at `selectedTime`: on a station with NOAA's minor-axis constants it includes the flow across the major axis, and elsewhere it is the absolute major-axis speed. The phase carries the major-axis sign. Predicted stations (harmonic, subordinate, or fitted) use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator; a speed prints without a sign only when it rounds to zero, below 0.05 in the display unit. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
 
 The state is:
 
@@ -370,7 +370,7 @@ The state is:
 - `Max flood` or `Max ebb` within one second of that maximum; or
 - `Flooding` / `Ebbing` otherwise.
 
-Outside slack, show a true-bearing arrow (`arrow.up` rotated to the bearing) and the set as one of 16 compass points, or as a three-digit true bearing (`225°`) when the person chooses degrees in Settings. Every reading of the set, spoken or shown, follows that choice; the station's fixed flood and ebb bearings in Station details stay in degrees true. Positive velocity selects the station's flood bearing; negative velocity selects its ebb bearing. In slack, use the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) instead of claiming a set. The set arrow and its set use the flood colour or ebb colour by direction, and the slack glyph uses the go colour.
+A set is shown as a true-bearing arrow (`arrow.up` rotated to the bearing) and as one of 16 compass points, or as a three-digit true bearing (`225°`) when the person chooses degrees in Settings. Every reading of the set, spoken or shown, follows that choice; the station's fixed flood and ebb bearings in Station details stay in degrees true. The set is the direction of SlackwaterKit's current vector at `selectedTime`; on a station with no vector data, positive velocity selects the station's flood bearing and negative velocity selects its ebb bearing. Outside slack the arrow and set use the flood colour or ebb colour by the major-axis sign. At `Slack` the word stays `Slack`, and while the flow across the major axis still formats above zero in the display unit (0.05 or more), the value and set show that crossing flow, with the arrow and set in the go colour, since there is no flood or ebb to colour by. Otherwise slack uses the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) in the go colour instead of claiming a set; a one-axis station has no crossing flow, so its slack always does. A zero vector has no set: the lead shows the slack glyph in the go colour and claims none.
 
 On the phone, a provisional or bounded model prefixes numeric values and water commentary events with `~` in visible text, and uses the attention colour for the value, its unit, and the whole set group (arrow and set, or the slack glyph). Sunrise and sunset commentary never receives a provisional prefix. VoiceOver never reads the `~`, which it would speak as the word “tilde”: the lead, the strip's value, and the commentary's accessible label omit it, and the bound notice under the strip says how far slack can differ from CHS's prediction. A bounded full model has no download status or progress. Provenance is outside this spec.
 
@@ -494,7 +494,7 @@ Do not confuse the riding dot with the graph's absolute-now dot:
 
 ### 12.1 Samples and interpolation
 
-The reference harmonic series is sampled every ten minutes. Official online series may arrive every fifteen minutes. Draw a continuous polyline through the samples and linearly interpolate the riding-dot position between them.
+The reference harmonic series is sampled every ten minutes. Official online series may arrive every fifteen minutes. Draw a continuous polyline through the samples and linearly interpolate the riding-dot position between them. The interpolation and the measured-current lead's speed and set come from SlackwaterKit.
 
 Prediction generation across the window, event finding, slack-window calculation, sun/moon event searches, and eclipse searches happen when the timeline is built, not on each scrub frame. A scrub frame may interpolate values, calculate the current sky, and evaluate the engine at the single selected instant for the tide and predicted-current leads (§9.1, §9.2), but must not rebuild the week.
 
@@ -695,7 +695,7 @@ The intended scrubber must be usable without seeing or directly dragging the can
 Expose one adjustable timeline control with:
 
 - label: the track type, `Tide timeline` for a tide strip and `Current timeline` for a measured or derived current strip (the watch labels its strip with the station name);
-- value: the lead state, then the magnitude and spoken unit when known, then the set on a measured current outside slack, then the station-local month, day, time, and time-zone abbreviation of the instant under the centreline. The phone joins the reading and the dated time with a comma. Neither speaks a provisional `~` (§9.2). The watch's value leads with the station-local month, day, time, and time-zone abbreviation, then the state, the value and spoken unit, and the set when known, joined with spaces;
+- value: the lead state, then the magnitude and spoken unit when known, then the set on a measured current wherever the lead shows one (§9.2), then the station-local month, day, time, and time-zone abbreviation of the instant under the centreline. The phone joins the reading and the dated time with a comma. Neither speaks a provisional `~` (§9.2). The watch's value leads with the station-local month, day, time, and time-zone abbreviation, then the state, the value and spoken unit, and the set when known, joined with spaces;
 - increment/decrement actions that move later/earlier by five minutes; and
 - named actions for next and previous magnetic target when the platform supports custom actions (`Next event`, `Previous event`), plus `Set an alert` on a detail strip whose host can alert (§6.5.1).
 
@@ -795,7 +795,7 @@ These scenarios define the minimum behavior shared by all platforms. Scenario 38
 
 ### Accessibility
 
-23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value, with the set on a measured current outside slack and no provisional `~`; the next- and previous-event actions park exactly on a magnetic target, or at the nearest reachable centre when the target lies within half a viewport of the content edge.
+23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value, with the set on a measured current wherever the lead shows one (§9.2) and no provisional `~`; the next- and previous-event actions park exactly on a magnetic target, or at the nearest reachable centre when the target lies within half a viewport of the content edge.
 24. **Direct controls:** Commentary and Now meet semantic target sizes and expose their visible meaning without requiring the canvas labels.
 25. **No-colour reading:** High/low, current direction, slack, magnitude, and schematic unknown remain distinguishable in greyscale.
 26. **Larger text:** At the largest accessibility size the lead value and its pad grow together, the plot and chrome rows move down without overprinting, and commentary and Now share one row.

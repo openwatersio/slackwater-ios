@@ -10,11 +10,12 @@ struct CurrentLead: View {
     let timeline: TimelineData
     let scrubTime: Date
     let now: Date
-    /// The velocity under the centerline — engine-exact for a harmonic
+    /// The water under the centerline: engine-exact for a predicted
     /// station, the fetched series for a gate.
-    let signed: Double
-    let floodDeg: Double
-    let ebbDeg: Double
+    let point: CurrentPoint
+    /// The published bearings, for a one-axis point that carries no set of its own.
+    let floodDeg: Double?
+    let ebbDeg: Double?
     let speedUnit: String
     let tz: TimeZone
     var ink: Color = .white
@@ -29,9 +30,8 @@ struct CurrentLead: View {
     @AppStorage(setFormatKey, store: AppGroup.defaults) private var setFormat = "compass"
 
     private var isSlack: Bool { timeline.isSlack(at: scrubTime) }
-    private var phase: CurrentPhase { currentPhase(signed: signed, inWindow: isSlack) }
+    private var phase: CurrentPhase { currentPhase(signed: point.speed, inWindow: isSlack) }
     private var tilde: String { (provisional || bounded) ? "~" : "" }
-    private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
     private var readingColor: Color { (provisional || bounded) ? SN.amber : ink }
 
     /// The stops the commentary walks: a slack window's opening, the slack
@@ -112,34 +112,69 @@ struct CurrentLead: View {
         return phase.word
     }
 
-    /// The lead in words, for the strip's spoken value: the set follows outside slack, as on the watch.
-    var spoken: String {
-        let reading = spokenReading(state, formatSpeed(abs(signed), unit: speedUnit), unit: speedUnitLabel(speedUnit))
-        return isSlack ? reading : "\(reading) \(formatSet(setDegrees, format: setFormat))"
+    /// What the lead shows and says, apart from its clock and tilde.
+    var reading: CurrentLeadReading {
+        currentLeadReading(state, isSlack: isSlack, point: point, floodDeg: floodDeg, ebbDeg: ebbDeg,
+                           speedUnit: speedUnit, setFormat: setFormat)
     }
 
+    /// The lead in words, for the strip's spoken value.
+    var spoken: String { reading.spoken }
+
     var body: some View {
-        let phaseColor = (provisional || bounded) ? SN.amber : CurrentDetailView.phaseColor(phase)
-        LeadCard(value: "\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))",
+        let reading = reading
+        let tint = (provisional || bounded) ? SN.amber : CurrentDetailView.phaseColor(reading.tint)
+        LeadCard(value: "\(tilde)\(reading.value)",
                  unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),
                  valueColor: readingColor,
                  timeColor: ink) {
-            leadState(state, ink: ink)
+            leadState(reading.state, ink: ink)
             // The set is the hero (#59), arrow and point together after the
-            // word. In slack the water goes both ways, so the glyph does too.
+            // word. With no set to claim, the slack glyph goes both ways.
             HStack(spacing: 4) {
-                if isSlack {
-                    LeadGlyph(systemName: "arrow.right.and.line.vertical.and.arrow.left")
-                } else {
-                    LeadGlyph(systemName: "arrow.up", degrees: setDegrees)
+                if let setDegrees = reading.setDegrees {
+                    LeadGlyph(systemName: reading.glyph, degrees: setDegrees)
                     // Unpinned, the eyebrow truncated "282°" to "28…" on iPhone 17.
                     Text(formatSet(setDegrees, format: setFormat)).fixedSize()
+                } else {
+                    LeadGlyph(systemName: reading.glyph)
                 }
             }
-            .foregroundStyle(phaseColor)
+            .foregroundStyle(tint)
         }
     }
+}
+
+/// What the measured-current lead shows and says at an instant, apart from its clock: plain values, so a unit test can read what the lead renders (scrubber §9.2).
+struct CurrentLeadReading: Equatable {
+    let state: String
+    /// The speed as printed, unsigned and without a provisional `~`.
+    let value: String
+    /// The set in degrees true, or nil where the lead shows the slack glyph and claims no set.
+    let setDegrees: Double?
+    /// The set as printed and spoken, in the chosen format.
+    let set: String?
+    /// The eyebrow's colour role: the flood or ebb colour, or the go colour for `.slack`.
+    let tint: CurrentPhase
+    /// The lead in words: the state, the speed with its unit written out, then the set where one is shown.
+    let spoken: String
+
+    var glyph: String { setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up" }
+}
+
+/// The value is the water's full speed and the set its direction. A one-axis point takes the published flood or ebb bearing for its sign through the kit, and a zero vector has no set. At `Slack` the lead points only at water still crossing the major axis fast enough to print above zero, in the go colour; a one-axis station never crosses, so its slack keeps the slack glyph.
+func currentLeadReading(_ state: String, isSlack: Bool, point: CurrentPoint, floodDeg: Double?, ebbDeg: Double?, speedUnit: String, setFormat: String) -> CurrentLeadReading {
+    let value = formatSpeed(point.magnitude, unit: speedUnit)
+    let direction = [point].vector(at: point.time, flood: floodDeg, ebb: ebbDeg)?.direction
+    let crossing = max(0, point.magnitude * point.magnitude - point.speed * point.speed).squareRoot()
+    let still = isSlack && formatSpeed(crossing, unit: speedUnit) == formatSpeed(0, unit: speedUnit)
+    let setDegrees = still ? nil : direction
+    let set = setDegrees.map { formatSet($0, format: setFormat) }
+    let words = spokenReading(state, value, unit: speedUnitLabel(speedUnit))
+    return CurrentLeadReading(state: state, value: value, setDegrees: setDegrees, set: set,
+                              tint: isSlack || setDegrees == nil ? .slack : point.speed >= 0 ? .flood : .ebb,
+                              spoken: set.map { "\(words) \($0)" } ?? words)
 }
 
 /// The scrub card both current details draw: the strip, the lead overlaid on

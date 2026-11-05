@@ -70,10 +70,10 @@ struct CurrentDetailView: View {
 
     private var pairedTide: TideStationRecord? { record.pairedTide }
     private var tz: TimeZone { record.tz }
-    /// Engine-exact velocity under the centerline, the same call the
+    /// The engine-exact water under the centerline, the same call the
     /// committed readout has always made.
     private func lead(_ tl: TimelineData, ink: Color = .white) -> CurrentLead {
-        var l = CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
+        var l = CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, point: exactPoint(at: scrubTime),
                             floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
                             speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil, bounded: record.chsGate?.isBounded == true)
         // The tile ranks the maximum it prints, against its own direction's.
@@ -270,9 +270,9 @@ struct CurrentDetailView: View {
 
     // MARK: - Data
 
-    /// Engine-exact signed velocity — same call as the old committed readout.
-    private func exactSigned(at t: Date) -> Double {
-        record.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first?.speed ?? 0
+    /// The engine-exact sample at `t`: signed speed, full speed and set — same call as the old committed readout.
+    private func exactPoint(at t: Date) -> CurrentPoint {
+        record.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first ?? CurrentPoint(time: t, speed: 0)
     }
 
     private func returnToNow() {
