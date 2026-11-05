@@ -43,4 +43,12 @@ final class FreeDayTests: XCTestCase {
         XCTAssertTrue(premiumActive(purchased: false, freeDay: day, at: date("2026-11-05T12:00:00Z")))
         XCTAssertFalse(premiumActive(purchased: false, freeDay: day, at: date("2026-11-06T00:00:00Z")))
     }
+
+    func testDebugLengthOverrideAcceptsAStringLikeALaunchArgument() {
+        UserDefaults.standard.set("300", forKey: "freeDayLength")
+        defer { UserDefaults.standard.removeObject(forKey: "freeDayLength") }
+        XCTAssertEqual(FreeDay.length, 300)
+        UserDefaults.standard.removeObject(forKey: "freeDayLength")
+        XCTAssertEqual(FreeDay.length, 86_400)
+    }
 }

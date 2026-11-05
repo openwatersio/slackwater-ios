@@ -9,9 +9,9 @@ struct FreeDay: Codable, Equatable {
     static var length: TimeInterval {
         #if DEBUG
         // Lets the device check watch a free day end in seconds, not a day.
-        if let override = UserDefaults.standard.object(forKey: "freeDayLength") as? Double, override > 0 {
-            return override
-        }
+        // Launch arguments arrive as strings; `double(forKey:)` coerces them.
+        let override = UserDefaults.standard.double(forKey: "freeDayLength")
+        if override > 0 { return override }
         #endif
         return 86_400
     }
