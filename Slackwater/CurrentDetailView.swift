@@ -102,6 +102,7 @@ struct CurrentDetailView: View {
                                     $0.kind != .slack && abs($0.time.timeIntervalSince(scrubTime)) < 1
                                 }.map { $0.kind == .maxFlood },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
+                            printable: printable,
                             above: { EmptyView() },
                             card: { tl in
                                 CurrentScrubCard(lead: lead(tl, ink: sky.ink), data: tl,
@@ -316,6 +317,18 @@ struct CurrentDetailView: View {
     /// mark is about size, not about which way the water is going.
     private func maxSymbol(_ tl: TimelineData) -> String? {
         lead(tl).standing?.marks == true ? "arrow.up.and.down" : nil
+    }
+
+    private var printable: PrintableConfig {
+        let speedUnit = speedUnit, flood = record.floodDirection, ebb = record.ebbDirection
+        return PrintableConfig(
+            source: .computed(.current(record, threshold: normalizedSlackThresholdKn(slackWindowSpeed))),
+            kind: .current(floodDeg: flood, ebbDeg: ebb),
+            facts: PrintFacts(name: record.name, region: record.region,
+                              units: printableUnitName(speedUnitLabel(speedUnit)), datum: nil,
+                              source: record.id,
+                              link: shareURL(forStationID: record.itemId, at: nil, tz: tz)),
+            entries: { scheduleEntries($0, floodDeg: flood, ebbDeg: ebb, speedUnit: speedUnit) })
     }
 
     /// nil opens around now (the intro); a focus keeps a parked scrub parked.

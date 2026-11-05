@@ -51,6 +51,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// What the strip offers to alert on for the centerline's moment (spec §7.1). Nil — the
     /// online gate, a CHS tide preview — means no line and a press does nothing.
     var alertOffer: AlertTrigger? = nil
+    /// What the schedule card's Printable tables row prints (docs/detail.md §8.6).
+    /// Nil hides the row: an online gate with nothing stored has nothing to print.
+    var printable: PrintableConfig? = nil
     @State private var topHeight: CGFloat = 0
     /// The tour's glide has settled, which swaps the stars copy from the
     /// instruction to the payoff.
@@ -455,6 +458,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                              tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
                              scrubTime: scrubTime, onTap: { moveRequests += 1; scrubTime = $0 })
+            if let printable {
+                Divider().overlay(Color.white.opacity(0.08))
+                PrintableTablesRow(config: printable, anchor: tl.anchor, tz: tz)
+            }
         }
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

@@ -44,6 +44,9 @@ struct OnlineGateDetailView: View {
     /// The block the Offline available card reports: today's, whatever week
     /// is on screen. Re-picked in `rebuild()`, never per body evaluation.
     @State private var reach: ChsOnlineWindow?
+    /// Every stored block, merged for the printable tables: their spans, and
+    /// their samples sorted and deduped by time. Re-read in `rebuild()`.
+    @State private var stored: (covered: [Range<Date>], points: [CurrentPoint])?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -111,6 +114,7 @@ struct OnlineGateDetailView: View {
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in pendingAnchor = nil; applyAnchor() },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
+                            printable: printable,
                             above: { EmptyView() },
                             card: { tl in
                                 if let window {
@@ -232,6 +236,27 @@ struct OnlineGateDetailView: View {
                 else { return }
                 extend(to: next)
             }
+    }
+
+    /// Only what is stored: no stored block, no row. Never fetches.
+    private var printable: PrintableConfig? {
+        guard let stored, let window else { return nil }
+        let points = stored.points, tz = tz, lat = gate.latitude, lon = gate.longitude
+        let now = live, threshold = normalizedSlackThresholdKn(slackWindowSpeed)
+        let speedUnit = speedUnit, flood = window.floodDirection, ebb = window.ebbDirection
+        return PrintableConfig(
+            source: .fetched(covered: stored.covered, timeline: { w in
+                TimelineData.build(onlinePoints: points, tz: tz, lat: lat, lon: lon,
+                                   now: now, anchor: w, threshold: threshold)
+            }),
+            kind: .current(floodDeg: flood, ebbDeg: ebb),
+            facts: PrintFacts(name: gate.name, region: gate.region,
+                              units: printableUnitName(speedUnitLabel(speedUnit)), datum: nil,
+                              source: gate.id,
+                              link: shareURL(forStationID: gate.id, at: nil, tz: tz)),
+            entries: { scheduleEntries($0, floodDeg: flood, ebbDeg: ebb, speedUnit: speedUnit) },
+            moreHint: String(localized: "To print more days, close this and download more below the schedule.",
+                             comment: "Printable tables sheet, under the note saying which days have predictions, for a current that has only downloaded official predictions. The download status sits below the schedule."))
     }
 
     // MARK: - Fetch
@@ -505,12 +530,23 @@ struct OnlineGateDetailView: View {
     /// stale window. Nil when no block covers the anchor: that is the
     /// honesty card's cue, and the picker's way back stays on screen.
     private func rebuild() {
-        reach = ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(tz))
+        let store = ChsModelStore.loadOnline(gate.id)
+        reach = store?.reachBlock(today: todayLocal(tz))
+        stored = store.flatMap { onlinePrintable($0.blocks) }
         guard let window, window.covers(anchor: anchor) else { timeline = nil; return }
         timeline = TimelineData.build(onlinePoints: window.points, tz: tz,
                                       lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,
                                       threshold: normalizedSlackThresholdKn(slackWindowSpeed))
     }
+}
+
+/// Every stored block's span, and all their samples sorted by time with one
+/// sample per instant. Nil when nothing is stored.
+func onlinePrintable(_ blocks: [ChsOnlineWindow]) -> (covered: [Range<Date>], points: [CurrentPoint])? {
+    guard !blocks.isEmpty else { return nil }
+    var seen = Set<Date>()
+    let points = blocks.flatMap(\.points).sorted { $0.time < $1.time }.filter { seen.insert($0.time).inserted }
+    return (blocks.map { $0.start..<$0.end }, points)
 }
 
 func onlineGateShouldResumePendingFetch(from previous: ChsFitService.OnlineFetchState,
