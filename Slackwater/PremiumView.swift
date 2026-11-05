@@ -108,7 +108,7 @@ private struct PremiumCarousel: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal, 20)
         .accessibilityElement(children: .contain)

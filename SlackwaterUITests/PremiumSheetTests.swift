@@ -82,7 +82,8 @@ final class PremiumSheetTests: ScreenshotTestCase {
     func testTableListsFreeRowsThenEveryFeature() {
         let app = launch("-locDenied", "-seedPremiumSheet")
         let table = element(app, "premium-table")
-        scrollTo(table, in: app)
+        // The whole table can sit taller than the space above the pinned button; its last row can't.
+        scrollTo(table.descendants(matching: .any)["Sky controls"].firstMatch, in: app)
         for label in ["Every tide and current, every date, offline", "Home screen widgets", "The watch app",
                       "Alerts", "Calendars", "Lock screen widgets", "Watch complications", "Sky controls"] {
             XCTAssert(table.descendants(matching: .any)

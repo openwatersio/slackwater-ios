@@ -75,9 +75,11 @@ final class PremiumStore: ObservableObject {
     }
 
     func loadProducts() async {
-        guard products.isEmpty else { return }
-        products = ((try? await Product.products(for: Self.ids)) ?? [])
-            .sorted { $0.price < $1.price }
+        // A partial load retries for the missing plan; a failed retry keeps what loaded.
+        guard Set(products.map(\.id)) != Set(Self.ids),
+              let loaded = try? await Product.products(for: Self.ids),
+              loaded.count >= products.count else { return }
+        products = loaded.sorted { $0.price < $1.price }
     }
 
     func purchase(_ product: Product) async throws {

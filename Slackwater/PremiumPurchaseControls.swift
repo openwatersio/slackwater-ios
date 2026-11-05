@@ -13,6 +13,15 @@ import SwiftUI
 
     var product: Product? { store.products.first { $0.id == plan } }
 
+    /// The selected plan can't be bought: StoreKit didn't return it, even when the other loaded.
+    var unavailable: Bool {
+        Self.unavailable(loading: loading, plan: plan, loaded: Set(store.products.map(\.id)))
+    }
+
+    nonisolated static func unavailable(loading: Bool, plan: String, loaded: Set<String>) -> Bool {
+        !loading && !loaded.contains(plan)
+    }
+
     func load() async {
         loading = true
         await store.loadProducts()
@@ -57,7 +66,7 @@ struct PremiumPlanPicker: View {
                  identifier: "premium-plan-yearly")
             plan(PremiumStore.lifetimeID, "Lifetime", detail: "Pay once, never again.",
                  identifier: "premium-plan-lifetime")
-            if !purchase.loading && store.products.isEmpty {
+            if purchase.unavailable {
                 Text("Purchases are temporarily unavailable.")
                     .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.85))

@@ -9,6 +9,28 @@ final class PremiumTests: XCTestCase {
         XCTAssertEqual(PremiumFeature.carousel(for: .mac), [.alerts, .calendars, .watch, .sky])
     }
 
+    func testSelectedPlanMissingFromAPartialLoadIsUnavailable() {
+        let yearly = PremiumStore.yearlyID, lifetime = PremiumStore.lifetimeID
+        XCTAssertTrue(PremiumPurchase.unavailable(loading: false, plan: yearly, loaded: [lifetime]))
+        XCTAssertTrue(PremiumPurchase.unavailable(loading: false, plan: yearly, loaded: []))
+        XCTAssertFalse(PremiumPurchase.unavailable(loading: true, plan: yearly, loaded: []))
+        XCTAssertFalse(PremiumPurchase.unavailable(loading: false, plan: lifetime, loaded: [lifetime]))
+    }
+
+    /// Every turn's label sits wholly inside the pane or wholly outside it.
+    func testSkyPaneEdgesClearEveryTurn() {
+        let width: CGFloat = 160, center: CGFloat = 1000, margin: CGFloat = 40
+        let turns: [CGFloat] = [925, 1060, 1200]
+        let left = skyPaneLeft(width: width, center: center, turns: turns, margin: margin)
+        for turn in turns {
+            XCTAssertGreaterThanOrEqual(abs(turn - left), margin)
+            XCTAssertGreaterThanOrEqual(abs(turn - (left + width)), margin)
+        }
+        XCTAssertNotEqual(left, center - width / 2, "the centred edge cuts the first turn")
+        XCTAssert(((left + 16)...(left + width - 16)).contains(center))
+        XCTAssertEqual(skyPaneLeft(width: width, center: center, turns: [], margin: margin), center - width / 2)
+    }
+
     func testEntitlementDerivation() {
         XCTAssertFalse(PremiumStore.isPremium(owned: []))
         XCTAssertFalse(PremiumStore.isPremium(owned: ["some.other.product"]))

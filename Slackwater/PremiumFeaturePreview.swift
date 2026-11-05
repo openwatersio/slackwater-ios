@@ -149,29 +149,23 @@ private struct SkyStripExample: View {
     let sky: SkyState
     let at: Date
     let bodies: Bool
-    private static let padTop: CGFloat = 110
-    private static let plotDepth: CGFloat = 50
+    private static let padTop: CGFloat = 80
+    private static let plotDepth: CGFloat = 44
 
     var body: some View {
         let geo = TimelineGeo(data: data, padTop: Self.padTop, plotDepth: Self.plotDepth)
         let height = geo.timeY + 10
         GeometryReader { proxy in
-            let center = data.x(at)
-            let first = max(Int((center - proxy.size.width) / TimelineCanvas.tileWidth), 0)
+            let left = skyPaneLeft(width: proxy.size.width, center: data.x(at),
+                                   turns: data.tideExtremes.map { data.x($0.time) })
+            let first = max(Int(left / TimelineCanvas.tileWidth), 0)
             // The canvas is two tiles wide: the sky takes the pane's width, not the canvas's.
             ZStack(alignment: .topLeading) {
                 TimelineCanvas(data: data, geo: geo, imperial: heightUnits() != "metric", speedUnit: "kn",
                                now: at, showsSunMarks: bodies, tileRange: first..<(first + 2))
-                    .offset(x: proxy.size.width / 2 - center)
+                    .offset(x: -left)
             }
             .frame(width: proxy.size.width, height: height, alignment: .topLeading)
-            // Any crop cuts the labels nearest the pane's edges; fading them out keeps a half
-            // label from reading as a broken time.
-            .mask {
-                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
-                                       .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
-                               startPoint: .leading, endPoint: .trailing)
-            }
             .background(alignment: .top) {
                 ZStack(alignment: .top) {
                     SN.canvas
@@ -183,6 +177,22 @@ private struct SkyStripExample: View {
         }
         .frame(height: height)
     }
+}
+
+/// The pane's left edge nearest centring `center`, moved until each edge is at least `margin`
+/// from every turn: a turn's time and reading are centred on it, so each shows whole or not
+/// at all. `center` stays inside the pane; with no such edge, the centred one.
+func skyPaneLeft(width: CGFloat, center: CGFloat, turns: [CGFloat], margin: CGFloat = 30) -> CGFloat {
+    let centred = center - width / 2
+    let clear = { (left: CGFloat) in
+        turns.allSatisfy { abs($0 - left) >= margin && abs($0 - (left + width)) >= margin }
+    }
+    // 16 keeps the pinned instant's dot inside the pane.
+    for shift in stride(from: CGFloat(0), through: width / 2 - 16, by: 2) {
+        if clear(centred - shift) { return centred - shift }
+        if clear(centred + shift) { return centred + shift }
+    }
+    return centred
 }
 
 /// The watch's circular complication, as the phone can draw it: the line three hours either
