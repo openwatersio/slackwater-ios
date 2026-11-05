@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadStations } from "@slackwater/database";
-import { here, undangle } from "./bundle.mjs";
+import { here, undangle, minorAxis } from "./bundle.mjs";
 
 const db = await loadStations();
 
@@ -40,6 +40,8 @@ test("Pollock Rip Channel ships NOAA's own axis, mean flow and M2", () => {
 
 // The database stores float32; the bundle ships NOAA's three decimals.
 const near = (a, b) => Math.abs(a - b) < 5e-4;
+// The minor axis's keys, which only a harmonic record publishing cross-flow carries.
+const MINOR = ["minorConstituents", "minorMeanFlow", "azimuth"];
 
 test("every station carries its database record's fields, in the engine's units", () => {
   for (const s of stations) {
@@ -66,7 +68,45 @@ test("every station carries its database record's fields, in the engine's units"
           `${s.id} ${k.name}`);
       }
     }
+    // The minor axis: NOAA's cross-flow constants, on harmonic records that publish any.
+    const minor = c.minor_constituents ?? [];
+    if (!s.reference && (minor.length > 0 || (c.minor_mean_flow ?? 0) !== 0)) {
+      assert.equal(s.minorConstituents.length, minor.length, `${s.id} minor constituent count`);
+      for (const k of minor) {
+        const shipped = s.minorConstituents.find((x) => x.name === k.name);
+        assert.ok(shipped && near(shipped.amplitude, k.amplitude) && near(shipped.phase, k.phase),
+          `${s.id} minor ${k.name}`);
+      }
+      assert.ok(near(s.minorMeanFlow, c.minor_mean_flow ?? 0), `${s.id} minor mean flow`);
+      assert.ok(near(s.azimuth, c.azimuth), `${s.id} azimuth`);
+    } else {
+      assert.deepEqual(MINOR.filter((k) => k in s), [], `${s.id} carries minor-axis keys`);
+    }
   }
+});
+
+test("the rotary stations ship their minor axis, Kodiak's among them", () => {
+  const rotary = stations.filter((s) => s.minorConstituents);
+  assert.ok(rotary.length > 850, `only ${rotary.length} stations carry a minor axis`);
+  const kod = stations.find((s) => s.id === "noaa/KOD0901");
+  assert.ok(kod?.minorConstituents?.length > 0, "noaa/KOD0901 carries no minor constituents");
+  assert.equal(kod.azimuth, kod.floodDirection);
+});
+
+test("no subordinate carries a minor axis", () => {
+  assert.deepEqual(subordinates.filter((s) => MINOR.some((k) => k in s)).map((s) => s.id), []);
+});
+
+// Review Focus 5: a cross-flow with no constituents of its own is still a minor axis.
+// No NOAA record publishes one today, so the shaping is asserted on a synthetic record.
+test("a minor mean flow with no minor constituents ships an empty list and the flow", () => {
+  assert.deepEqual(minorAxis({ azimuth: 12.34567, minor_mean_flow: -0.20004 }),
+    { minorConstituents: [], minorMeanFlow: -0.2, azimuth: 12.346 });
+  assert.deepEqual(minorAxis({ azimuth: 12, minor_mean_flow: 0, minor_constituents: [] }), {});
+  assert.deepEqual(minorAxis({ azimuth: 12 }), {});
+  assert.deepEqual(
+    minorAxis({ azimuth: 90, minor_constituents: [{ name: "M2", amplitude: 0.09200000017, phase: 266 }] }),
+    { minorConstituents: [{ name: "M2", amplitude: 0.092, phase: 266 }], minorMeanFlow: 0, azimuth: 90 });
 });
 
 test("every subordinate's reference ships in the bundle", () => {

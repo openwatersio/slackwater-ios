@@ -4,9 +4,10 @@
  * Source: the NOAA current records in @slackwater/database, the same release
  * gen-tides.mjs reads. The database's own source workspace extracts them from
  * NOAA CO-OPS (public domain), keeps the reviewed bundle, and asserts the
- * cross-flow bound there: every station here is modelled as one signed speed
- * along a fixed flood axis, and a station whose perpendicular flow exceeds
- * half its axis peak is refused at extraction, not here.
+ * cross-flow bound there: a station whose perpendicular flow exceeds half its
+ * axis peak is refused at extraction, not here. Every station ships its flood
+ * axis; a harmonic station that publishes cross-flow also ships its minor axis
+ * (bundle.mjs minorAxis), so SlackwaterKit reads its set as a vector.
  *
  * Filters, all inherited from slackwater-web's build-currents.mjs, all still
  * load-bearing:
@@ -55,7 +56,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
 import { loadStations } from "@slackwater/database";
-import { here, byNameThenId, undangle, round3, writeBundle } from "./bundle.mjs";
+import { here, byNameThenId, undangle, round3, minorAxis, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const db = await loadStations();
@@ -83,6 +84,8 @@ function fromDatabase(s) {
     offset: c.mean_flow == null ? undefined : round3(c.mean_flow),
     constituents: (s.harmonic_constituents ?? [])
       .map((k) => ({ name: k.name, amplitude: round3(k.amplitude), phase: round3(k.phase) })),
+    // A subordinate is its reference's events, offset; it has no axes of its own.
+    ...(!o && minorAxis(c)),
     ...(o && {
       reference: o.reference.slice(NOAA.length),
       slackBeforeFloodOffset: o.slack_before_flood * MINUTE,
@@ -164,6 +167,11 @@ const kept = bundle.stations
       ebbDirection: s.ebbDirection,
       meanFlow: s.offset ?? 0,
       constituents: isSubordinate(s) ? [] : s.constituents.filter((c) => c.amplitude > 0),
+      ...(s.minorConstituents && {
+        minorConstituents: s.minorConstituents,
+        minorMeanFlow: s.minorMeanFlow,
+        azimuth: s.azimuth,
+      }),
       // Seconds and ratios, exactly as the bundle (and the engine) spell them.
       ...(isSubordinate(s) && {
         reference: `noaa/${s.reference}`,

@@ -208,6 +208,13 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// A non-primary bin carried only as a subordinate's reference (#269):
     /// harmonic shape, in `all` and `byId`, never in `StationItem.all`.
     var referenceOnly: Bool? = nil
+    /// NOAA's minor (cross-flow) axis, on a harmonic record that publishes one:
+    /// its constituents, its mean (knots, positive 90° clockwise of `azimuth`)
+    /// and the major-axis azimuth it is measured from. Absent on a one-axis
+    /// station and on every subordinate.
+    var minorConstituents: [Con]? = nil
+    var minorMeanFlow: Double? = nil
+    var azimuth: Double? = nil
 
     var isSubordinate: Bool { reference != nil }
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
@@ -229,7 +236,9 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// The constituent model itself; a CHS-fitted gate is always harmonic.
     var harmonicStation: CurrentStation {
         CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                       floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow)
+                       floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow,
+                       minorConstituents: minorConstituents?.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
+                       minorMeanFlow: minorMeanFlow ?? 0, azimuth: azimuth)
     }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
