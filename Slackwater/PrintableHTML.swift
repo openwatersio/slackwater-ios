@@ -123,7 +123,7 @@ private func weekTable(_ page: PrintablePage, setFormat: String) -> String {
         columns = 3
     case .current:
         heads.append(String(localized: "Speed", comment: "Column header of a printed current table: the current speed."))
-        heads.append(String(localized: "Set", comment: "Column header of a printed current table: the direction the water flows."))
+        heads.append(String(localized: "printable.column.set", defaultValue: "Set", comment: "Column header on a printed current table: the direction the current flows toward."))
         columns = 4
     case .derivedGate:
         break
