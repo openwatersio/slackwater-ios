@@ -43,7 +43,7 @@ vector: the y-axis is the component along that axis, and cross-axis flow is not
 drawn.
 
 - `> 0` — **flood**, toward the station's flood bearing
-- `< 0` — **ebb**, toward flood bearing + 180°
+- `< 0` — **ebb**, toward the station's published ebb bearing, which is near but not always the flood's reciprocal (Dodd Narrows floods at 355° and ebbs at 155°)
 - `0` — the slack instant
 
 Sign is phase, never magnitude. Magnitude is drift; the flood axis is set.

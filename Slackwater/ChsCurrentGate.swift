@@ -272,16 +272,20 @@ extension ChsCurrentGateInfo {
         usableModel(model) != nil && offersProvisional && model.fitDays == Self.provisionalDays
     }
 
-    func cachedReading(at date: Date) -> (signedKn: Double, floodDirection: Double)? {
+    /// The signed speed at `date` with the gate's published flood and ebb
+    /// bearings. A gate is only fitted or fetched with both bearings, so a
+    /// model missing one is not a gate's and reads as absent.
+    func cachedReading(at date: Date) -> (signedKn: Double, floodDirection: Double, ebbDirection: Double)? {
         if isOnline {
             guard let window = ChsModelStore.loadOnline(id)?.blocks.first(where: { $0.start <= date && date <= $0.end }),
                   let signed = window.signedSpeed(at: date) else { return nil }
-            return (signed, window.floodDirection)
+            return (signed, window.floodDirection, window.ebbDirection)
         }
         guard let model = ChsModelStore.usableCurrent(id),
+              let flood = model.floodDirection, let ebb = model.ebbDirection,
               let signed = record(with: model).engineStation
                 .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed else { return nil }
-        return (signed, model.floodDirection ?? 0)
+        return (signed, flood, ebb)
     }
 
     /// A fitted CHS gate renders through the exact same record/engine/view path
