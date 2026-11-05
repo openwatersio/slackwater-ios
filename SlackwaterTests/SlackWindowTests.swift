@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Direct tests for slackWindow (SlackWindow.swift):
+// Slackwater — GPL v3. Direct tests for SlackwaterKit's slackWindow and mergeWindows as the app reads them through WindowRun:
 // interpolated sub-threshold span, clamping, and the no-window cases.
 import SwiftUI
 import XCTest
@@ -41,7 +41,7 @@ final class SlackWindowTests: XCTestCase {
                       CurrentPoint(time: t0.addingTimeInterval(1200), speed: 1)]
         for threshold in [0.0, 0.1, 0.5, 2] {
             let measured = measureSlacks(points, slacks: [slack], threshold: threshold)
-            let cores = mergeWindows(measured.cores.map { (start: $0.start, end: $0.end) })
+            let cores = mergeWindows(measured.cores.map { SlackWindow(start: $0.start, end: $0.end) }).runs
             XCTAssertTrue(cores.isEmpty, "zero has no duration at comfort current \(threshold)")
             XCTAssertTrue(readsSlack(at: slack, runs: cores, slacks: [slack]))
             XCTAssertFalse(readsSlack(at: slack.addingTimeInterval(30), runs: cores, slacks: [slack]))
@@ -129,10 +129,10 @@ final class SlackWindowTests: XCTestCase {
     func testMergeWindowsJoinsTouchingAndOverlappingRuns() {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
-        let runs = mergeWindows([(start: s(50), end: s(120)),
-                                 (start: s(110), end: s(220)),   // overlaps
-                                 (start: s(220), end: s(340)),   // touches
-                                 (start: s(500), end: s(700))])  // gap
+        let runs = mergeWindows([SlackWindow(start: s(50), end: s(120)),
+                                 SlackWindow(start: s(110), end: s(220)),   // overlaps
+                                 SlackWindow(start: s(220), end: s(340)),   // touches
+                                 SlackWindow(start: s(500), end: s(700))]).runs  // gap
         XCTAssertEqual(runs, [WindowRun(start: s(50), end: s(340)),
                               WindowRun(start: s(500), end: s(700))])
     }
@@ -225,8 +225,8 @@ final class SlackWindowTests: XCTestCase {
         let points = [CurrentPoint(time: t0, speed: 1), CurrentPoint(time: slack, speed: 0)]
         let window = try XCTUnwrap(slackWindow(points, around: slack, threshold: 0.5))
         let coreWindow = try XCTUnwrap(slackWindow(points, around: slack, threshold: 0.15))
-        let run = WindowRun(start: window.start, end: window.end)
-        let core = WindowRun(start: coreWindow.start, end: coreWindow.end)
+        let run = WindowRun(window)
+        let core = WindowRun(coreWindow)
         XCTAssertEqual(run.end, slack)
         XCTAssertEqual(core.end, slack)
         XCTAssertTrue(run.isDot)
@@ -276,7 +276,7 @@ final class SlackWindowTests: XCTestCase {
         let w = try XCTUnwrap(slackWindow(reversal, around: slack, threshold: 0.5))
         XCTAssertLessThanOrEqual(w.start, slack)
         XCTAssertGreaterThanOrEqual(w.end, slack)
-        let runs = mergeWindows([w])
+        let runs = mergeWindows([w]).runs
         XCTAssertEqual(runs.count, 1)
         XCTAssertEqual(bareSlacks([slack], runs: runs), [slack], "the closing is excluded from the run's coverage")
         let openings = slackWindowOpenings(FixedCurrent(points: reversal, slacks: [slack]),
@@ -288,7 +288,7 @@ final class SlackWindowTests: XCTestCase {
         let edge = [CurrentPoint(time: m(-10), speed: 2), CurrentPoint(time: m(0), speed: 0.4),
                     CurrentPoint(time: m(10), speed: -3)]
         let e = try XCTUnwrap(slackWindow(edge, around: m(2), threshold: 0.5))
-        XCTAssertTrue(WindowRun(start: e.start, end: e.end).contains(m(2)))
+        XCTAssertTrue(WindowRun(e).contains(m(2)))
     }
 }
 

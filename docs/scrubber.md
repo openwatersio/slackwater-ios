@@ -842,7 +842,8 @@ The living implementation is split by responsibility:
 | Derived phase-only lead | `Slackwater/DerivedGateDetailView.swift` |
 | Online sampled-current binding | `Slackwater/OnlineGateDetailView.swift` |
 | Shared strokes, fills, dots, runs, and hanging labels | `Slackwater/CurveDrawing.swift` |
-| Measured slack-window and slack-run predicate and merging, current axis moments, online sample-event derivation, speed-ramp anchors | `Slackwater/SlackWindow.swift` |
+| Slack runs as drawn, current axis moments, online sample-event derivation, speed-ramp anchors | `Slackwater/SlackWindow.swift` |
+| Measured slack-window predicate and merging | `swift/Sources/SlackwaterKit/Readings.swift` in the slackwater repository |
 | Derived slack instants, schematic ±1 shape, derived phase rule | `swift/Sources/SlackwaterKit/DerivedSlack.swift` in the slackwater repository |
 | Tide-rate targets | `Slackwater/TideMovement.swift` |
 | Eclipse windows and contacts | `Slackwater/Eclipse.swift` |

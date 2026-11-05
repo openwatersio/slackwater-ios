@@ -49,62 +49,9 @@ func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
     0
 }
 
-/// The workable window around a slack: where |v| stays under `threshold`,
-/// linearly interpolated at the crossings from the drawn 10-min samples —
-/// the same series the strip renders, so the window can never disagree with
-/// the curve. Clamped to the series and widened to hold the slack itself; nil
-/// for a slack outside it, between two above-threshold samples of one sign,
-/// or with the window off.
-func slackWindow(_ points: [CurrentPoint], around slack: Date,
-                 threshold: Double) -> (start: Date, end: Date)? {
-    guard !slackWindowIsOff(threshold) else { return nil }
-    // A slack outside the sampled series has no measurable window. Events are
-    // scanned with a ±6h pad beyond the strip while `currentPoints` is clipped
-    // to it, so a padded slack can otherwise walk the series' trailing
-    // sub-threshold run and return a window that lies entirely before itself.
-    guard let first = points.first, let last = points.last,
-          slack >= first.time, slack <= last.time else { return nil }
-    let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
-    let k: Int
-    if abs(points[i].speed) <= threshold { k = i }
-    else if i + 1 < points.count, abs(points[i + 1].speed) <= threshold { k = i + 1 }
-    else if i + 1 < points.count, (points[i].speed > 0) != (points[i + 1].speed > 0) {
-        // Both samples sit outside the band but the reversal between them crosses it.
-        let a = points[i], b = points[i + 1]
-        let span = abs(a.speed) + abs(b.speed), dt = b.time.timeIntervalSince(a.time)
-        // Keep the window connected to the engine's slack when it differs from the sampled crossing.
-        return (min(a.time.addingTimeInterval(dt * (abs(a.speed) - threshold) / span), slack),
-                max(a.time.addingTimeInterval(dt * (abs(a.speed) + threshold) / span), slack))
-    }
-    else { return nil }
-    func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date { bandCrossing(a, b, threshold: threshold) }
-    var start = points[0].time
-    var a = k
-    while a > 0 {
-        if abs(points[a - 1].speed) > threshold { start = cross(points[a - 1], points[a]); break }
-        a -= 1
-    }
-    var end = points[points.count - 1].time
-    var b = k
-    while b < points.count - 1 {
-        if abs(points[b + 1].speed) > threshold { end = cross(points[b], points[b + 1]); break }
-        b += 1
-    }
-    return (min(start, slack), max(end, slack))
-}
-
-/// Where the straight line between one sample inside the ±`threshold` band and
-/// one outside it crosses the band's edge. Signed, so a pair either side of a
-/// reversal crosses on the outside sample's side rather than at a mirrored speed.
-func bandCrossing(_ a: CurrentPoint, _ b: CurrentPoint, threshold: Double) -> Date {
-    let outside = abs(a.speed) > threshold ? a.speed : b.speed
-    let edge = outside > 0 ? threshold : -threshold
-    let f = (edge - a.speed) / (b.speed - a.speed)
-    return a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f)
-}
-
 /// Each slack's window at `threshold` and its slack core, measured on the same
-/// samples. A core lies inside its window; a slack outside the samples has neither.
+/// samples with SlackwaterKit's `slackWindow`. A core lies inside its window; a
+/// slack outside the samples has neither.
 func measureSlacks(_ points: [CurrentPoint], slacks: [Date], threshold: Double)
     -> (windows: [(slack: Date, start: Date, end: Date)], cores: [(slack: Date, start: Date, end: Date)]) {
     let core = slackCoreThresholdKn(threshold)
@@ -123,18 +70,14 @@ struct WindowRun: Equatable {
     func holdsSlack(at t: Date) -> Bool { start <= t && t < end }
 }
 
-/// Windows in chronological order → runs. Two windows join when the later
-/// one starts at or before the earlier one ends.
-func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
-    var runs: [WindowRun] = []
-    for w in windows {
-        if let last = runs.last, w.start <= last.end {
-            runs[runs.count - 1] = WindowRun(start: last.start, end: max(last.end, w.end))
-        } else {
-            runs.append(WindowRun(start: w.start, end: w.end))
-        }
-    }
-    return runs
+extension WindowRun {
+    /// The drawn run for a window SlackwaterKit measured or merged.
+    init(_ window: SlackWindow) { self.init(start: window.start, end: window.end) }
+}
+
+extension Array where Element == SlackWindow {
+    /// The runs to draw, from windows SlackwaterKit's `mergeWindows` joined.
+    var runs: [WindowRun] { map(WindowRun.init) }
 }
 
 extension WindowRun {

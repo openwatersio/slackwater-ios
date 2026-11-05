@@ -12,6 +12,7 @@
 import MapLibre
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
 
 @MainActor final class NationalScaleTests: XCTestCase {
 
@@ -162,9 +163,9 @@ import XCTest
         XCTAssertEqual(bearingDeg(0, 0, 1, 0), 0, accuracy: 1e-9)
         XCTAssertEqual(bearingDeg(0, 0, 0, 1), 90, accuracy: 1e-9)
         XCTAssertEqual(bearingDeg(0, 0, -1, 0), 180, accuracy: 1e-9)
-        XCTAssertEqual(compass16(bearingDeg(0, 0, 0, -1)), "W")
+        XCTAssertEqual(compassPoint(bearingDeg(0, 0, 0, -1)), "W")
         // Victoria to Friday Harbor runs east-northeast across Haro Strait.
-        XCTAssertEqual(compass16(bearingDeg(48.4235, -123.3705, 48.5467, -123.0128)), "ENE")
+        XCTAssertEqual(compassPoint(bearingDeg(48.4235, -123.3705, 48.5467, -123.0128)), "ENE")
     }
 
     /// The My Location cards cover both series where both exist, and never

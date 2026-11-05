@@ -42,7 +42,7 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
     let slacks = station.events(from: start, to: stop).filter { $0.kind == .slack }.map(\.time)
-    let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
+    let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
     let opened: [(event: Date, end: Date?)] = runs.map { ($0.start, $0.end) }
     let uncovered: [(event: Date, end: Date?)] = slacks
         .filter { t in !runs.contains { $0.contains(t) } }

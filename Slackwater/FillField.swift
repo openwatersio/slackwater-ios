@@ -32,11 +32,6 @@ struct FillCell {
     let bearingDeg: Double
 }
 
-struct CurrentVector {
-    let speedKn: Double
-    let bearingDeg: Double
-}
-
 func triangleContains(_ point: CLLocationCoordinate2D,
                       vertices: [CLLocationCoordinate2D]) -> Bool {
     guard vertices.count == 3 else { return false }
@@ -216,12 +211,11 @@ final class FillField: Sendable {
         return station.speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed ?? 0
     }
 
-    private func vector(u: Double, v: Double) -> CurrentVector {
+    private func vector(u: Double, v: Double) -> (speedKn: Double, bearingDeg: Double) {
         let rawBearing = atan2(u, v) * 180 / .pi
-        return CurrentVector(
-            speedKn: hypot(u, v),
-            bearingDeg: (rawBearing.truncatingRemainder(dividingBy: 360) + 360)
-                .truncatingRemainder(dividingBy: 360))
+        return (speedKn: hypot(u, v),
+                bearingDeg: (rawBearing.truncatingRemainder(dividingBy: 360) + 360)
+                    .truncatingRemainder(dividingBy: 360))
     }
 
     /// The vector at one coordinate, or nil where the field has no triangle.
@@ -230,9 +224,10 @@ final class FillField: Sendable {
     func sample(at coordinate: CLLocationCoordinate2D, time: Date) -> CurrentVector? {
         for k in 0..<header.elementCount {
             guard let el = element(at: k), triangleContains(coordinate, vertices: el.verts) else { continue }
-            return vector(
+            let vector = vector(
                 u: evaluate(el.u, offset: el.offsetU, at: time),
                 v: evaluate(el.v, offset: el.offsetV, at: time))
+            return CurrentVector(magnitude: vector.speedKn, direction: vector.bearingDeg)
         }
         return nil
     }

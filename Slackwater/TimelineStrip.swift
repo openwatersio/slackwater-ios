@@ -422,7 +422,7 @@ struct TimelineData {
     }
 
     private static func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {
-        mergeWindows(windows.map { (start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+        mergeWindows(windows.map { SlackWindow(start: $0.start, end: $0.end) }.sorted { $0.start < $1.start }).runs
     }
 
     private func mergedRuns(_ windows: [(slack: Date, start: Date, end: Date)]) -> [WindowRun] {

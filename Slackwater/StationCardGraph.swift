@@ -398,7 +398,7 @@ extension DerivedGateRecord {
 /// The card's runs: one window per slack from the SHARED `slackWindow`
 /// predicate against the effective threshold, merged where they touch.
 func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [WindowRun] {
-    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
+    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
 }
 
 /// The slack inside the card's windows at `threshold`, measured the same way.

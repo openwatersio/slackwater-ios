@@ -329,14 +329,6 @@ func schematicCurrentPhase(signed: Double) -> CurrentPhase {
 }
 
 
-private let points16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-                        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-
-func compass16(_ deg: Double) -> String {
-    let d = (deg.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-    return points16[Int((d / 22.5).rounded()) % 16]
-}
-
 // Speed formatting lives in Theme.swift (formatSpeed(_:unit:)) — the engine
 // always speaks knots; the display unit is the slackwater.speedUnit setting.
 

@@ -43,9 +43,10 @@ packages:
     # ChsTideFit, requires slackwater#429. The widget and Siri windows need
     # extremes that hold still as the window moves (slackwater#436, fixed in
     # slackwater#448) and a turn on UTC midnight kept (slackwater#449).
-    # Includes the IWLS recipe grids and client-owned persistent chunk cache in slackwater#460.
+    # Includes the IWLS recipe grids and client-owned persistent chunk cache in slackwater#460,
+    # vector prediction in slackwater#508, and the shared readings in slackwater#510.
     url: https://github.com/openwatersio/slackwater
-    revision: 05864b449f37e9d9e81c749aa3c0bd832b136a33
+    revision: 9945f90ddcb32f92f82d2c23abae171602dc704e
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

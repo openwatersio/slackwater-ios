@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The Nearby section closing every scrub detail: the
 // closest stations as regular cards, over a map framing them.
 import CoreLocation
+import SlackwaterKit
 import SwiftUI
 
 struct NearbySection: View {
@@ -79,7 +80,7 @@ struct NearbySection: View {
         let km = near.km(fromLat: lat, lon: lon)
         let bearing = bearingDeg(lat, lon, near.latitude, near.longitude)
         return StationChoiceCard(item: near,
-                                 distance: String(localized: "\(formatNm(km)) \(compass16(bearing))", comment: "Two adjacent values: nearby distance and bearing, or map category and unit."))
+                                 distance: String(localized: "\(formatNm(km)) \(compassPoint(bearing))", comment: "Two adjacent values: nearby distance and bearing, or map category and unit."))
             // Not a Button: press tracking goes dead below the strip in the
             // iPad split detail column (OpenTideDetailKey, Theme.swift).
             .onTapGesture { open(near) }

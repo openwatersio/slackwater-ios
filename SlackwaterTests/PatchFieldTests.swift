@@ -55,8 +55,8 @@ final class PatchFieldTests: XCTestCase {
             .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
         let coordinate = try XCTUnwrap(field.cells(at: date).first?.polygon.first)
         let vector = try XCTUnwrap(field.sample(at: coordinate, time: date))
-        XCTAssertEqual(vector.speedKn, abs(signed) * 0.5, accuracy: 1e-9)
-        XCTAssertEqual(vector.bearingDeg, signed >= 0 ? 90 : 270, accuracy: 0.1)
+        XCTAssertEqual(vector.magnitude, abs(signed) * 0.5, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(vector.direction), signed >= 0 ? 90 : 270, accuracy: 0.1)
     }
 
     func testSampleReturnsNilOutsideCoverageOrWithoutAnchor() throws {
@@ -82,7 +82,7 @@ final class PatchFieldTests: XCTestCase {
         })
         let coordinate = try XCTUnwrap(field.cells(at: ebbDate).first?.polygon.first)
         let vector = try XCTUnwrap(field.sample(at: coordinate, time: ebbDate))
-        XCTAssertEqual(vector.bearingDeg, 270, accuracy: 0.1)
+        XCTAssertEqual(try XCTUnwrap(vector.direction), 270, accuracy: 0.1)
     }
 
     func testChsPatchUsesOnlyTheOnlineGatesCachedWindow() throws {
