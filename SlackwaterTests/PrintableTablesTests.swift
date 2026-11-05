@@ -1,0 +1,306 @@
+// Slackwater — GPL v3. Printable tables: spans, day rows, night and coverage.
+import Almanac
+import XCTest
+@testable import Slackwater
+
+final class PrintableTablesTests: XCTestCase {
+    let tz = TimeZone(identifier: "America/Los_Angeles")!
+    var cal: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = tz
+        return c
+    }
+    func day(_ m: Int, _ d: Int, _ h: Int = 0, _ min: Int = 0) -> Date {
+        cal.date(from: DateComponents(year: 2026, month: m, day: d, hour: h, minute: min))!
+    }
+    func timeline(days: [TimelineDay]) -> TimelineData {
+        let s = day(11, 1)
+        return TimelineData(tz: tz, anchor: s, today: s, start: s, end: s.addingTimeInterval(86_400), days: days,
+                            tidePoints: [], tideRates: [], tideExtremes: [], currentPoints: [],
+                            currentEvents: [], snapTimes: [], slackWindows: [])
+    }
+
+    func testAWeekIsSevenLocalDaysFromTheAnchor() {
+        let anchor = day(10, 29)
+        let r = printRange(.week, anchor: anchor, tz: tz)
+        XCTAssertEqual(r.lowerBound, anchor)
+        XCTAssertEqual(r.upperBound, day(11, 5))
+        XCTAssertNotEqual(r.upperBound.timeIntervalSince(r.lowerBound), 7 * 86_400)  // spans DST end Nov 1
+    }
+    func testAMonthIsTheAnchorsCalendarMonth() {
+        let r = printRange(.month, anchor: day(11, 18), tz: tz)
+        XCTAssertEqual(r.lowerBound, day(11, 1))
+        XCTAssertEqual(r.upperBound, day(12, 1))
+    }
+    func testNovemberHasFiveWeekAnchors() {
+        let r = printRange(.month, anchor: day(11, 1), tz: tz)
+        XCTAssertEqual(printWeekAnchors(r, tz: tz).count, 5)
+        XCTAssertEqual(printWeekAnchors(r, tz: tz).map { cal.component(.day, from: $0) }, [1, 8, 15, 22, 29])
+    }
+
+    private func entry(_ t: Date) -> ScheduleEntry { ScheduleEntry(time: t, pill: .high, value: "5 ft") }
+
+    func testRowsOutsideCoverageAreDroppedAndTheNoteNamesEachRange() {
+        let r = printRange(.month, anchor: day(11, 1), tz: tz)
+        let covered = [day(11, 4)..<day(11, 11), day(11, 15)..<day(11, 18)]
+        let all = (1...30).map { entry(day(11, $0, 9)) }
+        let tl = timeline(days: [])
+        let days = printDays(timelines: [tl], entries: { _ in all }, range: r, covered: covered, tz: tz)
+        let dom = days.map { cal.component(.day, from: $0.start) }
+        XCTAssertEqual(dom, [4, 5, 6, 7, 8, 9, 10, 15, 16, 17])
+        let note = printCoverageNote(range: r, covered: covered, tz: tz, locale: Locale(identifier: "en_US"))
+        // DateIntervalFormatter puts thin spaces (U+2009) around the en dash, as weekRangeLabel's output does.
+        XCTAssertEqual(note?.replacingOccurrences(of: "\u{2009}", with: " "), "Predictions available Nov 4 – 10, Nov 15 – 17 only.")
+    }
+    func testDuplicatesAcrossWeekTimelinesAreDroppedAndSunTimesAttach() {
+        let r = day(11, 1)..<day(11, 3)
+        let rise = day(11, 1, 6, 30), set = day(11, 1, 17)
+        let tl = timeline(days: [TimelineDay(offset: 0, start: day(11, 1), sunrise: rise, sunset: set,
+                                             moonrise: nil, moonset: nil)])
+        let e = [entry(day(11, 1, 10)), entry(day(11, 1, 10)), entry(day(11, 1, 2)), entry(day(11, 3, 1))]
+        let days = printDays(timelines: [tl, tl], entries: { _ in e }, range: r, covered: nil, tz: tz)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertEqual(days[0].entries.map(\.time), [day(11, 1, 2), day(11, 1, 10)])
+        XCTAssertEqual(days[0].sunrise, rise)
+        XCTAssertEqual(days[0].sunset, set)
+    }
+    func testFullCoverageHasNoNote() {
+        let r = printRange(.month, anchor: day(11, 1), tz: tz)
+        XCTAssertNil(printCoverageNote(range: r, covered: nil, tz: tz))
+        XCTAssertNil(printCoverageNote(range: r, covered: [r], tz: tz))
+    }
+
+    func testAdjacentCoverageOneSampleApartIsFullCoverage() {
+        let r = day(11, 1)..<day(11, 8)
+        let gap = ChsOnlineWindow.sampleInterval
+        let a = day(11, 1)..<day(11, 4)
+        let b = a.upperBound.addingTimeInterval(gap)..<day(11, 8)
+        XCTAssertNil(printCoverageNote(range: r, covered: [b, a], tz: tz))
+        // A wider hole still reports, with the two ranges kept apart.
+        let c = a.upperBound.addingTimeInterval(gap + 1)..<day(11, 8)
+        XCTAssertNotNil(printCoverageNote(range: r, covered: [a, c], tz: tz))
+    }
+
+    /// A preview's coverage starts `Timeline.backHours` before today (`ChsFitService`), so the
+    /// note on a week anchored at today names only the days from today on.
+    func testAPreviewsCoverageNoteNamesOnlyDaysOnThePage() throws {
+        let anchor = day(11, 4)
+        let start = anchor.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = start.addingTimeInterval(7 * 24 * 3600)
+        let steps = Int(end.timeIntervalSince(start) / ChsGrid.tideSeconds)
+        let preview = ChsTidePreview(stationID: "chs-test", fetchedAt: start, samples: (0...steps).map {
+            .init(time: start.addingTimeInterval(Double($0) * ChsGrid.tideSeconds),
+                  height: 2 + sin(Double($0) * .pi / 25))
+        })
+        let coverage = try XCTUnwrap(preview.coverage)
+        // As TideDetailView hands it to the sheet.
+        let covered = [coverage.lowerBound..<coverage.upperBound]
+        let note = printCoverageNote(range: printRange(.week, anchor: anchor, tz: tz), covered: covered,
+                                     tz: tz, locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(note?.replacingOccurrences(of: "\u{2009}", with: " "), "Predictions available Nov 4 – 8 only.")
+    }
+
+    func testAnOnlineBlockOutsideTheMonthIsNotListed() {
+        let r = printRange(.month, anchor: day(11, 18), tz: tz)
+        let en = Locale(identifier: "en_US")
+        func note(_ covered: [Range<Date>]) -> String? {
+            printCoverageNote(range: r, covered: covered, tz: tz, locale: en)?
+                .replacingOccurrences(of: "\u{2009}", with: " ")
+        }
+        XCTAssertEqual(note([day(10, 20)..<day(10, 25), day(11, 4)..<day(11, 11)]),
+                       "Predictions available Nov 4 – 10 only.")
+        // A block that straddles the month's first midnight lists only its November days.
+        XCTAssertEqual(note([day(10, 30)..<day(11, 3)]), "Predictions available Nov 1 – 2 only.")
+        XCTAssertEqual(note([day(10, 20)..<day(10, 25), day(12, 2)..<day(12, 5)]),
+                       "No predictions available for these days.")
+        // Coverage that runs past both ends is full coverage.
+        XCTAssertNil(note([day(10, 20)..<day(12, 5)]))
+    }
+
+    private func nights(_ days: [TimelineDay]) -> [Range<Date>] {
+        printNightSpans(timelines: [timeline(days: days)])
+    }
+    private func sunDay(_ d: Int, rise: Date?, set: Date?) -> TimelineDay {
+        TimelineDay(offset: d, start: day(11, d), sunrise: rise, sunset: set, moonrise: nil, moonset: nil)
+    }
+    func testNightIsOutsideSunriseToSunset() {
+        let n = nights([sunDay(3, rise: day(11, 3, 6, 40), set: day(11, 3, 17)),
+                        sunDay(4, rise: day(11, 4, 6, 41), set: day(11, 4, 17))])
+        XCTAssertTrue(printIsNight(day(11, 4, 5), nights: n))
+        XCTAssertFalse(printIsNight(day(11, 4, 12), nights: n))
+        XCTAssertTrue(printIsNight(day(11, 3, 20), nights: n))
+    }
+    /// `TimelineData.sunSpans` pairs a sunset with the next sunrise even when the sunset falls after
+    /// local midnight, before its own civil day's sunrise. `rise..<set` built from one day would trap.
+    func testASunsetAfterMidnightBeforeThatDaysSunriseDoesNotTrapAndPairsAsTheStripDoes() {
+        let n = nights([sunDay(4, rise: day(11, 4, 9), set: day(11, 4, 0, 30)),
+                        sunDay(5, rise: day(11, 5, 9), set: day(11, 5, 0, 30))])
+        XCTAssertEqual(n, [day(11, 4, 0, 30)..<day(11, 4, 9), day(11, 5, 0, 30)..<day(11, 5, 9)])
+        XCTAssertTrue(printIsNight(day(11, 4, 3), nights: n))
+        XCTAssertFalse(printIsNight(day(11, 4, 12), nights: n))
+    }
+    /// A day with neither event (or one) yields no span in `sunSpans`, so the strip leaves it unshaded.
+    func testADayWithNoSunEventsOrOneIsNotNight() {
+        XCTAssertEqual(nights([sunDay(4, rise: nil, set: nil)]), [])
+        XCTAssertEqual(nights([sunDay(4, rise: day(11, 4, 7), set: nil)]), [])
+        XCTAssertFalse(printIsNight(day(11, 4, 2), nights: []))
+    }
+    func testNightsFromOverlappingWeekTimelinesMerge() {
+        let d = [sunDay(3, rise: day(11, 3, 7), set: day(11, 3, 17)), sunDay(4, rise: day(11, 4, 7), set: day(11, 4, 17))]
+        let merged = printNightSpans(timelines: [timeline(days: d), timeline(days: d)])
+        XCTAssertEqual(merged, [day(11, 3, 17)..<day(11, 4, 7)])
+    }
+
+    // MARK: - Sources and building a page
+
+    private var friday: TideStationRecord { TideStationRecord.record(id: TideStationRecord.fridayHarborID)! }
+    private let printedAt = Date(timeIntervalSince1970: 1_793_000_000)
+
+    /// The tide detail's schedule filter, reproduced: `TideDetailView.scheduleEntries` is private.
+    private func tideEntries(_ tl: TimelineData) -> [ScheduleEntry] {
+        tl.tideExtremes
+            .filter { tl.scheduleRange.contains($0.time) }
+            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
+                                 value: "\(formatHeight($0.height, imperial: true)) ft") }
+            .sorted { $0.time < $1.time }
+    }
+    private func config(_ source: PrintableSource) -> PrintableConfig {
+        PrintableConfig(source: source, kind: .tide(heightUnit: "ft"),
+                        facts: PrintFacts(name: "Friday Harbor", region: "WA", units: "feet", datum: "MLLW",
+                                          source: "NOAA", link: nil),
+                        entries: tideEntries)
+    }
+    private func weekTimeline(_ source: TimelineSource, _ w: Date) -> TimelineData {
+        let end = cal.date(byAdding: .day, value: 7, to: w)!
+        return TimelineData.merged([TimelineChunk.build(source, index: 0, start: w, end: end)],
+                                   source: source, anchor: w, today: w)
+    }
+
+    func testAComputedNovemberMonthHasARowForEveryDay() {
+        let src = PrintableSource.computed(.tide(friday))
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertEqual(page.days.count, 30)
+        XCTAssertEqual(page.days.first?.start, day(11, 1))
+        XCTAssertEqual(page.days.last?.start, day(11, 30))
+        for d in page.days {
+            XCTAssertFalse(d.entries.isEmpty)
+            for e in d.entries { XCTAssertEqual(cal.startOfDay(for: e.time), d.start) }
+        }
+        XCTAssertNil(page.covered)
+        XCTAssertFalse(page.nights.isEmpty)
+    }
+
+    func testAComputedWeekMatchesTheScheduleForThatAnchor() {
+        let src = PrintableSource.computed(.tide(friday))
+        let anchor = day(11, 12)
+        let tls = printTimelines(src, range: printRange(.week, anchor: anchor, tz: tz), tz: tz, now: day(11, 4))
+        XCTAssertEqual(tls.count, 1)
+        let page = printablePage(config(src), span: .week, anchor: anchor, tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        let ref = weekTimeline(.tide(friday), anchor)
+        let expected = (tideEntries(ref) + eclipseEntries(ref)).sorted { $0.time < $1.time }
+            .filter { page.range.contains($0.time) }
+        XCTAssertFalse(expected.isEmpty)
+        XCTAssertEqual(page.days.flatMap(\.entries).map(\.id), expected.map(\.id))
+    }
+
+    func testAFetchedSourcePrintsOnlyItsCoveredDays() {
+        let covered = [day(11, 4)..<day(11, 11)]
+        let tsrc = TimelineSource.tide(friday)
+        let tzCopy = tz
+        let src = PrintableSource.fetched(covered: covered, timeline: { w in
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = tzCopy
+            let end = c.date(byAdding: .day, value: 7, to: w)!
+            return TimelineData.merged([TimelineChunk.build(tsrc, index: 0, start: w, end: end)],
+                                       source: tsrc, anchor: w, today: w)
+        })
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        XCTAssertEqual(tls.count, 5)
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertFalse(page.days.isEmpty)
+        for d in page.days { XCTAssertTrue(d.start >= day(11, 4) && d.start <= day(11, 10), "\(d.start)") }
+        XCTAssertEqual(page.covered, covered)
+        XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
+    }
+
+    /// A chunk keeps an eclipse by its peak and `eclipseEntries` keeps it by its start, so an
+    /// eclipse that starts before a week seam and peaks after it needs the earlier week's chunk to
+    /// run past the seam. Found in the bundle: a place and an eclipse whose start and peak fall
+    /// on different local days, printed across two weeks that meet at the peak's midnight.
+    func testAnEclipseAcrossAWeekSeamIsPrintedOnce() throws {
+        var zones = Set<String>()
+        let from = day(1, 1), to = day(1, 1).addingTimeInterval(15 * 365 * 86_400)
+        for rec in TideStationRecord.all where zones.insert(rec.timezone).inserted {
+            let src = TimelineSource.tide(rec)
+            let zone = src.tz
+            guard let observer = try? Observer(latitudeDeg: rec.latitude, longitudeDeg: rec.longitude) else { continue }
+            guard let e = visibleEclipses(from: from, to: to, observer: observer)
+                .first(where: { dayLocal($0.start, zone) != dayLocal($0.peak, zone) }) else { continue }
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = zone
+            let seam = dayLocal(e.peak, zone)
+            let range = c.date(byAdding: .day, value: -7, to: seam)!..<c.date(byAdding: .day, value: 7, to: seam)!
+            let tls = printTimelines(.computed(src), range: range, tz: zone, now: e.start)
+            XCTAssertEqual(tls.count, 2)
+            let days = printDays(timelines: tls, entries: eclipseEntries, range: range, covered: nil, tz: zone)
+            let rows = days.flatMap(\.entries).filter { $0.pill == .eclipse }
+            XCTAssertEqual(rows.map(\.time), [e.start], "\(rec.id) eclipse peaking \(e.peak)")
+            return
+        }
+        XCTFail("no bundled place sees an eclipse across a local midnight")
+    }
+
+    func testAFetchedSourceWhoseTimelineIsNilBuildsNoDays() {
+        let covered = [day(11, 4)..<day(11, 11)]
+        let src = PrintableSource.fetched(covered: covered, timeline: { _ in nil })
+        let range = printRange(.month, anchor: day(11, 18), tz: tz)
+        let tls = printTimelines(src, range: range, tz: tz, now: day(11, 4))
+        XCTAssertTrue(tls.isEmpty)
+        let page = printablePage(config(src), span: .month, anchor: day(11, 18), tz: tz,
+                                 timelines: tls, printedAt: printedAt)
+        XCTAssertTrue(page.days.isEmpty)
+        XCTAssertEqual(page.covered, covered)
+        XCTAssertNotNil(printCoverageNote(range: page.range, covered: page.covered, tz: tz))
+    }
+}
+
+final class PrintSourceLabelTests: XCTestCase {
+    func testNOAAPrintsItsName() {
+        XCTAssertEqual(printSourceLabel(id: "noaa/9449880"), "NOAA 9449880")
+        XCTAssertEqual(printSourceLabel(id: "noaa/PUG1515", publisher: "NOAA CO-OPS"), "NOAA PUG1515")
+    }
+
+    func testCHSPrintsItsNameWithoutTheAppsKey() {
+        XCTAssertEqual(printSourceLabel(id: "chs-sechelt-rapids"), "CHS")
+        XCTAssertEqual(printSourceLabel(id: "chs-malibu-rapids"), "CHS")
+    }
+
+    func testADerivedGatePrintsItsEstimateFromThePortsTides() {
+        XCTAssertEqual(printDerivedSourceLabel(portName: "Point Atkinson"), "Estimated from Point Atkinson tides")
+    }
+
+    func testAnotherPublisherPrintsTheNameTheTcdbGives() {
+        XCTAssertEqual(printSourceLabel(id: "kartverket/ANX", publisher: "Kartverket"), "Kartverket ANX")
+    }
+
+    func testAnUnnamedPublisherFallsBackToTheID() {
+        XCTAssertEqual(printSourceLabel(id: "dmi/26239"), "dmi/26239")
+        XCTAssertEqual(printSourceLabel(id: "odd-key"), "odd-key")
+    }
+
+    /// Bundled records, read as the tide detail builds the label.
+    func testBundledRecordsPrintTheirPublisher() throws {
+        let friday = try XCTUnwrap(TideStationRecord.record(id: "noaa/9449880"))
+        XCTAssertEqual(printSourceLabel(id: friday.id, publisher: friday.source), "NOAA 9449880")
+        let andenes = try XCTUnwrap(TideStationRecord.record(id: "kartverket/ANX"))
+        let publisher = try XCTUnwrap(andenes.source, "the tcdb names no publisher for Andenes")
+        XCTAssertTrue(publisher.contains("Kartverket"), publisher)
+        XCTAssertEqual(printSourceLabel(id: andenes.id, publisher: andenes.source), "\(publisher) ANX")
+    }
+}

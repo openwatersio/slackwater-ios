@@ -212,7 +212,7 @@ A nearby-station link appears only within 20 km. A current's paired tide port co
 
 ## 8. Schedule
 
-The schedule card lists the station's events for seven calendar days, grouped by day. It heads with the week-range bar (§9).
+The schedule card lists the station's events for seven calendar days, grouped by day. It heads with the week-range bar (§9) and ends with the Printable tables row (§8.6).
 
 ### 8.1 Span
 
@@ -292,6 +292,30 @@ Past rows are not dimmed. The highlight is the time cue.
 The row nearest the scrubber's selected instant is highlighted with go green at 13%, a 2-unit go-green bar on its leading edge, and a white time. The highlight follows the scrubber continuously and is visible only when its day is open.
 
 Tapping a row moves the scrubber to that event, using the scrubber's programmatic movement (scrubber §8).
+
+### 8.6 Printable tables
+
+The last row of the schedule card, below the days and behind a divider like theirs, is "Printable tables": a printer symbol, the label, `sparkles` beside it, and a trailing chevron. It is one button with the identifier `printable-tables-row`. Every kind shows it whenever the schedule card is shown, and where the card is hidden the row is hidden with it. An online gate with nothing stored has no schedule card, so no row. One brief exception: when a Canadian preview port (§12.1.1) receives a preview with no predictions in it, the previous preview's schedule stays up until the page rebuilds its timeline, and the row is missing until then.
+
+Premium is checked on every tap. Without Premium, the tap opens the Support Slackwater sheet ([premium](premium.md)) and nothing else.
+
+With Premium, the tap opens a sheet titled "Printable tables": a Week and Month switch at the top, then a preview of the page on white, with Done and a share button in the toolbar. The sheet opens on Week, and the switch keeps its position only while the sheet is open.
+
+- **Week:** the seven station-local days starting at the schedule's anchor (§8.1), the same days the schedule shows.
+- **Month:** the calendar month containing the anchor, from its first station-local day to its last, built with the station's calendar.
+
+Weeks and months change on the detail, through the week-range bar (§9), not in the sheet.
+
+The page has a header with the place name (and the month and year on a month page), the region, the time zone abbreviation or both when daylight saving changes inside the span ("PST/PDT"), the units, the datum for a tide, the source by name with the station's ID ("NOAA 9449880", or the publisher the tide database names, such as "Kartverket ANX"; a Canadian place prints "CHS" alone, since the app holds no CHS station code; a derived gate prints "Estimated from <port> tides" with its reference port's name, since CHS publishes no current predictions for it and the slack times are Slackwater's estimate), and, for a current, the flood and ebb sets. The week page lists every schedule event, eclipses included, one line each under a day heading with sunrise and sunset: Time, Event, then Height for a tide, Speed and Set for a current, and nothing more for a derived gate. An eclipse row's time is its start, its Event reads "Lunar eclipse (peak 3:12 AM)" or "Solar eclipse (peak …)", and its value columns hold "—". An eclipse that starts on a week's last day and peaks after midnight still prints on that day. The month page has one row per day: High and Low for a tide; Slack, Max flood and Max ebb for a current; Slack for a derived gate; an eclipse is noted on its day's row. A current month's rows print a size smaller than the rest of the page so a usual month fits one sheet, and a busy cell wraps between its times, never inside one, so the table stays within the page's width. An event between sunset and the next sunrise is shaded light grey-blue. The footer carries the station's share link (the same link the header's share button sends), the print date, and "Predictions are not observations. Not for navigation."
+
+The preview is the PDF itself, on Letter where the locale measures in US units and on A4 elsewhere, with 36-point margins. Share writes it to a file named "<place> – Week.pdf" or "<place> – Month.pdf" and opens the system share sheet, which offers Print, Save to Files, Mail and AirDrop. A preview, a printout and a saved file are the same pages. A month is built off the main thread, with a progress indicator in the preview until it is ready. The header's own share button is unchanged and still sends only the link (§15).
+
+Tide, current and derived-gate pages predict any span. Two kinds print only what is already on the device, and the sheet never downloads:
+
+- an online gate prints every stored block that falls inside the span;
+- a Canadian tide port showing its downloaded preview (§12.1.1) prints the preview's coverage.
+
+When those predictions do not cover the whole span, the page and the sheet both say which of the span's days they do cover, such as "Predictions available Nov 4 – 10 only.", listing each covered range when there are gaps. Only days inside the span are named: a preview that starts two days before today, or a stored block in another month, is cut to the span or left out. When nothing on the device falls inside the span, the note reads "No predictions available for these days." Below that note the sheet, but not the page, says where to get more: "To print more days, close this and download more below the schedule." on an online gate (§10.1), and "To print more days, close this and download the full predictions from the notice above." on a preview tide port.
 
 ## 9. Week-range bar and date picker
 
@@ -511,6 +535,12 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 
 30. **A Norwegian tide:** Andenes's footer names Kartverket, not TICON-4.
 
+### Printable tables
+
+31. **Free:** tapping Printable tables without Premium opens Support Slackwater and no table.
+32. **Week and month:** with Premium the sheet opens on the schedule's week; Month shows the anchor's whole month, and share offers Print and Save to Files.
+33. **Stored only:** an online gate's month past its stored block says "Predictions available … only." with the download hint; a gate with nothing stored has no row.
+
 ## 19. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy:
@@ -538,9 +568,10 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Summary tiles, Moon phase and tide labels, week label | `Slackwater/DetailPieces.swift` |
 | Moon sheet | `Slackwater/MoonDetailSheet.swift`, `Slackwater/MoonMarks.swift` |
 | Nearby | `Slackwater/NearbySection.swift` |
+| Printable tables: spans, days, coverage, page HTML, sheet and PDF | `Slackwater/PrintableTables.swift`, `Slackwater/PrintableHTML.swift`, `Slackwater/PrintableSheet.swift` |
 | Report a problem | `Slackwater/ReportProblem.swift` |
 | Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/StationLinkTests.swift`, `SlackwaterTests/ReportProblemTests.swift`, `SlackwaterTests/SeasonalWaterTests.swift`, `SlackwaterTests/EclipseTests.swift`, `SlackwaterTests/DetailLeadTests.swift` |
-| End-to-end checks | `SlackwaterUITests/DetailAndScrubTests.swift`, `SlackwaterUITests/ListAndFavoritesTests.swift`, `SlackwaterUITests/MapSearchAndNavigationTests.swift`, `SlackwaterUITests/OfflineCoverageTests.swift`, `SlackwaterUITests/OfflineTransitionTests.swift` |
+| End-to-end checks | `SlackwaterUITests/DetailAndScrubTests.swift`, `SlackwaterUITests/ListAndFavoritesTests.swift`, `SlackwaterUITests/MapSearchAndNavigationTests.swift`, `SlackwaterUITests/OfflineCoverageTests.swift`, `SlackwaterUITests/OfflineTransitionTests.swift`, `SlackwaterUITests/PrintableTablesUITests.swift` |
 
 The watch's place page (`SlackwaterWatch/PlaceDetail.swift`) shows a reading card, the Crown-driven strip, and a sheet with the rest of the selected day's events, "Predictions — not for navigation", and the favorite toggle. The disclaimer is in the sheet, below the fold as the phone's footer is, because the page has no row for it: on a 40mm watch the strip's hours already sit under the bottom bar. It has no week schedule, tiles, picker, provenance, or share.
 

@@ -122,6 +122,7 @@ struct TideDetailView: View {
                                 turnIsHigh: atTurn.map { $0.kind == .high },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
                                 heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
+                            printable: printable,
                             above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
@@ -376,6 +377,31 @@ struct TideDetailView: View {
                                   ?? (rising ? "arrow.up.right" : "arrow.down.right"))
                 .foregroundStyle(warning ?? (up ? SN.graphHigh : SN.graphLow))
         }
+    }
+
+    /// A preview port prints only the fetched coverage, never `.computed(.tide(previewIdentity))`:
+    /// the preview identity has no constituents, so that would be a month of empty days.
+    private var printable: PrintableConfig? {
+        let source: PrintableSource
+        var moreHint: String?
+        if let preview = activePreview {
+            guard let coverage = preview.coverage else { return nil }
+            let record = record, now = live
+            source = .fetched(covered: [coverage.lowerBound..<coverage.upperBound], timeline: { w in
+                TimelineData.build(preview: preview, tide: record, now: now, anchor: w)
+            })
+            moreHint = String(localized: "To print more days, close this and download the full predictions from the notice above.",
+                              comment: "Printable tables sheet, under the note saying which days have predictions, for a tide place that shows only an online preview. The notice above the schedule offers the download.")
+        } else {
+            source = .computed(.tide(record))
+        }
+        let facts = PrintFacts(name: record.name, region: record.region,
+                               units: printableUnitName(unit),
+                               datum: record.chartDatum,
+                               source: printSourceLabel(id: record.id, publisher: record.source),
+                               link: shareURL(forStationID: record.id, at: nil, tz: tz))
+        return PrintableConfig(source: source, kind: .tide(heightUnit: unit), facts: facts,
+                               entries: scheduleEntries, moreHint: moreHint)
     }
 
     // MARK: - Rolling multi-day schedule (turns, day-grouped)

@@ -1358,6 +1358,12 @@ struct ScheduleEntry: Identifiable {
     }
 }
 
+extension ScheduleEntry: Equatable {
+    static func == (a: ScheduleEntry, b: ScheduleEntry) -> Bool {
+        a.time == b.time && a.pill == b.pill && a.value == b.value && a.arrowDeg == b.arrowDeg
+    }
+}
+
 /// The window's eclipses as schedule rows: one row each, at the first bite,
 /// with the peak in the value column.
 ///

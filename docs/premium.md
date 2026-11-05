@@ -3,7 +3,7 @@
 **Everyone gets correct readings and the default chart design. Premium gets planning features and advanced chart controls.**
 
 - **Free:** every prediction at every station and date, offline; the chart as designed; the unit and format choices and the comfort current in Settings; the watch app and home screen widgets.
-- **Premium planning features:** notification alerts and station calendars ([alerts](alerts.md) §2).
+- **Premium planning features:** notification alerts, station calendars and printable tables ([alerts](alerts.md) §2, [detail](detail.md) §8.6).
 - **Premium advanced chart controls:** Settings' "Sun, moon and stars" switch ([scrubber](scrubber.md) §14).
 - **Premium glance surfaces:** lock screen widgets and watch complications.
 

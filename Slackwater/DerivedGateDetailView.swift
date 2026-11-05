@@ -55,6 +55,12 @@ struct DerivedGateDetailView: View {
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             alertOffer: derivedAlertOffer(
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
+                            printable: PrintableConfig(
+                                source: .computed(.gate(record)), kind: .derivedGate,
+                                facts: PrintFacts(name: gate.name, region: gate.region, units: "", datum: nil,
+                                                  source: printDerivedSourceLabel(portName: port.name),
+                                                  link: shareURL(forStationID: gate.id, at: nil, tz: tz)),
+                                entries: scheduleEntries),
                             above: { EmptyView() },
                             card: { tl in
                                 let next = nextStop
