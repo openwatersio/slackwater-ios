@@ -48,6 +48,8 @@ drawn.
 
 Sign is phase, never magnitude. Magnitude is drift; the flood axis is set.
 
+The chart draws the along-axis component only. The readings beside it (the lead, the list card, the widget, the complication and the watch) show the full vector's speed and set from the kit, with the published flood or ebb bearing chosen by sign where a station has no minor-axis data. Cross-axis flow is read, not drawn. Scrubber §9.2 holds the reading rule.
+
 This model assumes a **rectilinear** station — a pass that reverses between two
 roughly opposed bearings. It is a lie at a rotary station, where the set sweeps
 through 360° and there is no axis to project onto. See §10.
@@ -578,6 +580,8 @@ reading.
 0.5 kn" still means something at a rotary station, but "the sign reverses inside
 it" does not.* Until this is answered, a rotary station is better shown as a
 table than as a chart that implies an axis it does not have.
+
+What ships today: the strip stays rectilinear on the major axis, and the readings carry the vector. Speed and set come from the kit's minor-axis prediction, and 869 of the bundled NOAA harmonic stations carry those constants. At a major-axis slack the lead reads `Slack` with the crossing flow beside it. The chart form stays open.
 
 ---
 
