@@ -102,7 +102,8 @@ import Foundation
         seedOnlineFarWindow(stationID: id)
     }
     // -seedOnlineMonth <id>: same trap, same fix — a fresh download's month
-    // from two days back, so the status reads "Offline through <date>".
+    // from two days back, so the status reads "Through <date>" and no daily
+    // refresh is due.
     if let id = UserDefaults.standard.string(forKey: "seedOnlineMonth") {
         _ = ChsFitService.shared
         seedOnline(stationID: id, offsetDays: -2, spanDays: Int(Timeline.onlineFetchDays) + 2)

@@ -99,9 +99,10 @@ enum CardStatus: Equatable {
 /// How far the stored copy of official predictions reaches. A date, never a
 /// count of days left: a countdown reads as a free trial running out.
 /// `standalone` is for a sentence with no "Offline available" title above it.
+/// Days, not instants: "Through Nov 26" holds all of Nov 26 in `calendar`'s zone.
 func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current,
                             standalone: Bool = false) -> String {
-    guard end > now else { return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.") }
+    guard calendar.startOfDay(for: end) >= calendar.startOfDay(for: now) else { return String(localized: "Expired", comment: "Expired prediction download. Used in compact statuses, station footer/card titles, and spoken accessibility status.") }
     let date = end.formatted(Date.FormatStyle(timeZone: calendar.timeZone).month(.abbreviated).day())
     return standalone
         ? String(localized: "Offline through \(date)", comment: "How far downloaded predictions reach without a connection. The value is a localized short date, such as Nov 26.")

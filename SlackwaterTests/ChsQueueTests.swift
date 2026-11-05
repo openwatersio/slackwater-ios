@@ -230,7 +230,7 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.idle, queued: false, covered: true, online: false))
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: false, online: true))
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.deferred(t0), queued: false, covered: true, online: true),
-                       "the retry skips a gate covering today, so its backoff ends in no fetch")
+                       "a covered gate gets at most its one quiet refresh, so nothing waits on its backoff")
         XCTAssertTrue(ChsFitService.onlineDownloadIsActive(.fetching, queued: false, covered: false, online: true))
         XCTAssertFalse(ChsFitService.onlineDownloadIsActive(.fetching, queued: false, covered: true, online: true),
                        "the daily refresh of a station that already works starts no background task")
@@ -566,6 +566,34 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertFalse(count.active)
         XCTAssertFalse(count.inFlight)
         XCTAssertEqual(count.ready, count.total, "a station mid-refresh still works, so it stays ready")
+    }
+
+    /// One automatic try a day for a station that still works, and a failure
+    /// of that try neither shows nor retries.
+    @MainActor
+    func testACoveredStationRefreshesOnceADayAndFailsQuietly() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil
+        })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        XCTAssertTrue(service.onlineRefreshDue(gate), "a station with nothing stored downloads")
+        let span = Timeline.window(anchor: todayLocal(gate.tz))
+        try ChsModelStore.saveOnline(ChsOnlineWindow(
+            stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
+            start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        XCTAssertTrue(service.onlineRefreshDue(gate), "a week left of a month is due")
+        service.markOnlineRefresh(gate)
+        XCTAssertFalse(service.onlineRefreshDue(gate), "once a day")
+        service.beginOnlineFetch(gate)
+        service.noteOnlineRefreshFailure(gate.id)
+        XCTAssertEqual(service.onlineState(gate.id), .idle, "no amber line and no retry countdown")
+        XCTAssertFalse(service.onlineRefreshDue(gate), "the failure waits for tomorrow")
     }
 
     @MainActor

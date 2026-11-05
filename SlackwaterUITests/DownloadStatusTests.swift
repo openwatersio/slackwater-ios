@@ -96,11 +96,13 @@ final class DownloadStatusTests: ScreenshotTestCase {
             XCTFail("A queued station must still allow an early update")
             return
         }
+        let before = footer.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Through '")).firstMatch.label
         update.tap()
         XCTAssert(footer.progressIndicators.firstMatch.appears(within: 5))
         releaseFixture(token, "chs-sechelt-rapids-first-chunk")
         XCTAssert(footer.staticTexts.matching(NSPredicate(
-            format: "label BEGINSWITH 'Through '")).firstMatch.appears(within: 30))
+            format: "label BEGINSWITH 'Through ' AND label != %@", before)).firstMatch.appears(within: 30),
+                  "the update must move the date forward")
         XCTAssertFalse(footer.staticTexts["Queued"].exists,
                        "a completed manual update must leave the pending queue")
     }
@@ -129,7 +131,9 @@ final class DownloadStatusTests: ScreenshotTestCase {
             return
         }
         scrollTo(footer, in: app)
-        XCTAssert(footer.staticTexts["Expired"].exists)
+        // The seeded copy covers only today's strip: its last day is today.
+        let lastDay = NSPredicate(format: "label BEGINSWITH 'Through '")
+        XCTAssert(footer.staticTexts.matching(lastDay).firstMatch.exists)
         XCTAssert(footer.staticTexts["Offline available"].exists,
                   "the download status needs its own card, apart from the disclaimer")
         XCTAssertEqual(app.images["downloader-connection"].firstMatch.value as? String,
@@ -146,7 +150,9 @@ final class DownloadStatusTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Waiting for signal'")).firstMatch.exists)
         let row = app.descendants(matching: .any)["download-row-chs-sechelt-rapids"].firstMatch
         scrollTo(row, in: app, within: app.scrollViews["downloads-manager"])
-        XCTAssert(row.staticTexts["Expired"].exists)
+        let seeded = row.staticTexts.matching(lastDay).firstMatch
+        XCTAssert(seeded.exists)
+        let before = seeded.label
         XCTAssertEqual(row.buttons["download-update-chs-sechelt-rapids"].exists, online)
         save(app, "download-manager-\(online ? "online" : "offline").png")
         if online {
@@ -156,13 +162,13 @@ final class DownloadStatusTests: ScreenshotTestCase {
             // Under -networkKillSwitch nothing else can land, so the fresh row sorts
             // last in the lazy list, which draws it only once scrolled to.
             let fresh = row.staticTexts.matching(NSPredicate(
-                format: "label BEGINSWITH 'Through '")).firstMatch
+                format: "label BEGINSWITH 'Through ' AND label != %@", before)).firstMatch
             let list = app.scrollViews["downloads-manager"]
             XCTAssert(eventually(within: 10) {
                 if fresh.exists { return true }
                 list.swipeUp(velocity: .slow)
                 return false
-            }, "Update now must replace the expired download with fresh coverage")
+            }, "Update now must move the download's date forward")
             scrollTo(fresh, in: app)
         }
     }

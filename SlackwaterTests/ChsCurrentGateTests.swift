@@ -328,33 +328,47 @@ final class ChsCurrentGateTests: XCTestCase {
                        "Through Aug 27")
         XCTAssertEqual(onlineDownloadValidity(end: lateEvening, now: now, calendar: cal, standalone: true),
                        "Offline through Aug 27", "a sentence with no title above it says what the date is for")
-        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: -1, to: now)!,
+        // The last day holds until it ends, as the strip still draws it.
+        let lastMorning = cal.date(from: DateComponents(year: 2026, month: 8, day: 25, hour: 8))!
+        XCTAssertEqual(onlineDownloadValidity(end: lastMorning, now: now, calendar: cal), "Through Aug 25")
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: -1, to: now)!,
                                               now: now, calendar: cal),
                        "Expired")
     }
 
-    /// Online, a copy fetched before today is refreshed even though it still
-    /// covers today; Low Data Mode waits until today is missing.
-    func testAnOnlineCopyRefreshesOncePerDay() {
+    /// Online, a copy reaching less than a fetch ahead refreshes even though
+    /// it still covers today, whenever it was last fetched; Low Data Mode
+    /// waits until today is missing.
+    func testAnOnlineCopyRefreshesUntilItReachesAMonthAhead() {
         let tz = TimeZone(identifier: "America/Vancouver")!
         let today = todayLocal(tz)
         let span = Timeline.window(anchor: today)
-        func store(fetchedAt: Date, start: Date = span.start, end: Date = span.end) -> ChsOnlineStore {
-            ChsOnlineStore(stationID: "chs-test-refresh", blocks: [
-                ChsOnlineWindow(stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
-                                fetchedAt: fetchedAt, start: start, end: end,
-                                floodDirection: 0, ebbDirection: 180,
-                                times: [start.timeIntervalSince1970, end.timeIntervalSince1970],
-                                speeds: [0, 0])])
+        let month = Timeline.onlineFetchDays * 86_400
+        func block(_ start: Date, _ end: Date, fetchedAt: Date = appNow()) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
+                            fetchedAt: fetchedAt, start: start, end: end,
+                            floodDirection: 0, ebbDirection: 180,
+                            times: [start.timeIntervalSince1970, end.timeIntervalSince1970],
+                            speeds: [0, 0])
         }
-        let yesterday = today.addingTimeInterval(-3600)
-        XCTAssertFalse(store(fetchedAt: today.addingTimeInterval(60)).needsRefresh(today: today))
-        XCTAssertTrue(store(fetchedAt: yesterday).needsRefresh(today: today))
-        XCTAssertFalse(store(fetchedAt: yesterday).needsRefresh(today: today, lowData: true))
-        let behind = store(fetchedAt: yesterday, start: span.start.addingTimeInterval(-40 * 86_400),
-                           end: span.start.addingTimeInterval(-10 * 86_400))
+        func store(_ blocks: ChsOnlineWindow...) -> ChsOnlineStore {
+            ChsOnlineStore(stationID: "chs-test-refresh", blocks: blocks)
+        }
+        let fetchedToday = block(span.start, today.addingTimeInterval(month - 900))
+        let fetchedYesterday = block(span.start, today.addingTimeInterval(month - 86_400))
+        XCTAssertFalse(store(fetchedToday).needsRefresh(today: today),
+                       "today's fetch, clamped to its last sample, is a full month")
+        XCTAssertTrue(store(fetchedYesterday).needsRefresh(today: today))
+        XCTAssertTrue(store(block(span.start, today.addingTimeInterval(month - 86_400), fetchedAt: today))
+            .needsRefresh(today: today), "an older week merged in today does not renew the month ahead")
+        XCTAssertFalse(store(fetchedYesterday).needsRefresh(today: today, lowData: true))
+        let behind = store(block(span.start.addingTimeInterval(-40 * 86_400), span.start.addingTimeInterval(-10 * 86_400)))
         XCTAssertTrue(behind.needsRefresh(today: today, lowData: true),
                       "a copy that no longer covers today downloads even in Low Data Mode")
+        let later = block(today.addingTimeInterval(60 * 86_400), today.addingTimeInterval(90 * 86_400))
+        XCTAssertEqual(store(fetchedYesterday, later).reachBlock(today: today)?.end, fetchedYesterday.end,
+                       "the date shown is today's block, never one past a gap")
+        XCTAssertEqual(store(later).reachBlock(today: today)?.end, later.end)
     }
 
     // MARK: - Merging (the 30-day fetch, unioned on save)

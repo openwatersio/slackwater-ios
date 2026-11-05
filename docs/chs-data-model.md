@@ -192,7 +192,12 @@ The practical list. Each of these has cost someone time.
   model of its own.
 - **A fitted harmonic model does not expire**; a fetched online window does, and
   expiry there is a *coverage* question (`ChsOnlineWindow.covers`), not a
-  staleness heuristic.
+  staleness heuristic. Refresh is one too: while online, a gate whose block
+  covering today reaches less than a full fetch ahead refreshes at most once a
+  station-local day (`ChsOnlineStore.needsRefresh`,
+  `ChsFitService.onlineRefreshDue`). That refresh is quiet: it counts as ready,
+  requests no background processing, and a failure records nothing and waits
+  for the next day.
 - **Canada is roughly 4.4 hours of politely paced IWLS requests** if you fetch
   everything; the request budget is scarce and shared (`ChsFitService.swift`).
 - **Fetch-don't-bundle is not a general licence workaround.** It applies to

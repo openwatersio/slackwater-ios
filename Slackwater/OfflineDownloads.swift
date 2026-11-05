@@ -615,7 +615,7 @@ struct OfflineManagerList: View {
     }
 
     private func onlineWindow(_ gate: ChsCurrentGateInfo) -> ChsOnlineWindow? {
-        ChsModelStore.loadOnline(gate.id)?.blocks.last
+        ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(gate.tz))
     }
 
     private func remainingDays(_ gate: ChsCurrentGateInfo) -> Int? {

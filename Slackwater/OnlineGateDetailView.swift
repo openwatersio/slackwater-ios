@@ -38,6 +38,9 @@ struct OnlineGateDetailView: View {
     /// downloads. The week on screen stays put until it lands (`extend`).
     @State private var pendingAnchor: Date?
     @State private var pendingFetchAnchor: Date?
+    /// The last day `fetchNow` actually fetched from, so a week it could not
+    /// supply is never asked for again on its own.
+    @State private var requestedFrom: Date?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -199,8 +202,13 @@ struct OnlineGateDetailView: View {
                     // A completed fetch can cover today while leaving the week at the strip's edge uncovered.
                     let resumePending = onlineGateShouldResumePendingFetch(
                         from: fetchState, to: state, pendingFetchActive: pendingFetchAnchor != nil)
+                    // A fetch this view did not ask for (the daily refresh)
+                    // made `fetchNow` drop a week picked meanwhile; ask once.
+                    let fetchPicked = fetchState == .fetching && state == .idle && !resumePending
+                        && timeline == nil && net.online && requestedFrom != anchor
                     fetchState = state
                     if resumePending { fetchPending() }
+                    if fetchPicked { fetchNow(from: anchor) }
                 }
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
@@ -308,6 +316,7 @@ struct OnlineGateDetailView: View {
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
         guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
+        requestedFrom = from
         ChsFitService.startOnlineWork(for: gate) {
             if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {
                 window = fresh
@@ -446,15 +455,13 @@ struct OnlineGateDetailView: View {
 
     private var expectation: String {
         // "About a month", not "about a week": one fetch is
-        // `Timeline.onlineFetchDays` forward of the anchor. The footer two
-        // views up prints the real covers-to date, and the two lines sat on
-        // one screen contradicting each other.
+        // `Timeline.onlineFetchDays` forward of the anchor.
         var lines = [net.online
             ? String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation.")
             : String(localized: "Connect for a moment to download about a month of predictions.", comment: "Offline-prediction download explanation while offline.")]
         // Deliberate: a disk read per body evaluation, but this only renders
         // on the honesty path — re-pick into state if it ever shows in a trace.
-        if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
+        if let window = ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(tz)) {
             let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar, standalone: true)
             lines.append(String(localized: "\(validity).", comment: "Offline-prediction validity sentence. The value is a localized expiry phrase."))
         }
