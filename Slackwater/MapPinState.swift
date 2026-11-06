@@ -186,7 +186,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
         bearing: signed >= 0 ? station.floodDirection : station.ebbDirection)
 }
 
-/// 1,549 subordinate current pins hang off 50 references, so the reference is
+/// Most current pins are subordinates hanging off a few dozen references, so the reference is
 /// searched once per build and each pin only reduces — the engine's own
 /// `reduce` and `speed(at:along:)`, so the math has one owner. The engine
 /// extracts reference events per UTC day (`eventsByDay`), so the held list

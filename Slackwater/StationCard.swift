@@ -239,8 +239,8 @@ struct ChsPendingCard: View {
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
             // Named per station. "Some card on screen says 'Canadian tidal
-            // predictions'" is a unique locator at 21 Canadian stations and
-            // meaningless at 1,097 — every undownloaded station says it, so a test
+            // predictions'" was a unique locator with a handful of Canadian stations and
+            // is meaningless with a thousand — every undownloaded station says it, so a test
             // waiting for THIS station's copy to go never sees it go.
             .accessibilityIdentifier("chs-pending-\(id)")
     }
@@ -372,7 +372,7 @@ struct ChsCurrentGateCardView: View {
                               progress: status == .downloading ? service.queue.job(gate.id)?.downloadProgress ?? 0 : nil)
     }
 
-    /// The 7 online (fit-reject) gates: a covering fetched window
+    /// The online (fit-reject) gates: a covering fetched window
     /// reads like any other current card; without one, the pending shell
     /// carries the strip `onlineGateStatus` picks — never a queue status this
     /// gate can't be in.
@@ -679,7 +679,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
     return cardDownloadLabel(job, position: queue.position(id))
 }
 
-/// The 7 online (fit-reject) gates: never queued, never fitted, so the only
+/// The online (fit-reject) gates: never queued, never fitted, so the only
 /// question is what is on disk. Called with a window that does NOT cover the
 /// strip on screen — a covering one renders as an ordinary reading.
 ///

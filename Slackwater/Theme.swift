@@ -1189,9 +1189,9 @@ struct StationGroups {
 
 /// The list ranks the whole catalog by distance and builds `StationGroups`
 /// over it — and it does that inside `body`, which SwiftUI re-evaluates on
-/// every fit that lands, every favourite toggle, every unit switch. At 41
-/// bundled stations nobody could measure it. At 3,125 it is a 3,125-element
-/// sort plus two dictionary builds, tens of times a second.
+/// every fit that lands, every favourite toggle, every unit switch. With a few
+/// dozen bundled stations nobody could measure it. With thousands it is a sort
+/// of the whole catalog plus two dictionary builds, tens of times a second.
 ///
 /// So it is computed once per FIX, not once per render. The key is the fix
 /// rounded to ~100 m — finer than the list can show, coarser than GPS jitter,

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. The 7 online (fit-reject) gates' detail (online-gates
+// Slackwater — GPL v3. The online (fit-reject) gates' detail (online-gates
 // spec §2/§3): no on-device model exists for these, ever — the fetched CHS
 // window is the only source of truth. Modeled on CurrentDetailView's
 // post-split single-track anatomy, minus everything fit/provisional (there is

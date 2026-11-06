@@ -422,7 +422,7 @@ enum StationItem: Identifiable, Hashable {
     ///
     /// Concrete, NOT `any StationIdentity`: these payloads are wider than an
     /// existential's inline buffer, so every boxed read heap-allocates. The
-    /// map's decimation scan reads coordinates for all 7,329 stations on
+    /// map's decimation scan reads coordinates for every bundled station on
     /// every camera move and measured 200 ms a pass through the box; this
     /// costs a few retains.
     var fields: StationFields {
@@ -571,8 +571,8 @@ enum StationItem: Identifiable, Hashable {
     }()
 
     /// Id → item, built once. Every row, every map-pin tap and every id→item
-    /// lookup used to be `all.first(where:)`; at 41 stations that was free and
-    /// at 3,125 it is a linear scan per row per render (M53).
+    /// lookup used to be `all.first(where:)`; with a few dozen stations that was free and
+    /// with thousands it is a linear scan per row per render (M53).
     static let byId: [String: StationItem] =
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
@@ -651,7 +651,7 @@ enum StationItem: Identifiable, Hashable {
 
     /// Matches, best first. Rank is the web's (name > region > alias) and
     /// DISTANCE breaks the tie — the other thing national scale forces, since
-    /// alphabetical order across 3,125 stations answers "port" in Boston with
+    /// alphabetical order across thousands of stations answers "port" in Boston with
     /// Alaska. Ties on distance break on id, so the order is total.
     ///
     /// A plain scan over prebuilt lowercased keys. Lowercasing three strings

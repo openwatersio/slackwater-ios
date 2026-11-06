@@ -195,7 +195,7 @@ final class ChsFitService: ObservableObject {
     static let autoFitGates = 3
     nonisolated static let autoFitRadiusKm = 150.0
 
-    /// Every CHS station the app could fit, ports and validated gates. The 7
+    /// Every CHS station the app could fit, ports and validated gates. The
     /// online (fit-reject) gates are excluded here, at the source every job —
     /// auto-fit and opened-by-hand alike — is drawn from (`autoFitSet` below,
     /// and `promote`'s add-if-missing): they never get an on-device model, so
@@ -303,7 +303,7 @@ final class ChsFitService: ObservableObject {
         onlineDesired = Dictionary(uniqueKeysWithValues: ChsCurrentGateInfo.all.filter {
             $0.isOnline && requestedDownloads.contains($0.id)
         }.map { ($0.id, $0) })
-        // One directory read, not 1,097 stat calls: which stations already
+        // One directory read, not a stat call per station: which stations already
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
@@ -687,10 +687,10 @@ final class ChsFitService: ObservableObject {
     /// cost — the manager's bulk action, and the reason currents need no
     /// region model (#8).
     ///
-    /// Gates are the series a bulk download is affordable for. There are 13
-    /// fittable ones in the whole country and 9 online windows, against 1,058
-    /// tide ports: fitting every gate is about 25 minutes, fitting every port
-    /// is about 4.4 hours. So the passes a passage crosses are selectable as
+    /// Gates are the series a bulk download is affordable for. There are a
+    /// couple of dozen in the whole country against a thousand-odd tide ports:
+    /// fitting every gate takes tens of minutes, fitting every port takes
+    /// hours. So the passes a passage crosses are selectable as
     /// one set, and "the Gulf Islands" never has to become a place you pick.
     /// ponytail: no region picker, no route parsing — all of them, once.
     var gatesToDownload: [ChsJob] {

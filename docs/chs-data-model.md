@@ -64,12 +64,15 @@ user's own derivation. That yields three options, of which only one works:
 
 So, structurally:
 
-- **Identity only is bundled.** `Resources/chs-stations.json` (1,058 stations)
+- **Identity only is bundled.** `Resources/chs-stations.json` (1,057 stations)
   and `Resources/chs-current-gates.json` (23 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
   `Resources/chs-tombstones.json` is the same posture for stations that have
   since left the bundle: identity we authored, for a favorite that persists a
   bare id and would otherwise have nothing left to name it (issue #91).
+  `Resources/station-successors.json` is the third identity file: it maps a retired id to the
+  record that replaced it (`noaa/8218617` → `chs-mill-bay`), and saved favorites, requested and
+  cancelled downloads are remapped through it on load.
   `Resources/unavailable-stations.json` is the posture for the third case —
   stations that never entered the bundle and never can, because upstream
   states their predictions are non-commercial (issue #401). Written by
@@ -82,7 +85,7 @@ So, structurally:
 - CHS data is **not to be used for navigation**; the app says so in Settings and
   marks *"Predictions — not for navigation"* on every detail footer.
 
-`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. Tide ports fit `ChsFitter.tideBasis`, the engine's shared CHS tide recipe `ChsTideFit.basis`: the validated 23 constituents, without SA/SSA. Current gates fit `ChsFitter.currentBasis`, the engine's shared `ChsCurrentFit.basis`; its recipe stamp prevents a changed recipe from reusing evidence measured on another fit. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
+`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. Tide ports fit `ChsFitter.tideBasis`, the engine's shared CHS tide recipe `ChsTideFit.basis`: the validated 23 constituents, without SA/SSA. Current gates fit `ChsFitter.currentBasis`, the engine's shared `ChsCurrentFit.basis`, which is the same 23 constituents; its recipe stamp prevents a changed recipe from reusing evidence measured on another fit. Recorded Victoria samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter; recorded Dodd samples compare the 60-day provisional fit with the 210-day full fit on held-out data. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
 
 On iPhone, tide ports first cache seven elapsed days of official water-level predictions, beginning 48 hours before station-local midnight. The finite preview supplies the initial reading, curve, and sampled turns while the full model downloads. It does not make yearly claims, supply derived gates, or travel to the watch as a harmonic model. Preview files survive interrupted downloads and remain useful offline inside their coverage; invalid or expired coverage never permits extrapolation.
 
@@ -112,18 +115,25 @@ field question and hit this wall; see §6.
 ### The commercial-use gate is already enforced in the build
 
 `tools/gen-tides.mjs` filters on `license?.commercial_use === true` and
-re-asserts it on output, because this app's licence is *"a copyleft structure
-that holds together with paid distribution"* (Settings). **Non-commercial terms
+re-asserts it on output, because this app is sold under the GPL (About: "Slackwater is open
+source: this app under GPL-3.0, the prediction engine under MIT"), a copyleft structure that
+holds together with paid distribution. **Non-commercial terms
 are a hard stop by a rule that already ships**, not a judgement call. Unknown
 terms are worse than "no" — silence is not permission.
 
-### The other two sources, and why they behave differently
+### The other sources, and why they behave differently
 
-- **NOAA** — public domain. 1,429 tide stations and 842 current stations ship
-  with full constituents, offline from first launch.
-- **TICON-4** — the CC BY 4.0 half ships; 49 bundled stations cover Canadian
-  water CHS does not gauge. Attribution is in Settings. **This is the precedent
-  for bundling third-party harmonic constants** — see `tools/gen-tides.mjs`.
+- **NOAA** — public domain. 3,263 tide stations and 2,572 current stations (harmonic or
+  subordinate-offset) ship with full constituents, offline from first launch.
+- **TICON-4** — the CC BY 4.0 half ships, 1,381 stations; the ones in Canadian water CHS does
+  not gauge are the gap-fills `tools/gen-tides.mjs` counts in its census line. Attribution is in
+  Settings. **This is the precedent for bundling third-party harmonic constants** — see
+  `tools/gen-tides.mjs`.
+- **DMI** (205), **JMA** and **JHOD** (70 and 20), **LINZ** (56) and **Kartverket** (33) tide
+  gauges ship the same way, each credited in About.
+
+Counts are the bundle at the time of writing; `tools/gen-tides.mjs` prints the census when it
+runs.
 
   The non-commercial half's CONSTANTS can never ship, and none do. Its
   IDENTITY does, for 109 of those stations: name, region and position, with no
@@ -137,7 +147,7 @@ terms are worse than "no" — silence is not permission.
 
 ## 4. The current data sources
 
-NOAA currents ship bundled harmonics or subordinate offsets. CHS currents use the database's curated `chs_fit` disposition; `tools/gen-chs-gates.mjs` carries its window, bound and recipe stamp into the app. Every curated gate remains findable, including Arran Rapids. A gate without measured fit evidence and without a derived reference is online.
+NOAA currents ship bundled harmonics or subordinate offsets. CHS currents use the database's curated `chs_fit` disposition; `tools/chs-current-gates.mjs` (`currentGate()`, written out by `tools/gen-chs-gates.mjs`) carries its window, bound, recipe stamp, online-miss context and magnitude note into the app. Every curated gate remains findable, including Arran Rapids. A gate without measured fit evidence and without a derived reference is online.
 
 Fitted gates use `ChsCurrentFit.basis` and `ChsCurrentFit.project` over their measured 60- or 210-day window. Final gates show plain readings. Phone cards and details retain approximate readings for bounded gates and quote their year-round slack bound without download wording or progress. The watch detail sheet quotes the bound; watch rows, widgets, alerts and Siri keep their existing presentation, with follow-up [#852](https://github.com/openwatersio/slackwater-ios/issues/852). A 210-day gate offers a provisional 60-day answer only when its evidence explicitly supplies `provisionalSlackMinutes`; the remaining download continues while that answer is visible.
 
@@ -151,7 +161,7 @@ Malibu Rapids derives slack timing from a reference tide port and fixed high/low
 
 Final fits pass quarterly median limits of 15 minutes for slack, 20 minutes for extremum timing and 0.5 knots for peak speed, with no missed or invented slack or reversed axis, and a year-round worst slack error at most 30 minutes. Bounded fits meet the same clauses with worst slack error over 30 and at most 45 minutes, rounded up to five minutes for display. Other gates use official online predictions. Demotions follow the first failing grid point; promotions require the published margin on two consecutive grid points.
 
-A stored current model is usable only when its recipe stamp matches the gate's evidence and its window is the full measured window, or the 60-day answer that gate explicitly offers. Unstamped models and models without a recorded fit window refit once. Reusing an unstamped model requires the app to reproduce the shared recipe golden; it does not infer that equivalence from the pinned stamp alone. A changed bound on the same recipe needs no refit. Moving online removes the fitted model and its chunk cache; moving back to fitted removes downloaded online windows.
+A stored current model is usable only when its recipe stamp matches the gate's evidence and its window is the full measured window, or the 60-day answer that gate explicitly offers. Unstamped models and models without a recorded fit window are never reused: they refit once (`usableModel`). The pinned stamp is checked against the measured recipe fixture by test, not inferred. A changed bound on the same recipe needs no refit. Moving online removes the fitted model and its chunk cache; moving back to fitted removes downloaded online windows.
 
 ---
 
@@ -198,7 +208,12 @@ The practical list. Each of these has cost someone time.
   `ChsFitService.onlineRefreshDue`; the marker is in memory, so a relaunch can
   try once more). That refresh is quiet: it counts as ready, requests no
   background processing, and a failure records nothing and waits for the next
-  day.
+  day. In Low Data Mode the daily refresh is skipped; a station with no block
+  for today still fetches. Blocks older than 60 days (`Timeline.onlineRetentionDays`)
+  are pruned on save; there is no forward cap. The card and the Station details
+  show how long the download lasts as a date — "Through *Mon d*", or
+  "Offline through *date*" — and read "Expired" only once the whole last
+  station-local day has passed ([detail.md](detail.md) §7 and `onlineDownloadValidity`).
 - **Canada is roughly 4.4 hours of politely paced IWLS requests** if you fetch
   everything; the request budget is scarce and shared (`ChsFitService.swift`).
 - **Fetch-don't-bundle is not a general licence workaround.** It applies to
@@ -214,13 +229,16 @@ The practical list. Each of these has cost someone time.
 
 | Thing | File |
 |---|---|
-| CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
-| Identity for stations that have LEFT the bundle (28) | `Slackwater/Resources/chs-tombstones.json` |
+| CHS station identity (1,057) | `Slackwater/Resources/chs-stations.json` |
+| Identity for stations that have LEFT the bundle (31) | `Slackwater/Resources/chs-tombstones.json` |
+| Retired id → replacement record | `Slackwater/Resources/station-successors.json` |
 | Identity for stations that may NEVER ship (109) | `Slackwater/Resources/unavailable-stations.json` |
 | CHS current gates (23: 7 fitted, 16 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
-| NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |
-| NOAA current stations (842) | `Slackwater/Resources/currents.json` |
+| Bundled tide stations (5,028: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.json` |
+| NOAA current stations (2,572) | `Slackwater/Resources/currents.json` |
+| Fitted models, online blocks and tide previews | App Group container, `ChsModels/{id}.json`, `-current.json`, `-online.json`, `-tide-preview.json` (moved once from Application Support) |
+| Chunk cache and the 7-day IWLS station list cache | Application Support, `ChsChunks/` and `IwlsStations.json` (backup-excluded) |
 | Regeneration | `cd tools && npm install && npm run build:data` |
 | Fit validation criteria and evidence | `docs/validation/chs-currents.md` |
 | Peak-magnitude distributions | `tools/ramp-domain.mjs` |

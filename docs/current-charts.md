@@ -48,7 +48,7 @@ drawn.
 
 Sign is phase, never magnitude. Magnitude is drift; the flood axis is set.
 
-The chart draws the along-axis component only. The readings beside it (the lead, the list card, the widget, the complication and the watch) show the full vector's speed and set from the kit, with the published flood or ebb bearing chosen by sign where a station has no minor-axis data. Cross-axis flow is read, not drawn. Scrubber §9.2 holds the reading rule.
+The chart draws the along-axis component only. The readings beside it (the lead, the list card, the widget, the complication and the watch) show the full vector's speed and set from the kit, with the published flood or ebb bearing chosen by sign where a station has no minor-axis data. Cross-axis flow is read, not drawn. Scrubber §9.2 holds the reading rule. The map pin stays on the major axis: its colour and reading use the signed along-axis speed, while the Dodd map arrow uses the kit vector.
 
 This model assumes a **rectilinear** station — a pass that reverses between two
 roughly opposed bearings. It is a lie at a rotary station, where the set sweeps
@@ -553,12 +553,15 @@ On a derived gate:
 - **No set arrow.** The gate knows timing and nothing about set; inventing a
   bearing is the schematic-curve mistake in glyph form. Fall back to a mark that
   claims only phase.
-- The readout says **slack timing**, not a speed.
+- The readout says **slack timing**, not a speed. The phone's detail and card read `Slack` within 12 minutes of a derived slack (SlackwaterKit `slackWindowMinutes`); the watch reads it from the schematic shape instead, below 0.15 of the ±1 amplitude, roughly 17 minutes either side on a six-hour half-cycle (scrubber §9.4).
 - A gate whose accuracy fails validation is **absent, not broken-looking**.
   Shipping a bad prediction with a caveat is worse than shipping nothing.
 
 **Online gates** — real official predictions fetched on demand — are a third
-case. Events come from scanning the fetched series rather than a harmonic model.
+case. Events come from scanning the fetched series (`sampleEvents`: one maximum per sign run and
+interpolated zero crossings on 15-minute samples) rather than from the kit's `maxima`, which
+finds extremes above 0.01 kn prominence on the harmonic series and labels each by its sign, so a
+relaxation peak that never reverses stays flood or ebb as NOAA's `max_slack` does.
 Everything in §3–§8 applies unchanged; only provenance differs.
 
 Neither kind has a model to class it by (§1). A derived gate draws no maxima, so it has no maximum-time row; an online gate's fetched window moves with the picked date, so it is not classed from it. Both keep the narrows order, and the online gate's maxima stay in the schedule.
@@ -660,7 +663,7 @@ regressed once. Minimum set:
 - The go colour and the window's blue resolve from the **shared window
   predicate** on every surface that shows them (§6.1).
 - A schematic series yields **no windows and no speed marks** (§9).
-- The maximum-time row draws **exactly when the station's reading is reach and it has maxima**, decided from the station's model and unchanged by which span is loaded or which date is picked (§1, §5.4.1).
+- The maximum-time row draws **exactly when the station's reading is reach and it has maxima**, decided from the station's model and unchanged by which span is loaded or which date is picked (§1, §5.4.1). Not yet tested; the shipped row has no reach reading to check (§16).
 - **Source-text tripwires** for retired colour literals and for direction colours
   inside the current-drawing path. These catch the actual failure mode — a
   literal creeping back in — which a rendered-colour test does not.
@@ -677,17 +680,18 @@ every mark that only earns its place at scale. The card and the widget are
 
 ### 15.1 What the curve shows
 
-- **One swing back, three ahead.** Half the M2 period per swing (≈6.2 h);
-  the past faded, the forecast at full strength, a white dot at now.
+- **One and a half swings back, two and a half ahead.** Half the M2 period per swing (≈6.2 h),
+  four swings in all; the past faded, the forecast at full strength, a white dot at now.
 - **The window is the only window mark.** The run is drawn on the line in
   blue, with the slack inside it in the go colour and the line outside every
   window in the ramp's yellow floor (§5.2), from
   the SHARED window predicate (§6.1). The
-  threshold lines are dropped: their job — letting the reader see the margin
-  and overrule the chart (§4.3) — belongs to the detail, one tap away.
-- **The window's edges get the dots** (§5.4.1): the opening at full
-  strength while it is ahead, the closing at half; inside the window they
-  swap. Nothing else on a current curve gets a dot.
+  threshold lines are not drawn here: their job — letting the reader see the margin
+  and overrule the chart (§4.3) — belongs to the detail, one tap away (and is not drawn there
+  yet either, §16).
+- **No dots on a measured current.** The window is marked by the run on the line and the
+  slack by its short green stroke (#821); the window's edges get no dots. Only a derived gate's
+  slacks draw as dots.
 - **Peaks are context at every station** (§5.4). The card has no room for
   peak times, so it keeps the narrows order even where the detail leads with
   the peaks (§5.1): the speed, no unit, and the set arrow hang
@@ -773,3 +777,27 @@ their locked and empty states.
 The locked state uses the watch's tide icon; tapping it opens the Premium
 support explanation in Settings. Loading placeholders use the same icon,
 without calculating predictions or linking subscribers to Premium.
+
+## 16. Implementation status
+
+This spec is the target. The iOS app at the time of writing has not reached these parts of it;
+scrubber §18 holds the detail strip's own list. Fixing one should remove it here.
+
+- **Reach and narrows are not classed** (§1, §5.4.1, §14). No code reads a station's yearly
+  peak or compares it with the make-way anchor. The maximum-time row draws at every measured
+  current with maxima, online gates included (`TimelineGeo.hasPeakTimes`), and the §14
+  invariant on it has no test.
+- **Threshold lines, their ± labels and ticks are not drawn** (§3, §5.2, §7.1–§7.4). The zero
+  reference line draws unconditionally on every measured current; the "zero line only without
+  threshold lines" rule has nothing to act on.
+- **The ramp's floor is a constant, not the reader's threshold** (§3, §6.3 rule 4).
+  `currentSpeedRampAnchorsKn` is `[0.5, 3, 8, 12]`; the threshold moves the window and nothing
+  else. The floor is flat yellow to 3 kn, so this does not show, but "one number" is not yet
+  true of the fill.
+- **The threshold is printed nowhere on the detail** (§3): there is no `for 41m @ 0.5 kn`, and
+  the run summaries of §4.1 and §4.2 (*under 0.5 kn all day*, *~5h, 1.1 kn blip midway*) are
+  target wording. The shipped commentary stops are Slack, Slack window, Slack window closes, Max
+  flood and Max ebb (scrubber §10).
+- **Slack cores are inert.** `slackCoreThresholdKn` is 0 and the kit returns no window for a
+  threshold of 0, so the go colour reduces to the one-second rule at the zero instant plus a
+  stroke of fixed minimum width (`SlackWindow.swift`), as scrubber §13.2 describes.

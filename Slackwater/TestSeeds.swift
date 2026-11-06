@@ -80,7 +80,7 @@ import Foundation
                          provisional: CommandLine.arguments.contains("-seedCurrentProvisional"))
     }
     // -seedOnlineWindow <id> (UserDefaults argument domain): writes a
-    // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
+    // fetched-looking ChsOnlineWindow for one of the online (fit-reject)
     // gates, so a UI test can land on OnlineGateDetailView's fetched
     // single-track detail with no network.
     if let id = UserDefaults.standard.string(forKey: "seedOnlineWindow") {

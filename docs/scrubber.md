@@ -116,9 +116,9 @@ The reference implementation samples `now` when the detail opens, when Now is ac
 
 `now` never advances on a timer while the view stays open. A long-open detail can show a slightly stale now marker; resampling on foreground return covers the real case.
 
-Every detail takes the Today, Tomorrow, and Yesterday day labels from the session `now`, the same instant that places the absolute-now dot: each chunk publish and each fixed-window build labels its days from it. Refreshing `now` (Now, or a foreground return whether home or scrubbed away) relabels the days when the refreshed `now` falls on a different station-local day, so the labels and the now dot always agree.
+Every detail takes the Today, Tomorrow, and Yesterday day labels from the session `now`, the same instant that places the absolute-now dot: each chunk publish and each fixed-window build labels its days from it. On the phone, refreshing `now` (Now, or a foreground return whether home or scrubbed away) relabels the days through `TimelineWindowStore.setNow` when the refreshed `now` falls on a different station-local day, so the labels and the now dot always agree.
 
-The watch place page follows the same `now` sampling and settle re-anchor rules, counting a raised wrist as a foreground return. It opens directly on now, without the opening motion.
+The watch place page follows the same `now` sampling and settle re-anchor rules, counting a raised wrist as a foreground return. It opens directly on now, without the opening motion. It does not call `setNow`: a refreshed `now` moves its now dot but keeps the day labels from the day the page opened (§18).
 
 All visible civil-time language uses the station's time zone, never the device's time zone. Horizontal geometry uses elapsed time. A daylight-saving transition therefore produces a 23- or 25-hour civil day while the curve remains continuous.
 
@@ -144,7 +144,7 @@ windowEnd   = anchor + 180 hours
 duration    = 228 elapsed hours
 ```
 
-The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values. The online detail never re-anchors on settle. Every selection stays within its fixed window: drags stop at its edges, and every programmatic move clamps to them (§8).
+The online detail only shows its scrubber when a stored block covers this whole window. Picking another week may require a fetch. Missing coverage uses the loading or honesty state, never extrapolated current values. Every selection stays within its fixed window: drags stop at its edges, and every programmatic move clamps to them (§8). Because the centerline can never settle outside that window, the online detail re-anchors by its own rule, `Timeline.edgeReanchor`: after a selection rests 600 ms within half a viewport plus one hour of either window end, the schedule anchor moves to the rested local day. A stored block covering that day moves the window at once; otherwise the week on screen stays, the card under the strip says the next block is downloading, and when it lands the window moves only if the scrub still rests at the edge that asked for it — a reader who scrolled back to today meanwhile keeps today. The scrubber never gives way to the honesty card for a week the user only scrolled toward.
 
 Every advertised target should have half a viewport of valid content on both sides. Continuous details meet this by building data around each target. The online window pads 12 hours past its schedule week, which is enough for a phone-width viewport. Where a viewport is wider than its window allows, including at either end of a Canadian tide preview, every programmatic move (§8) clamps to the content edge and shows the time actually under the centreline, never an unreachable target. Explicit picker and shared-link destinations must have their data ready before centring; a first build for a shared link uses the linked instant rather than the ordinary opening destination.
 
@@ -368,7 +368,7 @@ The state is:
 
 - `Slack` within one second of a predicted zero instant (§13.2), where the magnet parks on its mark; never elsewhere, however slow the water, and never merely inside a slack window;
 - `Max flood` or `Max ebb` within one second of that maximum; or
-- `Flooding` / `Ebbing` otherwise.
+- `Flooding` / `Ebbing` otherwise, by the sign of the major-axis speed; an exact zero outside slack reads `Flooding`.
 
 A set is shown as a true-bearing arrow (`arrow.up` rotated to the bearing) and as one of 16 compass points, or as a three-digit true bearing (`225°`) when the person chooses degrees in Settings. Every reading of the set, spoken or shown, follows that choice; the station's fixed flood and ebb bearings in Station details stay in degrees true. The set is the direction of SlackwaterKit's current vector at `selectedTime`; on a station with no vector data, positive velocity selects the station's flood bearing and negative velocity selects its ebb bearing. Outside slack the arrow and set use the flood colour or ebb colour by the major-axis sign. At `Slack` the word stays `Slack`, and while the flow across the major axis still formats above zero in the display unit (0.05 or more), the lead keeps the water's full speed as its value and shows the arrow and set along the water's direction in the go colour, since there is no flood or ebb to colour by. Otherwise slack uses the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) in the go colour instead of claiming a set; a one-axis station has no crossing flow, so its slack always does. A zero vector has no set: the lead shows the slack glyph in the go colour and claims none.
 
@@ -822,6 +822,8 @@ This section lists implementation gaps, not behavior to copy to another platform
 
 The iOS reference draws the maximum-time row at every current with maxima, rather than only at a reach (§13.2). It has no narrows or reach classification yet.
 
+The watch place page does not relabel Today, Tomorrow and Yesterday when its `now` is refreshed (§4.1): `returnToNow` jumps the store without calling `setNow`, so the labels stay with the day the page opened while the now dot moves.
+
 A gap found later is listed here. Fixing one should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 
 ## 19. Reference implementation map
@@ -844,6 +846,7 @@ The living implementation is split by responsibility:
 | Shared strokes, fills, dots, runs, and hanging labels | `Slackwater/CurveDrawing.swift` |
 | Slack runs as drawn and the slack-run predicate, current axis moments, online sample-event derivation, speed-ramp anchors | `Slackwater/SlackWindow.swift` |
 | Measured slack-window predicate and merging | `swift/Sources/SlackwaterKit/Readings.swift` in the slackwater repository |
+| Slack marks and the lead's `Slack` state (`readsSlack`, `bareSlacks`, `slackStrokes`) | `Slackwater/SlackWindow.swift` |
 | Derived slack instants, schematic ±1 shape, derived phase rule | `swift/Sources/SlackwaterKit/DerivedSlack.swift` in the slackwater repository |
 | Tide-rate targets | `Slackwater/TideMovement.swift` |
 | Eclipse windows and contacts | `Slackwater/Eclipse.swift` |
