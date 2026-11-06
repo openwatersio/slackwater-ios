@@ -75,16 +75,14 @@ final class StationIndexTests: XCTestCase {
     }
 
     /// The point of the file: it has to be a fraction of the catalogs it is
-    /// generated from. stations.json is build-time only, so it is read from
-    /// the repository rather than the bundle.
+    /// generated from. stations.json and currents.json are build-time only, so
+    /// they are read from the repository rather than the bundle.
     func testIndexIsFarSmallerThanTheCatalogsItReplaces() throws {
         func bytes(_ name: String) throws -> Int {
-            let url = try XCTUnwrap(Bundle.main.url(forResource: name, withExtension: "json"))
-            return try Data(contentsOf: url).count
+            try Data(contentsOf: repoRoot.appendingPathComponent("Slackwater/Resources/\(name).json")).count
         }
-        let stations = repoRoot.appendingPathComponent("Slackwater/Resources/stations.json")
         let index = try bytes("station-index")
-        let catalogs = try Data(contentsOf: stations).count + bytes("currents")
+        let catalogs = try bytes("stations") + bytes("currents")
         XCTAssertLessThan(index * 4, catalogs, "index \(index) vs catalogs \(catalogs)")
     }
 }

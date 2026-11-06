@@ -107,77 +107,6 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
     }
 }
 
-func catalogRecord<T: Decodable & StationIdentity>(
-    _ resource: String, id: String, directory: URL
-) throws -> T? {
-    let url = directory.appendingPathComponent(resource + ".json")
-    guard FileManager.default.fileExists(atPath: url.path) else {
-        throw CatalogError(resource: resource, stage: .lookup, reason: "file missing")
-    }
-    let data: Data
-    do { data = try Data(contentsOf: url, options: .mappedIfSafe) }
-    catch { throw CatalogError(resource: resource, stage: .read, reason: "unable to read file") }
-    do { return try decodeCatalogRecord(data, id: id) }
-    catch { throw CatalogError(resource: resource, stage: .decode, reason: "invalid catalog record") }
-}
-
-/// Shared with candidate validation so downloaded NOAA files must satisfy the
-/// exact same compact-record contract as widget lookups.
-/// ponytail: relies on generated compact JSON keeping `id` first; add an
-/// offset index if that catalog format changes.
-func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
-    guard data.first == 91, data.last == 93 else {
-        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
-    }
-    let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
-    guard let start = data.range(of: marker)?.lowerBound else {
-        guard data == Data("[]".utf8) || data.starts(with: Data("[{\"id\":\"".utf8)) else {
-            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
-        }
-        var stack: [UInt8] = [], quoted = false, escaped = false, expectsRecord = true
-        let bytes = Array(data)
-        for (index, byte) in bytes.enumerated() {
-            if quoted { if escaped { escaped = false } else if byte == 92 { escaped = true } else if byte == 34 { quoted = false }; continue }
-            if stack.count == 1 {
-                if byte == 123 {
-                    guard expectsRecord, bytes[index...].starts(with: [123, 34, 105, 100, 34, 58, 34]) else {
-                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
-                    }
-                    expectsRecord = false
-                } else if byte == 44 {
-                    guard !expectsRecord else {
-                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
-                    }
-                    expectsRecord = true
-                } else if byte == 93 {
-                    guard index == bytes.count - 1, !expectsRecord || bytes == [91, 93] else {
-                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "multiple compact catalog roots"))
-                    }
-                } else {
-                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
-                }
-            }
-            if byte == 34 { quoted = true }
-            else if byte == 91 || byte == 123 { stack.append(byte) }
-            else if byte == 93 || byte == 125 {
-                guard let open = stack.popLast(), (open == 91 && byte == 93) || (open == 123 && byte == 125) else {
-                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog delimiters"))
-                }
-            }
-        }
-        guard !quoted, !escaped, stack.isEmpty else {
-            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "truncated compact catalog"))
-        }
-        return nil
-    }
-    guard let arrayEnd = data.lastIndex(of: 93) else { return nil }
-    let separator = Data(",{\"id\":".utf8)
-    let afterMarker = data.index(start, offsetBy: marker.count)
-    guard arrayEnd >= afterMarker else { return nil }
-    let end = data.range(of: separator, in: afterMarker..<data.endIndex)?.lowerBound ?? arrayEnd
-    return try JSONDecoder().decode(T.self, from: data[start..<end])
-}
-
 struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
@@ -206,7 +135,7 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var floodSpeedRatio: Double? = nil
     var ebbSpeedRatio: Double? = nil
     /// A non-primary bin carried only as a subordinate's reference (#269):
-    /// harmonic shape, in `all` and `byId`, never in `StationItem.all`.
+    /// harmonic shape, in `all` and `record(id:)`, never in `StationItem.all`.
     var referenceOnly: Bool? = nil
     /// NOAA's minor (cross-flow) axis, on a harmonic record that publishes one:
     /// its constituents, its mean (knots, positive 90° clockwise of `azimuth`)
@@ -217,7 +146,7 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var azimuth: Double? = nil
 
     var isSubordinate: Bool { reference != nil }
-    var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
+    var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.record(id: $0) } }
 
     var engineStation: any CurrentPredicting {
         engineStation(referenceRecord: referenceRecord)
@@ -273,9 +202,6 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
                 String(localized: "flood ×\(ratioText(floodSpeedRatio)) · ebb ×\(ratioText(ebbSpeedRatio))", comment: "NOAA subordinate-station speed ratios. Values are decimal multipliers."))
     }
 
-    static let all: [CurrentStationRecord] = bundled("currents")
-    static let byId: [String: CurrentStationRecord] =
-        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 }
 
 /// "+38 min" — a NOAA table offset, stored in seconds, as the table prints it.
@@ -594,8 +520,7 @@ enum StationItem: Identifiable, Hashable {
 
     static func widgetItem(id: String, directory: URL) throws -> StationItem? {
         if id.hasPrefix("current:") {
-            let record: CurrentStationRecord? = try catalogRecord(
-                "currents", id: String(id.dropFirst("current:".count)), directory: directory)
+            let record = try currentRecord(id: String(id.dropFirst("current:".count)), directory: directory)
             return record.map { .current(StationIndexInfo($0)) }
         }
         if id.hasPrefix("chs-") {

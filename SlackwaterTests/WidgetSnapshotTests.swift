@@ -419,7 +419,7 @@ import SlackwaterKit
 
     /// Pollock Rip has no cross-flow constants, so its card and widget read exactly as they did before vectors: the unsigned major-axis speed and the published bearing for its sign.
     func testAOneAxisCardReadsAsItAlwaysHas() throws {
-        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let pollock = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         XCTAssertNil(pollock.minorConstituents, "the fixture is one-axis")
         let faces = cardInstants(pollock.engineStation).map {
             face(WidgetCard.build(.current(pollock, station: pollock.engineStation), now: $0).reading)
@@ -448,7 +448,7 @@ import SlackwaterKit
 
     /// Kodiak's cross-flow runs at up to about 0.8 of its major axis: away from slack the card and widget print the water's full speed and point its own set, in the word the signed speed gives.
     func testARotaryCardShowsTheWatersSpeedAndSet() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         XCTAssertNotNil(kodiak.minorConstituents, "the fixture is rotary")
         let station = kodiak.engineStation
         var departs = 0
@@ -471,7 +471,7 @@ import SlackwaterKit
 
     /// At Kodiak's slacks the card prints the water's full speed. Where it says Slack it shows the crossing flow's set only while that flow prints above zero; the card finds its own slacks over its own span, which can land them a second or more from these, so a slack it does not mark reads as moving water.
     func testARotaryCardAtSlackShowsTheCrossingFlow() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         let station = kodiak.engineStation
         let slacks = station.events(from: day, to: day.addingTimeInterval(86_400)).filter { $0.kind == .slack }
         var crossing = 0
@@ -509,7 +509,7 @@ import SlackwaterKit
 
     /// The card's state keeps the whole engine-exact point, and the lock-screen widget's value is the same full speed the card prints.
     func testTheCardStateAndTheAccessoryValueCarryTheWatersSpeed() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         let station = WidgetStation.current(kodiak.engineStation, tz: TimeZone(identifier: "UTC")!, name: kodiak.name)
         for hour in [0, 6, 12, 18] {
             let t = day.addingTimeInterval(Double(hour) * 3600 + 7)
@@ -520,7 +520,7 @@ import SlackwaterKit
             XCTAssertEqual(state.direction, p.direction)
             XCTAssertEqual(WidgetSnapshot.build(station, now: t).value, "\(formatSpeed(p.magnitude, unit: "kn")) kn")
         }
-        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let pollock = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         let ebbing = pollock.cardState(at: day.addingTimeInterval(3 * 3600 + 7))
         XCTAssertLessThan(ebbing.signed, 0)
         XCTAssertEqual(ebbing.magnitude, abs(ebbing.signed))

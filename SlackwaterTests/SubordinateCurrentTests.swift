@@ -95,7 +95,7 @@ final class SubordinateCurrentTests: XCTestCase {
     }
 
     func testAReferenceOnlyBinIsInTheCatalogButNotAStation() {
-        XCTAssertNotNil(CurrentStationRecord.byId["noaa/EPT0003@11"])
+        XCTAssertNotNil(CurrentStationRecord.record(id: "noaa/EPT0003@11"))
         XCTAssertNil(StationItem.byId["current:noaa/EPT0003@11"])
         let referenceOnly = Set(CurrentStationRecord.all.filter { $0.referenceOnly == true }
             .map { "current:" + $0.id })

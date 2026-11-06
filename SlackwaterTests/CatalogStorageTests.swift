@@ -86,7 +86,7 @@ final class CatalogStorageTests: XCTestCase {
         let result: String? = CatalogFileLocator(storage: storage).load { directory in
             directories += [directory, directory]
             _ = try Data(contentsOf: directory.appendingPathComponent("stations.tcdb"))
-            _ = try Data(contentsOf: directory.appendingPathComponent("currents.json"))
+            _ = try Data(contentsOf: directory.appendingPathComponent("currents.tcdb"))
             return "ok"
         }
         XCTAssertEqual(result, "ok")

@@ -164,7 +164,7 @@ The JSON files in `Slackwater/Resources/` are generated artifacts, not source; [
 cd tools && npm run build:data
 ```
 
-The generators run as a chain — CHS stations, then tides, then NOAA currents, then CHS gates — and each reads the one before it, so a change anywhere means regenerating all of them and committing every changed artifact together. CI regenerates `stations.json` and `currents.json` and fails if the committed copies differ.
+The generators run as a chain — CHS stations, then tides, then NOAA currents, then CHS gates — and each reads the one before it, so a change anywhere means regenerating all of them and committing every changed artifact together. CI regenerates every generator's output, including `stations.tcdb` and `currents.tcdb`, and fails if the committed copies differ.
 
 Because the diff is one enormous line of JSON, say in the PR description what the counts went from and to. Nothing checks what the diff _means_, so read it: dropping a tide station can silently unpair the current stations that referenced it.
 

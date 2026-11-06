@@ -47,19 +47,17 @@ enum WidgetStationLoader {
         let record: WidgetRecord
         switch item {
         // `widgetItem` hands back identity only (#317), so the record costs a
-        // second scan of the same mapped file. ponytail: two scans, not one;
-        // give `widgetItem` a record-returning sibling if this ever measures.
+        // second lookup in the same mapped file. ponytail: two lookups, not
+        // one; give `widgetItem` a record-returning sibling if this ever measures.
         case .tide(let info):
             let database = try tideDatabase(directory: directory)
             guard let r = database.station(id: info.id).map(TideStationRecord.init) else { return nil }
             let reference = r.reference.flatMap { database.station(id: $0) }.map(TideStationRecord.init)
             record = .tide(r, station: r.engineStation(referenceRecord: reference))
         case .current(let info):
-            guard let r: CurrentStationRecord = try catalogRecord("currents", id: info.id, directory: directory)
-            else { return nil }
-            let reference: CurrentStationRecord? = try r.reference.flatMap {
-                try catalogRecord("currents", id: $0, directory: directory)
-            }
+            let database = try currentDatabase(directory: directory)
+            guard let r = database.station(id: info.id).map(CurrentStationRecord.init) else { return nil }
+            let reference = r.reference.flatMap { database.station(id: $0) }.map(CurrentStationRecord.init)
             record = .current(r, station: r.engineStation(referenceRecord: reference))
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }

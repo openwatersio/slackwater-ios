@@ -1,5 +1,6 @@
 /**
- * Generate Resources/currents.json — every bundled NOAA tidal-current station.
+ * Generate Resources/currents.json and currents.tcdb — every bundled NOAA
+ * tidal-current station, as the reviewable JSON and the database the app reads.
  *
  * Source: the NOAA current records in @slackwater/database, the same release
  * gen-tides.mjs reads. The database's own source workspace extracts them from
@@ -51,11 +52,11 @@
  *
  * Run: cd tools && npm install && node gen-tides.mjs && node gen-noaa-currents.mjs
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { loadStations } from "@slackwater/database";
-import { here, byNameThenId, undangle, round3, minorAxis, writeBundle } from "./bundle.mjs";
+import { buildDatabase, loadStations } from "@slackwater/database";
+import { here, byNameThenId, undangle, round3, minorAxis, sourceCredits, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const db = await loadStations();
@@ -216,12 +217,65 @@ if (worstNeighbour > REGION_SANITY_KM) {
 }
 
 const size = writeBundle(join(res, "currents.json"), stations);
+
+/**
+ * Resources/currents.tcdb — the stations of currents.json, as the
+ * memory-mapped file the app, widget and watch look currents up in by id
+ * (#902), as stations.tcdb does for tides (#459). currents.json stays as the
+ * reviewable record and as input to gen-slugs and gen-station-index.
+ *
+ * Each record is the database's own row for its identity and provenance,
+ * with everything this generator resolved written over it: display name,
+ * region, timezone, pairing, and the constituents, axes and offsets exactly
+ * as currents.json carries them. Offsets go back to the database's whole
+ * minutes. A reference-only bin needs no flag, because its id is the only
+ * one with an "@". Quality stays out, as it does for tides.
+ */
+const rawById = new Map(db.all.map((s) => [s.id, s]));
+const databaseVersion = JSON.parse(readFileSync(
+  join(here, "node_modules", "@slackwater", "database", "package.json"), "utf8")).version;
+const tcdb = buildDatabase(stations.map((s) => ({
+  ...rawById.get(s.id),
+  name: s.name,
+  region: s.region,
+  aliases: s.aliases,
+  timezone: s.timezone,
+  type: s.reference ? "subordinate" : "reference",
+  quality: undefined,
+  datums: undefined,
+  offsets: undefined,
+  harmonic_constituents: s.constituents,
+  current: {
+    flood_direction: s.floodDirection,
+    ebb_direction: s.ebbDirection,
+    mean_flow: s.meanFlow,
+    tide_reference: s.tideReference,
+    ...(s.minorConstituents && {
+      minor_constituents: s.minorConstituents,
+      minor_mean_flow: s.minorMeanFlow,
+      azimuth: s.azimuth,
+    }),
+    ...(s.reference && {
+      offsets: {
+        reference: s.reference,
+        slack_before_flood: s.slackBeforeFloodOffset / MINUTE,
+        slack_before_ebb: s.slackBeforeEbbOffset / MINUTE,
+        flood_time: s.floodTimeOffset / MINUTE,
+        ebb_time: s.ebbTimeOffset / MINUTE,
+        flood_speed_ratio: s.floodSpeedRatio,
+        ebb_speed_ratio: s.ebbSpeedRatio,
+      },
+    }),
+  },
+})), { version: databaseVersion, credits: await sourceCredits(db.all) });
+writeFileSync(join(res, "currents.tcdb"), tcdb);
 const subordinateCount = stations.filter((s) => s.reference).length;
 const referenceOnlyCount = stations.filter((s) => s.referenceOnly).length;
 const binSubordinates = stations.filter((s) => s.reference?.includes("@")).length;
 console.log(
   `${stations.length} NOAA current stations (${stations.length - subordinateCount - referenceOnlyCount} harmonic, ` +
   `${subordinateCount} subordinate, ${referenceOnlyCount} reference-only bins serving ${binSubordinates}; ` +
-  `${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size}; ` +
+  `${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size} ` +
+  `(${(tcdb.length / 1024 / 1024).toFixed(2)} MB as tcdb); ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);

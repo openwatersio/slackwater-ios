@@ -1,4 +1,5 @@
 import XCTest
+import SlackwaterDatabase
 @testable import Slackwater
 
 @MainActor final class CatalogSnapshotTests: XCTestCase {
@@ -25,22 +26,12 @@ import XCTest
         let url = directory.appendingPathComponent(resource + ".json")
         var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         change(&rows)
-        // Preserve the NOAA generator's compact, id-first record format while
-        // mutating values; formatting failures have their own test below.
-        let records = try rows.map { row -> String in
-            var rest = row
-            let id = rest.removeValue(forKey: "id")!
-            let idJSON = try JSONSerialization.data(withJSONObject: id, options: [.fragmentsAllowed, .withoutEscapingSlashes])
-            let fieldsJSON = try JSONSerialization.data(withJSONObject: rest)
-            return "{\"id\":" + String(decoding: idJSON, as: UTF8.self) + ","
-                + String(decoding: fieldsJSON.dropFirst(), as: UTF8.self)
-        }
-        try Data(("[" + records.joined(separator: ",") + "]").utf8).write(to: url)
+        try JSONSerialization.data(withJSONObject: rows).write(to: url)
     }
 
-    /// The JSON catalogs; tide stations are a binary database, edited below
-    /// as decoded records instead.
-    private let jsonResources = CatalogSnapshot.resources.filter { $0 != "stations" }
+    /// The JSON catalogs; tide and current stations are binary databases,
+    /// edited below as decoded records instead.
+    private let jsonResources = CatalogSnapshot.resources.filter { $0 != "stations" && $0 != "currents" }
 
     /// The bundled tide records as JSON rows, encoded once. Validation reads
     /// records, so a change to a row reaches it exactly as a bad file would.
@@ -49,19 +40,45 @@ import XCTest
         return try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
     }()
 
-    private func snapshot(tides change: (inout [[String: Any]]) -> Void) throws -> CatalogSnapshot {
-        var rows = Self.tideRows
-        change(&rows)
-        let tides = try JSONDecoder().decode(
-            [TideStationRecord].self, from: JSONSerialization.data(withJSONObject: rows))
-        return try CatalogSnapshot(tides: tides, directory: directory)
+    /// The bundled current records as rows, from the currents.json that
+    /// CurrentStationDatabaseTests holds equal to the database.
+    private static let currentRows: [[String: Any]] = {
+        let url = repoRoot.appendingPathComponent("Slackwater/Resources/currents.json")
+        return try! JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [[String: Any]]
+    }()
+
+    private static func decoded<T: Decodable>(_ rows: [[String: Any]]) throws -> [T] {
+        try JSONDecoder().decode([T].self, from: JSONSerialization.data(withJSONObject: rows))
+    }
+
+    private func snapshot(tides: (inout [[String: Any]]) -> Void = { _ in },
+                          currents: (inout [[String: Any]]) -> Void = { _ in },
+                          records: (inout [CurrentStationRecord]) -> Void = { _ in },
+                          active: CatalogSnapshot? = nil) throws -> CatalogSnapshot {
+        var tideRows = Self.tideRows, currentRows = Self.currentRows
+        tides(&tideRows)
+        currents(&currentRows)
+        var currentRecords: [CurrentStationRecord] = try Self.decoded(currentRows)
+        records(&currentRecords)
+        return try CatalogSnapshot(tides: Self.decoded(tideRows), currents: currentRecords,
+                                   directory: directory, active: active)
     }
 
     private func rejectedTides(file: StaticString = #filePath, line: UInt = #line,
                                _ change: (inout [[String: Any]]) -> Void) {
-        XCTAssertThrowsError(try snapshot(tides: change), file: file, line: line) {
+        rejectedRecords("stations", file: file, line: line) { try snapshot(tides: change) }
+    }
+
+    private func rejectedCurrents(active: CatalogSnapshot? = nil, file: StaticString = #filePath, line: UInt = #line,
+                                  _ change: (inout [[String: Any]]) -> Void) {
+        rejectedRecords("currents", file: file, line: line) { try snapshot(currents: change, active: active) }
+    }
+
+    private func rejectedRecords(_ resource: String, file: StaticString, line: UInt,
+                                 _ build: () throws -> CatalogSnapshot) {
+        XCTAssertThrowsError(try build(), file: file, line: line) {
             guard let error = $0 as? CatalogError else { return XCTFail("Unexpected error: \($0)", file: file, line: line) }
-            XCTAssertEqual(error.resource, "stations", file: file, line: line)
+            XCTAssertEqual(error.resource, resource, file: file, line: line)
             XCTAssertEqual(error.stage, .validation, file: file, line: line)
         }
     }
@@ -102,19 +119,33 @@ import XCTest
         }
     }
 
+    /// A database cut short after a valid header opens unverified and traps on
+    /// a later read, so validation verifies the whole file and refuses it.
+    func testTruncatedDatabasesAreRefused() throws {
+        for resource in ["stations", "currents"] {
+            let url = directory.appendingPathComponent(CatalogSnapshot.fileName(resource))
+            let saved = try Data(contentsOf: url)
+            try saved.prefix(saved.count / 2).write(to: url)
+            XCTAssertNoThrow(try stationDatabase(resource, directory: directory), "the header alone still opens")
+            rejected(resource, stage: .decode)
+            try saved.write(to: url)
+        }
+    }
+
     func testRequiredCatalogNeverConvertsFailureToEmpty() throws {
         let missing = directory.appendingPathComponent("missing", isDirectory: true)
         XCTAssertThrowsError(
-            try requiredCatalog("currents", directory: missing) as [CurrentStationRecord]
+            try requiredCatalog("chs-stations", directory: missing) as [ChsStationInfo]
         ) { error in
             let catalog = error as? CatalogError
-            XCTAssertEqual(catalog?.resource, "currents")
+            XCTAssertEqual(catalog?.resource, "chs-stations")
             XCTAssertEqual(catalog?.stage, .lookup)
         }
     }
 
     func testEveryCatalogMustRemainNonempty() throws {
         rejectedTides { $0 = [] }
+        rejectedCurrents { $0 = [] }
         for resource in jsonResources {
             let url = directory.appendingPathComponent(resource + ".json")
             let saved = try Data(contentsOf: url)
@@ -130,6 +161,11 @@ import XCTest
         }
         rejectedTides { $0.append($0[0]) }
         rejectedTides { $0[0]["timezone"] = "not/a/timezone" }
+        for (key, value) in [("id", "" as Any), ("name", "  "), ("latitude", 91), ("longitude", -181)] {
+            rejectedCurrents { $0[0][key] = value }
+        }
+        rejectedCurrents { $0.append($0[0]) }
+        rejectedCurrents { $0[0]["timezone"] = "not/a/timezone" }
         for resource in jsonResources {
             let url = directory.appendingPathComponent(resource + ".json")
             let saved = try Data(contentsOf: url)
@@ -156,8 +192,13 @@ import XCTest
                 rows[index][key] = value
             }
         }
+        for (key, value) in [("constituents", [] as Any), ("tideReference", "missing")] {
+            rejectedCurrents { rows in
+                let index = rows.firstIndex { $0["reference"] == nil }!
+                rows[index][key] = value
+            }
+        }
         let mutations: [(String, String, Any)] = [
-            ("currents", "constituents", []), ("currents", "tideReference", "missing"),
             ("chs-gates", "reference", "missing"), ("chs-current-gates", "tideReference", "missing")]
         for (resource, key, value) in mutations {
             let url = directory.appendingPathComponent(resource + ".json")
@@ -172,30 +213,44 @@ import XCTest
     }
 
     func testSubordinateCurrentCorrectionsAndReference() throws {
-        let url = directory.appendingPathComponent("currents.json")
-        let saved = try Data(contentsOf: url)
         for field in ["slackBeforeFloodOffset", "slackBeforeEbbOffset", "floodTimeOffset", "ebbTimeOffset", "floodSpeedRatio", "ebbSpeedRatio"] {
-            try edit("currents") { rows in
+            rejectedCurrents { rows in
                 let i = rows.firstIndex { $0["reference"] != nil }!
                 rows[i].removeValue(forKey: field)
             }
-            rejected("currents")
-            try saved.write(to: url)
         }
         for reference in ["missing", "self"] {
-            try edit("currents") { rows in
+            rejectedCurrents { rows in
                 let i = rows.firstIndex { $0["reference"] != nil }!
                 rows[i]["reference"] = reference == "self" ? rows[i]["id"] : reference
             }
-            rejected("currents")
-            try saved.write(to: url)
         }
         for ratios in [(-1.0, 1.0), (1.0, -1.0), (0.0, 0.0)] {
-            try edit("currents") { rows in
+            rejectedCurrents { rows in
                 let i = rows.firstIndex { $0["reference"] != nil }!
                 rows[i]["floodSpeedRatio"] = ratios.0
                 rows[i]["ebbSpeedRatio"] = ratios.1
             }
+        }
+    }
+
+    /// The one check that needs the file rather than records: the record
+    /// cannot tell a missing direction from due north, a missing mean flow
+    /// from none, or a missing region from an empty one.
+    func testCurrentMissingAFieldTheRecordDefaultsIsRefused() throws {
+        let url = directory.appendingPathComponent("currents.tcdb")
+        let saved = try Data(contentsOf: url)
+        let clears: [(inout StationInput) -> Void] = [
+            { $0.current?.floodDirection = nil }, { $0.current?.ebbDirection = nil },
+            { $0.current?.meanFlow = nil }, { $0.region = nil },
+            // JSON could not spell these; float32 can.
+            { $0.current?.floodDirection = .nan }, { $0.current?.meanFlow = .infinity }]
+        for clear in clears {
+            let database = try currentDatabase(directory: directory)
+            var stations = database.map(StationInput.init)
+            let i = try XCTUnwrap(stations.firstIndex { $0.current?.offsets == nil })
+            clear(&stations[i])
+            try StationDatabase.build(stations, version: database.version).write(to: url)
             rejected("currents")
             try saved.write(to: url)
         }
@@ -213,8 +268,6 @@ import XCTest
     }
 
     func testNonfiniteNumbersAndUnusableConstituents() throws {
-        let url = directory.appendingPathComponent("currents.json")
-        let saved = try Data(contentsOf: url)
         for constituents: [[String: Any]] in [
             [["name": "M2", "amplitude": -1, "phase": 0]],
             [["name": "M2", "amplitude": 0, "phase": 0]],
@@ -224,21 +277,19 @@ import XCTest
                 let i = rows.firstIndex { $0["reference"] == nil }!
                 rows[i]["constituents"] = constituents
             }
-            try edit("currents") { rows in
+            rejectedCurrents { rows in
                 let i = rows.firstIndex { $0["reference"] == nil }!
                 rows[i]["constituents"] = constituents
             }
-            rejected("currents")
-            try saved.write(to: url)
         }
-        // JSONDecoder rejects overflowing numbers before validation; never accept
-        // infinity as a correction even though it has JSON-number syntax.
-        let json = try String(contentsOf: url, encoding: .utf8)
-        let bad = json.replacingOccurrences(of: #""floodTimeOffset":-?[0-9]+"#,
-                                           with: #""floodTimeOffset":1e999"#, options: .regularExpression)
-        XCTAssertNotEqual(bad, json)
-        try Data(bad.utf8).write(to: url)
-        rejected("currents", stage: .decode)
+        // JSON cannot spell infinity, but the database's float32 can, so
+        // validation is what keeps it out of a correction.
+        rejectedRecords("currents", file: #filePath, line: #line) {
+            try snapshot(records: { records in
+                let i = records.firstIndex(where: \.isSubordinate)!
+                records[i].floodTimeOffset = .infinity
+            })
+        }
     }
 
     func testFixedOffsetIsNotAnIANAIdentifier() throws {
@@ -246,15 +297,8 @@ import XCTest
             rejectedTides { $0[0]["timezone"] = zone }
         }
         for zone in ["UTC", "Etc/GMT+5", "US/Pacific"] {
-            XCTAssertNoThrow(try snapshot { $0[0]["timezone"] = zone })
+            XCTAssertNoThrow(try snapshot(tides: { $0[0]["timezone"] = zone }))
         }
-    }
-
-    func testNOAACatalogRequiresWidgetFormat() throws {
-        let url = directory.appendingPathComponent("currents.json")
-        let rows = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
-        try JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted).write(to: url)
-        rejected("currents")
     }
 
     func testHistoricalTombstonesPersistUnlessStationReturns() throws {
@@ -281,19 +325,19 @@ import XCTest
                                         to: directory.appendingPathComponent("chs-tombstones.json"))
         try edit("chs-current-gates") { $0[0]["id"] = gate.id }
         rejected("chs-current-gates")
-        var removed: [String: Any] = [:]
-        // Remove a current: its rendered ID differs from its record ID.
-        try edit("currents") { rows in
-            let references = Set(rows.compactMap { $0["reference"] as? String })
-            let i = rows.firstIndex { !references.contains($0["id"] as! String) }!
-            removed = rows.remove(at: i)
-        }
         try edit("chs-current-gates") { $0[0]["id"] = active.chsCurrents[0].id }
-        rejected("chs-tombstones", active: active)
+        // Remove a current: its rendered ID differs from its record ID.
+        let references = Set(Self.currentRows.compactMap { $0["reference"] as? String })
+        let index = try XCTUnwrap(Self.currentRows.firstIndex { !references.contains($0["id"] as! String) })
+        let removeCurrent = { (rows: inout [[String: Any]]) in _ = rows.remove(at: index) }
+        rejectedRecords("chs-tombstones", file: #filePath, line: #line) {
+            try snapshot(currents: removeCurrent, active: active)
+        }
         try edit("chs-tombstones") {
+            var removed = Self.currentRows[index]
             removed["id"] = "current:" + (removed["id"] as! String)
             $0.append(removed)
         }
-        XCTAssertNoThrow(try CatalogSnapshot(directory: directory, active: active))
+        XCTAssertNoThrow(try snapshot(currents: removeCurrent, active: active))
     }
 }

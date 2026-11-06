@@ -6,11 +6,10 @@ import Foundation
 ///
 /// The full records carry ~110k harmonic constituents between them, and the
 /// first frame reads none of them (#317) — so `StationItem.all` is built from
-/// `station-index.json` (1.3 MB) instead of the tide database and
-/// currents.json, and a station's model is resolved by id when something
-/// actually needs to predict. `TideStationRecord.record(id:)` reads one
-/// station from the mapped stations.tcdb; `CurrentStationRecord.byId`
-/// decodes currents.json on first use.
+/// `station-index.json` (1.3 MB) instead of the two station databases, and a
+/// station's model is resolved by id when something actually needs to
+/// predict. `TideStationRecord.record(id:)` and `CurrentStationRecord.record(id:)`
+/// each read one station from their mapped .tcdb.
 struct StationIndexInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
@@ -43,16 +42,16 @@ extension StationIndexInfo {
     /// stations.tcdb. Nil is unreachable for a bundled station — the index is
     /// generated from the catalog — so callers may treat it as "not renderable".
     var tideRecord: TideStationRecord? { TideStationRecord.record(id: id) }
-    var currentRecord: CurrentStationRecord? { CurrentStationRecord.byId[id] }
+    var currentRecord: CurrentStationRecord? { CurrentStationRecord.record(id: id) }
 
     /// The same lookups off the main actor. A row's `.task` runs inside the
-    /// first commit, so the first resolve — for currents, the one that decodes
-    /// the whole catalog — would still be the first frame's to pay (#317).
+    /// first commit, so the first resolve, which maps the database, would
+    /// still be the first frame's to pay (#317).
     func resolveTideRecord() async -> TideStationRecord? {
         await Task.detached(priority: .userInitiated) { TideStationRecord.record(id: id) }.value
     }
     func resolveCurrentRecord() async -> CurrentStationRecord? {
-        await Task.detached(priority: .userInitiated) { CurrentStationRecord.byId[id] }.value
+        await Task.detached(priority: .userInitiated) { CurrentStationRecord.record(id: id) }.value
     }
 }
 
