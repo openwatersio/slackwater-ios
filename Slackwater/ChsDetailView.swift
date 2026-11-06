@@ -57,7 +57,7 @@ struct ChsDetailView: View {
                 }
             case .currentGate(let gate):
                 if gate.isOnline {
-                    // The 7 fit-rejects: no on-device model ever exists for
+                    // The fit-rejects: no on-device model ever exists for
                     // these, so there is no fit to wait on — a fetched
                     // window or the honest why-not, never the waiting page.
                     OnlineGateDetailView(gate: gate)
@@ -82,7 +82,7 @@ struct ChsDetailView: View {
         .onAppear { if !isOnlineGate { service.promote(route.jobID) } }
     }
 
-    /// True only for `.currentGate` routes on one of the 7 online gates.
+    /// True only for `.currentGate` routes on an online gate.
     private var isOnlineGate: Bool {
         if case .currentGate(let gate) = route { return gate.isOnline }
         return false

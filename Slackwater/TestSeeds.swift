@@ -80,7 +80,7 @@ import Foundation
                          provisional: CommandLine.arguments.contains("-seedCurrentProvisional"))
     }
     // -seedOnlineWindow <id> (UserDefaults argument domain): writes a
-    // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
+    // fetched-looking ChsOnlineWindow for one of the online (fit-reject)
     // gates, so a UI test can land on OnlineGateDetailView's fetched
     // single-track detail with no network.
     if let id = UserDefaults.standard.string(forKey: "seedOnlineWindow") {
@@ -107,6 +107,29 @@ import Foundation
     if let id = UserDefaults.standard.string(forKey: "seedOnlineMonth") {
         _ = ChsFitService.shared
         seedOnline(stationID: id, offsetDays: -2, spanDays: Int(Timeline.onlineFetchDays) + 2)
+    }
+    // Clears the iCloud copy even under -noCloudSync, as -resetTour does: a cold launch
+    // without the test's arguments would otherwise adopt an earlier test's free day.
+    if CommandLine.arguments.contains("-resetFreeDay") {
+        FreeDayStore.shared.reset()
+        NSUbiquitousKeyValueStore.default.removeObject(forKey: AppGroup.freeDayStartKey)
+    }
+    if CommandLine.arguments.contains("-seedFreeDay") {
+        FreeDayStore.shared.seed(lastStart: appNow())
+    }
+    // -seedFreeDayCalendar <id>: a subscription a free day turned on, as it reads once that
+    // day has ended. After -resetCalendars, which the store applies when first read.
+    if let i = CommandLine.arguments.firstIndex(of: "-seedFreeDayCalendar"),
+       CommandLine.arguments.indices.contains(i + 1) {
+        StationCalendarStore.shared.subscribe(CommandLine.arguments[i + 1], notify: false, freeDay: true)
+    }
+    // This month's free day, used and over: a day ago, or the month's first instant when that
+    // falls in last month. On the 1st that start is still running unless the test also passes
+    // -freeDayLength 1, which ends it a second after it starts.
+    if CommandLine.arguments.contains("-seedFreeDayUsed") {
+        let now = appNow()
+        let monthStart = Calendar.current.dateInterval(of: .month, for: now)?.start ?? now
+        FreeDayStore.shared.seed(lastStart: max(now - FreeDay.length, monthStart))
     }
 }
 
@@ -238,4 +261,16 @@ let seededScrubInstant: Date? = UserDefaults.standard.string(forKey: "scrubInsta
     .flatMap { ISO8601DateFormatter().date(from: $0) }
 #else
 let seededScrubInstant: Date? = nil
+#endif
+
+/// `-seedPremiumSheet [feature]`: the list presents the Premium sheet on launch, open on that
+/// feature's card (a `PremiumFeature` raw value) or the first.
+#if DEBUG
+let seedsPremiumSheet = CommandLine.arguments.contains("-seedPremiumSheet")
+let seededPremiumFeature: PremiumFeature? = CommandLine.arguments.firstIndex(of: "-seedPremiumSheet")
+    .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? CommandLine.arguments[$0 + 1] : nil }
+    .flatMap(PremiumFeature.init(rawValue:))
+#else
+let seedsPremiumSheet = false
+let seededPremiumFeature: PremiumFeature? = nil
 #endif

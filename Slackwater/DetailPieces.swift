@@ -336,10 +336,13 @@ struct SkyBackdrop: View {
     let sky: SkyState
     /// The strip's plot depth, which the sky runs on under: shorter on the watch.
     var plotDepth: CGFloat = TimelineGeo.plotDepth
+    /// Draws the bodies whatever Settings says, or hides them: the Premium sheet's side-by-side.
+    var bodies: Bool? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Settings' sun, moon and stars switch. Off leaves the gradient alone:
     /// the sky still says day or night, without a second axis over the plot.
-    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var showsBodies = true
+    @AppStorage(AppGroup.skyBodiesKey, store: AppGroup.defaults) private var settingShowsBodies = true
+    private var showsBodies: Bool { bodies ?? settingShowsBodies }
 
     var body: some View {
         GeometryReader { proxy in

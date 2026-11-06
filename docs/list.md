@@ -44,7 +44,7 @@ Sections appear top to bottom in this order:
 | 4 | Favorites | At least one favorite remains after de-duplication |
 | 5 | Near Me | Always: a header row with the series filter, then 4 or 5 cards |
 | 6 | Recents | At least one recent remains after de-duplication |
-| 7 | Footer | Always: Downloads, Settings, and supporter-status rows, then the wordmark |
+| 7 | Footer | Always: Downloads and Settings rows, the supporter-status row in builds that sell Premium, then the wordmark |
 
 Favorites and Recents have no empty-state copy; their heading simply does not render. The list has no pull-to-refresh and no reordering. Visible cards recalculate their readings and curves immediately when the app becomes active and every 60 seconds while active, preserving scroll position and the selected detail. Online current cards also recheck the cached prediction window for the current day, including while offline.
 
@@ -77,7 +77,7 @@ A fix counts only while location is authorized. A cached fix is usable when it i
 
 ### 4.1 Hero cards
 
-With a fix, the slot holds the nearest station of either series. If the nearest station of the other series lies within 20 km of the fix, it appears beside the first as a second hero. Heroes ignore the series filter, show their distance from the fix, and are each replaced by the person's chosen namesake (§5.3) when one exists. Hero cards have no swipe actions.
+With a fix, the slot holds the nearest station of either series. If the nearest station of the other series lies within 20 km of the fix, it appears below the first as a second hero, the two stacked in one row. Heroes ignore the series filter, show their distance from the fix, and are each replaced by the person's chosen namesake (§5.3) when one exists. Hero cards have no swipe actions.
 
 ## 5. Groups
 
@@ -103,7 +103,7 @@ The filter narrows Near Me and search. It does not hide heroes, favorites, or re
 
 ### 5.3 One place per name
 
-In Near Me and search, stations with the same series and the same name collapse to a single entry: the person's chosen namesake when one exists, otherwise the nearest. A tide and a current with the same name stay separate. Namesake choices come from the detail page's "Other locations" chooser, never from the list; they persist on the device and sync through iCloud.
+In Near Me, stations with the same series and the same name collapse to a single entry: the person's chosen namesake when one exists, otherwise the nearest. Search does not collapse: every namesake is its own result, told apart by region. A tide and a current with the same name stay separate. Namesake choices come from the detail page's "Other locations" chooser, never from the list; they persist on the device and sync through iCloud.
 
 Favorites and Recents are not collapsed. A station the person saved or opened stays as itself.
 
@@ -118,7 +118,7 @@ Near Me lists the collapsed, filtered ranking with heroes and favorites removed:
 - **Remove:** a trailing swipe "Unfavorite" on a favorite card, or the detail header's star. A full swipe must not trigger it. An unstarred station moves to the front of Recents rather than disappearing.
 - **Limit:** none.
 - **Storage:** an ordered list on the device, shared with widgets, and one iCloud key-value entry per station whose value is the star time. After the first merge, the iCloud key set is the list, which is how an unstar on one device reaches the others: an iCloud store emptied elsewhere empties this device too. When the iCloud account changes, the device re-seeds iCloud from its own list instead of adopting the new account's.
-- **Widgets** reload on every change.
+- **Widgets** reload their timelines on a star, an unstar and an iCloud merge; forgetting a tombstoned favorite or replacing it only refreshes the complication recommendations.
 
 Cards show no distance in Favorites.
 
@@ -138,7 +138,7 @@ Each station renders in one group only, by priority: My Location, then Favorites
 
 ## 6. The station card
 
-The list, search results, the map's preview panel, Nearby, and the station chooser draw the same card. It is one tap target. In the list, search, map preview, and Nearby, tapping opens the station's detail. In the namesake chooser, tapping saves the choice and closes the sheet; choosing a different station also opens it. When choosing a replacement for a removed favorite, tapping replaces the favorite, closes the sheet, and opens the chosen station without saving a namesake choice. Nearby and the chooser put the station kind and provider below the card, alongside the distance. The chooser also labels the displayed station "Shown" and outlines the station selected on its map.
+The list, search results, the map's preview panel, Nearby, and the station chooser draw the same card. It is one tap target. In the list, search, map preview, and Nearby, tapping opens the station's detail. In the namesake chooser, tapping saves the choice and closes the sheet; choosing a different station also opens it. When choosing a replacement for a removed favorite, tapping replaces the favorite, closes the sheet, and opens the chosen station without saving a namesake choice. Nearby and the chooser put the station kind and provider below the card, alongside the distance when there is an origin for it: "2.1 nm from you" with an authorized fix, "2.1 nm from *Removed station*" in the replacement chooser, and no distance otherwise. The chooser also labels the displayed station "Shown" and outlines the station selected on its map.
 
 ### 6.1 Anatomy
 
@@ -188,7 +188,7 @@ An online Canadian gate shows an ordinary current card while its downloaded wind
 | State | Label | Placement |
 |---|---|---|
 | Downloading | "Downloading" | Replaces the reading |
-| Queued | Its place: "Next", or "3rd in line" | Replaces the reading |
+| Queued | Its place: "Next", or "3rd in line"; "Queued" when the job has no position yet | Replaces the reading |
 | Retrying | "Retrying in N min", or "Retrying" | Replaces the reading |
 | Not queued | none | No strip |
 | Offline | "Not downloaded" | Strip below the identity |
@@ -235,8 +235,7 @@ Results fill the screen. The series filter and the input float at the bottom ove
 2. Match it as a plain substring against each station's lowercased name, region, and aliases. There is no word, prefix, or diacritic folding.
 3. Apply the series filter during the scan, so the result cap fills with the chosen series.
 4. Rank name matches first, then region, then alias; break ties by distance from the anchor (§5.1), then by id.
-5. Collapse namesakes as in §5.3.
-6. Return at most 60 results.
+5. Return at most 60 results. Namesakes are not collapsed (§5.3).
 
 An empty query returns the nearest 60, so opening search shows nearby stations at once. A non-empty query waits 120 ms after the last keystroke; ranking runs off the main thread, and a result for a superseded query is discarded.
 
@@ -260,7 +259,7 @@ Canadian predictions download to the device in tiers: the stations in view, then
 
 "N of M" counts fitted Canadian stations and the online currents being downloaded, and the Live Activity, the Downloads row in the footer, and the Downloads sheet's counter all show the same count. An online current downloading on its own also shows the strip.
 
-The footer is a rounded card with three rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), "Settings", and "Support Slackwater" ("Slackwater supporter ❇" when Premium is active), each at least 48 units tall. The support row opens a dedicated sheet with Premium benefits, purchase options, and restore. Settings orders units and the comfort-current control first, then the Sky section's "Sun, moon and stars" switch, marked with sparkles (on by default; off keeps the sky's day and night colours and drops the bodies and the sunrise and sunset marks, and needs Premium, scrubber §14), followed by Alerts and Calendar, also marked with sparkles, a Premium section with lock-screen widget previews and a support button, free widget previews, and a final group containing Help, the station tour, and About. Help opens `https://slackwater.xyz/support/`. About names licensing, acknowledgements, and privacy in its subtitle. The purchase sheet illustrates its benefits with the actual lock-screen widget views and example calendar events and alerts, and names chart controls without a picture; purchase and restore controls stay in that sheet. Below the card are "Slackwater" and "by Open Waters". The Help link in Settings has a minimum 44-point tap target.
+The footer is a rounded card with three rows: "Downloads", which opens the Downloads sheet and announces its state ("Online, all stations downloaded", "Offline, 3 still to download", and so on), "Settings", and, in builds that sell Premium, "Support Slackwater" with a sparkles icon (once Premium is purchased the icon is tinted leaf, the row reads "Slackwater supporter" and a caption adds "You have Premium — thank you."; a free day leaves it as "Support Slackwater"), each at least 48 units tall. The support row opens the Premium sheet ([premium](premium.md)). Settings orders units and the comfort-current control first, then the Sky section's "Sun, moon and stars" switch, marked with sparkles (on by default; off keeps the sky's day and night colours and drops the bodies and the sunrise and sunset marks, and needs Premium, scrubber §14), followed by Alerts and Calendar, also marked with sparkles, a Premium section with lock-screen widget previews and a support button, free widget previews, and a final group containing Help, the station tour, and About. Help opens `https://slackwater.xyz/support/`. About names licensing, acknowledgements, and privacy in its subtitle. The Premium sheet opens on the feature that sent you there and swipes through a card for each Premium feature, each with a live example drawn from the app's own views (an alert, calendar events, a lock screen widget, a watch complication, the chart with and without the sky), then a free vs Premium table, the yearly and lifetime plans with yearly selected, the month's free day ([premium](premium.md#free-day)), a closing note that Slackwater is independent and open source, and Restore purchase, Privacy Policy and Terms of Use; the Get Premium button stays pinned at the bottom. Below the card are "Slackwater" and "by Open Waters". The Help link in Settings has a minimum 44-point tap target.
 
 Downloads begins with "Canadian tides and currents", explains that Canadian data requirements mean predictions must be downloaded individually, and says "Station data is always free." Its checklist offers Nearby (the stations on the list, selected automatically), Within 25 km, Within 150 km, and All current stations. Automatic online-current downloads cover the places shown on the list; optional radii extend that set. Each row shows an estimated remaining download time or "Available offline". Selecting an optional row adds its work to the queue and requests continued background processing. Tapping a selected optional row unchecks it: 150 km returns to 25 km, and turning off 25 km clears both radius choices and returns to automatic Nearby. The 150 km choice covers both smaller sets, and All current stations independently includes fitted and online Canadian currents across the country. Narrowing a radius cancels unfinished work outside the remaining choices. Turning off All current stations affects only current downloads. Completed predictions, favorites, and places opened directly are retained; unfinished direct and automatic Nearby downloads persist across launches, including unfinished Nearby work from earlier places after moving to a new area. Completed online predictions do not create a persistent refresh request across launches. Cached partial predictions stay usable without restarting deselected downloads on launch. Choices persist across launches, and overlapping selections never download the same station twice. Explicit choices include the whole selected set even in Low Data Mode.
 
@@ -288,11 +287,11 @@ Opening a Canadian station moves its download to the front of the queue. At regu
 |---|---|
 | `slackwater://station/<id>` | Opens the station. The id is percent-encoded and read whole, so ids containing `/` survive. |
 | `https://slackwater.xyz/tides/<slug>[/<instant>]`, `…/currents/…` | Opens the station, centred on the instant when one is given. An instant that does not parse rejects the whole link. |
-| `slackwater://premium` | Opens the dedicated Support Slackwater sheet, in builds that sell it. |
+| `slackwater://premium` | Opens the Premium sheet, in builds that sell it. |
 
 An alert notification opens through the same path.
 
-A link to a station that is no longer published resets navigation, closes search, and shows the Station unavailable section at the top of the list. A link to an id the app has never known does nothing. On a first run, a link wins over the tour's station whichever arrives first, and the tour moves to the linked station (§11).
+A link to a station that is no longer published resets navigation, hides the map, closes search and every sheet (Settings, Downloads, Premium, the chooser), and shows the Station unavailable section at the top of the list. A link to an id the app has never known does nothing. On a first run, a link wins over the tour's station whichever arrives first, and the tour moves to the linked station (§11).
 
 Neither the unavailable section nor the removed-station card says *why* the station is gone, and that is deliberate. The app cannot tell a decommissioned gauge from a renumbered one from a publisher's outage, and a guess printed as a reason is worse than no reason. Do not add an explanation back.
 
@@ -324,7 +323,7 @@ There are no tabs. Two floating 56-unit glass buttons sit at the bottom of the l
 
 The right button swaps the list and the map in place. At regular width, opening the map clears the detail pane, and returning to the list shows the placeholder. Tapping a detail header's title returns to the map focused on that station.
 
-The map's preview panel uses the station card (§6) without a distance; tapping it opens the detail. The map's pins, camera, and gestures are outside this document.
+The map's preview panel uses the station card (§6) without a distance; tapping it opens the detail. A legend sits at the bottom of the map pane, under the preview panel when one is up: a circle glyph with "Tides" and the height unit, an arrow glyph with "Currents" and the speed unit, then "Not for navigation." The whole glass pill, at least 44 units tall, is one button that opens Settings (accessibility identifier `map-disclaimer`). The map's pins, camera, and gestures are outside this document.
 
 ## 11. First run
 
@@ -425,7 +424,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 |---|---|
 | Screen structure, sections, location slot, search overlay, action buttons, regular-width split | `Slackwater/StationListView.swift` |
 | Favorites, Recents, group de-duplication | `Slackwater/StationLists.swift`, `Slackwater/FavoritesCloud.swift` |
-| Ranking, anchor, search index, station kinds | `Slackwater/CurrentStation.swift`, `Slackwater/LocationService.swift` |
+| Ranking, anchor, search index, station kinds | `Slackwater/CurrentStation.swift`, `Slackwater/StationIndex.swift`, `Slackwater/LocationService.swift` |
 | Namesake collapse, chooser picks, series filter | `Slackwater/Theme.swift`, `Slackwater/StationChooser.swift` |
 | Card shell and readings | `Slackwater/StationCardFace.swift`, `Slackwater/StationCard.swift` |
 | Card refresh lifecycle | `Slackwater/CardRefresh.swift`, `SlackwaterTests/CardRefreshTests.swift` |

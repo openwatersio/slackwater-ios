@@ -11,13 +11,16 @@ struct ComplicationProvider: AppIntentTimelineProvider {
 
     private func entryBuilder(_ intent: StationConfigIntent,
                               for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
-        let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        let purchased = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        let freeDay = storedFreeDay(AppGroup.defaults)
         let (id, prefix) = WidgetStationLoader.configured(intent.station?.id)
         let card = Self.cardFamilies.contains(family)
-        // Locked: no record at all, so no station data can leak.
-        let source: (Date) -> WidgetRecord? = premium ? WidgetStationLoader.recordSource(id: id) : { _ in nil }
+        let source: (Date) -> WidgetRecord? = purchased || freeDayRunning(freeDay, at: .now)
+            ? WidgetStationLoader.recordSource(id: id) : { _ in nil }
         return { date in
-            let record = source(date).flatMap { $0.isWatchSupported ? $0 : nil }
+            let premium = premiumActive(purchased: purchased, freeDay: freeDay, at: date)
+            // Locked: no record at all, so no station data can leak.
+            let record = (premium ? source(date) : nil).flatMap { $0.isWatchSupported ? $0 : nil }
             return SlackwaterEntry(
                 date: date, snapshot: nil,
                 card: card ? record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) } : nil,
@@ -46,7 +49,8 @@ struct ComplicationProvider: AppIntentTimelineProvider {
     func timeline(for intent: StationConfigIntent, in context: Context) async -> Timeline<SlackwaterEntry> {
         let now = Date()
         let entry = entryBuilder(intent, for: context.family)
-        let entries = stride(from: 0.0, to: 12 * 3600, by: 900).map { entry(now.addingTimeInterval($0)) }
+        let entries = widgetEntryDates(now: now, freeDayEnd: storedFreeDay(AppGroup.defaults)?.end,
+                                       span: 12 * 3600, step: 900).map(entry)
         return Timeline(entries: entries, policy: .atEnd)
     }
 }

@@ -33,7 +33,8 @@ struct StationListView: View {
     @State private var showSettings = false
     @State private var showDownloads = false
     @ObservedObject private var premium = PremiumStore.shared
-    @State private var showPremium = false
+    @State private var showPremium = seedsPremiumSheet
+    @State private var premiumOpening = seededPremiumFeature
     @State private var searching = false
     @State private var results: [StationItem] = []
     @State private var completedSearch: SearchInput?
@@ -210,8 +211,8 @@ struct StationListView: View {
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, { openChsRoute($0) }) }
-        .sheet(isPresented: $showPremium) {
-            PremiumView()
+        .sheet(isPresented: $showPremium, onDismiss: { premiumOpening = nil }) {
+            PremiumView(opening: premiumOpening)
         }
         .onOpenURL(perform: handleDeepLink)
         .onContinueUserActivity(stationActivityType) { activity in
@@ -645,7 +646,7 @@ struct StationListView: View {
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
-    /// both routes: locked accessory widgets → premium (the Support Slackwater sheet), home widgets
+    /// both routes: locked accessory widgets → premium (the Premium sheet), home widgets
     /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
     /// rather than inline because user activities and alert taps route
     /// through it too.
@@ -661,7 +662,7 @@ struct StationListView: View {
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         #if PREMIUM_ENABLED
-        case "premium": showPremium = true
+        case "premium": premiumOpening = .lockScreen; showPremium = true
         #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
@@ -1050,12 +1051,13 @@ struct StationListView: View {
                 #if PREMIUM_ENABLED
                     Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
                     Button {
+                        premiumOpening = nil
                         showPremium = true
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles").frame(width: 28)
-                                .foregroundStyle(premium.isPremium ? SN.leaf : SN.foam)
-                            if premium.isPremium {
+                                .foregroundStyle(premium.hasPurchased ? SN.leaf : SN.foam)
+                            if premium.hasPurchased {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(localized: "Slackwater supporter", comment: "Main list button for an active Premium supporter."))
                                     Text("You have Premium — thank you.")
@@ -1064,7 +1066,7 @@ struct StationListView: View {
                                 }
                                 .padding(.vertical, 8)
                             } else {
-                                Text(String(localized: "Support Slackwater", comment: "Main list button and purchase sheet title."))
+                                Text(String(localized: "Support Slackwater", comment: "Button that opens the Premium sheet, on the main list and in Settings."))
                             }
                             Spacer()
                             Image(systemName: "chevron.right")

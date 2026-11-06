@@ -76,6 +76,9 @@ enum AppGroup {
     /// chooser. The app folds it into the three nearest ids above.
     static let chosenStationsKey = "slackwater.chosenStations"
     static let premiumKey = "slackwater.premium"
+    /// Start of the running or last free day, a `Date`. The app's copy of
+    /// record is its own store; this one lets widgets see the end without it.
+    static let freeDayStartKey = "slackwater.freeDay.start"
     /// How far out the CHS download queue is allowed to walk
     /// (`DownloadTier`'s raw value). A preference, not a job: the manager's
     /// switch has to still be on next launch, and an accepted tier has to

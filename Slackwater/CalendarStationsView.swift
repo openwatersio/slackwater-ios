@@ -34,7 +34,7 @@ struct CalendarStationsView: View {
             // Revisit (a capped list, or a lazy container once the Toggle-tap bug above is
             // understood) if a real favorites list ever gets long enough for this to measure.
             VStack(alignment: .leading, spacing: 10) {
-                PremiumRequirement()
+                PremiumRequirement(feature: .calendars)
                     .padding(.bottom, 6)
 
                 if favorites.ids.isEmpty {
@@ -62,7 +62,7 @@ struct CalendarStationsView: View {
             .padding(.bottom, 30)
         }
         .background(CanvasBackground())
-        .sheet(isPresented: $showPremium) { PremiumView() }
+        .sheet(isPresented: $showPremium) { PremiumView(opening: .calendars) }
         .alert("Calendar access is off", isPresented: $denied) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -123,20 +123,35 @@ struct CalendarStationsView: View {
         } else {
             "Needs a download before it can publish"
         }
-        return Toggle(isOn: Binding(get: { on }, set: { _ in Task { await toggle(stationID) } })) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name(stationID)).foregroundStyle(.white)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(SN.foam.opacity(0.62))
+        let stopped = calendars.subscriptions.contains {
+            $0.stationID == stationID && calendarStopped($0, premium: premium.isPremium)
+        }
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(get: { on }, set: { _ in Task { await toggle(stationID) } })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name(stationID)).foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(SN.foam.opacity(0.62))
+                }
+            }
+            .disabled(record == nil)
+            .accessibilityIdentifier("calendar-station-\(stationID)")
+            if stopped {
+                Button { showPremium = true } label: {
+                    Label("Stopped — needs Premium", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(SN.leaf)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("calendar-stopped-\(stationID)")
             }
         }
-        .disabled(record == nil)
         .padding(16)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-        .accessibilityIdentifier("calendar-station-\(stationID)")
     }
 
     private func toggle(_ stationID: String) async {
@@ -185,7 +200,7 @@ struct CalendarStationsView: View {
     /// by any bundled tide or current station, which always has a next high/low or slack window
     /// inside that window.
     private func subscribeAndVerify(_ stationID: String) async {
-        calendars.subscribe(stationID, notify: false)
+        calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()
         guard calendars.calendarID(for: stationID) == nil else { return }
         calendars.unsubscribe(stationID)

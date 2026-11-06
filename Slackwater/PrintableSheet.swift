@@ -85,7 +85,7 @@ struct PrintableTablesRow: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("printable-tables-row")
         .sheet(isPresented: $showSheet) { PrintableSheet(config: config, anchor: anchor, tz: tz) }
-        .sheet(isPresented: $showPremium) { PremiumView() }
+        .sheet(isPresented: $showPremium) { PremiumView(opening: .print) }
     }
 }
 

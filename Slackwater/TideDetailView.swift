@@ -4,6 +4,16 @@
 import SwiftUI
 import SlackwaterKit
 
+/// The tide schedule's turns, each with its height; also the Premium sheet's print example.
+func tideScheduleEntries(_ tl: TimelineData, imperial: Bool) -> [ScheduleEntry] {
+    let unit = heightUnit(imperial: imperial)
+    return tl.tideExtremes
+        .filter { tl.scheduleRange.contains($0.time) }
+        .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
+                             value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
+        .sorted { $0.time < $1.time }
+}
+
 struct TideDetailView: View {
     let record: TideStationRecord
     var preview: ChsTidePreview? = nil
@@ -407,11 +417,7 @@ struct TideDetailView: View {
     // MARK: - Rolling multi-day schedule (turns, day-grouped)
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-        tl.tideExtremes
-            .filter { tl.scheduleRange.contains($0.time) }
-            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
-                                 value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
-            .sorted { $0.time < $1.time }
+        tideScheduleEntries(tl, imperial: imperial)
     }
 
     // The provenance/confidence marking (chs-online spec §2d, §7d — simplified

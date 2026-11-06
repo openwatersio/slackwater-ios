@@ -85,6 +85,7 @@ targetTemplates:
       # degrade. The list's sync rule above is what prevents that.
       - path: Slackwater/Resources/unavailable-stations.json
       - Slackwater/AppGroup.swift
+      - Slackwater/FreeDay.swift
       - Slackwater/Units.swift
       - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
@@ -101,6 +102,7 @@ targetTemplates:
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
       - Slackwater/ComplicationReading.swift
+      - Slackwater/ComplicationLineCanvas.swift
       - Slackwater/AccessoryWidgetContent.swift
       - Slackwater/DayCurveContentView.swift
       - Slackwater/NextEventContentView.swift
@@ -198,7 +200,7 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        # The app's first URL scheme: `slackwater://premium` opens the Support Slackwater sheet
+        # The app's first URL scheme: `slackwater://premium` opens the Premium sheet
         # and `slackwater://station/<id>` opens that station's detail.
         # Widgets already emit both (Task 5/6); StationListView.onOpenURL
         # (SlackwaterApp.swift) is the receiving end.
@@ -294,6 +296,7 @@ targets:
       - Slackwater/OnlineGates.swift
       - Slackwater/NearestWidgetStation.swift
       - Slackwater/PremiumStore.swift
+      - Slackwater/FreeDayStore.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.

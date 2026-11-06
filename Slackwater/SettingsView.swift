@@ -15,7 +15,7 @@ struct SettingsView: View {
     @ObservedObject private var alerts = AlertRuleStore.shared
     @ObservedObject private var calendars = StationCalendarStore.shared
     @ObservedObject private var premium = PremiumStore.shared
-    @State private var showPremium = false
+    @State private var premiumFeature: PremiumFeature?
     @State private var settle: Task<Void, Never>?
 
     /// What the Calendar row says it is doing, from what is actually subscribed.
@@ -95,13 +95,13 @@ struct SettingsView: View {
                     }
 
                     section(String(localized: "Sky", comment: "Settings section heading: the sky drawn above a chart."), premium: true) {
-                        PremiumRequirement()
+                        PremiumRequirement(feature: .sky)
                         Toggle(isOn: Binding(
                             get: { skyBodies },
                             set: { on in
                                 // A refused change leaves the switch where it was: the getter still reads the stored value.
                                 guard skyBodiesSwitchAllowed(to: on, premium: premium.isPremium) else {
-                                    showPremium = true
+                                    premiumFeature = .sky
                                     return
                                 }
                                 UnitsCloud.shared.set(on, forKey: AppGroup.skyBodiesKey)
@@ -165,8 +165,8 @@ struct SettingsView: View {
                                 Text("Long-press your lock screen → Customize → add Slackwater above or below the clock.")
                                     .font(.caption)
                             }
-                            Button { showPremium = true } label: {
-                                Label(premium.isPremium
+                            Button { premiumFeature = SettingsPlatform.current == .mobile ? .lockScreen : nil } label: {
+                                Label(premium.hasPurchased
                                       ? String(localized: "Slackwater supporter")
                                       : String(localized: "Support Slackwater"), systemImage: "sparkles")
                                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -231,7 +231,7 @@ struct SettingsView: View {
                 .padding(.bottom, 30)
             }
             .background(CanvasBackground())
-            .sheet(isPresented: $showPremium) { PremiumView() }
+            .sheet(item: $premiumFeature) { PremiumView(opening: $0) }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(SN.canvas, for: .navigationBar)

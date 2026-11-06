@@ -194,7 +194,7 @@ struct AlertSheet: View {
         // only materializes rows near the screen, so On and Delete are out of reach there.
         .presentationDetents(hSize == .regular ? [.large] : [.medium, .large])
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showPremium) { PremiumView() }
+        .sheet(isPresented: $showPremium) { PremiumView(opening: .alerts) }
     }
 
     private func noteText(_ note: AlertSheetNote) -> String {

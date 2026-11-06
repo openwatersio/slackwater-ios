@@ -17,13 +17,16 @@ struct StationProvider: AppIntentTimelineProvider {
     /// event labels and readings alongside a full card-span graph.
     private func entryBuilder(_ intent: StationConfigIntent,
                               for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
-        let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        let purchased = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        let freeDay = storedFreeDay(AppGroup.defaults)
         let accessory = Self.accessoryFamilies.contains(family)
         let (id, prefix) = WidgetStationLoader.configured(intent.station?.id)
-        let source: (Date) -> WidgetRecord? = accessory && !premium
+        let source: (Date) -> WidgetRecord? = accessory && !purchased && !freeDayRunning(freeDay, at: .now)
             ? { _ in nil } : WidgetStationLoader.recordSource(id: id)
         return { date in
-            let record = source(date)
+            let premium = premiumActive(purchased: purchased, freeDay: freeDay, at: date)
+            // An entry past the free day's end is the locked view: no station data.
+            let record = accessory && !premium ? nil : source(date)
             let snapshot = accessory
                 ? record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
                 : nil
@@ -36,7 +39,8 @@ struct StationProvider: AppIntentTimelineProvider {
     }
     func placeholder(in context: Context) -> SlackwaterEntry {
         SlackwaterEntry(date: .now, snapshot: nil, card: nil,
-                        premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
+                        premium: premiumActive(purchased: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
+                                               freeDay: storedFreeDay(AppGroup.defaults), at: .now),
                         stationID: nil, isPlaceholder: true)
     }
     func snapshot(for intent: StationConfigIntent, in context: Context) async -> SlackwaterEntry {
@@ -45,8 +49,7 @@ struct StationProvider: AppIntentTimelineProvider {
     func timeline(for intent: StationConfigIntent, in context: Context) async -> Timeline<SlackwaterEntry> {
         let now = Date()
         let entry = entryBuilder(intent, for: context.family)
-        let entries = stride(from: 0.0, to: 86_400, by: 1_800)
-            .map { entry(now.addingTimeInterval($0)) }
+        let entries = widgetEntryDates(now: now, freeDayEnd: storedFreeDay(AppGroup.defaults)?.end).map(entry)
         return Timeline(entries: entries, policy: .atEnd)
     }
 }

@@ -24,6 +24,10 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
     private func audit(_ app: XCUIApplication, _ screen: String) throws {
         save(app, "audit-\(screen.replacingOccurrences(of: " ", with: "-")).png")
         let window = app.windows.firstMatch.frame
+        // Content scrolled up under the navigation bar is covered by its opaque
+        // canvas fill; the user cannot see it, but the audit still reports it
+        // and its screenshot samples whatever the scroll had reached.
+        let bar = app.navigationBars.firstMatch
         var issues: [String] = []
         try app.performAccessibilityAudit(for: audits) { issue in
             // An issue without an element cannot be located or measured; the
@@ -42,6 +46,7 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
             if issue.auditType == .contrast {
                 // Partly off-screen text samples the void; judge only what is fully visible.
                 guard window.contains(f) else { return true }
+                if bar.exists, bar.frame.intersects(f), e.elementType != .navigationBar { return true }
                 if let ratio = self.renderedContrast(e), ratio >= 4.5 { return true }
             }
             issues.append("\(issue.auditType.rawValue) \(e.elementType.rawValue) id=\(e.identifier) label=\(e.label) "
@@ -92,6 +97,14 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
         let app = launch("-resetFavorites", "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openFridayHarbor(app)
         try audit(app, "tide detail")
+    }
+
+    func testPremiumSheetPassesTheAudit() throws {
+        let app = launch("-locDenied", "-seedPremiumSheet")
+        XCTAssert(app.otherElements["premium-preview-print"].appears(within: 10))
+        try audit(app, "premium sheet")
+        scrollTo(app.buttons["Restore purchase"], in: app)
+        try audit(app, "premium sheet end")
     }
 
     func testCurrentDetailPassesTheAudit() throws {

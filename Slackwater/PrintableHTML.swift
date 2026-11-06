@@ -100,7 +100,7 @@ func printableHTML(_ page: PrintablePage, setFormat: String) -> String {
 // MARK: - Words
 
 /// The schedule pill's word in sentence case.
-private func eventWord(_ pill: SchedulePill) -> String {
+func eventWord(_ pill: SchedulePill) -> String {
     switch pill {
     case .high: String(localized: "High", comment: "High-tide event label.")
     case .low: String(localized: "Low", comment: "Low-tide event label.")

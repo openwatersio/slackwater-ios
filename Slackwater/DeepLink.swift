@@ -33,7 +33,7 @@ let idPathCharacters = CharacterSet(charactersIn:
 /// percent-encoded; the receiving `.onOpenURL` reads the id back decoded via
 /// `url.pathComponents`.
 ///
-/// With no id to resolve (M2) a PREMIUM_ENABLED build opens the dedicated Support Slackwater sheet.
+/// With no id to resolve (M2) a PREMIUM_ENABLED build opens the Premium sheet.
 /// Without Premium that route does not exist, so the widget
 /// gets no URL and a tap opens the app wherever it was.
 func deepLink(forStationID id: String?) -> URL? {
@@ -50,7 +50,7 @@ func deepLink(forStationID id: String?) -> URL? {
 
 func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
 
-/// A lock-screen widget's link: its station once unlocked, the Support Slackwater sheet
+/// A lock-screen widget's link: its station once unlocked, the Premium sheet
 /// while locked. The provider resolves `stationID` either way, so the locked
 /// case can't lean on `deepLink(_:)`'s nil fallback.
 func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {

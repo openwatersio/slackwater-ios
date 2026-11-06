@@ -26,7 +26,7 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     ///
     /// Optional for the same reason `reference` is: gen-tides writes it into
     /// stations.json only where it is true, and a non-optional `Bool` would make
-    /// the synthesized decoder demand the key on all 4,409 records that omit it.
+    /// the synthesized decoder demand the key on the thousands of records that omit it.
     var seasonalDominant: Bool? = nil
     /// The floor and ceiling of this station's predictions, in metres above its
     /// chart datum — the same frame as `TideExtreme.height`, so they compare

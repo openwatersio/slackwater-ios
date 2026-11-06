@@ -43,11 +43,11 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         let tideSwitch = app.switches["calendar-station-\(tide)"]
         tideSwitch.tap()
 
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
         XCTAssertFalse(app.buttons["settings-calendar-row"].exists)
-        app.buttons["premium-done"].tap()
+        app.buttons["premium-close"].tap()
         XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
         XCTAssertEqual(tideSwitch.value as? String, "0")
         save(app, "calendar-after-premium.png")

@@ -3,13 +3,13 @@ import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
     private func dismissPremium(_ app: XCUIApplication) -> Bool {
-        let done = app.buttons["premium-done"]
+        let close = app.buttons["premium-close"]
         for _ in 0..<3 {
-            if done.exists { done.tap() }
+            if close.exists { close.tap() }
             // The presenting page remains in the iPad hierarchy while the sheet is open.
-            if done.disappears(within: 5) { return true }
+            if close.disappears(within: 5) { return true }
         }
-        XCTFail("the Premium sheet did not dismiss after Done")
+        XCTFail("the Premium sheet did not dismiss after its close button")
         return false
     }
 
@@ -35,7 +35,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             }
             save(app, rowID + ".png")
             requirement.tap()
-            XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+            XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
             guard dismissPremium(app) else { return }
             XCTAssert(app.navigationBars[page].appears(within: 5))
             app.navigationBars.buttons.firstMatch.tap()
@@ -45,15 +45,16 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
         save(app, "settings-premium-section.png")
         support.tap()
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
         save(app, "premium-visuals-top.png")
         let restore = app.buttons["Restore purchase"]
         scrollTo(restore, in: app)
         XCTAssertTrue(restore.isHittable)
-        XCTAssert(app.otherElements["premium-preview-calendar"].exists)
-        XCTAssert(app.otherElements["premium-preview-alert"].exists)
-        XCTAssert(app.staticTexts["Chart controls"].exists, "the sheet names chart controls as a benefit")
+        let table = app.descendants(matching: .any)["premium-table"].firstMatch
+        for row in ["Calendars", "Lock screen widgets", "Sky controls"] {
+            XCTAssert(table.descendants(matching: .any)[row].firstMatch.exists, "the table names \(row)")
+        }
         save(app, "premium-visuals-bottom.png")
         guard dismissPremium(app) else { return }
         XCTAssert(app.navigationBars["Settings"].appears(within: 5))
@@ -116,7 +117,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertEqual(toggle.value as? String, "1")
         save(free, "settings-sky-premium.png")
         toggle.tap()
-        XCTAssert(free.navigationBars["Support Slackwater"].appears(within: 5),
+        XCTAssert(free.navigationBars["Slackwater Premium"].appears(within: 5),
                   "a free switch-off must open the purchase sheet")
         guard dismissPremium(free) else { return }
         XCTAssertEqual(toggle.value as? String, "1", "a free switch-off must not turn the bodies off")
@@ -131,7 +132,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssert(paidToggle.appears(within: 5))
         paidToggle.tap()
         XCTAssert(eventually(within: 5) { paidToggle.value as? String == "0" })
-        XCTAssertFalse(paid.navigationBars["Support Slackwater"].exists)
+        XCTAssertFalse(paid.navigationBars["Slackwater Premium"].exists)
         paid.terminate()
         let clean = launch("-locDenied", "-resetSkyBodies")
         clean.terminate()
@@ -334,9 +335,10 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertTrue(support.label.contains("Slackwater supporter"))
         save(app, "supporter-footer.png")
         support.tap()
-        XCTAssert(app.navigationBars["Slackwater supporter"].appears(within: 5))
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         XCTAssert(app.staticTexts["You have Premium — thank you."].exists)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
+        XCTAssertFalse(app.buttons["premium-buy"].exists)
         save(app, "supporter-sheet.png")
         guard dismissPremium(app) else { return }
         openSettings(app)
@@ -353,8 +355,8 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertTrue(support.label.contains("Support Slackwater"))
         save(app, "support-footer.png")
         support.tap()
-        XCTAssert(app.navigationBars["Support Slackwater"].appears(within: 5))
-        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5), "The lock-screen example must load before showing purchase controls")
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        XCTAssert(app.otherElements["premium-preview-print"].appears(within: 5), "The first card's example must load before showing purchase controls")
         scrollTo(app.buttons["Restore purchase"], in: app)
         XCTAssert(app.buttons["Restore purchase"].isHittable)
         // App Review 3.1.2 rejects a subscription sheet without both policy links.

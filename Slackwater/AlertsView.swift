@@ -57,7 +57,7 @@ struct AlertsView: View {
 
     var body: some View {
         List {
-            PremiumRequirement()
+            PremiumRequirement(feature: .alerts)
             if store.rules.isEmpty {
                 Text("No alerts yet. Tap Set an alert under any station's timeline.")
                     .foregroundStyle(SN.foam.opacity(0.62))
@@ -83,7 +83,7 @@ struct AlertsView: View {
                             }
                             .buttonStyle(.borderless)
                             if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
-                                PremiumRequirement(title: "Notifications are Premium")
+                                PremiumRequirement(title: "Notifications are Premium", feature: .alerts)
                             } else {
                                 Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
                                     .font(.caption)
