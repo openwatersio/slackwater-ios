@@ -39,7 +39,7 @@ final class PremiumSheetTests: ScreenshotTestCase {
     func testFreeDayTurnsOnPremium() {
         let app = launch("-locDenied", "-resetFreeDay", "-seedPremiumSheet")
         let freeDay = element(app, "premium-free-day")
-        scrollTo(freeDay, in: app)
+        scrollTo(freeDay, in: app, visibleFrame: premiumContentFrame(in: app))
         XCTAssertTrue(freeDay.label.contains("Try everything free today"), freeDay.label)
         freeDay.tap()
         XCTAssert(waitFor(freeDay, "label CONTAINS 'Free day until'"), freeDay.label)
