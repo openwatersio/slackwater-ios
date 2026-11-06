@@ -21,7 +21,7 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
     /// eyebrow measured at 11.8:1 came back "failed"). An element's own
     /// screenshot settles it — the brightest pixels are the text, the median
     /// is its ground.
-    private func audit(_ app: XCUIApplication, _ screen: String) throws {
+    private func audit(_ app: XCUIApplication, _ screen: String, premiumContent: CGRect? = nil) throws {
         save(app, "audit-\(screen.replacingOccurrences(of: " ", with: "-")).png")
         let window = app.windows.firstMatch.frame
         // Content scrolled up under the navigation bar is covered by its opaque
@@ -46,6 +46,8 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
             if issue.auditType == .contrast {
                 // Partly off-screen text samples the void; judge only what is fully visible.
                 guard window.contains(f) else { return true }
+                if let premiumContent, !premiumContent.contains(f),
+                   app.scrollViews.containing(e.elementType, identifier: e.label).firstMatch.exists { return true }
                 if bar.exists, bar.frame.intersects(f), e.elementType != .navigationBar { return true }
                 if let ratio = self.renderedContrast(e), ratio >= 4.5 { return true }
             }
@@ -102,9 +104,17 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
     func testPremiumSheetPassesTheAudit() throws {
         let app = launch("-locDenied", "-seedPremiumSheet")
         XCTAssert(app.otherElements["premium-preview-print"].appears(within: 10))
-        try audit(app, "premium sheet")
-        scrollTo(app.buttons["Restore purchase"], in: app)
-        try audit(app, "premium sheet end")
+        let content = premiumContentFrame(in: app)
+        try audit(app, "premium sheet", premiumContent: content)
+        scrollTo(app.staticTexts["Sky controls"].firstMatch, in: app, visibleFrame: content)
+        let table = app.otherElements["premium-table"].firstMatch
+        for label in ["Print and PDF", "Alerts", "Calendars", "Lock screen widgets", "Watch complications", "Sky controls"] {
+            let row = table.staticTexts[label].firstMatch
+            if !content.contains(row.frame) { scrollTo(row, in: app, visibleFrame: content) }
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(renderedContrast(row)), 4.5, label)
+        }
+        scrollTo(app.buttons["Restore purchase"], in: app, visibleFrame: content)
+        try audit(app, "premium sheet end", premiumContent: content)
     }
 
     func testCurrentDetailPassesTheAudit() throws {

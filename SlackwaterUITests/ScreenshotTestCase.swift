@@ -285,7 +285,7 @@ import notify
     /// the target in view. The container is read through its properties: a
     /// snapshot would copy its whole subtree on every check.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication,
-                  within preferredContainer: XCUIElement? = nil) {
+                  within preferredContainer: XCUIElement? = nil, visibleFrame: CGRect? = nil) {
         // A lazy row needs its scroll container before it appears in the accessibility tree.
         if let preferredContainer, !preferredContainer.appears(within: 5) {
             XCTFail("preferred scroll container did not appear")
@@ -297,6 +297,7 @@ import notify
             var bounds = container.frame.intersection(app.windows.firstMatch.frame)
             // Reserve a bottom margin for floating controls; this does not measure their safe-area-adjusted frames.
             if container.identifier == "station-list" { bounds.size.height -= 80 }
+            if let visibleFrame { bounds = bounds.intersection(visibleFrame) }
             return bounds.contains(target.frame) && el.isHittable
         }
         var inReach = false, pinned = preferredContainer != nil
@@ -313,7 +314,7 @@ import notify
             if attempt < 10 {
                 if !container.exists, preferredContainer == nil { container = listContainer(app) }
                 // A swipe can carry a short row past the sheet's top edge.
-                if let target, !target.frame.isEmpty, target.frame.minY < container.frame.minY {
+                if let target, !target.frame.isEmpty, target.frame.minY < (visibleFrame?.minY ?? container.frame.minY) {
                     container.swipeDown(velocity: .slow)
                 } else {
                     container.swipeUp(velocity: .slow)
@@ -325,6 +326,12 @@ import notify
         let found = (try? el.snapshot()).map { "\($0.identifier) \($0.frame)" } ?? "missing"
         let box = container.exists ? "\(container.identifier) \(container.frame)" : "missing"
         XCTAssert(reachable(), "could not scroll element within reach: target \(found), container \(box)")
+    }
+
+    func premiumContentFrame(in app: XCUIApplication) -> CGRect {
+        let bar = app.navigationBars["Slackwater Premium"].frame
+        let buy = app.buttons["premium-buy"].frame
+        return CGRect(x: bar.minX, y: bar.maxY, width: bar.width, height: buy.minY - bar.maxY)
     }
 
     /// The scroll view around `target`, queried by its own identifier when it
