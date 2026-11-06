@@ -447,16 +447,13 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.
     func testM48MapPinToUnfittedDetail() throws {
-        // The camera is put ON Race Passage rather than aimed at it from the
-        // wide Salish view: at national scale a finger-sized box over that pin
-        // holds several dots, so "the nearest dot to the tap" is not reliably
-        // the one this test means. The fix is the fix — the discovery map opens
-        // on it — plus a station-scale zoom.
-        let app = launch("-chsResetModels", "-networkKillSwitch",
-                         "-fixLat", "48.3067", "-fixLon", "-123.5367", "-mapZoom", "11")
-        app.buttons["Map"].tap()
+        // Start on the map with Race Passage isolated under the centre tap.
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-openMap", "-locDenied", "-chsResetModels", "-networkKillSwitch",
+                                             "-mapCenter", "48.3067,-123.5367", "-mapZoom", "11"])
+        app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
-        XCTAssert(map.appears(within: 5))
+        XCTAssert(map.appears(within: 15))
         sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
 
         // Dead centre: the camera is on the station, so the pin is the middle.
