@@ -26,28 +26,27 @@ struct TideLead: View {
         let t = min(max(scrubTime, first), last)
         return readTide(at: t, heights: timeline.tidePoints, rates: timeline.tideRates, extremes: timeline.tideExtremes)
     }
-    private var atTurn: Bool { kit?.state == .high || kit?.state == .low }
+    private func atTurn(_ kit: TideReading?) -> Bool { kit?.state == .high || kit?.state == .low }
     /// The kit is nil only on an empty series, where the lead is not shown: the rate's sign stands in.
-    private var rising: Bool { kit?.rising ?? (rate >= 0) }
-    /// "Rising 2.3 ft/hr" in place of the lead's bare word while the water is
-    /// fast: it explains the yellow line under it.
-    private var leadRate: String? {
-        atTurn ? nil : tideRateReading(rate: rate, imperial: imperial)
-    }
-    private var leadState: String {
+    private func rising(_ kit: TideReading?) -> Bool { kit?.rising ?? (rate >= 0) }
+    private func leadState(_ kit: TideReading?) -> String {
         switch kit?.state {
         case .high: String(localized: "High", comment: "High-tide state.")
         case .low: String(localized: "Low", comment: "Low-tide state.")
-        default: rising
+        default: rising(kit)
             ? String(localized: "Rising", comment: "Rising-tide state.")
             : String(localized: "Falling", comment: "Falling-tide state.")
         }
     }
 
-    /// What the lead shows and says, apart from its clock.
+    /// What the lead shows and says, apart from its clock. The kit is read once.
     var reading: TideLeadReading {
-        let turn = atTurn
-        let word = leadState
+        let kit = kit
+        let turn = atTurn(kit), rising = rising(kit)
+        let word = leadState(kit)
+        // "Rising 2.3 ft/hr" in place of the lead's bare word while the water is
+        // fast: it explains the yellow line under it.
+        let leadRate = turn ? nil : tideRateReading(rate: rate, imperial: imperial)
         let value = formatHeight(height, imperial: imperial)
         let words = spokenReading(word, value, unit: unit)
         return TideLeadReading(

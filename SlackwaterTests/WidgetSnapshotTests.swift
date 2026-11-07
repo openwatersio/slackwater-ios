@@ -446,13 +446,15 @@ import SlackwaterKit
         ])
     }
 
-    /// Friday Harbor's card at a fixed instant and at the midpoint of the first fall after it, between a high and the low that follows, never on a turn.
+    /// Friday Harbor's card at a fixed instant, at the midpoint of the first fall after it (between a high and the low that follows) and at the midpoint of the first rise (a low and the high that follows), never on a turn.
     func testTheTideCardReadsAsItAlwaysHas() throws {
         let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })
         let now = Date(timeIntervalSince1970: 1_790_000_000)
         let turns = record.engineStation.extremes(from: now, to: now.addingTimeInterval(48 * 3600))
         let i = try XCTUnwrap(turns.indices.dropLast().first { turns[$0].kind == .high && turns[$0 + 1].kind == .low })
         let midFall = turns[i].time.addingTimeInterval(turns[i + 1].time.timeIntervalSince(turns[i].time) / 2)
+        let j = try XCTUnwrap(turns.indices.dropLast().first { turns[$0].kind == .low && turns[$0 + 1].kind == .high })
+        let midRise = turns[j].time.addingTimeInterval(turns[j + 1].time.timeIntervalSince(turns[j].time) / 2)
 
         let atNow = record.cardState(at: now)
         XCTAssertEqual(atNow.height, 0.20008368511312424, accuracy: 1e-9)
@@ -460,6 +462,9 @@ import SlackwaterKit
         let falling = record.cardState(at: midFall)
         XCTAssertEqual(falling.height, 1.9027424681577627, accuracy: 1e-9)
         XCTAssertFalse(falling.rising)
+        let rising = record.cardState(at: midRise)
+        XCTAssertEqual(rising.height, 1.2297737742539478, accuracy: 1e-9)
+        XCTAssertTrue(rising.rising)
     }
 
     /// A tide that never turns has no later extreme to point the card, so it reads by its rate, as the kit's reading does.
@@ -472,8 +477,8 @@ import SlackwaterKit
         XCTAssertEqual(card.height, 2 - now.timeIntervalSince1970 / 3600, accuracy: 1e-6)
     }
 
-    /// A Canadian preview read at its last sample has no sample after now, so the kit gives no reading and the card falls back to the sign of the preview's rate.
-    func testAPreviewCardAtItsLastSampleStillReadsADirection() throws {
+    /// The kit's bracket is inclusive at both ends, so a Canadian preview read at its last sample still reads a direction. The kit gives no reading only when now is outside the preview's samples (a preview past its coverage), where the card has no rate either and reads rising.
+    func testAPreviewCardAtItsLastSampleReadsThroughTheKitsBracket() throws {
         let gate = try XCTUnwrap(ChsGateInfo.all.first)
         let info = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gate.reference })
         let now = Date(timeIntervalSince1970: 1_785_000_000)

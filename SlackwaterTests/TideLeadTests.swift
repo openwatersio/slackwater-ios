@@ -1,8 +1,8 @@
 // Slackwater — GPL v3. What the tide lead says at an instant, pinned as plain values (#901).
 //
 // `TideLead.reading` is a plain value, so this target can read what the lead
-// renders without drawing it (RenderProbes.swift). The literals below were
-// captured from the rule the lead had when it lived in `TideDetailView`.
+// renders without drawing it (RenderProbes.swift). The literals below are
+// baselines: a change to the lead's rule fails here.
 import XCTest
 @testable import Slackwater
 import SlackwaterKit
@@ -141,12 +141,16 @@ import SlackwaterKit
         let midpoint = start.addingTimeInterval(3 * ChsGrid.tideSeconds)
         XCTAssertEqual(tl.tideExtremes.first?.time, midpoint)
         XCTAssertEqual(tl.tideExtremes.first?.kind, .high)
-        let before = lead(midpoint.addingTimeInterval(-300), in: tl).reading
+        let beforeTime = midpoint.addingTimeInterval(-300), afterTime = midpoint.addingTimeInterval(300)
+        let before = lead(beforeTime, in: tl).reading
         XCTAssertEqual(before.state, "Rising")
         XCTAssertTrue(before.rising)
-        let after = lead(midpoint.addingTimeInterval(300), in: tl).reading
+        let after = lead(afterTime, in: tl).reading
         XCTAssertEqual(after.state, "Falling")
         XCTAssertFalse(after.rising)
+        // The list card for the same preview agrees with the lead.
+        XCTAssertEqual(info.previewIdentity.cardState(at: beforeTime, station: preview).rising, before.rising)
+        XCTAssertEqual(info.previewIdentity.cardState(at: afterTime, station: preview).rising, after.rising)
     }
 
     /// A selection past the loaded week keeps the end's phase rather than dropping out.

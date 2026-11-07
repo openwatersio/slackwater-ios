@@ -59,9 +59,9 @@ struct ComplicationReading: Equatable {
             // The next turn comes from the card's own reach: at a micro-tidal
             // gauge it can be more than 15h out.
             let last = s.extremes(from: now.addingTimeInterval(-15 * 3600), to: now).last { $0.time <= now }
-            // From a second back, so a turn the kit reads as the one just passed is in the list.
-            let ahead = s.extremes(from: now.addingTimeInterval(-1), to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH))
-            let next = ahead.first { $0.time > now }
+            // Only turns after now go to the kit, so `rising` always agrees with `next` while a turn is loaded.
+            let ahead = s.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH)).filter { $0.time > now }
+            let next = ahead.first
             let rising = s.tideReading(at: now, extremes: ahead)?.rising ?? s.risesByRate(at: now)
             var gauge: Gauge?
             if let last, let next, let bounds = tideGaugeBounds(prev: last, next: next, rising: rising) {

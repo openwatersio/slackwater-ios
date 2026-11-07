@@ -124,11 +124,12 @@ struct TideDetailView: View {
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             alertOffer: activePreview == nil ? lead.map { shown in
-                                tideAlertOffer(
+                                let reading = shown.reading
+                                return tideAlertOffer(
                                     scrubbedAway: scrubbedAway(scrubTime, from: live),
-                                    turnIsHigh: shown.reading.atTurn ? shown.reading.rising : nil,
+                                    turnIsHigh: reading.atTurn ? reading.rising : nil,
                                     onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                    heightM: scrubHeight, rising: shown.reading.rising, imperial: imperial)
+                                    heightM: scrubHeight, rising: reading.rising, imperial: imperial)
                             } : nil,
                             printable: printable,
                             above: { EmptyView() },
