@@ -127,7 +127,7 @@ if "workflows/ci.yml" in sys.argv[2]:
         runs.insert(0, {**run, "id": 124, "head_sha": os.environ["NIGHTLY_NEWER_SHA"], "status": "in_progress", "conclusion": None})
     print(json.dumps([{"workflow_runs": runs}]))
 else:
-    names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "rest") for d in ("", " · iPad")]
+    names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "premium", "rest") for d in ("", " · iPad")]
     print(json.dumps([{"jobs": [{"id": i, "run_attempt": 1, "name": n, "status": "completed", "conclusion": "success"} for i, n in enumerate(names)]}]))
 PYGH
   exit

@@ -7,8 +7,11 @@ run_name = workflow.fetch("run-name")
 raise "CI run name must preserve the PR marker and complete expression" unless run_name.include?("format('CI · PR \#{0}', github.event.number)") && run_name.end_with?("}}")
 app = workflow.fetch("jobs").fetch("app")
 shards = app.fetch("strategy").fetch("matrix").fetch("shard")
-raise "keep the five release validation shards" unless shards.map { |s| s.fetch("name") } == %w[offline list transition detail rest]
+raise "keep the six release validation shards" unless shards.map { |s| s.fetch("name") } == %w[offline list transition detail premium rest]
 raise "rest must remain a catch-all" if shards.last.key?("only")
+# Nightly releases only commits whose every app job passed, so it must name every shard.
+nightly = File.read("#{root}/scripts/nightly-validation.py")[/for shard in \(([^)]*)\)/, 1].to_s.scan(/"(\w+)"/).flatten
+raise "nightly-validation.py requires shards #{nightly}, not the matrix's" unless nightly == shards.map { |s| s.fetch("name") }
 selectors = shards.flat_map { |s| %w[only skip].flat_map { |key| s.fetch(key, "").split(",") } }
 
 tests = JSON.parse(File.read("#{root}/TestPlans/Slackwater.xctestplan")).fetch("testTargets").flat_map do |entry|
@@ -53,4 +56,4 @@ run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
   raise "unrelated PRs share a slot" if group.call("pull_request", 1, "refs/pull/1/merge") == group.call("pull_request", 2, "refs/pull/2/merge")
 end
 puts "main groups preserve pending siblings; PR groups cancel obsolete attempts"
-puts "#{tests.size} test methods run exactly once across five shards; new classes and split-class methods reach rest"
+puts "#{tests.size} test methods run exactly once across six shards; new classes and split-class methods reach rest"
