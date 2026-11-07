@@ -62,29 +62,25 @@ struct TideDetailView: View {
     private var nextExtreme: TideExtreme? {
         timeline?.tideExtremes.first { $0.time > scrubTime }
     }
-    private var rising: Bool {
-        if let preview = activePreview { return preview.rateOfChange(at: scrubTime) >= 0 }
-        return nextExtreme.map { $0.kind == .high } ?? true
-    }
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
     /// Metres per hour under the centerline, signed.
     private var scrubRate: Double { timeline?.rateAt(scrubTime) ?? 0 }
-    /// The rate ramp's colour when the rate is out of the ordinary (#95: at
-    /// Friday Harbor 0.8 ft/hr is nothing, at Ile Haute 8 ft/hr is the
-    /// warning), else nil and the direction colour stands. The lead's word
-    /// and glyph wear it for the selection's rate, the pill for the peak it
-    /// names, lifted for the sky they float on — the ramp's red end is
-    /// unreadable against a sunrise otherwise.
-    private func rateWarning(_ rate: Double, over ground: UInt32) -> Color? {
-        abs(rate) >= tideMovementRampAnchorsMHr[0]
-            ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(rate)), over: ground) : nil
+    /// The lead over the centerline, nil until a timeline is loaded.
+    private var lead: TideLead? {
+        timeline.map {
+            TideLead(timeline: $0, scrubTime: scrubTime, height: scrubHeight, rate: scrubRate,
+                     previewRate: activePreview?.rateOfChange(at: scrubTime),
+                     imperial: imperial, tz: tz)
+        }
     }
-    /// "Rising 2.3 ft/hr" in place of the lead's bare word while the water is
-    /// fast: it explains the yellow line under it.
-    private var leadRate: String? {
-        atTurn == nil ? tideRateReading(rate: scrubRate, imperial: imperial) : nil
+    /// The lead wearing the sky's ink and ground.
+    private func shownLead(sky: SkyState) -> TideLead? {
+        guard var shown = lead else { return nil }
+        shown.ink = sky.ink
+        shown.chromeGround = sky.chromeGround
+        return shown
     }
     /// The stop the pill names and its tap walks to: the next turn, a fast
     /// run's peak before it, or the sun's next rise or set when that comes
@@ -129,9 +125,9 @@ struct TideDetailView: View {
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             alertOffer: activePreview == nil ? tideAlertOffer(
                                 scrubbedAway: scrubbedAway(scrubTime, from: live),
-                                turnIsHigh: atTurn.map { $0.kind == .high },
+                                turnIsHigh: lead.flatMap { $0.reading.atTurn ? $0.reading.rising : nil },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
+                                heightM: scrubHeight, rising: lead?.reading.rising ?? true, imperial: imperial) : nil,
                             printable: printable,
                             above: { EmptyView() },
                             card: { tl in
@@ -142,14 +138,14 @@ struct TideDetailView: View {
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    onResumeScrubbedAway: { live = appNow() },
-                                                   spokenLead: spokenLead,
+                                                   spokenLead: lead?.spoken ?? "",
                                                    commentary: commentary,
-                                                   commentaryTint: commentaryPeak.flatMap { rateWarning($0.rate, over: sky.chromeGround) },
+                                                   commentaryTint: commentaryPeak.flatMap { tideRateWarning($0.rate, over: sky.chromeGround) },
                                                    onCommentary: scrubToCommentary,
                                                    scrollGate: store?.gate ?? previewGate,
                                                    onViewportWidth: { viewportPts = $0 },
                                                    moveRequests: clampRequests)
-                                    .overlay(alignment: .top) { lead(sky: sky) }
+                                    .overlay(alignment: .top) { shownLead(sky: sky) }
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
@@ -273,11 +269,6 @@ struct TideDetailView: View {
 
     // MARK: - The lead reading, fixed over the centerline
 
-    /// At a turn the water is at its high or low; otherwise it is on its way
-    /// to one. Snap targets land exactly on the extreme, hence the 1 s.
-    private var atTurn: TideExtreme? {
-        timeline?.tideExtremes.first { abs($0.time.timeIntervalSince(scrubTime)) < 1 }
-    }
     /// This swing's range: the extreme behind the scrub to the one ahead.
     private var range: (label: String, value: String, caption: String)? {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
@@ -345,47 +336,6 @@ struct TideDetailView: View {
                 standing: standing, swing: swing, phases: phases, months: months, seasons: seasons,
                 latDatum: record.latDatum, hatDatum: record.hatDatum,
                 imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
-        }
-    }
-
-    private var leadState: String {
-        atTurn.map {
-            $0.kind == .high
-                ? String(localized: "High", comment: "High-tide state.")
-                : String(localized: "Low", comment: "Low-tide state.")
-        } ?? (rising
-            ? String(localized: "Rising", comment: "Rising-tide state.")
-            : String(localized: "Falling", comment: "Falling-tide state."))
-    }
-    /// The lead in words, for the strip's spoken value.
-    private var spokenLead: String {
-        let reading = spokenReading(leadState, formatHeight(scrubHeight, imperial: imperial), unit: unit)
-        return leadRate == nil ? reading : spokenTideRate(after: reading, rate: scrubRate, imperial: imperial)
-    }
-
-    private func lead(sky: SkyState) -> some View {
-        let ink = sky.ink
-        let turn = atTurn
-        let up = turn.map { $0.kind == .high } ?? rising
-        let state = leadRate ?? leadState
-        let warning = rateWarning(scrubRate, over: sky.chromeGround)
-        return LeadCard(value: formatHeight(scrubHeight, imperial: imperial),
-                        unit: unit,
-                        time: leadWhen(scrubTime, tz),
-                        valueColor: ink,
-                        timeColor: ink) {
-            // Word then glyph, the order the current lead reads in.
-            // The rate, when it shows, outranks the word's usual ink (#95).
-            Text(state).fontWeight(.medium).monospacedDigit()
-                .foregroundStyle(leadRate == nil ? ink.opacity(0.85) : warning ?? ink)
-                .accessibilityLabel(leadRate == nil ? leadState
-                                    : spokenTideRate(after: leadState, rate: scrubRate, imperial: imperial))
-            // The graph's own two inks, so the eyebrow names the curve the
-            // reader is looking at — unless the rate is out of the ordinary
-            // (#95), which outranks direction.
-            LeadGlyph(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
-                                  ?? (rising ? "arrow.up.right" : "arrow.down.right"))
-                .foregroundStyle(warning ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
 
