@@ -13,6 +13,10 @@ final class TideRateTests: XCTestCase {
     private let m2 = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 1.0, phase: 0)])
     private let start = Date(timeIntervalSince1970: 1_770_000_000)
 
+    private func rate(_ t: Date) -> Double {
+        m2.rates(from: t, to: t.addingTimeInterval(1), step: 1).first?.rate ?? 0
+    }
+
     private func firstRise() -> (low: TideExtreme, high: TideExtreme) {
         let ex = m2.extremes(from: start, to: start.addingTimeInterval(24 * 3600))
         let lowIdx = ex.firstIndex { $0.kind == .low }!
@@ -21,14 +25,14 @@ final class TideRateTests: XCTestCase {
 
     func testRateVanishesAtTheTurns() {
         let (low, high) = firstRise()
-        XCTAssertEqual(m2.rateOfChange(at: low.time), 0, accuracy: 0.05)
-        XCTAssertEqual(m2.rateOfChange(at: high.time), 0, accuracy: 0.05)
+        XCTAssertEqual(rate(low.time), 0, accuracy: 0.05)
+        XCTAssertEqual(rate(high.time), 0, accuracy: 0.05)
     }
 
     func testRatePeaksMidTideInMetresPerHour() {
         let (low, high) = firstRise()
         let mid = low.time.addingTimeInterval(high.time.timeIntervalSince(low.time) / 2)
-        let rate = m2.rateOfChange(at: mid)
+        let rate = rate(mid)
         // Magnitude in m/hr — a per-second slip would read 0.00014 here.
         XCTAssertEqual(rate, 0.506, accuracy: 0.05)
     }
@@ -37,6 +41,6 @@ final class TideRateTests: XCTestCase {
         let (low, high) = firstRise()
         // Same distance past the high as the rise's midpoint was before it.
         let fallingMid = high.time.addingTimeInterval(high.time.timeIntervalSince(low.time) / 2)
-        XCTAssertLessThan(m2.rateOfChange(at: fallingMid), -0.4)
+        XCTAssertLessThan(rate(fallingMid), -0.4)
     }
 }

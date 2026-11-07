@@ -209,21 +209,31 @@ extension TideStationRecord {
     }
 
     func cardState(at now: Date, station: any TidePredicting) -> CardState {
-        let extremes = station.extremes(from: now, to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH))
+        // From a second back, so a turn the kit reads as the one just passed is in the list.
+        let extremes = station.extremes(from: now.addingTimeInterval(-1), to: now.addingTimeInterval(TIDE_NEXT_TURN_REACH))
         let next = extremes.first { $0.time > now }
         let height = station.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
-        // Direction from the next turn, not neighbouring samples (web tides.ts:
-        // near a turn the curve is flat and sampling picks up numerical noise).
-        let rising = next.map { $0.kind == .high } ?? (station as? ChsTidePreview).map { $0.rateOfChange(at: now) >= 0 } ?? true
+        let rising = station.tideReading(at: now, extremes: extremes)?.rising ?? station.risesByRate(at: now)
         return CardState(height: height, rising: rising, next: next)
     }
 }
 
 extension TidePredicting {
-    /// dh/dt at `t` in metres/hour — the rate-of-rise readout (#95 part 1).
-    /// The engine's analytic derivative (v0.4.0), same evaluation the strip's
-    /// rate ramp draws from.
-    func rateOfChange(at t: Date) -> Double {
-        rates(from: t, to: t.addingTimeInterval(1), step: 1).first?.rate ?? 0
+    /// The kit's reading at `now` from a two-sided one-second bracket of this
+    /// station's samples, the same reading the detail lead gives. `extremes`
+    /// are this station's turns from a second before `now` onward. Nil only
+    /// when the station yields no samples on both sides of `now`: a preview at
+    /// the edge of its coverage.
+    func tideReading(at now: Date, extremes: [TideExtreme]) -> TideReading? {
+        let from = now.addingTimeInterval(-1), to = now.addingTimeInterval(1)
+        return readTide(at: now, heights: heights(from: from, to: to, step: 1),
+                        rates: rates(from: from, to: to, step: 1), extremes: extremes)
+    }
+
+    /// Whether the tide is rising by the sign of its rate at `now`, for the
+    /// stretch where `tideReading` has no samples to read. A station with no
+    /// rate at all reads rising, as a zero rate does.
+    func risesByRate(at now: Date) -> Bool {
+        (rates(from: now, to: now.addingTimeInterval(1), step: 1).first?.rate ?? 0) >= 0
     }
 }

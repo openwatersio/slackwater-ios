@@ -446,6 +446,48 @@ import SlackwaterKit
         ])
     }
 
+    /// Friday Harbor's card at a fixed instant and at the midpoint of the first fall after it, between a high and the low that follows, never on a turn.
+    func testTheTideCardReadsAsItAlwaysHas() throws {
+        let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let turns = record.engineStation.extremes(from: now, to: now.addingTimeInterval(48 * 3600))
+        let i = try XCTUnwrap(turns.indices.dropLast().first { turns[$0].kind == .high && turns[$0 + 1].kind == .low })
+        let midFall = turns[i].time.addingTimeInterval(turns[i + 1].time.timeIntervalSince(turns[i].time) / 2)
+
+        let atNow = record.cardState(at: now)
+        XCTAssertEqual(atNow.height, 0.20008368511312424, accuracy: 1e-9)
+        XCTAssertFalse(atNow.rising)
+        let falling = record.cardState(at: midFall)
+        XCTAssertEqual(falling.height, 1.9027424681577627, accuracy: 1e-9)
+        XCTAssertFalse(falling.rising)
+    }
+
+    /// A tide that never turns has no later extreme to point the card, so it reads by its rate, as the kit's reading does.
+    func testATideWithNoLaterTurnReadsByItsRate() throws {
+        let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let card = record.cardState(at: now, station: FallingTide())
+        XCTAssertFalse(card.rising)
+        XCTAssertNil(card.next)
+        XCTAssertEqual(card.height, 2 - now.timeIntervalSince1970 / 3600, accuracy: 1e-6)
+    }
+
+    /// A Canadian preview read at its last sample has no sample after now, so the kit gives no reading and the card falls back to the sign of the preview's rate.
+    func testAPreviewCardAtItsLastSampleStillReadsADirection() throws {
+        let gate = try XCTUnwrap(ChsGateInfo.all.first)
+        let info = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gate.reference })
+        let now = Date(timeIntervalSince1970: 1_785_000_000)
+        let preview = ChsTidePreview(stationID: info.id, fetchedAt: now, samples: [
+            .init(time: now.addingTimeInterval(-1800), height: 2),
+            .init(time: now.addingTimeInterval(-900), height: 1.5),
+            .init(time: now, height: 1),
+        ])
+        let card = info.previewIdentity.cardState(at: now, station: preview)
+        XCTAssertEqual(card.height, 1)
+        XCTAssertFalse(card.rising)
+        XCTAssertNil(card.next)
+    }
+
     /// Kodiak's cross-flow runs at up to about 0.8 of its major axis: away from slack the card and widget print the water's full speed and point its own set, in the word the signed speed gives.
     func testARotaryCardShowsTheWatersSpeedAndSet() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
@@ -593,6 +635,22 @@ import SlackwaterKit
         XCTAssertTrue(graph.isSlack(at: now))
         XCTAssertEqual(face(state, inWindow: graph.isSlack(at: now)), ["Slack", "0.2", "•", "0.2 kn, slack"])
     }
+}
+
+/// A tide that only falls and never turns: the no-later-turn case an engine station cannot produce.
+/// It yields a sample at every whole second the range reaches, so a one-second bracket has one each side of now.
+struct FallingTide: TidePredicting {
+    private func seconds(_ from: Date, _ to: Date) -> [Date] {
+        let first = Int(from.timeIntervalSince1970.rounded(.down)), last = Int(to.timeIntervalSince1970.rounded(.up))
+        return first <= last ? (first...last).map { Date(timeIntervalSince1970: Double($0)) } : []
+    }
+    func heights(from: Date, to: Date, step: TimeInterval) -> [TidePoint] {
+        seconds(from, to).map { TidePoint(time: $0, height: 2 - $0.timeIntervalSince1970 / 3600) }
+    }
+    func rates(from: Date, to: Date, step: TimeInterval) -> [TideRatePoint] {
+        seconds(from, to).map { TideRatePoint(time: $0, rate: -1) }
+    }
+    func extremes(from: Date, to: Date) -> [TideExtreme] { [] }
 }
 
 /// A current whose samples and slacks are given, clipped to the range asked for.
