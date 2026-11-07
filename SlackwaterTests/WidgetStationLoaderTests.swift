@@ -4,6 +4,7 @@
 import XCTest
 @testable import Slackwater
 import SlackwaterKit
+import SlackwaterDatabase
 
 @MainActor final class WidgetStationLoaderTests: XCTestCase {
     private var storageRoots: [URL] = []
@@ -37,27 +38,21 @@ import SlackwaterKit
         let url = directory.appendingPathComponent(resource + ".json")
         var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         change(&rows)
-        if resource == "currents" {
-            let records = try rows.map { row -> String in
-                var rest = row
-                let id = rest.removeValue(forKey: "id")!
-                let idJSON = try JSONSerialization.data(withJSONObject: id,
-                                                        options: [.fragmentsAllowed, .withoutEscapingSlashes])
-                let fieldsJSON = try JSONSerialization.data(withJSONObject: rest)
-                return "{\"id\":" + String(decoding: idJSON, as: UTF8.self) + ","
-                    + String(decoding: fieldsJSON.dropFirst(), as: UTF8.self)
-            }
-            try Data(("[" + records.joined(separator: ",") + "]").utf8).write(to: url)
-        } else {
-            try JSONSerialization.data(withJSONObject: rows).write(to: url)
-        }
+        try JSONSerialization.data(withJSONObject: rows).write(to: url)
     }
 
-    /// A generation's changes are made to current stations: they are JSON a
-    /// test can edit, where tide stations are a binary database. The locator
-    /// and the generation work the same for both. This is a listed harmonic
-    /// current that no subordinate predicts from, so it can be renamed or
-    /// removed without breaking the catalog's joins.
+    /// Rewrites a generation's current database with the stations changed,
+    /// as a downloaded catalog would arrive.
+    private func editCurrents(in directory: URL, change: (inout [StationInput]) -> Void) throws {
+        let database = try currentDatabase(directory: directory)
+        var stations = database.map(StationInput.init)
+        change(&stations)
+        try StationDatabase.build(stations, version: database.version)
+            .write(to: directory.appendingPathComponent("currents.tcdb"))
+    }
+
+    /// A listed harmonic current that no subordinate predicts from, so a
+    /// generation can rename or remove it without breaking the catalog's joins.
     private var current: CurrentStationRecord {
         let referenced = Set(CurrentStationRecord.all.compactMap(\.reference))
         return CurrentStationRecord.all.first {
@@ -66,24 +61,24 @@ import SlackwaterKit
     }
 
     private func editStation(_ id: String, in directory: URL,
-                             change: (inout [String: Any]) -> Void) throws {
-        try edit("currents", in: directory) { rows in
-            change(&rows[rows.firstIndex { $0["id"] as? String == id }!])
+                             change: (inout StationInput) -> Void) throws {
+        try editCurrents(in: directory) { stations in
+            change(&stations[stations.firstIndex { $0.id == id }!])
         }
     }
 
     private func removeStation(_ id: String, from directory: URL) throws {
-        try edit("currents", in: directory) { rows in
-            rows.remove(at: rows.firstIndex { $0["id"] as? String == id }!)
+        try editCurrents(in: directory) { stations in
+            stations.remove(at: stations.firstIndex { $0.id == id }!)
         }
     }
 
     private func appendStation(copying id: String, as newID: String, name: String, in directory: URL) throws {
-        try edit("currents", in: directory) { rows in
-            var station = rows[rows.firstIndex { $0["id"] as? String == id }!]
-            station["id"] = newID
-            station["name"] = name
-            rows.append(station)
+        try editCurrents(in: directory) { stations in
+            var station = stations[stations.firstIndex { $0.id == id }!]
+            station.id = newID
+            station.name = name
+            stations.append(station)
         }
     }
 
@@ -94,20 +89,17 @@ import SlackwaterKit
     }
 
     private func scaleCurrentConstituents(_ id: String, by factor: Double, in directory: URL) throws {
-        try edit("currents", in: directory) { rows in
-            let index = rows.firstIndex { $0["id"] as? String == id }!
-            var constituents = rows[index]["constituents"] as! [[String: Any]]
-            for index in constituents.indices {
-                constituents[index]["amplitude"] = (constituents[index]["amplitude"] as! NSNumber).doubleValue * factor
+        try editStation(id, in: directory) { station in
+            station.constituents = station.constituents.map {
+                .init(name: $0.name, amplitude: $0.amplitude * factor, phase: $0.phase)
             }
-            rows[index]["constituents"] = constituents
         }
     }
 
     func testWidgetReadsCorrectedActiveStation() throws {
         let id = current.id
         let storage = try makeStorage { directory in
-            try editStation(id, in: directory) { $0["name"] = "Remote current" }
+            try editStation(id, in: directory) { $0.name = "Remote current" }
         }
         let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
             id: "current:" + id,
@@ -119,7 +111,7 @@ import SlackwaterKit
     func testTimelineSourceRetainsLoadedCatalogRecord() throws {
         let id = current.id
         let storage = try makeStorage { directory in
-            try editStation(id, in: directory) { $0["name"] = "Timeline current" }
+            try editStation(id, in: directory) { $0.name = "Timeline current" }
         }
         let source = WidgetStationLoader.recordSource(
             id: "current:" + id, locator: CatalogFileLocator(storage: storage))
@@ -196,33 +188,16 @@ import SlackwaterKit
         XCTAssertEqual(tide.name, TideStationRecord.record(id: TideStationRecord.fridayHarborID)?.name)
     }
 
-    func testTruncatedNestedActiveNOAAFileFallsBackToBundle() throws {
+    func testCorruptActiveCurrentDatabaseFallsBackToBundle() throws {
         let id = current.id
         let storage = try makeStorage()
         let directory = try XCTUnwrap(storage.activeDirectory())
-        try Data("[{\"id\":\"first\",\"aliases\":[]".utf8)
-            .write(to: directory.appendingPathComponent("currents.json"))
+        try Data("broken".utf8).write(to: directory.appendingPathComponent("currents.tcdb"))
         let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
             id: "current:" + id,
             locator: CatalogFileLocator(storage: storage)))
         guard case .current(let current, _) = record else { return XCTFail("Expected current") }
-        XCTAssertEqual(current.name, CurrentStationRecord.byId[id]?.name)
-    }
-
-    func testCompactScannerRejectsInvalidOuterGrammar() {
-        struct IDOnlyRecord: Decodable { let id: String }
-        let missing = "missing"
-        for bytes in [
-            "[{\"id\":\"first\"}][]",
-            "[{\"id\":\"first\"},garbage]",
-            "[{\"id\":\"first\"}{\"id\":\"second\"}]",
-            "[{\"id\":\"first\"}[]]",
-            "[{\"id\":\"first\"},[]{\"id\":\"second\"}]",
-            "[{\"id\":\"first\"},[garbage]{\"id\":\"second\"}]"
-        ] {
-            XCTAssertThrowsError(try decodeCatalogRecord(Data(bytes.utf8), id: missing) as TideStationRecord?)
-        }
-        XCTAssertThrowsError(try decodeCatalogRecord(Data("{\"id\":\"first\"}]".utf8), id: "first") as IDOnlyRecord?)
+        XCTAssertEqual(current.name, CurrentStationRecord.record(id: id)?.name)
     }
 
     func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
@@ -235,14 +210,13 @@ import SlackwaterKit
             locator: CatalogFileLocator(storage: storage)))
         guard case .current(let current, let station) = record else { return XCTFail("Expected current") }
         let directory = try XCTUnwrap(storage.activeDirectory())
-        let activeReference: CurrentStationRecord? = try catalogRecord(
-            "currents", id: subordinate.reference!, directory: directory)
+        let activeReference = try currentRecord(id: subordinate.reference!, directory: directory)
         let start = Date(timeIntervalSince1970: 1_750_000_000)
         let end = start + 6 * 3600
         let actual = station.speeds(from: start, to: end, step: 60).map(\.speed)
         let expected = current.engineStation(referenceRecord: activeReference)
             .speeds(from: start, to: end, step: 60).map(\.speed)
-        let bundled = try XCTUnwrap(CurrentStationRecord.byId[subordinate.reference!])
+        let bundled = try XCTUnwrap(CurrentStationRecord.record(id: subordinate.reference!))
         let staleStation = current.engineStation(referenceRecord: bundled)
         let stale = staleStation
             .speeds(from: start, to: end, step: 60).map(\.speed)

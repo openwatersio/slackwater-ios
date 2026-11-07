@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. Pure validation boundary for bundled and downloaded catalogs.
 import Foundation
+import SlackwaterDatabase
 
 struct CatalogError: Error, CustomStringConvertible {
     enum Stage: String { case lookup, read, decode, validation }
@@ -26,18 +27,6 @@ func readCatalog<T: Decodable & StationIdentity>(_ resource: String, directory: 
         // Do not include the payload or decoder debugDescription in release logs.
         throw CatalogError(resource: resource, stage: .decode, reason: "invalid catalog JSON or record schema")
     }
-    // ponytail: sample per design rule 12; use a linear whole-file format check
-    // if generators ever emit heterogeneous record layouts.
-    if resource == "currents", let sample = records.first {
-        do {
-            let scanned: T? = try decodeCatalogRecord(data, id: sample.id)
-            guard scanned?.id == sample.id else {
-                throw CatalogError(resource: resource, stage: .validation, reason: "record not found by widget scanner")
-            }
-        } catch {
-            throw CatalogError(resource: resource, stage: .validation, reason: "incompatible widget record format")
-        }
-    }
     return records.sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
 }
 
@@ -45,9 +34,10 @@ func readCatalog<T: Decodable & StationIdentity>(_ resource: String, directory: 
 /// No global catalog accessors are used: validation also works before app startup.
 struct CatalogSnapshot {
     static let resources = ["stations", "currents", "chs-stations", "chs-gates", "chs-current-gates", "chs-tombstones"]
-    /// Tide stations are the one binary resource; see TideStationDatabase.swift.
+    /// The two NOAA catalogs are station databases (TideStationDatabase.swift,
+    /// CurrentStationDatabase.swift); the CHS catalogs are JSON.
     static func fileName(_ resource: String) -> String {
-        resource == "stations" ? "stations.tcdb" : resource + ".json"
+        resource == "stations" || resource == "currents" ? resource + ".tcdb" : resource + ".json"
     }
 
     let tides: [TideStationRecord]
@@ -60,15 +50,18 @@ struct CatalogSnapshot {
     let byID: [String: StationItem]
 
     init(directory: URL, active: CatalogSnapshot? = nil) throws {
-        try self.init(tides: tideDatabase(directory: directory).map(TideStationRecord.init),
+        try self.init(tides: stationDatabase("stations", directory: directory, verifying: true)
+                        .map(TideStationRecord.init),
+                      currents: Self.currentRecords(stationDatabase("currents", directory: directory, verifying: true)),
                       directory: directory, active: active)
     }
 
-    /// Validates tide records already read from a directory's database, with
-    /// that directory's JSON catalogs.
-    init(tides: [TideStationRecord], directory: URL, active: CatalogSnapshot? = nil) throws {
+    /// Validates tide and current records already read from a directory's
+    /// databases, with that directory's JSON catalogs.
+    init(tides: [TideStationRecord], currents: [CurrentStationRecord], directory: URL,
+         active: CatalogSnapshot? = nil) throws {
         self.tides = tides.sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
-        currents = try readCatalog("currents", directory: directory)
+        self.currents = currents.sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
         chsStations = try readCatalog("chs-stations", directory: directory)
         chsGates = try readCatalog("chs-gates", directory: directory)
         chsCurrents = try readCatalog("chs-current-gates", directory: directory)
@@ -147,6 +140,27 @@ struct CatalogSnapshot {
         }
         items = groups.flatMap(\.1).sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
         byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+    }
+
+    /// A database's current stations as the app's records. The record reads a
+    /// missing direction or mean flow as zero, and a missing region as empty;
+    /// currents.json could not decode without them, so a station missing one
+    /// is refused here rather than drawn or predicted wrong.
+    private static func currentRecords(_ database: StationDatabase) throws -> [CurrentStationRecord] {
+        try database.map { station in
+            guard let current = station.current, current.floodDirection != nil, current.ebbDirection != nil,
+                  current.meanFlow != nil, station.region != nil else {
+                throw invalid("currents", "missing direction, mean flow or region for \(station.id)")
+            }
+            // JSON could not spell a non-finite number; float32 can.
+            let axes = [current.floodDirection, current.ebbDirection, current.meanFlow,
+                        current.minorMeanFlow, current.azimuth].compactMap { $0 }
+                + (current.minorConstituents ?? []).flatMap { [$0.amplitude, $0.phase] }
+            guard axes.allSatisfy(\.isFinite) else {
+                throw invalid("currents", "non-finite direction, flow or minor axis for \(station.id)")
+            }
+            return CurrentStationRecord(station)
+        }
     }
 
     private static func invalid(_ resource: String, _ reason: String) -> CatalogError {

@@ -12,7 +12,7 @@ final class ScrubReadingTests: XCTestCase {
     }
 
     private func current() throws -> TimelineData {
-        let r = try XCTUnwrap(CurrentStationRecord.byId["noaa/PUG1515"])
+        let r = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/PUG1515"))
         return TimelineData.build(tide: nil, current: r, now: at, anchor: at)
     }
 
@@ -103,7 +103,7 @@ final class ScrubReadingTests: XCTestCase {
     private let day = Date(timeIntervalSince1970: 1_786_363_200)
 
     private func timeline(_ id: String) throws -> (CurrentStationRecord, TimelineData) {
-        let r = try XCTUnwrap(CurrentStationRecord.byId[id])
+        let r = try XCTUnwrap(CurrentStationRecord.record(id: id))
         return (r, TimelineData.build(tide: nil, current: r, now: day, anchor: day))
     }
 

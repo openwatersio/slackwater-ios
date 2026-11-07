@@ -141,11 +141,11 @@ func tidePinState(_ record: TideStationRecord, at now: Date,
 /// pointing their offsets at the mouth. One rank step outweighs any signal
 /// difference: harmonics land in 0...9, subordinates in 10...19.
 ///
-/// Not free, though: reading `tideRecord`/`currentRecord` is what first
-/// touches `byId` and decodes the bundled catalog. `allPinCandidates` pays
-/// that once, off the main actor inside `refreshPins`' detached task, and
-/// `pinFeatures` would have forced the same decode a moment later anyway —
-/// so it costs a cold map open, not a frame.
+/// Not free, though: reading `tideRecord`/`currentRecord` decodes that
+/// station's constituents from its database, and nothing caches the result.
+/// `allPinCandidates` pays it once per station on a cold map open, off the
+/// main actor inside `refreshPins`' detached task, and `pinRanks` keeps the
+/// result for every refresh after.
 func pinSortRank(_ item: StationItem) -> Double {
     func rank(_ subordinate: Bool, _ signal: Double) -> Double {
         (subordinate ? 10 : 0) + max(0, 9 - signal)
@@ -193,8 +193,9 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
 /// and the one the detail view's `speeds` searches are the same events, and
 /// the pin's colour is the detail's speed at that instant.
 private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double {
+    // One read of the reference for both: each `referenceRecord` decodes it.
     guard let ref = station.referenceRecord,
-          case let sub as SubordinateStation = station.engineStation else { return 0 }
+          case let sub as SubordinateStation = station.engineStation(referenceRecord: ref) else { return 0 }
     return SubordinateStation.speed(at: now, along: sub.reduce(ReferenceCurrentEvents.shared.events(of: ref, at: now)))
 }
 
@@ -398,6 +399,11 @@ func pinCandidates(_ items: [StationItem]) -> [PinCandidate] {
 /// runs in a detached task).
 let allPinCandidates: [PinCandidate] = pinCandidates(StationItem.all)
 
+/// Each candidate's rank by id, so a refresh's features reuse the rank
+/// rather than reading the station's record again.
+let pinRanks: [String: Double] = Dictionary(
+    allPinCandidates.map { ($0.item.id, $0.rank) }, uniquingKeysWith: { first, _ in first })
+
 /// `pinned` always survives, whatever its cell holds: the station a detail
 /// page is about must appear on that page's own map, and the pin a preview
 /// panel is describing must not vanish under the panel.
@@ -453,7 +459,7 @@ func pinFeatures(for items: [StationItem], zoom: Double,
             let state = pinState(s, at: now, chsStates: chsStates, imperial: units.imperial,
                                  speedUnit: units.speedUnit, detailed: detailed)
             var properties: [String: Any] = ["id": s.id, "name": s.name, "kind": s.pinKind,
-                                             "state": state.state, "sort": pinSortRank(s)]
+                                             "state": state.state, "sort": pinRanks[s.id] ?? pinSortRank(s)]
             if let reading = state.reading {
                 if showsUnits, let unit = state.unit {
                     properties["reading"] = "\(reading) \(unit)"

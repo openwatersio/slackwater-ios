@@ -124,7 +124,7 @@ final class CurrentDirectionTests: XCTestCase {
     /// Kodiak's cross-flow is the strongest NOAA publishes (minor about 0.8 of
     /// major): at a major-axis slack the water still runs, and it has a set.
     func testARotaryStationStillRunsAtItsMajorAxisSlack() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         let slacks = kodiak.engineStation.events(from: date, to: date.addingTimeInterval(86_400))
             .filter { $0.kind == .slack }
         XCTAssertFalse(slacks.isEmpty)
@@ -138,7 +138,7 @@ final class CurrentDirectionTests: XCTestCase {
 
     /// Pollock Rip publishes no cross-flow, so its reading is the signed major-axis speed and a published bearing.
     func testAOneAxisStationReadsAlongItsPublishedBearings() throws {
-        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let pollock = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         XCTAssertNil(pollock.minorConstituents)
         for hour in stride(from: 0, to: 12, by: 2) {
             let p = point(pollock, at: date.addingTimeInterval(Double(hour) * 3600))

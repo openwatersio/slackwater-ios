@@ -14,7 +14,10 @@ Do not edit these committed artifacts directly:
   memory-mapped file (issue #459). Binary; `git diff` shows only that it changed.
   `stations.json` is not bundled. It stays here as the reviewable record of the
   same stations and as input to the generators that follow gen-tides.
-- `currents.json` — `tools/gen-noaa-currents.mjs`
+- `currents.json` and `currents.tcdb` — `tools/gen-noaa-currents.mjs`. The
+  pair works as `stations.json` and `stations.tcdb` do (issue #902): the app,
+  widget and watch ship and read the database, and the JSON stays here, not
+  bundled, as the reviewable record and as input to the generators after it.
 - `slugs.json`, `station-successors.json` and `station-tombstones.json` —
   `tools/gen-slugs.mjs`. The last two say where a saved station id goes once
   its station stops shipping: the bundled station the database publishes as

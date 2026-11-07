@@ -139,7 +139,7 @@ final class PatchField: Sendable {
         let record: CurrentStationRecord?
         switch anchor.provider {
         case "noaa":
-            record = CurrentStationRecord.all.first { $0.id == "noaa/\(anchor.stationId)" }
+            record = CurrentStationRecord.record(id: "noaa/\(anchor.stationId)")
         case "chs":
             return ChsCurrentGateInfo.all.first { $0.id == anchor.stationId }?.cachedReading(at: date)?.signedKn
         default:

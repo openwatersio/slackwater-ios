@@ -287,7 +287,7 @@ import SlackwaterKit
 
     /// Pollock Rip predicted by the engine, through a day of events and hours: the reading the lead built before vectors, from the signed speed and the published bearings, is the one it builds now.
     func testAnEngineOneAxisStationReadsAsItAlwaysHas() throws {
-        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let pollock = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         let station = pollock.engineStation
         let events = station.events(from: t0, to: t0.addingTimeInterval(86_400))
         let hours = (0..<24).map { (time: t0.addingTimeInterval(Double($0) * 3600 + 7), slack: false) }
@@ -336,7 +336,7 @@ import SlackwaterKit
 
     /// Kodiak's cross-flow runs at up to about 0.8 of its major axis, so at two of its three slacks on this day the engine-exact lead still has a speed and a set; at the third the crossing flow prints 0.0 and the lead claims no set.
     func testKodiakAtItsSlacksShowsTheCrossingFlow() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         let slacks = kodiak.engineStation.events(from: t0, to: t0.addingTimeInterval(86_400)).filter { $0.kind == .slack }
         var crossing = 0, still = 0
         for slack in slacks {

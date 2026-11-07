@@ -3,20 +3,28 @@
 import Foundation
 import SlackwaterDatabase
 
-/// Opens a catalog generation's tide stations. Mapping the file reads nothing
-/// but its 8-byte header; each lookup is a binary search that pages in only
-/// the station it finds.
-func tideDatabase(directory: URL) throws -> StationDatabase {
-    let url = directory.appendingPathComponent("stations.tcdb")
+/// Opens one of a catalog generation's station databases, `<resource>.tcdb`.
+/// Mapping the file reads nothing but its 8-byte header; each lookup is a
+/// binary search that pages in only the station it finds. `verifying` walks
+/// the whole file first, so bytes that are cut short or corrupt throw rather
+/// than trap on a later read; catalog validation opens a generation that way
+/// once, before it can become the active one.
+func stationDatabase(_ resource: String, directory: URL, verifying: Bool = false) throws -> StationDatabase {
+    let url = directory.appendingPathComponent(resource + ".tcdb")
     guard FileManager.default.fileExists(atPath: url.path) else {
-        throw CatalogError(resource: "stations", stage: .lookup, reason: "file missing")
+        throw CatalogError(resource: resource, stage: .lookup, reason: "file missing")
     }
-    do { return try StationDatabase(contentsOf: url) }
+    do { return try verifying ? StationDatabase(verifyingContentsOf: url) : StationDatabase(contentsOf: url) }
     catch is InvalidStationDatabase {
-        throw CatalogError(resource: "stations", stage: .decode, reason: "not a station database")
+        throw CatalogError(resource: resource, stage: .decode, reason: "not a station database")
     } catch {
-        throw CatalogError(resource: "stations", stage: .read, reason: "unable to read file")
+        throw CatalogError(resource: resource, stage: .read, reason: "unable to read file")
     }
+}
+
+/// Opens a catalog generation's tide stations.
+func tideDatabase(directory: URL) throws -> StationDatabase {
+    try stationDatabase("stations", directory: directory)
 }
 
 func tideRecord(id: String, directory: URL) throws -> TideStationRecord? {

@@ -79,7 +79,7 @@ final class ComplicationReadingTests: XCTestCase {
 
     /// Pollock Rip has no cross-flow constants, so its complication reads exactly as before vectors: the unsigned major-axis speed, every third hour and at each of the day's events.
     func testAOneAxisCurrentReadsAsItAlwaysHas() throws {
-        let pollock = try XCTUnwrap(CurrentStationRecord.byId["noaa/ACT1616"])
+        let pollock = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         XCTAssertNil(pollock.minorConstituents, "the fixture is one-axis")
         let station = WidgetStation.current(pollock.engineStation, tz: utc, name: pollock.name)
         let events = pollock.engineStation.events(from: day, to: day.addingTimeInterval(86_400))
@@ -102,7 +102,7 @@ final class ComplicationReadingTests: XCTestCase {
 
     /// Kodiak's complication prints the water's full speed, at its events as anywhere else; away from them its word and symbol keep following the signed speed.
     func testARotaryCurrentShowsTheWatersFullSpeed() throws {
-        let kodiak = try XCTUnwrap(CurrentStationRecord.byId["noaa/KOD0901"])
+        let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         XCTAssertNotNil(kodiak.minorConstituents, "the fixture is rotary")
         let engine = kodiak.engineStation
         let station = WidgetStation.current(engine, tz: utc, name: kodiak.name)

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadStations } from "@slackwater/database";
-import { here, undangle, minorAxis } from "./bundle.mjs";
+import { here, undangle, minorAxis, round3 } from "./bundle.mjs";
 
 const db = await loadStations();
 
@@ -168,5 +168,43 @@ test("every station is named and placed by its database record", () => {
     assert.equal(s.name, d.name, s.id);
     assert.deepEqual(s.aliases, d.aliases ?? [], s.id);
     if (d.context) assert.equal(s.region, undangle(d.context), s.id);
+  }
+});
+
+// currents.tcdb is what the app reads; this holds it to currents.json field
+// by field from the tools lane too, so a generator change that drops or
+// reshapes a station in one file and not the other fails here as well as in
+// the Swift tests.
+test("currents.tcdb holds the stations of currents.json", async () => {
+  const tcdb = await loadStations(new Uint8Array(
+    readFileSync(join(here, "..", "Slackwater", "Resources", "currents.tcdb"))));
+  assert.deepEqual(tcdb.all.map((s) => s.id).sort(), stations.map((s) => s.id).sort());
+  for (const s of stations) {
+    const t = tcdb.byId(s.id);
+    assert.equal(t.kind, "current", s.id);
+    assert.equal(t.name, s.name, s.id);
+    assert.equal(t.region, s.region, s.id);
+    assert.equal(t.timezone, s.timezone, s.id);
+    assert.equal(t.current.tide_reference, s.tideReference, s.id);
+    assert.equal(t.current.offsets?.reference, s.reference, s.id);
+    // Three places, as the generator writes them; float32 in the database.
+    const r = (v) => (v === undefined ? undefined : round3(v));
+    const cons = (list) => (list ?? []).map((c) => [c.name, r(c.amplitude), r(c.phase)]);
+    assert.deepEqual(cons(t.harmonic_constituents), cons(s.constituents), s.id);
+    assert.deepEqual(cons(t.current.minor_constituents), cons(s.minorConstituents), s.id);
+    assert.equal(r(t.current.flood_direction), s.floodDirection, s.id);
+    assert.equal(r(t.current.ebb_direction), s.ebbDirection, s.id);
+    assert.equal(r(t.current.mean_flow), s.meanFlow, s.id);
+    if (s.reference) {
+      const o = t.current.offsets;
+      assert.equal(o.slack_before_flood * 60, s.slackBeforeFloodOffset, s.id);
+      assert.equal(o.slack_before_ebb * 60, s.slackBeforeEbbOffset, s.id);
+      assert.equal(o.flood_time * 60, s.floodTimeOffset, s.id);
+      assert.equal(o.ebb_time * 60, s.ebbTimeOffset, s.id);
+      assert.equal(r(o.flood_speed_ratio), s.floodSpeedRatio, s.id);
+      assert.equal(r(o.ebb_speed_ratio), s.ebbSpeedRatio, s.id);
+    }
+    // float32 in the database; the generator writes three places.
+    assert.equal(t.current.minor_mean_flow === undefined ? undefined : round3(t.current.minor_mean_flow), s.minorMeanFlow, s.id);
   }
 });
