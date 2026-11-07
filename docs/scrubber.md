@@ -839,7 +839,7 @@ The living implementation is split by responsibility:
 | Lead card, commentary pill and stop walk, lead clock, sky state and backdrop | `Slackwater/DetailPieces.swift` |
 | Colour tokens, curve style, station-local clock formatting | `Slackwater/Palette.swift` |
 | Shared current lead and direct commentary walk | `Slackwater/CurrentLead.swift` |
-| Tide lead and its fast-rate reading, tide commentary stops; Canadian tide preview binding and its sample model (coverage, interpolation, rates, extremes) | `Slackwater/TideDetailView.swift`, `Slackwater/ChsTidePreview.swift` |
+| Tide lead and its fast-rate reading, tide commentary stops; Canadian tide preview binding and its sample model (coverage, interpolation, rates, extremes) | `Slackwater/TideLead.swift`, `Slackwater/TideDetailView.swift`, `Slackwater/ChsTidePreview.swift` |
 | Predicted-current binding (harmonic, subordinate, and fitted) | `Slackwater/CurrentDetailView.swift` |
 | Derived phase-only lead | `Slackwater/DerivedGateDetailView.swift` |
 | Online sampled-current binding | `Slackwater/OnlineGateDetailView.swift` |
@@ -852,7 +852,7 @@ The living implementation is split by responsibility:
 | Eclipse windows and contacts | `Slackwater/Eclipse.swift` |
 | Press offer and alert line | `Slackwater/AlertOffer.swift`, `Slackwater/AlertLine.swift` |
 | Watch place page and Crown strip | `SlackwaterWatch/PlaceDetail.swift`, `SlackwaterWatch/CrownScrubStrip.swift`, `Slackwater/ScrubReading.swift` |
-| Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/TimelineSnapTests.swift`, `SlackwaterTests/TimelineChunkTests.swift`, `SlackwaterTests/DetailLeadTests.swift`, `SlackwaterTests/SkyBackdropTests.swift`, `SlackwaterTests/EclipseTests.swift`, `SlackwaterTests/SlackWindowTests.swift`, `SlackwaterTests/RenderedStripTests.swift`, `SlackwaterTests/ReduceMotionTests.swift`, `SlackwaterTests/ScrubReadingTests.swift`, `SlackwaterTests/ChsTidePreviewTests.swift`, `SlackwaterTests/AlertOfferTests.swift`, `SlackwaterTests/AlertLineTests.swift`, `SlackwaterTests/DerivedGateTests.swift` |
+| Pure behavior checks | `SlackwaterTests/TimelineTests.swift`, `SlackwaterTests/TimelineSnapTests.swift`, `SlackwaterTests/TimelineChunkTests.swift`, `SlackwaterTests/DetailLeadTests.swift`, `SlackwaterTests/SkyBackdropTests.swift`, `SlackwaterTests/EclipseTests.swift`, `SlackwaterTests/SlackWindowTests.swift`, `SlackwaterTests/RenderedStripTests.swift`, `SlackwaterTests/ReduceMotionTests.swift`, `SlackwaterTests/ScrubReadingTests.swift`, `SlackwaterTests/ChsTidePreviewTests.swift`, `SlackwaterTests/TideLeadTests.swift`, `SlackwaterTests/AlertOfferTests.swift`, `SlackwaterTests/AlertLineTests.swift`, `SlackwaterTests/DerivedGateTests.swift` |
 | End-to-end interaction checks | `SlackwaterUITests/DetailAndScrubTests.swift`, `SlackwaterUITests/AlertLineUITests.swift`, `SlackwaterUITests/AccessibilityAuditTests.swift`, `SlackwaterWatchUITests/WatchUITests.swift` |
 
 Design history and completed implementation plans belong in Git history and pull requests. This file is the maintained scrubber contract.

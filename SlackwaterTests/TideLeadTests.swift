@@ -160,4 +160,19 @@ import SlackwaterKit
         XCTAssertEqual(past.rising, atEnd.rising)
         XCTAssertEqual(past.atTurn, atEnd.atTurn)
     }
+
+    /// The tide's direction is the kit's (#901). A `?? true` on a line naming
+    /// rising, or a `{ $0.kind == .high } ?? true` read off the next turn, is
+    /// a copy of the old rule that called an unknown direction rising. Scans
+    /// every app source, so a copy in a file nobody thought to check still
+    /// fails. A `.map { $0.kind == .high } ?? predictor.rates(...)` falls back
+    /// to the rate's sign, not to true, and does not match.
+    func testNoAppSourceDecidesATideDirectionItself() throws {
+        let rule = try NSRegularExpression(
+            pattern: #"(rising|Rising)[^\n]*\?\? true|\$0\.kind == \.high \} \?\? true"#)
+        for (name, source) in try appSources() {
+            let range = NSRange(source.startIndex..., in: source)
+            XCTAssertNil(rule.firstMatch(in: source, range: range), "\(name) decides a tide direction itself")
+        }
+    }
 }
