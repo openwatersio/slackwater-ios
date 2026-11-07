@@ -12,8 +12,6 @@ struct TideLead: View {
     let height: Double
     /// Metres per hour under the centerline, signed, clamped to the series (`TimelineData.rateAt`).
     let rate: Double
-    /// A CHS preview's own slope at `scrubTime`; nil on an engine station.
-    let previewRate: Double?
     let imperial: Bool
     let tz: TimeZone
     var ink: Color = .white
@@ -22,30 +20,28 @@ struct TideLead: View {
 
     private var unit: String { heightUnit(imperial: imperial) }
 
-    /// At a turn the water is at its high or low; otherwise it is on its way
-    /// to one. Snap targets land exactly on the extreme, hence the 1 s.
-    private var atTurn: TideExtreme? {
-        timeline.tideExtremes.first { abs($0.time.timeIntervalSince(scrubTime)) < 1 }
+    /// SlackwaterKit's reading at the selection clamped into the series, so a selection past the loaded week keeps the end's phase.
+    private var kit: TideReading? {
+        guard let first = timeline.tidePoints.first?.time, let last = timeline.tidePoints.last?.time else { return nil }
+        let t = min(max(scrubTime, first), last)
+        return readTide(at: t, heights: timeline.tidePoints, rates: timeline.tideRates, extremes: timeline.tideExtremes)
     }
-    private var nextExtreme: TideExtreme? {
-        timeline.tideExtremes.first { $0.time > scrubTime }
-    }
-    private var rising: Bool {
-        previewRate.map { $0 >= 0 } ?? nextExtreme.map { $0.kind == .high } ?? true
-    }
+    private var atTurn: Bool { kit?.state == .high || kit?.state == .low }
+    /// The kit is nil only on an empty series, where the lead is not shown: the rate's sign stands in.
+    private var rising: Bool { kit?.rising ?? (rate >= 0) }
     /// "Rising 2.3 ft/hr" in place of the lead's bare word while the water is
     /// fast: it explains the yellow line under it.
     private var leadRate: String? {
-        atTurn == nil ? tideRateReading(rate: rate, imperial: imperial) : nil
+        atTurn ? nil : tideRateReading(rate: rate, imperial: imperial)
     }
     private var leadState: String {
-        atTurn.map {
-            $0.kind == .high
-                ? String(localized: "High", comment: "High-tide state.")
-                : String(localized: "Low", comment: "Low-tide state.")
-        } ?? (rising
+        switch kit?.state {
+        case .high: String(localized: "High", comment: "High-tide state.")
+        case .low: String(localized: "Low", comment: "Low-tide state.")
+        default: rising
             ? String(localized: "Rising", comment: "Rising-tide state.")
-            : String(localized: "Falling", comment: "Falling-tide state."))
+            : String(localized: "Falling", comment: "Falling-tide state.")
+        }
     }
 
     /// What the lead shows and says, apart from its clock.
@@ -57,10 +53,10 @@ struct TideLead: View {
         return TideLeadReading(
             state: leadRate ?? word,
             word: word,
-            glyph: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
-                ?? (rising ? "arrow.up.right" : "arrow.down.right"),
-            rising: turn.map { $0.kind == .high } ?? rising,
-            atTurn: turn != nil,
+            glyph: turn ? (rising ? "arrow.up.to.line" : "arrow.down.to.line")
+                : (rising ? "arrow.up.right" : "arrow.down.right"),
+            rising: rising,
+            atTurn: turn,
             value: value,
             spoken: leadRate == nil ? words : spokenTideRate(after: words, rate: rate, imperial: imperial))
     }
@@ -71,7 +67,7 @@ struct TideLead: View {
     var body: some View {
         let reading = reading
         let warning = tideRateWarning(rate, over: chromeGround)
-        let fast = leadRate != nil
+        let fast = reading.state != reading.word
         LeadCard(value: reading.value,
                  unit: unit,
                  time: leadWhen(scrubTime, tz),

@@ -71,12 +71,11 @@ struct TideDetailView: View {
     private var lead: TideLead? {
         timeline.map {
             TideLead(timeline: $0, scrubTime: scrubTime, height: scrubHeight, rate: scrubRate,
-                     previewRate: activePreview?.rateOfChange(at: scrubTime),
                      imperial: imperial, tz: tz)
         }
     }
     /// The lead wearing the sky's ink and ground.
-    private func shownLead(sky: SkyState) -> TideLead? {
+    private func shownLead(_ lead: TideLead?, sky: SkyState) -> TideLead? {
         guard var shown = lead else { return nil }
         shown.ink = sky.ink
         shown.chromeGround = sky.chromeGround
@@ -106,6 +105,7 @@ struct TideDetailView: View {
     }
 
     var body: some View {
+        let lead = lead
         let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude,
                            days: timeline?.days ?? [],
                            eclipses: timeline?.eclipses ?? [])
@@ -123,11 +123,13 @@ struct TideDetailView: View {
                                 holdOutlook(anchor)
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
-                            alertOffer: activePreview == nil ? tideAlertOffer(
-                                scrubbedAway: scrubbedAway(scrubTime, from: live),
-                                turnIsHigh: lead.flatMap { $0.reading.atTurn ? $0.reading.rising : nil },
-                                onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                heightM: scrubHeight, rising: lead?.reading.rising ?? true, imperial: imperial) : nil,
+                            alertOffer: activePreview == nil ? lead.map { shown in
+                                tideAlertOffer(
+                                    scrubbedAway: scrubbedAway(scrubTime, from: live),
+                                    turnIsHigh: shown.reading.atTurn ? shown.reading.rising : nil,
+                                    onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
+                                    heightM: scrubHeight, rising: shown.reading.rising, imperial: imperial)
+                            } : nil,
                             printable: printable,
                             above: { EmptyView() },
                             card: { tl in
@@ -145,7 +147,7 @@ struct TideDetailView: View {
                                                    scrollGate: store?.gate ?? previewGate,
                                                    onViewportWidth: { viewportPts = $0 },
                                                    moveRequests: clampRequests)
-                                    .overlay(alignment: .top) { shownLead(sky: sky) }
+                                    .overlay(alignment: .top) { shownLead(lead, sky: sky) }
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {

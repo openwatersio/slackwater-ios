@@ -17,9 +17,9 @@ import SlackwaterKit
     }
 
     /// The test feeds the interpolated height; the view feeds the exact one. Both are inputs, the rule under test is the state.
-    private func lead(_ t: Date, in tl: TimelineData, previewRate: Double? = nil) -> TideLead {
+    private func lead(_ t: Date, in tl: TimelineData) -> TideLead {
         TideLead(timeline: tl, scrubTime: t,
-                 height: tl.heightAt(t), rate: tl.rateAt(t), previewRate: previewRate,
+                 height: tl.heightAt(t), rate: tl.rateAt(t),
                  imperial: true, tz: utc)
     }
 
@@ -117,20 +117,47 @@ import SlackwaterKit
         XCTAssertEqual(r.spoken, "Rising 5.9 feet, 2.6 feet per hour")
     }
 
-    /// The old rule, on purpose: with no turn ahead the lead falls back to rising, even where the water is falling. Task 2 flips it.
-    func testNoLaterTurnReadsRisingByDefault() {
-        let tl = steady(rate: -0.2)
-        let r = lead(at.addingTimeInterval(3600), in: tl).reading
-        XCTAssertEqual(r.state, "Rising")
-        XCTAssertEqual(r.glyph, "arrow.up.right")
-        XCTAssertTrue(r.rising)
+    /// With no turn ahead the direction is the sampled rate's sign.
+    func testNoLaterTurnReadsByTheRatesSign() {
+        let falling = lead(at.addingTimeInterval(3600), in: steady(rate: -0.2)).reading
+        XCTAssertEqual(falling.state, "Falling")
+        XCTAssertEqual(falling.glyph, "arrow.down.right")
+        XCTAssertFalse(falling.rising)
+        let rising = lead(at.addingTimeInterval(3600), in: steady(rate: 0.2)).reading
+        XCTAssertEqual(rising.state, "Rising")
+        XCTAssertEqual(rising.glyph, "arrow.up.right")
+        XCTAssertTrue(rising.rising)
     }
 
-    func testAPreviewReadsItsOwnSlope() {
-        let tl = steady(rate: -0.2)
-        let r = lead(at.addingTimeInterval(3600), in: tl, previewRate: -0.3).reading
-        XCTAssertEqual(r.state, "Falling")
-        XCTAssertEqual(r.glyph, "arrow.down.right")
-        XCTAssertFalse(r.rising)
+    /// A CHS preview's high is a flat run of centimetre-rounded samples whose rate is zero: the water rises to the run's midpoint and falls after it, as the list card reads it. The trailing low is what the fall heads for.
+    func testAPreviewPlateauTurnsAtItsMidpoint() throws {
+        let info = try XCTUnwrap(ChsStationInfo.all.first)
+        let heights = [1.0, 1.2, 1.3, 1.3, 1.3, 1.2, 1.0, 0.8, 0.7, 0.8]
+        let start = at.addingTimeInterval(-3600)
+        let preview = ChsTidePreview(stationID: info.id, fetchedAt: at, samples: heights.enumerated().map {
+            .init(time: start.addingTimeInterval(Double($0.offset) * ChsGrid.tideSeconds), height: $0.element)
+        })
+        let tl = try XCTUnwrap(TimelineData.build(preview: preview, tide: info.previewIdentity, now: at, anchor: at))
+        let midpoint = start.addingTimeInterval(3 * ChsGrid.tideSeconds)
+        XCTAssertEqual(tl.tideExtremes.first?.time, midpoint)
+        XCTAssertEqual(tl.tideExtremes.first?.kind, .high)
+        let before = lead(midpoint.addingTimeInterval(-300), in: tl).reading
+        XCTAssertEqual(before.state, "Rising")
+        XCTAssertTrue(before.rising)
+        let after = lead(midpoint.addingTimeInterval(300), in: tl).reading
+        XCTAssertEqual(after.state, "Falling")
+        XCTAssertFalse(after.rising)
+    }
+
+    /// A selection past the loaded week keeps the end's phase rather than dropping out.
+    func testPastTheSeriesEndTheLeadKeepsTheEndsPhase() throws {
+        let tl = try tide()
+        let end = try XCTUnwrap(tl.tidePoints.last).time
+        let atEnd = lead(end, in: tl).reading
+        let past = lead(end.addingTimeInterval(3600), in: tl).reading
+        XCTAssertEqual(past.state, atEnd.state)
+        XCTAssertEqual(past.glyph, atEnd.glyph)
+        XCTAssertEqual(past.rising, atEnd.rising)
+        XCTAssertEqual(past.atTurn, atEnd.atTurn)
     }
 }
