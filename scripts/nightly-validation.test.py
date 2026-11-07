@@ -15,7 +15,7 @@ validation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(validation)
 sha = "a" * 40
 run = dict(id=123, run_attempt=2, head_sha=sha, head_branch="main", event="push", status="completed", conclusion="success")
-names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "rest") for d in ("", " · iPad")]
+names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "premium", "rest") for d in ("", " · iPad")]
 jobs = [dict(id=i, run_attempt=1, name=n, status="completed", conclusion="success") for i, n in enumerate(names)]
 
 
@@ -41,6 +41,8 @@ check([run], [{**jobs[-1], "id": 100, "run_attempt": 2, "conclusion": "failure"}
 check([], jobs, False)
 check([run], [], False)  # Docs-only green is not full app validation.
 check([run], jobs[:-1], False)  # Missing iPad shard.
+# A run from before the premium shard has the other ten app jobs and is refused.
+check([run], [j for j in jobs if "premium" not in j["name"]], False)
 for conclusion in ("failure", "cancelled", None):
     check([{**run, "conclusion": conclusion}], jobs, False)
 check([{**run, "status": "in_progress"}], jobs, False)

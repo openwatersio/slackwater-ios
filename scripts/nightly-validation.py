@@ -53,7 +53,7 @@ def validate_jobs(run, repository):
     jobs = [job for page in pages for job in page["jobs"]]
     required = {"Build for testing"} | {
         f"App tests · {shard}{suffix}"
-        for shard in ("offline", "list", "transition", "detail", "rest")
+        for shard in ("offline", "list", "transition", "detail", "premium", "rest")
         for suffix in ("", " · iPad")
     }
     latest = {}

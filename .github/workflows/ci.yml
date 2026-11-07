@@ -275,13 +275,17 @@ jobs:
     # shard was 67 min into a 10-minute step, holding a slot, until someone
     # cancelled it.
     timeout-minutes: 75
-    # Five shards per device: a PR's five iPhone jobs fill the org's five macOS
-    # slots in one wave, and a push to main's ten fill them in two.
+    # Six shards per device. The org has five macOS slots, so a PR's sixth
+    # iPhone job waits for the first to finish, and a push to main's twelve
+    # run in three waves. Premium got its own shard because it outgrew rest:
+    # PremiumSheetTests took 18-24 min of an iPad rest lane that, with it,
+    # reached 74 min and then the 75-min cap.
     #
     # Keep long UI classes spread across lanes: alert popups run with offline,
-    # map search with list, accessibility audits and tours with detail.
-    # Settings methods span four shards; printable tables run in offline,
-    # list, and transition. Rest catches new tests and runs the unit target. Re-measure lanes from test-summary
+    # map search with list, accessibility audits and tours with detail, and
+    # PremiumSheetTests alone in premium. Settings methods span four shards;
+    # printable tables run in offline, list, and transition. Rest catches new
+    # tests and runs the unit target. Re-measure lanes from test-summary
     # artifacts and classes from a failed lane's test-evidence bundle.
     strategy:
       # A failing shard must not cancel its siblings. The whole point is to see
@@ -302,11 +306,13 @@ jobs:
           - name: detail
             only: SlackwaterUITests/DetailAndScrubTests,SlackwaterUITests/AccessibilityAuditTests,SlackwaterUITests/TourUITests,SlackwaterUITests/SettingsLayoutTests/testSettingsInFrench,SlackwaterUITests/SettingsLayoutTests/testSettingsInPortuguese,SlackwaterUITests/SettingsLayoutTests/testSettingsInFinnish,SlackwaterUITests/SettingsLayoutTests/testSettingsInSwedish,SlackwaterUITests/SettingsLayoutTests/testPremiumSupporterSeesTheirStatusInTheFooterAndSheet,SlackwaterUITests/SettingsLayoutTests/testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage
             skip: SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon
+          - name: premium
+            only: SlackwaterUITests/PremiumSheetTests
           # The catch-all names no tests — it SKIPS the others. A class added
           # tomorrow therefore runs here, instead of running nowhere and
           # looking green. Never convert this one to `only`.
           - name: rest
-            skip: SlackwaterUITests/AlertLineUITests,SlackwaterUITests/AccessibilityAuditTests,SlackwaterUITests/TourUITests,SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests,SlackwaterUITests/SettingsLayoutTests/testHeightDefaultsUseRegionAndPreserveAnExplicitChoice,SlackwaterUITests/SettingsLayoutTests/testSettingsInSpanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInDutch,SlackwaterUITests/SettingsLayoutTests/testSettingsInItalian,SlackwaterUITests/SettingsLayoutTests/testMacSettingsShowsDesktopWidgets,SlackwaterUITests/SettingsLayoutTests/testSlackWindowPreviewChangesWithComfortCurrent,SlackwaterUITests/SettingsLayoutTests/testSettingsInJapanese,SlackwaterUITests/SettingsLayoutTests/testSettingsInNorwegian,SlackwaterUITests/SettingsLayoutTests/testSettingsInKorean,SlackwaterUITests/SettingsLayoutTests/testMacWidgetInstructionsInFrenchAndSpanish,SlackwaterUITests/SettingsLayoutTests/testWidgetsAndAboutAreInSettings,SlackwaterUITests/SettingsLayoutTests/testSettingsInGerman,SlackwaterUITests/SettingsLayoutTests/testSettingsInDanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInEuropeanPortuguese,SlackwaterUITests/SettingsLayoutTests/testTVSettingsOmitsWidgetInstructions,SlackwaterUITests/SettingsLayoutTests/testSettingsInFrench,SlackwaterUITests/SettingsLayoutTests/testSettingsInPortuguese,SlackwaterUITests/SettingsLayoutTests/testSettingsInFinnish,SlackwaterUITests/SettingsLayoutTests/testSettingsInSwedish,SlackwaterUITests/SettingsLayoutTests/testPremiumSupporterSeesTheirStatusInTheFooterAndSheet,SlackwaterUITests/PrintableTablesUITests/testAFreeUserGetsThePremiumSheet,SlackwaterUITests/PrintableTablesUITests/testAnOnlineGateMonthSaysWhatIsCovered,SlackwaterUITests/PrintableTablesUITests/testAnOnlineGateWithNothingStoredHasNoRow,SlackwaterUITests/PrintableTablesUITests/testPremiumOpensTheWeekAndMonthAndOffersPrintAndSave,SlackwaterUITests/PrintableTablesUITests/testTheDetailShareButtonStillSendsTheLink,SlackwaterUITests/PrintableTablesUITests/testTheRowClosesTheCurrentAndDerivedGateSchedules,SlackwaterUITests/SettingsLayoutTests/testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage
+            skip: SlackwaterUITests/PremiumSheetTests,SlackwaterUITests/AlertLineUITests,SlackwaterUITests/AccessibilityAuditTests,SlackwaterUITests/TourUITests,SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests,SlackwaterUITests/SettingsLayoutTests/testHeightDefaultsUseRegionAndPreserveAnExplicitChoice,SlackwaterUITests/SettingsLayoutTests/testSettingsInSpanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInDutch,SlackwaterUITests/SettingsLayoutTests/testSettingsInItalian,SlackwaterUITests/SettingsLayoutTests/testMacSettingsShowsDesktopWidgets,SlackwaterUITests/SettingsLayoutTests/testSlackWindowPreviewChangesWithComfortCurrent,SlackwaterUITests/SettingsLayoutTests/testSettingsInJapanese,SlackwaterUITests/SettingsLayoutTests/testSettingsInNorwegian,SlackwaterUITests/SettingsLayoutTests/testSettingsInKorean,SlackwaterUITests/SettingsLayoutTests/testMacWidgetInstructionsInFrenchAndSpanish,SlackwaterUITests/SettingsLayoutTests/testWidgetsAndAboutAreInSettings,SlackwaterUITests/SettingsLayoutTests/testSettingsInGerman,SlackwaterUITests/SettingsLayoutTests/testSettingsInDanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInEuropeanPortuguese,SlackwaterUITests/SettingsLayoutTests/testTVSettingsOmitsWidgetInstructions,SlackwaterUITests/SettingsLayoutTests/testSettingsInFrench,SlackwaterUITests/SettingsLayoutTests/testSettingsInPortuguese,SlackwaterUITests/SettingsLayoutTests/testSettingsInFinnish,SlackwaterUITests/SettingsLayoutTests/testSettingsInSwedish,SlackwaterUITests/SettingsLayoutTests/testPremiumSupporterSeesTheirStatusInTheFooterAndSheet,SlackwaterUITests/PrintableTablesUITests/testAFreeUserGetsThePremiumSheet,SlackwaterUITests/PrintableTablesUITests/testAnOnlineGateMonthSaysWhatIsCovered,SlackwaterUITests/PrintableTablesUITests/testAnOnlineGateWithNothingStoredHasNoRow,SlackwaterUITests/PrintableTablesUITests/testPremiumOpensTheWeekAndMonthAndOffersPrintAndSave,SlackwaterUITests/PrintableTablesUITests/testTheDetailShareButtonStillSendsTheLink,SlackwaterUITests/PrintableTablesUITests/testTheRowClosesTheCurrentAndDerivedGateSchedules,SlackwaterUITests/SettingsLayoutTests/testPremiumMessagesOpenTheSupportSheetAndReturnToTheirPage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
