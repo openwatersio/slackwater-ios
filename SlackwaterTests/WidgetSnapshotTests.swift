@@ -467,6 +467,23 @@ import SlackwaterKit
         XCTAssertTrue(rising.rising)
     }
 
+    /// Half a second past a high, the card follows the coming low: only turns after now reach the kit, so the passed high cannot hold the card at its turn. The complication's gauge agrees, running from that high toward the low.
+    func testACardBuiltJustAfterATurnFollowsTheComingTurn() throws {
+        let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let high = try XCTUnwrap(record.engineStation.extremes(from: now, to: now.addingTimeInterval(48 * 3600))
+            .first { $0.kind == .high })
+        let justAfter = high.time.addingTimeInterval(0.5)
+
+        let card = record.cardState(at: justAfter)
+        XCTAssertFalse(card.rising)
+        XCTAssertEqual(card.next?.kind, .low)
+
+        let gauge = try XCTUnwrap(ComplicationReading.build(
+            .tide(record.engineStation, tz: record.tz, name: record.name), now: justAfter)?.gauge)
+        XCTAssertFalse(gauge.towardEnd)
+    }
+
     /// A tide that never turns has no later extreme to point the card, so it reads by its rate, as the kit's reading does.
     func testATideWithNoLaterTurnReadsByItsRate() throws {
         let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })

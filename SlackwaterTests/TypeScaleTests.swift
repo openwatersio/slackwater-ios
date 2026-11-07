@@ -169,7 +169,7 @@ extension TypeScaleTests {
             // The lead's value: formatted where it is known and consumed by
             // `LeadCard`'s one value Text, which carries the mono trait and
             // the Dynamic-Type-scaled size (Theme.swift).
-            "TideDetailView.swift:lead",
+            "TideLead.swift:reading",
             "CurrentLead.swift:currentLeadReading",
             // The list card's and widget's current value: formatted where it is
             // known and consumed by `ConditionsItem`'s value Text, which carries

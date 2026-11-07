@@ -144,8 +144,8 @@ import XCTest
 
         // The lead glyph, which may be outranked by a rate warning (#95) but
         // otherwise names the curve the reader is looking at.
-        XCTAssertTrue(try repoSource("Slackwater/TideDetailView.swift")
-                        .contains("(up ? SN.graphHigh : SN.graphLow)"),
+        XCTAssertTrue(try repoSource("Slackwater/TideLead.swift")
+                        .contains("(reading.rising ? SN.graphHigh : SN.graphLow)"),
                       "the tide lead's glyph must draw the same two inks")
 
         // The station card's conditions arrow, the same pair one screen back.
