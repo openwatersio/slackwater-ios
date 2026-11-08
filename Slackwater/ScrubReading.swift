@@ -20,7 +20,12 @@ struct ScrubReading: Equatable {
         if data.hasTide {
             let turn = data.tideExtremes.first { abs($0.time.timeIntervalSince(t)) < onEvent }
             let next = data.tideExtremes.first { $0.time.timeIntervalSince(t) >= onEvent }
-            let rising = next.map { $0.kind == .high } ?? true
+            // The kit's direction at the selection clamped into the series; the watch keeps its own words and reach.
+            let clamped = data.tidePoints.first.flatMap { first in
+                data.tidePoints.last.map { last in min(max(t, first.time), last.time) }
+            } ?? t
+            let rising = readTide(at: clamped, heights: data.tidePoints, rates: data.tideRates, extremes: data.tideExtremes)?.rising
+                ?? (data.rateAt(t) >= 0)
             let title = turn.map(extremeName)
                 ?? (rising ? String(localized: "Rising", comment: "Rising-tide state.")
                            : String(localized: "Falling", comment: "Falling-tide state."))

@@ -171,7 +171,7 @@ Readings describe the moment the card was built (§6.5).
 | Canadian tide preview | Downloaded height, with the ordinary tide state | Additional download status below the identity |
 | Canadian station without readings | None | The download status (§6.3) |
 
-Tide state is Rising when the next extreme is a high. With no next extreme it is Rising, except that a finite Canadian preview uses the local downloaded slope.
+Tide state is Rising when the next extreme is a high and Falling when it is a low; with no later extreme loaded, by the sign of the tide's rate, from SlackwaterKit's tide reading; a Canadian preview reads the same way.
 
 Current state is "Slack" in go green within one second of a predicted zero instant, as on the detail lead and watch complications; otherwise "Flooding" or "Ebbing" in neutral foam. The comfort current defines only the slack window, 0.5 kn by default, and never changes what counts as slack. Inside the window away from zero the water is still moving, and the state says so. A current that never reaches zero has no slack. The state word and the arrow's colour follow the major-axis speed's sign: the set arrow is flood blue (`#4A9FD8`) or ebb amber (`#E8A33D`). At Slack the card shows a set only while the water still crosses the channel at a speed that prints above zero, and that arrow is go green; otherwise Slack shows the neutral dot and VoiceOver speaks no set. Below 0.05 kn of water the bearing is replaced by a neutral dot, because the direction means nothing there. A zero vector has no set. The home-screen widget is this card; the lock-screen widget and the watch complications print the same full speed, with their own phase word and symbol.
 

@@ -97,6 +97,43 @@ final class ScrubReadingTests: XCTestCase {
         XCTAssertNotEqual(compassPoint(pollock.floodDirection), compassPoint(pollock.ebbDirection))
     }
 
+    // MARK: - The watch's tide direction
+
+    /// The watch's 200-second reach is its own: a High reads High on both sides of the turn.
+    func testAHundredSecondsEitherSideOfAHighReadsHigh() throws {
+        let tl = try tide()
+        let high = try XCTUnwrap(tl.tideExtremes.first { $0.kind == .high && $0.time > at })
+        for offset in [-100.0, 100.0] {
+            let r = ScrubReading.at(high.time.addingTimeInterval(offset), in: tl, imperial: true, speedUnit: "kn")
+            XCTAssertEqual(r.title, "High", "\(offset) s")
+            XCTAssertEqual(r.symbol, "arrow.up.to.line", "\(offset) s")
+        }
+    }
+
+    func testAHundredSecondsBeforeALowReadsLow() throws {
+        let tl = try tide()
+        let low = try XCTUnwrap(tl.tideExtremes.first { $0.kind == .low && $0.time > at })
+        let r = ScrubReading.at(low.time.addingTimeInterval(-100), in: tl, imperial: true, speedUnit: "kn")
+        XCTAssertEqual(r.title, "Low")
+        XCTAssertEqual(r.symbol, "arrow.down.to.line")
+    }
+
+    /// With no turn ahead the direction is the sampled rate's sign, not a default of rising.
+    func testATideWithNoLaterTurnReadsByItsRate() {
+        let hours = Array(-1...5)
+        let tl = TimelineData(
+            tz: TimeZone(identifier: "UTC")!, anchor: at, today: at,
+            start: at.addingTimeInterval(-3600), end: at.addingTimeInterval(18_000),
+            days: [],
+            tidePoints: hours.map { TidePoint(time: at.addingTimeInterval(Double($0) * 3600), height: 2 - 0.2 * Double($0)) },
+            tideRates: hours.map { TideRatePoint(time: at.addingTimeInterval(Double($0) * 3600), rate: -0.2) },
+            tideExtremes: [],
+            currentPoints: [], currentEvents: [], snapTimes: [], slackWindows: [])
+        let r = ScrubReading.at(at.addingTimeInterval(3600), in: tl, imperial: true, speedUnit: "kn")
+        XCTAssertEqual(r.title, "Falling")
+        XCTAssertEqual(r.symbol, "arrow.down.right")
+    }
+
     // MARK: - The watch's speed and set
 
     /// 2026-08-10 12:00 UTC, the day the detail lead's Kodiak and Pollock Rip tests read.

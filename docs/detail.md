@@ -559,7 +559,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 |---|---|
 | Shared page composition, schedule card, week bar and picker, footer, station details, station links | `Slackwater/Theme.swift` |
 | Header, share link | `Slackwater/DetailHeader.swift`, `Slackwater/DeepLink.swift` |
-| Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/RangeOutlook.swift`, `Slackwater/TideStation.swift` |
+| Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/TideLead.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/RangeOutlook.swift`, `Slackwater/TideStation.swift` |
 | Sun card, Sun activity sheet, golden and blue hours | `Slackwater/SunSummaryCard.swift`, `Slackwater/SunDetailSheet.swift`, `Slackwater/SunOrbitView.swift`, `Slackwater/SunWindows.swift` |
 | Next max tile and sheet | `Slackwater/CurrentLead.swift`, `Slackwater/CurrentDetailView.swift`, `Slackwater/MaxDetailSheet.swift`, `Slackwater/CurrentStanding.swift`, `Slackwater/CurrentStandingStore.swift` |
 | Range sheet's three sections | `Slackwater/TideStanding.swift`, `Slackwater/TideStandingStore.swift`, `Slackwater/SwingFigure.swift`, `Slackwater/StandingFigure.swift`, `Slackwater/YearFigure.swift` |

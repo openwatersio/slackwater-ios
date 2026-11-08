@@ -25,6 +25,13 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(r.gauge).towardEnd, rising)
     }
 
+    /// A tide with no later turn reads by its rate, as the kit's reading does.
+    func testATideWithNoLaterTurnReadsByItsRate() throws {
+        let r = try XCTUnwrap(ComplicationReading.build(.tide(FallingTide(), tz: utc, name: "Falling"), now: now))
+        XCTAssertEqual(r.word, "Falling")
+        XCTAssertEqual(r.symbol, "arrow.down")
+    }
+
     func testSamplesCoverTheSpanEveryTenMinutes() throws {
         let r = try XCTUnwrap(ComplicationReading.build(tide, now: now))
         // The engine aligns samples to a ten-minute grid, so the ends land
