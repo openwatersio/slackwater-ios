@@ -162,6 +162,23 @@ import XCTest
                        "the map's falling gauge must draw the chart's low ink")
     }
 
+    /// The card's axis row names each moment in its own ink, as the strip's
+    /// does: a high's time in the high teal, a low's in the low amber, a
+    /// slack moment's in go green. Before #912 a tide card set every time in
+    /// foam while the current card beside it set its slacks in green.
+    func testCardAxisTimesWearTheirMomentsInk() throws {
+        assertSameColour(StationCardGraph.axisTimeTint(high: true, includesZero: false), SN.graphHigh,
+                         "a high's time must wear the chart's high ink")
+        assertSameColour(StationCardGraph.axisTimeTint(high: false, includesZero: false), SN.graphLow,
+                         "a low's time must wear the chart's low ink")
+        assertSameColour(StationCardGraph.axisTimeTint(high: nil, includesZero: true), SN.go,
+                         "a slack moment's time must stay go green")
+        // The row has to ask for it: a tint nothing draws with is no tint.
+        let card = try repoSource("Slackwater/StationCardGraph.swift")
+        XCTAssertTrue(card.contains(".foregroundStyle(Self.axisTimeTint("),
+                      "the card's axis times must draw with axisTimeTint")
+    }
+
     /// The tone `PIN_STATE_COLOUR`'s match assigns to one named state.
     private func mapPinHex(_ state: String) -> String? {
         guard let match = PIN_STATE_COLOUR[2] as? [Any] else { return nil }

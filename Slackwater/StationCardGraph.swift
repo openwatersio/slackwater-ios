@@ -138,6 +138,18 @@ nonisolated struct StationCardGraph: View {
         readsSlack(at: t, runs: cores, slacks: slacks)
     }
 
+    /// An axis time's ink, the same pair the strip's row uses (#912): a tide
+    /// turn's time in its turn's ink, teal for a high and amber for a low; a
+    /// current card's moments in go green, as its slack marks are. Every
+    /// moment a tide card prints today is a turn with a kind; a moment
+    /// without one falls back to the row's old foam rather than borrowing a
+    /// turn's colour.
+    static func axisTimeTint(high: Bool?, includesZero: Bool) -> Color {
+        if includesZero { return SN.go }
+        guard let high else { return SN.foam }
+        return high ? SN.graphHigh : SN.graphLow
+    }
+
     /// The card uses the shared opening-or-slack rule at its own drawing scale.
     static func axisMoments(_ windows: [WindowRun], cores: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
         slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour)
@@ -257,12 +269,13 @@ nonisolated struct StationCardGraph: View {
 
             // Cards and detail strips share their current-axis moments, including zeros in continuous windows.
             // A tide turn arrives with its time already formatted.
-            var axisMoments: [(time: Date, text: String?)] = []
+            // A turn carries its kind for the row's ink; a slack moment has none.
+            var axisMoments: [(time: Date, text: String?, high: Bool?)] = []
             if showsTimes {
-                axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText) }
+                axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText, $0.high) }
                 if includesZero {
                     axisMoments += Self.axisMoments(windows, cores: cores, slacks: slacks,
-                                                    pointsPerHour: xScale * 3600).map { ($0, nil) }
+                                                    pointsPerHour: xScale * 3600).map { ($0, nil, nil) }
                 }
             }
             let keptAxisTimes = Self.thinAxisMoments(axisMoments.map(\.time), x: x, width: size.width)
@@ -273,7 +286,7 @@ nonisolated struct StationCardGraph: View {
                     let text = context.resolve(Text(moment.text ?? cardTime(moment.time, tz))
                         .font(.system(size: Self.timeFontSize).monospacedDigit())
                         .fontWeight(.medium)
-                        .foregroundStyle((includesZero ? SN.go : SN.foam).opacity(fade)))
+                        .foregroundStyle(Self.axisTimeTint(high: moment.high, includesZero: includesZero).opacity(fade)))
                     let at = CGPoint(x: x(moment.time), y: size.height - Self.timeBaseline)
                     return (text: text, at: at,
                             ink: Self.axisTimeInk(at: at.x, width: text.measure(in: size).width, height: size.height))

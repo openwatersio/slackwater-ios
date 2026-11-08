@@ -745,6 +745,8 @@ the bottom row. It follows the geometry of §15.1, not its thesis: on a tide
 the turns *are* the events (§1). A low near the top of the plot or a high
 near its bottom hangs its reading off the other side of the dot, and the
 turn times are thinned by the same edge and spacing rule as a current's.
+A turn's dot, arrow and time share one ink, high teal or low amber (list
+§6.4), where a current's slack times use go green.
 
 ### 15.5 The small widget
 
