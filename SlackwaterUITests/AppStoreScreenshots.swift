@@ -12,7 +12,7 @@
 // it. Frames are numbered because App Store Connect orders an upload by
 // filename.
 //
-// Only the free widget previews are cropped from Settings; no paid feature
+// Only the free widget previews are cropped from the Premium sheet; no paid feature
 // or navigation use may be implied by the exported artwork.
 import XCTest
 
@@ -161,18 +161,27 @@ final class AppStoreScreenshots: ShotWalk {
     private func freeWidgetPreviews() {
         let app = launchShots()
         guard app.windows.firstMatch.frame.width < app.windows.firstMatch.frame.height else { return }
-        openSettings(app)
+        // The free widgets sit on the Premium sheet, under the comparison table.
+        let support = app.buttons["support-slackwater"]
+        scrollTo(support, in: app)
+        support.tap()
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         let heading = app.staticTexts["Home screen — free"].firstMatch
         let next = app.staticTexts["Next Event"].firstMatch
-        scrollTo(next, in: app)
+        // The sheet pins Get Premium at the bottom; the crop must stay clear of it. The
+        // first card's example marks the sheet as settled, and the bounds are read again
+        // afterwards: the buy button grows by a price line once the product loads.
+        XCTAssert(app.otherElements["premium-preview-print"].appears(within: 10))
+        scrollTo(next, in: app, visibleFrame: premiumContentFrame(in: app))
         settleLayout(next)
-        let bounds = app.windows.firstMatch.frame
+        let bounds = premiumContentFrame(in: app)
+        // Measured from the sheet's edge, which is inset from the window on iPad.
         let crop = CGRect(x: heading.frame.minX, y: heading.frame.maxY + 10,
-                          width: min(364, bounds.maxX - 2 * heading.frame.minX),
+                          width: min(364, bounds.width - 2 * (heading.frame.minX - bounds.minX)),
                           height: next.frame.minY - heading.frame.maxY - 20)
         XCTAssert(heading.isHittable && next.isHittable)
         XCTAssertGreaterThan(crop.height, 330, "both widget previews must be loaded")
-        XCTAssert(bounds.contains(crop), "widget previews must be entirely visible")
+        XCTAssert(bounds.contains(crop), "widget previews must be entirely visible above the buy button")
         let shot = XCUIScreen.main.screenshot().image
         let pixels = crop.applying(CGAffineTransform(scaleX: shot.scale, y: shot.scale))
         guard let image = shot.cgImage?.cropping(to: pixels),

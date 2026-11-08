@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Free widgets, with previews and add instructions.
+// Slackwater — GPL v3. Free widgets, with previews and add instructions, on the Premium sheet.
 import SwiftUI
 
 struct WidgetSettingsContent: View {
@@ -14,7 +14,7 @@ struct WidgetSettingsContent: View {
                 group(
                     platform == .mac
                         ? String(localized: "Desktop — free", comment: "Free desktop widgets on Mac.")
-                        : String(localized: "Home screen — free", comment: "Settings widget section title."),
+                        : String(localized: "Home screen — free", comment: "Heading over the free home-screen widgets on the Premium sheet."),
                     note: platform == .mac
                         ? String(
                             localized: "Control-click your desktop → Edit Widgets → Slackwater.",
@@ -85,7 +85,7 @@ struct WidgetSettingsContent: View {
                     }
                 }
             }
-            Text(note).font(.caption2).foregroundStyle(SN.foam.opacity(0.5))
+            Text(note).font(.caption2).foregroundStyle(SN.foam.opacity(0.62))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

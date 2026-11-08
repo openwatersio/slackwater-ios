@@ -6,7 +6,7 @@
 - **Premium planning features:** notification alerts and their Live Activities, favourites calendars (a calendar for each favorite station) and printable tables ([alerts](alerts.md) §2, [detail](detail.md) §8.6).
 - **Premium advanced chart controls:** Settings' "Sun, moon and stars" switch ([scrubber](scrubber.md) §14).
 - **Premium glance surfaces:** lock screen widgets and watch complications. Without Premium they draw a locked wave labelled "Premium", and a tap opens the Premium sheet (`slackwater://premium`).
-- Everything Premium is compiled under `PREMIUM_ENABLED` (`project.yml`); a build without it has no lock screen widgets, complications, Support Slackwater entry points or `slackwater://premium` route.
+- Everything Premium is compiled under `PREMIUM_ENABLED` (`project.yml`); a build without it has no lock screen widgets, complications, Support Slackwater entry points or `slackwater://premium` route. The free widgets' previews and add instructions sit on the Premium sheet under the comparison table; that build, which sells nothing, leaves them off the sheet and shows them in Settings.
 
 ## Deciding a new feature
 
