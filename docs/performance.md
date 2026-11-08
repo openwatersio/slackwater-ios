@@ -63,6 +63,23 @@ These are 1 ms sampling counts inside the presentation transaction, not tap-to-p
 
 Tide, harmonic-current, derived-gate, and online-gate details have different data paths; record the variant with every result. Attribute record resolution, initial timeline construction, schedule construction, and SwiftUI layout independently before changing the shared scrubber.
 
+## Widget timeline
+
+**Boundary:** one `WidgetCard.build` call per entry, 48 entries for a day's home-screen timeline (`widgetEntryDates`). Measure the subordinate and harmonic paths separately: a subordinate station answers every height, rate, and extremes call with a search of its reference's turns, so the same card costs more there.
+
+On 2026-11-07, a tide card was timed on the iPhone 17 simulator in the Debug test build, 48 calls each, for `noaa/TEC4635` (a subordinate) and Friday Harbor `noaa/9449880`. These are attribution numbers: they show where a card's time goes, not whether the timeline is fast enough.
+
+| Work | Subordinate | Harmonic |
+|---|---:|---:|
+| Printed height, one-second sample | 0.77 ms | 0.15 ms |
+| Direction bracket, heights | 0.73 ms | 0.15 ms |
+| Direction bracket, rates | 0.78 ms | 0.17 ms |
+| Next-turn search, 30 h | 0.55 ms | 1.02 ms |
+| `cardState` | 3.24 ms | 1.63 ms |
+| `WidgetCard.build`, one entry | 6.21 ms | 4.75 ms |
+
+The direction bracket is the kit's `readTide` input (list §6.2): about half a subordinate card's prediction work and about a quarter of its entry. A whole subordinate timeline is about 300 ms here. A physical-device Release trace is still required before deciding whether the bracket's rate samples should come from its height samples instead of a second reference search.
+
 ## Open map view
 
 **Boundary:** map-button tap to a visible, interactive map with its initial pin state. Separate the first map presentation from later toggles.

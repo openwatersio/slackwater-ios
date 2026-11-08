@@ -192,8 +192,6 @@ extension TypeScaleTests {
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = [
-            // The strip's VoiceOver value: the lead in words.
-            "TideDetailView.swift:spokenLead",
             // A fast tide's rate in words, for the lead's and the strip's
             // VoiceOver labels; the visible rate is `tideRateReading`.
             "TideDetailView.swift:spokenTideRate",
