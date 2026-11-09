@@ -490,6 +490,50 @@ final class RenderedStripTests: XCTestCase {
                        "a turn 22pt from the canvas edge printed a time the card clips")
     }
 
+    /// A tide card's axis times wear their turn's ink, as the strip's do (#912):
+    /// teal under a high, amber under a low, and never the other's.
+    @MainActor
+    func testTideAxisTimesWearTheirTurnsInk() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let now = Date(timeIntervalSince1970: 1_780_000_000)
+        let start = now.addingTimeInterval(-StationCardGraph.backWindow)
+        let times = Array(stride(from: start, through: now.addingTimeInterval(StationCardGraph.forwardWindow), by: 600))
+        let points = times.enumerated().map { i, t in
+            StationCardGraph.Point(time: t, value: i == 0 ? 0 : i == times.count - 1 ? 1 : 0.5)
+        }
+        let width: CGFloat = 356, height: CGFloat = 114
+        // A turn 150pt in: past now (133pt), so its time prints at full strength.
+        let when = start.addingTimeInterval(StationCardGraph.window * Double(150 / width))
+        func card(high: Bool) throws -> (bytes: [UInt8], width: Int) {
+            var graph = StationCardGraph(points: points, extremes: [
+                .init(time: when, value: 0.5, valueText: "8.8", spokenText: "8.8 ft",
+                      timeText: cardTime(when, tz), high: high),
+            ], now: now)
+            graph.showsReadings = false
+            graph.showsNow = false
+            return try pixels(XCTUnwrap(ImageRenderer(content: graph.frame(width: width, height: height)
+                .background(SN.canvas)).uiImage))
+        }
+        // The axis row alone: the curve, its dot and the fill all sit above it.
+        func axisHas(_ p: (bytes: [UInt8], width: Int), _ ink: (Int, Int, Int) -> Bool) -> Bool {
+            (Int(height) - 18...Int(height) - 2).contains { y in
+                (0..<p.width).contains { x in
+                    let i = (y * p.width + x) * 4
+                    return ink(Int(p.bytes[i]), Int(p.bytes[i + 1]), Int(p.bytes[i + 2]))
+                }
+            }
+        }
+        // Teal is green and blue over red; amber is red and green over blue.
+        // Foam and the canvas are neither, so a time in the old ink matches nothing.
+        let teal = { (r: Int, g: Int, b: Int) in g > r + 25 && b > r + 25 }
+        let amber = { (r: Int, g: Int, b: Int) in r > b + 25 && g > b + 25 }
+        let high = try card(high: true), low = try card(high: false)
+        XCTAssertTrue(axisHas(high, teal), "a high's time is not teal")
+        XCTAssertFalse(axisHas(high, amber), "a high's time has amber in it")
+        XCTAssertTrue(axisHas(low, amber), "a low's time is not amber")
+        XCTAssertFalse(axisHas(low, teal), "a low's time has teal in it")
+    }
+
     @MainActor
     func testSlackAxisTimesUseTheGreenOfSlack() throws {
         let start = Date(timeIntervalSince1970: 1_780_000_000)
