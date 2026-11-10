@@ -330,8 +330,10 @@ import notify
 
     func premiumContentFrame(in app: XCUIApplication) -> CGRect {
         let bar = app.navigationBars["Slackwater Premium"].frame
-        let buy = app.buttons["premium-buy"].frame
-        return CGRect(x: bar.minX, y: bar.maxY, width: bar.width, height: buy.minY - bar.maxY)
+        let buy = app.buttons["premium-buy"]
+        let bottom = buy.exists ? buy.frame.minY
+            : app.scrollViews.containing(.any, identifier: "premium-table").firstMatch.frame.maxY
+        return CGRect(x: bar.minX, y: bar.maxY, width: bar.width, height: bottom - bar.maxY)
     }
 
     /// The scroll view around `target`, queried by its own identifier when it

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Settings keeps widgets inline and app information one page away.
+// Slackwater — GPL v3. Settings keeps Premium in one card, widgets on the Premium sheet, and app information one page away.
 import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
@@ -26,7 +26,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             XCTAssertTrue(row.isHittable)
             row.tap()
             XCTAssert(app.navigationBars[page].appears(within: 5))
-            // Settings' Sky section has the same button; the pushed page's is the hittable one.
+            // The pushed page's requirement is the hittable one; Settings behind it keeps none.
             let requirements = app.buttons.matching(identifier: "Requires Slackwater Premium")
             XCTAssert(requirements.firstMatch.appears(within: 5))
             guard let requirement = requirements.allElementsBoundByIndex.first(where: \.isHittable) else {
@@ -40,21 +40,37 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             XCTAssert(app.navigationBars[page].appears(within: 5))
             app.navigationBars.buttons.firstMatch.tap()
         }
+        // One card holds every Premium feature; the sheet does the selling, so Settings
+        // keeps no preview and no add instructions.
         let support = app.buttons["settings-premium-cta"]
         scrollTo(support, in: app)
-        XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
+        XCTAssertTrue(support.label.contains("Support Slackwater"))
+        XCTAssertFalse(app.otherElements["premium-preview-lockScreen"].exists)
+        XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
+        for row in ["Sky controls", "Alerts", "Calendars", "Lock screen"] {
+            XCTAssert(app.staticTexts[row].firstMatch.exists, "the Premium card names \(row)")
+        }
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Long-press your lock screen'")).firstMatch.exists,
+                  "the lock screen row keeps its add instructions")
+        XCTAssert(app.switches["settings-sky-bodies"].firstMatch.exists, "the sky switch stays live in the card")
         save(app, "settings-premium-section.png")
         support.tap()
         XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
         XCTAssert(app.otherElements["premium-preview-lockScreen"].appears(within: 5))
         save(app, "premium-visuals-top.png")
-        let restore = app.buttons["Restore purchase"]
-        scrollTo(restore, in: app)
-        XCTAssertTrue(restore.isHittable)
         let table = app.descendants(matching: .any)["premium-table"].firstMatch
         for row in ["Calendars", "Lock screen widgets", "Sky controls"] {
             XCTAssert(table.descendants(matching: .any)[row].firstMatch.exists, "the table names \(row)")
         }
+        // What stays free follows the table: the home screen widgets with their live previews.
+        let home = app.staticTexts["Home screen — free"].firstMatch
+        scrollTo(home, in: app)
+        XCTAssert(home.exists)
+        XCTAssert(app.staticTexts["Next Event"].firstMatch.exists)
+        save(app, "premium-free-widgets.png")
+        let restore = app.buttons["Restore purchase"]
+        scrollTo(restore, in: app)
+        XCTAssertTrue(restore.isHittable)
         save(app, "premium-visuals-bottom.png")
         guard dismissPremium(app) else { return }
         XCTAssert(app.navigationBars["Settings"].appears(within: 5))
@@ -234,13 +250,23 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     func testMacSettingsShowsDesktopWidgets() {
         let app = launch("-locDenied", "-settingsPlatform", "mac")
         openSettings(app)
-        XCTAssert(app.staticTexts["Desktop — free"].exists)
+        // Widgets live on the Premium sheet now, and a Mac has no lock screen row.
+        XCTAssertFalse(app.staticTexts["Desktop — free"].exists)
         XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
-        XCTAssertFalse(app.staticTexts["Lock screen — Premium"].exists)
+        XCTAssertFalse(app.staticTexts["Lock screen"].exists)
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "settings-mac-policy.png")
+        let support = app.buttons["settings-premium-cta"]
+        scrollTo(support, in: app)
+        support.tap()
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        let desktop = app.staticTexts["Desktop — free"].firstMatch
+        scrollTo(desktop, in: app)
+        XCTAssert(desktop.exists)
+        XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
+        save(app, "premium-mac-widgets.png")
     }
 
     func testMacWidgetInstructionsInFrenchAndSpanish() {
@@ -253,11 +279,17 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             let settings = app.buttons[settingsTitle].firstMatch
             scrollTo(settings, in: app)
             settings.tap()
-            XCTAssert(app.staticTexts[desktopTitle].exists)
             let about = app.buttons["settings-about-row"].firstMatch
             scrollTo(about, in: app)
             XCTAssertFalse(app.staticTexts[supportTitle].exists)
             save(app, "settings-mac-\(language).png")
+            let support = app.buttons["settings-premium-cta"]
+            scrollTo(support, in: app)
+            support.tap()
+            let desktop = app.staticTexts[desktopTitle].firstMatch
+            XCTAssert(desktop.appears(within: 5))
+            scrollTo(desktop, in: app)
+            save(app, "premium-mac-\(language).png")
             app.terminate()
         }
     }
@@ -267,11 +299,18 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         openSettings(app)
         XCTAssertFalse(app.staticTexts["Desktop — free"].exists)
         XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
-        XCTAssertFalse(app.staticTexts["Lock screen — Premium"].exists)
+        XCTAssertFalse(app.staticTexts["Lock screen"].exists)
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
         XCTAssertFalse(app.buttons["Restore purchase"].exists)
         save(app, "settings-tv-policy.png")
+        let support = app.buttons["settings-premium-cta"]
+        scrollTo(support, in: app)
+        support.tap()
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        scrollTo(app.buttons["Restore purchase"], in: app)
+        XCTAssertFalse(app.staticTexts["Desktop — free"].exists)
+        XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
     }
 
     private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String, previewTitle: String? = nil, calendarSummary: String? = nil) {
@@ -302,11 +341,11 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["Not for navigation."].exists)
         XCTAssertFalse(app.staticTexts["Offline downloads"].exists)
         if language == "en" {
-            XCTAssert(app.staticTexts["Home screen — free"].exists)
-            XCTAssert(app.staticTexts["Lock screen — Premium"].exists)
-            let home = app.staticTexts["Home screen — free"].firstMatch
-            scrollTo(home, in: app)
-            save(app, "settings-home-en.png")
+            XCTAssertFalse(app.staticTexts["Home screen — free"].exists)
+            XCTAssert(app.staticTexts["Lock screen"].exists)
+            let support = app.buttons["settings-premium-cta"].firstMatch
+            scrollTo(support, in: app)
+            save(app, "settings-premium-en.png")
         }
         let about = app.buttons["settings-about-row"].firstMatch
         scrollTo(about, in: app)
@@ -342,10 +381,18 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "supporter-sheet.png")
         guard dismissPremium(app) else { return }
         openSettings(app)
-        let settingsSupport = app.buttons["settings-premium-cta"]
+        // A buyer gets thanks where the Support button was, not another sales button.
+        let settingsSupport = app.descendants(matching: .any)["settings-premium-cta"].firstMatch
         scrollTo(settingsSupport, in: app)
-        XCTAssertTrue(settingsSupport.label.contains("Slackwater supporter"))
+        XCTAssertTrue(settingsSupport.label.contains("You have Premium — thank you."))
+        XCTAssertFalse(app.buttons["Support Slackwater"].exists)
         save(app, "settings-supporter.png")
+        // The thanks still lead to the sheet, where the free widgets' add instructions live.
+        settingsSupport.tap()
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        let home = app.staticTexts["Home screen — free"].firstMatch
+        scrollTo(home, in: app)
+        XCTAssert(home.exists)
     }
 
     func testSupportSheetOpensAndClosesFromTheFooter() {

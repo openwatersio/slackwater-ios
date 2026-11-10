@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. The Premium sheet, shared by every upgrade entry point: each feature
-// with a live example, what stays free, the plans, and the month's free day.
+// with a live example, what stays free with the free widgets shown, the plans, and the month's free day.
 import SwiftUI
 
 struct PremiumView: View {
@@ -16,6 +16,11 @@ struct PremiumView: View {
                     PremiumCarousel(opening: opening)
                     VStack(alignment: .leading, spacing: 24) {
                         PremiumComparison()
+                        // What stays free, shown: the widgets with their live previews. TV has
+                        // none, and a build that sells nothing keeps them in Settings.
+                        #if PREMIUM_ENABLED
+                            if SettingsPlatform.current != .tv { WidgetSettingsContent() }
+                        #endif
                         #if PREMIUM_ENABLED
                             if store.hasPurchased {
                                 Label("You have Premium — thank you.", systemImage: "sparkles")

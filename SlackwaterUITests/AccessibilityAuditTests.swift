@@ -113,6 +113,9 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
             if !content.contains(row.frame) { scrollTo(row, in: app, visibleFrame: content) }
             XCTAssertGreaterThanOrEqual(try XCTUnwrap(renderedContrast(row)), 4.5, label)
         }
+        // The free widget group sits between the table and the plans.
+        scrollTo(app.staticTexts["Next Event"].firstMatch, in: app, visibleFrame: content)
+        try audit(app, "premium sheet free widgets", premiumContent: content)
         scrollTo(app.buttons["Restore purchase"], in: app, visibleFrame: content)
         try audit(app, "premium sheet end", premiumContent: content)
     }

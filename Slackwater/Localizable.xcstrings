@@ -6905,7 +6905,7 @@
       }
     },
     "Lock screen" : {
-      "comment" : "Premium feature name on the Premium sheet card: widgets on the iPhone Lock Screen.",
+      "comment" : "Premium feature name on the Premium sheet card and as a row heading in Settings' Premium card: widgets on the iPhone Lock Screen.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -9665,101 +9665,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ställer in den högsta strömhastighet Slackwater räknar som en användbar strömstilla period (0,1–10 kn). Av visar bara strömstilla."
-          }
-        }
-      }
-    },
-    "Sky" : {
-      "comment" : "Settings section heading: the sky drawn above a chart.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Himmel"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Himmel"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cielo"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taivas"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ciel"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spéir"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cielo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "空"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "하늘"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Himmel"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lucht"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Céu"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Céu"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Himmel"
           }
         }
       }
@@ -13430,7 +13335,7 @@
       }
     },
     "The next tide without unlocking your phone." : {
-      "comment" : "Premium sheet card for Lock Screen widgets: the next high or low water, seen without unlocking.",
+      "comment" : "Premium sheet card for Lock Screen widgets, and the Lock screen row in Settings' Premium card on iPhone and iPad: the next high or low water, seen without unlocking.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -25386,7 +25291,7 @@
           }
         }
       },
-      "comment" : "Settings section heading."
+      "comment" : "Premium feature name: notification alerts. Also the Alerts page title and its row heading in Settings' Premium card."
     },
     "All" : {
       "comment" : "Station series filter showing all stations.",
@@ -27100,100 +27005,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "av Open Waters"
-          }
-        }
-      }
-    },
-    "Calendar" : {
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalender"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalender"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendario"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalenteri"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendrier"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Féilire"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mìosachan"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendario"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カレンダー"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "캘린더"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalender"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalender"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendário"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendário"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kalender"
           }
         }
       }
@@ -37304,7 +37115,7 @@
       }
     },
     "Home screen — free" : {
-      "comment" : "Settings widget section title.",
+      "comment" : "Heading over the free home-screen widgets on the Premium sheet.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -39389,101 +39200,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plats ej tillgänglig"
-          }
-        }
-      }
-    },
-    "Lock screen — Premium" : {
-      "comment" : "Settings widget section title.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Låseskærm — Premium"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sperrbildschirm — Premium"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pantalla de bloqueo — Premium"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lukittu näyttö — Premium"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écran verrouillé — Premium"
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scáileán Glasáilte — Premium"
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sgrìn-ghlasaidh — Premium"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schermata di blocco — Premium"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ロック画面 — Premium"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "잠금 화면 — Premium"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Låst skjerm — Premium"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toegangsscherm — Premium"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tela Bloqueada — Premium"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ecrã bloqueado — Premium"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Låsskärm — Premium"
           }
         }
       }
@@ -67858,101 +67574,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slackwater-supporter"
-          }
-        }
-      }
-    },
-    "Tides and currents at a glance on your lock screen." : {
-      "comment" : "Premium benefit: lock-screen widgets.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tidevand og strøm med et blik på din låseskærm."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gezeiten und Strömungen auf einen Blick auf deinem Sperrbildschirm."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mareas y corrientes de un vistazo en tu pantalla de bloqueo."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuorovedet ja virtaukset yhdellä silmäyksellä lukitusnäytöllä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marées et courants en un coup d’œil sur votre écran verrouillé."
-          }
-        },
-        "ga" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taoidí agus sruthanna d'aon sracfhéachaint ar do Scáileán Glasáilte."
-          }
-        },
-        "gd" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seòlan-mara is sruthan sa bhad air an sgrìn-ghlasaidh agad."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Maree e correnti a colpo d’occhio sulla schermata di blocco."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ロック画面で潮汐と潮流をひと目で確認。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "잠금 화면에서 조석과 조류를 한눈에 확인하세요."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tidevann og strøm med et blikk på låseskjermen."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Getijden en stromingen in één oogopslag op je toegangsscherm."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marés e correntes de relance na tela bloqueada."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marés e correntes num relance no ecrã bloqueado."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tidvatten och strömmar med en blick på låsskärmen."
           }
         }
       }

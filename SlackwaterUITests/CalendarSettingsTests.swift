@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Settings → Calendar: subscribe a station, with Premium (docs/alerts.md §7.4).
+// Slackwater — GPL v3. Settings → Slackwater Premium → Calendars: subscribe a station, with Premium (docs/alerts.md §7.4).
 import XCTest
 
 final class CalendarSettingsTests: ScreenshotTestCase {

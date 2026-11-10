@@ -204,7 +204,7 @@ Review notes for Premium Yearly:
 >
 > To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices and the yearly term, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, tap Set an alert under a station's timeline, or turn off Settings → Sky → Sun, moon and stars. No account is needed.
+> To see it unlocked: in Settings → Slackwater Premium → Calendars, turn on a saved station, tap Set an alert under a station's timeline, or turn off Sun, moon and stars in the same Settings card. No account is needed.
 
 Review notes for Premium Lifetime:
 
@@ -212,7 +212,7 @@ Review notes for Premium Lifetime:
 >
 > To buy: scroll to the bottom of the station list and tap Support Slackwater. Settings → Slackwater Premium → Support Slackwater opens the same sheet. It shows both Premium products with their prices, Restore purchase, and links to the Privacy Policy and Terms of Use.
 >
-> To see it unlocked: in Settings → Calendar, turn on a saved station, tap Set an alert under a station's timeline, or turn off Settings → Sky → Sun, moon and stars. No account is needed.
+> To see it unlocked: in Settings → Slackwater Premium → Calendars, turn on a saved station, tap Set an alert under a station's timeline, or turn off Sun, moon and stars in the same Settings card. No account is needed.
 
 ## Before submission
 

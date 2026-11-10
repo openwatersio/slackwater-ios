@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Units, slack threshold, integrations, and widgets.
+// Slackwater — GPL v3. Units, slack threshold, the Premium card, and About.
 import SwiftUI
 
 struct SettingsView: View {
@@ -94,91 +94,108 @@ struct SettingsView: View {
                         }
                     }
 
-                    section(String(localized: "Sky", comment: "Settings section heading: the sky drawn above a chart."), premium: true) {
-                        PremiumRequirement(feature: .sky)
-                        Toggle(isOn: Binding(
-                            get: { skyBodies },
-                            set: { on in
-                                // A refused change leaves the switch where it was: the getter still reads the stored value.
-                                guard skyBodiesSwitchAllowed(to: on, premium: premium.isPremium) else {
-                                    premiumFeature = .sky
-                                    return
-                                }
-                                UnitsCloud.shared.set(on, forKey: AppGroup.skyBodiesKey)
-                            })
-                        ) {
-                            Text("Sun, moon and stars", comment: "Settings switch: draw the sun, moon and stars in the sky above the chart.")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(SN.foam.opacity(0.85))
-                        }
-                        .tint(SN.leaf)
-                        .accessibilityIdentifier("settings-sky-bodies")
-                        Text("Draw them in the sky above the chart as they stand at the selected time, and mark sunrise and sunset under each day. Off keeps the sky's day and night colors.", comment: "Settings footnote under the sun, moon and stars switch.")
-                    }
-
-                    section(String(localized: "Alerts", comment: "Settings section heading."), premium: true) {
-                        NavigationLink {
-                            AlertsView()
-                                .navigationTitle("Alerts")
-                                .navigationBarTitleDisplayMode(.inline)
-                                .toolbarBackground(SN.canvas, for: .navigationBar)
-                        } label: {
-                            HStack {
-                                Text(
-                                    alerts.rules.isEmpty
-                                        ? "Tap Set an alert under any station's timeline"
-                                        : "\(alerts.rules.count) alerts")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
+                    // The Premium features Settings has a say in, one card, a row each like the
+                    // free widget rows. The Premium sheet does the selling; this card only names and controls.
+                    section(String(localized: "Slackwater Premium"), premium: true) {
+                        premiumRow(.sky) {
+                            Toggle(isOn: Binding(
+                                get: { skyBodies },
+                                set: { on in
+                                    // A refused change leaves the switch where it was: the getter still reads the stored value.
+                                    guard skyBodiesSwitchAllowed(to: on, premium: premium.isPremium) else {
+                                        premiumFeature = .sky
+                                        return
+                                    }
+                                    UnitsCloud.shared.set(on, forKey: AppGroup.skyBodiesKey)
+                                })
+                            ) {
+                                Text("Sun, moon and stars", comment: "Settings switch: draw the sun, moon and stars in the sky above the chart.")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(SN.foam.opacity(0.85))
                             }
-                            .foregroundStyle(SN.leaf)
-                        }
-                    }
-
-                    section(String(localized: "Calendar", comment: "Settings section heading."), premium: true) {
-                        NavigationLink {
-                            CalendarStationsView()
-                                .navigationTitle("Favourites calendars")
-                                .navigationBarTitleDisplayMode(.inline)
-                                .toolbarBackground(SN.canvas, for: .navigationBar)
-                        } label: {
-                            HStack {
-                                Text(calendarSummary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                            }
-                            .foregroundStyle(SN.leaf)
-                        }
-                        .accessibilityIdentifier("settings-calendar-row")
-                    }
-
-                    #if PREMIUM_ENABLED
-                        section(String(localized: "Slackwater Premium"), premium: true) {
-                            if SettingsPlatform.current == .mobile {
-                                Text("Lock screen — Premium")
-                                    .font(.headline)
-                                    .foregroundStyle(SN.foam)
-                                PremiumFeaturePreview(feature: .lockScreen)
-                                Text("Tides and currents at a glance on your lock screen.")
-                                Text("Long-press your lock screen → Customize → add Slackwater above or below the clock.")
-                                    .font(.caption)
-                            }
-                            Button { premiumFeature = SettingsPlatform.current == .mobile ? .lockScreen : nil } label: {
-                                Label(premium.hasPurchased
-                                      ? String(localized: "Slackwater supporter")
-                                      : String(localized: "Support Slackwater"), systemImage: "sparkles")
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                            }
-                            .buttonStyle(.borderedProminent)
                             .tint(SN.leaf)
-                            .foregroundStyle(SN.canvas)
-                            .accessibilityIdentifier("settings-premium-cta")
+                            .accessibilityIdentifier("settings-sky-bodies")
+                            Text("Draw them in the sky above the chart as they stand at the selected time, and mark sunrise and sunset under each day. Off keeps the sky's day and night colors.", comment: "Settings footnote under the sun, moon and stars switch.")
                         }
-                    #endif
+                        Divider()
+                        premiumRow(.alerts) {
+                            NavigationLink {
+                                AlertsView()
+                                    .navigationTitle("Alerts")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                    .toolbarBackground(SN.canvas, for: .navigationBar)
+                            } label: {
+                                HStack {
+                                    Text(
+                                        alerts.rules.isEmpty
+                                            ? "Tap Set an alert under any station's timeline"
+                                            : "\(alerts.rules.count) alerts")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.footnote.weight(.semibold))
+                                }
+                                .foregroundStyle(SN.leaf)
+                            }
+                        }
+                        Divider()
+                        premiumRow(.calendars) {
+                            NavigationLink {
+                                CalendarStationsView()
+                                    .navigationTitle("Favourites calendars")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                    .toolbarBackground(SN.canvas, for: .navigationBar)
+                            } label: {
+                                HStack {
+                                    Text(calendarSummary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.footnote.weight(.semibold))
+                                }
+                                .foregroundStyle(SN.leaf)
+                            }
+                            .accessibilityIdentifier("settings-calendar-row")
+                        }
+                        #if PREMIUM_ENABLED
+                            // A build without PREMIUM_ENABLED ships no lock screen widgets.
+                            if SettingsPlatform.current == .mobile {
+                                Divider()
+                                premiumRow(.lockScreen) {
+                                    Text(PremiumFeature.lockScreen.detail)
+                                    Text("Long-press your lock screen → Customize → add Slackwater above or below the clock.")
+                                        .font(.caption)
+                                }
+                            }
+                            if premium.hasPurchased {
+                                // Thanks, not another sale; still a way to the sheet, which
+                                // holds the free widgets' add instructions.
+                                Button { premiumFeature = .lockScreen } label: {
+                                    Label("You have Premium — thank you.", systemImage: "sparkles")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(SN.leaf)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("settings-premium-cta")
+                            } else {
+                                // The sheet opens on the card's last row where there is one; the
+                                // carousel falls back to its first page on a Mac or TV.
+                                Button { premiumFeature = .lockScreen } label: {
+                                    Label(String(localized: "Support Slackwater"), systemImage: "sparkles")
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(SN.leaf)
+                                .foregroundStyle(SN.canvas)
+                                .accessibilityIdentifier("settings-premium-cta")
+                            }
+                        #endif
+                    }
 
-                    WidgetSettingsContent()
+                    #if !PREMIUM_ENABLED
+                        // Nothing in this build sells Premium, so the sheet does not show the
+                        // free widgets and Settings keeps them.
+                        WidgetSettingsContent()
+                    #endif
 
                     section(String(localized: "About")) {
                         Link(destination: URL(string: "https://slackwater.xyz/support/")!) {
@@ -277,6 +294,21 @@ struct SettingsView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(SN.foam.opacity(0.85))
             content()
+        }
+        .padding(.top, 4)
+    }
+
+    /// One Premium feature inside the Premium card: the sheet's symbol and title, then its control.
+    @ViewBuilder private func premiumRow(_ feature: PremiumFeature, @ViewBuilder content: () -> some View) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: feature.symbol).frame(width: 24).foregroundStyle(SN.leaf)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(feature.title)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(SN.foam.opacity(0.85))
+                content()
+            }
         }
         .padding(.top, 4)
     }
