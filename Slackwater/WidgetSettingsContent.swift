@@ -79,6 +79,7 @@ struct WidgetSettingsContent: View {
             ForEach(rows, id: \.0) { row in
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: row.1).frame(width: 24).foregroundStyle(SN.leaf)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.0).font(.footnote.weight(.medium)).foregroundStyle(SN.foam.opacity(0.85))
                         Text(row.2).font(.caption).foregroundStyle(SN.foam.opacity(0.62))

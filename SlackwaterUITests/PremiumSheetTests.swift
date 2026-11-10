@@ -77,6 +77,11 @@ final class PremiumSheetTests: ScreenshotTestCase {
         XCTAssertFalse(element(app, "premium-plan-yearly").exists)
         XCTAssertFalse(element(app, "premium-free-day").exists)
         XCTAssertFalse(element(app, "premium-buy").exists)
+        let content = premiumContentFrame(in: app)
+        XCTAssertGreaterThan(content.height, 0)
+        let next = app.staticTexts["Next Event"].firstMatch
+        scrollTo(next, in: app, visibleFrame: content)
+        XCTAssert(content.contains(next.frame), "purchased sheets keep the free widgets within reach")
         save(app, "premium-sheet-purchased.png")
     }
 
