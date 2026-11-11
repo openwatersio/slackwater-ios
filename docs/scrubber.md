@@ -291,7 +291,7 @@ The reference target set is the sorted, de-duplicated union of all applicable in
 
 - tide high and low extrema;
 - the fastest-rate instant of each tide run that reaches the rate-warning scale;
-- current maxima and slack instants;
+- current maxima, same-direction minima, and slack instants;
 - the opening and closing of each merged measured slack window drawn as a stroke (§13.2);
 - each measured-current zero instant (§13.2);
 - sunrise and sunset, while Settings' sun, moon and stars switch is on (§14);
@@ -367,7 +367,8 @@ The value is SlackwaterKit's full speed of the water at `selectedTime`: on a sta
 The state is:
 
 - `Slack` within one second of a predicted zero instant (§13.2), where the magnet parks on its mark; never elsewhere, however slow the water, and never merely inside a slack window;
-- `Max flood` or `Max ebb` within one second of that maximum; or
+- `Max flood` or `Max ebb` within one second of that maximum;
+- `Minimum flood` or `Minimum ebb` within one second of a same-direction lull; or
 - `Flooding` / `Ebbing` otherwise, by the sign of the major-axis speed; an exact zero outside slack reads `Flooding`.
 
 A set is shown as a true-bearing arrow (`arrow.up` rotated to the bearing) and as one of 16 compass points, or as a three-digit true bearing (`225°`) when the person chooses degrees in Settings. Every reading of the set, spoken or shown, follows that choice; the station's fixed flood and ebb bearings in Station details stay in degrees true. The set is the direction of SlackwaterKit's current vector at `selectedTime`; on a station with no vector data, positive velocity selects the station's flood bearing and negative velocity selects its ebb bearing. Outside slack the arrow and set use the flood colour or ebb colour by the major-axis sign. At `Slack` the word stays `Slack`, and while the flow across the major axis still formats above zero in the display unit (0.05 or more), the lead keeps the water's full speed as its value and shows the arrow and set along the water's direction in the go colour, since there is no flood or ebb to colour by. Otherwise slack uses the slack glyph (`arrow.right.and.line.vertical.and.arrow.left`) in the go colour instead of claiming a set; a one-axis station has no crossing flow, so its slack always does. A zero vector has no set: the lead shows the slack glyph in the go colour and claims none.
@@ -418,12 +419,12 @@ The marks above represent SF Symbols, not translated glyphs, drawn between the l
 | High, Low | `arrow.up`, `arrow.down` |
 | Fastest rise, Fastest fall | `arrow.up.right`, `arrow.down.right` |
 | Slack | `arrow.right.and.line.vertical.and.arrow.left` |
-| Max flood, Max ebb | None |
+| Max flood, Max ebb, Minimum flood, Minimum ebb | None |
 | Sunrise, Sunset | `sunrise`, `sunset` |
 
-Max flood and max ebb commentary have no symbol. The current reading and curve show bearing arrows where a set bearing is available.
+Current maximum and minimum commentary have no symbol. The current reading and curve show bearing arrows where a set bearing is available.
 
-The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Maximum ebb current in 42 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
+The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes`, `Maximum ebb current in 42 minutes`, or `Minimum ebb current in 4 hours, 36 minutes`, and never carries a provisional `~` (§9.2). The decorative symbol is hidden from accessibility.
 
 All four phone consumers compare the next water stop with sunrise and sunset and name whichever occurs first. With Settings' sun, moon and stars switch off, sunrise and sunset are no candidates (§14). Every candidate, water or sun, is the first stop more than one second after the selection, so landing on a stop advances the pill, and it must lie between the first and last drawn sample: water events kept beyond the strip for event search and sun events from day chrome beyond the data never count. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop, and activation moves there by §8. When a sun event and a water stop share an instant, the sun event is named. Commentary is absent when there is no applicable later target.
 
@@ -440,7 +441,9 @@ Walk strictly forward—more than one second after `selectedTime`—through thes
 1. a drawn slack window's opening, named `Slack window`;
 2. a measured-current zero instant, named `Slack`;
 3. the window's closing, named `Slack window` with the closing glyph; and
-4. `Max flood` and `Max ebb`.
+4. `Max flood`, `Max ebb`, `Minimum flood`, and `Minimum ebb`.
+
+A same-direction minimum is the lull between two maxima without a zero crossing. It stays on the curve, in the schedule, and in the commentary, even when its speed rounds to 0.0. It is never slack and never eligible for the Next max tile, maximum rankings, or maximum alerts. Subordinate minima keep the published time adjustment and speed ratio for their signed flood or ebb direction.
 
 Slack is one stop at the predicted zero instant, named `Slack`. A window too short to draw has no stops; its zero instant still does. Comfort current changes only the window edges.
 

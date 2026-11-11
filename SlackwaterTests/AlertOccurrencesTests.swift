@@ -60,6 +60,20 @@ import SlackwaterKit
         XCTAssertEqual(found.map(\.event), floods.map { alertMinute($0.time) })
     }
 
+    func testTrialIslandMinimumDoesNotTriggerAMaximumAlert() throws {
+        let start = Date(timeIntervalSince1970: 1_794_297_600)
+        let end = start.addingTimeInterval(86_400)
+        let id = "current:noaa/PCT1391"
+        let (station, position) = try load(id)
+        guard case .current(let engine, _, _) = station else { return XCTFail("expected current") }
+        let events = engine.events(from: start, to: end)
+        let minimum = try XCTUnwrap(events.first { $0.kind == .minEbb })
+        let rule = AlertRule(stationID: id, trigger: .currentPeak(flood: false))
+        let found = alertOccurrences(rule, station: station, position: position, from: start, to: end, threshold: 0.5)
+        XCTAssertFalse(found.contains { $0.event == alertMinute(minimum.time) })
+        XCTAssertEqual(found.map(\.event), events.filter { $0.kind == .maxEbb }.map { alertMinute($0.time) })
+    }
+
     func testTheFirstWindowOpeningAgreesWithTheSiriAnswer() throws {
         // A generous threshold so every slack in the week has a real window for the Siri
         // query to give.

@@ -294,7 +294,7 @@ the readout has three homes and they will drift.
 Times that leave the chart do not leave the product — the schedule table keeps
 its absolute column.
 
-On the detail strip, maximum ebb and flood times sit on a quiet gray row below the green slack times. Each row thins crowded labels independently. The peak row draws under the reach reading and is omitted under the narrows reading (§5.4.1), and whenever the current has no maximum events. Day names and dates follow the event times, with sunrise and sunset sharing the date row and no sun dots while Settings shows them (scrubber §14). Eclipse glyphs sit below the sun times.
+On the detail strip, maximum and minimum ebb and flood times sit on a quiet gray row below the green slack times. Each row thins crowded labels independently. This turning-point row draws under the reach reading and is omitted under the narrows reading (§5.4.1), and whenever the current has no turning events. Same-direction minima keep their speed and set labels on the strip and station-card curve; the lead, commentary, and schedule name them as minima. Day names and dates follow the event times, with sunrise and sunset sharing the date row and no sun dots while Settings shows them (scrubber §14). Eclipse glyphs sit below the sun times.
 
 Where two labels would collide, **measure the rendered text; never estimate
 widths** — a hardcoded estimate stops being true the moment the font changes.
@@ -559,9 +559,8 @@ On a derived gate:
 
 **Online gates** — real official predictions fetched on demand — are a third
 case. Events come from scanning the fetched series (`sampleEvents`: one maximum per sign run and
-interpolated zero crossings on 15-minute samples) rather than from the kit's `maxima`, which
-finds extremes above 0.01 kn prominence on the harmonic series and labels each by its sign, so a
-relaxation peak that never reverses stays flood or ebb as NOAA's `max_slack` does.
+interpolated zero crossings on 15-minute samples) rather than from the kit's harmonic events,
+which find extremes above 0.01 kn prominence and distinguish same-direction minima from maxima by sign and turning direction. A relaxation that never reverses is named `Minimum flood` or `Minimum ebb`; it remains a curve knot, without establishing slack.
 Everything in §3–§8 applies unchanged; only provenance differs.
 
 Neither kind has a model to class it by (§1). A derived gate draws no maxima, so it has no maximum-time row; an online gate's fetched window moves with the picked date, so it is not classed from it. Both keep the narrows order, and the online gate's maxima stay in the schedule.

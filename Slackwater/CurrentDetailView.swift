@@ -5,7 +5,7 @@ import SwiftUI
 import SlackwaterKit
 
 /// One schedule for every real-velocity current strip (harmonic or fetched
-/// official samples): slack rows bare, max rows with speed + set bearing.
+/// official samples): slack rows bare, turning points with speed + set bearing.
 func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speedUnit: String) -> [ScheduleEntry] {
     // `scheduleRange` hangs off the ANCHOR, not `today` — the list a September
     // window shows is September's. Never re-derive it from `tl.today` here.
@@ -15,12 +15,12 @@ func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speed
             switch e.kind {
             case .slack:
                 ScheduleEntry(time: e.time, pill: .slack)
-            case .maxFlood:
-                ScheduleEntry(time: e.time, pill: .flood,
+            case .maxFlood, .minFlood:
+                ScheduleEntry(time: e.time, pill: e.kind.isMaximum ? .flood : .minFlood,
                               value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                               arrowDeg: floodDeg)
-            case .maxEbb:
-                ScheduleEntry(time: e.time, pill: .ebb,
+            case .maxEbb, .minEbb:
+                ScheduleEntry(time: e.time, pill: e.kind.isMaximum ? .ebb : .minEbb,
                               value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                               arrowDeg: ebbDeg)
             }
@@ -97,9 +97,8 @@ struct CurrentDetailView: View {
                             onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             alertOffer: currentAlertOffer(
-                                // CurrentLead's `atMax`, read here because the lead keeps it private.
                                 maxIsFlood: timeline?.currentEvents.first {
-                                    $0.kind != .slack && abs($0.time.timeIntervalSince(scrubTime)) < 1
+                                    $0.kind.isMaximum && abs($0.time.timeIntervalSince(scrubTime)) < 1
                                 }.map { $0.kind == .maxFlood },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
                             printable: printable,

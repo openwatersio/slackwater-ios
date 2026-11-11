@@ -261,6 +261,54 @@ import SlackwaterKit
 
     // MARK: - The lead's speed and set
 
+    func testSameDirectionMinimumIsAStopButNeverTheNextMaximum() throws {
+        for (sign, minimum, maximum, name) in [
+            (-1.0, CurrentEventKind.minEbb, CurrentEventKind.maxEbb, "Minimum ebb"),
+            (1.0, CurrentEventKind.minFlood, CurrentEventKind.maxFlood, "Minimum flood"),
+        ] {
+            let events = [CurrentEvent(time: t0, speed: sign * 0.8, kind: maximum),
+                          CurrentEvent(time: at(3600), speed: sign * 0.0398, kind: minimum),
+                          CurrentEvent(time: at(7200), speed: sign * 2.1, kind: maximum)]
+            let tl = TimelineData(
+                tz: utc, anchor: t0, today: t0, start: t0, end: at(7200), days: [],
+                tidePoints: [], tideRates: [], tideExtremes: [],
+                currentPoints: events.map { CurrentPoint(time: $0.time, speed: $0.speed) },
+                currentEvents: events, snapTimes: events.map(\.time), slackWindows: [])
+            let before = lead(scrub: at(1), signed: sign * 0.8, timeline: tl)
+            XCTAssertEqual(before.nextSignificant?.time, at(3600))
+            XCTAssertEqual(before.nextSignificant?.label, name)
+            XCTAssertEqual(before.nextMaxEvent?.time, at(7200))
+            XCTAssertEqual(before.nextMax?.value, "2.1\u{00a0}kn")
+            let onMinimum = lead(scrub: at(3600), signed: sign * 0.0398, timeline: tl)
+            XCTAssertEqual(onMinimum.reading.state, name)
+            XCTAssertEqual(onMinimum.reading.value, "0.0")
+            XCTAssertFalse(tl.isSlack(at: at(3600)))
+            XCTAssertTrue(TimelineData.currentSnapTimes(events: events, windows: [], cores: []).contains(at(3600)))
+            let entries = scheduleEntries(tl, floodDeg: 0, ebbDeg: 180, speedUnit: "kn")
+            XCTAssertEqual(eventWord(try XCTUnwrap(entries.first { $0.time == at(3600) }).pill), name)
+        }
+    }
+
+    func testTrialIslandLullIsExcludedFromNextMax() throws {
+        let trial = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/PCT1391"))
+        let start = Date(timeIntervalSince1970: 1_794_297_600) // 2026-11-10 08:00 UTC
+        let tl = TimelineData.build(tide: nil, current: trial, now: start, anchor: start)
+        let minimum = try XCTUnwrap(tl.currentEvents.first { $0.kind == .minEbb && $0.time > start })
+        XCTAssertEqual(abs(minimum.speed), 0.0398, accuracy: 0.001)
+        let before = CurrentLead(timeline: tl, scrubTime: minimum.time.addingTimeInterval(-3600), now: start,
+                                 point: CurrentPoint(time: start, speed: -0.1),
+                                 floodDeg: trial.floodDirection, ebbDeg: trial.ebbDirection,
+                                 speedUnit: "kn", tz: trial.tz)
+        XCTAssertEqual(before.nextSignificant?.label, "Minimum ebb")
+        XCTAssertEqual(before.nextMaxEvent?.kind, .maxEbb)
+        XCTAssertGreaterThan(try XCTUnwrap(before.nextMaxEvent?.time), minimum.time)
+        XCTAssertFalse(CurrentStanding.peaks(tl.currentEvents, kind: .maxEbb).contains { $0.time == minimum.time })
+        let widget = WidgetSnapshot.build(.current(trial.engineStation, tz: trial.tz, name: trial.name),
+                                          now: minimum.time.addingTimeInterval(-3600))
+        XCTAssertTrue(try XCTUnwrap(widget.next?.label).hasPrefix("Minimum ebb "))
+        XCTAssertEqual(widget.next?.time, minimum.time)
+    }
+
     private func reading(_ state: String, _ value: String, set: Double?, _ text: String?,
                          tint: CurrentPhase, spoken: String) -> CurrentLeadReading {
         CurrentLeadReading(state: state, value: value, setDegrees: set, set: text, tint: tint, spoken: spoken)

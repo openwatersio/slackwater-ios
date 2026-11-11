@@ -59,6 +59,10 @@ struct WidgetSnapshot: Equatable {
                                       label: String(localized: "Max flood \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget maximum flood-current event. Values are formatted speed and compact unit."))
                 case .maxEbb: Event(time: $0.time,
                                     label: String(localized: "Max ebb \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget maximum ebb-current event. Values are formatted speed and compact unit."))
+                case .minFlood: Event(time: $0.time,
+                                      label: String(localized: "Minimum flood \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget minimum flood-current event without reversal. Values are formatted speed and compact unit."))
+                case .minEbb: Event(time: $0.time,
+                                    label: String(localized: "Minimum ebb \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget minimum ebb-current event without reversal. Values are formatted speed and compact unit."))
                 }
             }
             return .init(stationName: name, tz: tz, next: next,

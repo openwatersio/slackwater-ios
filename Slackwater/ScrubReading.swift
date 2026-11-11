@@ -80,10 +80,8 @@ struct ScrubReading: Equatable {
         switch e.kind {
         case .slack:
             return "\(String(localized: "Slack", comment: "Current phase: water is near zero speed.")) · \(time)"
-        case .maxFlood, .maxEbb:
-            let name = e.kind == .maxFlood
-                ? String(localized: "Max flood", comment: "Maximum flood-current event label.")
-                : String(localized: "Max ebb", comment: "Maximum ebb-current event label.")
+        case .maxFlood, .maxEbb, .minFlood, .minEbb:
+            let name = e.turnLabel
             if data.speedsAreSchematic { return "\(name) · \(time)" }
             return "\(name) \(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(time)"
         }
