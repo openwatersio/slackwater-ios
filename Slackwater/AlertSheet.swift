@@ -74,7 +74,6 @@ struct AlertSheet: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
-    @State private var saving = false
     @State private var showPremium = false
 
     init(rule: AlertRule, stationName: String, boundMoment: Date?, isNew: Bool = false,
@@ -183,8 +182,8 @@ struct AlertSheet: View {
                         .accessibilityIdentifier("alert-sheet-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }
-                        .disabled(saving || !canSave || parsing)
+                    Button("Save") { save() }
+                        .disabled(!canSave || parsing)
                         .accessibilityIdentifier("alert-sheet-save")
                 }
             }
@@ -245,12 +244,14 @@ struct AlertSheet: View {
     /// Being told is Premium (§2): a free user's Save opens the Support sheet and writes nothing.
     /// Notification permission is asked on the first save, never at launch; a denial still
     /// saves the rule, and the Alerts screen says why it is quiet.
-    private func save() async {
+    private func save() {
         guard premium.isPremium else { showPremium = true; return }
-        saving = true
-        defer { saving = false }
-        _ = await AlertNotifications.requestAccess()
         store.upsert(rule)
         dismiss()
+        // After the close: a denial still saves (docs/alerts.md §7.2), and a prompt the system never answers must not hold the sheet.
+        Task {
+            _ = await AlertNotifications.requestAccess()
+            AlertScheduler.requestReschedule()
+        }
     }
 }

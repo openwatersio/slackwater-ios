@@ -98,9 +98,11 @@ final class AlertLineUITests: ScreenshotTestCase {
         line(app).tap()
         XCTAssert(app.buttons["alert-sheet-save"].appears(within: 5))
         app.buttons["alert-sheet-save"].tap()
-        allowNotificationsIfAsked()
 
         XCTAssert(sheet(app).disappears(within: 10), "the sheet stayed open after Save")
+        // The prompt follows the close, over the detail. Answer it here, before the next
+        // tap, which XCUITest would otherwise clear with "Don't Allow" for the whole shard.
+        allowNotificationsIfAsked()
         XCTAssertTrue(line(app).label.hasPrefix("Alert set"), "line read: \(line(app).label)")
         save(app, "alert-line-set.png")
 

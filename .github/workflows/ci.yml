@@ -348,12 +348,12 @@ jobs:
       # The runtime IS pinned, by SLACKWATER_SIM_OS. The image's Xcode 27.1
       # has no iOS 27.1 runtime for these devices (that runtime carries only
       # the iPhone Duo), so an unpinned destination takes the newest runtime
-      # that has them: 27.2, a pre-release build. On it the notification
-      # permission prompt never appeared after Save in two of three runs of
-      # AlertLineUITests.testSavingTurnsTheLineToSet, with the app's
-      # requestAuthorization never returning (#920). The same test passes on
-      # a local 27.2 and 27.0, so this is the hosted runtime, not the suite.
-      # 27.0 is the GA runtime that has both devices.
+      # that has them: 27.2, a pre-release build. 27.0 is the GA runtime that
+      # has both devices. The pin keeps the lanes off pre-release runtimes;
+      # it is not a fix for the hosted iOS 27 simulators sometimes never
+      # drawing the notification permission prompt, which showed on 27.0 too
+      # (#920, #921) and which the alert sheet now tolerates by saving and
+      # closing before it asks.
       #
       # Then boot the device the tests run on (SLACKWATER_NO_CLONE below), so
       # its first boot is paid here and not by the first test's launch. On a
