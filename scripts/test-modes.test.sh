@@ -125,6 +125,12 @@ SLACKWATER_SIMS='Mine' run_mode
 assert_has "name=Mine"
 assert_lacks "simctl erase"
 assert_lacks "simctl create"
+assert_lacks ",OS="
+
+# A pinned runtime goes on the destination; CI pins one so the lanes don't
+# follow the image's newest, pre-release, runtime.
+SLACKWATER_SIMS='Mine' SLACKWATER_SIM_OS='27.0' run_mode
+assert_has "name=Mine,OS=27.0"
 
 # A prebuilt run tests the given products and never rebuilds or regenerates.
 SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode

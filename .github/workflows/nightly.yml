@@ -55,7 +55,10 @@ jobs:
     needs: authorize
     # Server-evaluated before runner assignment, including single-job reruns.
     if: needs.authorize.outputs.sha != '' && (github.triggering_actor == 'clarkbw' || github.triggering_actor == 'bkeepers')
-    runs-on: macos-latest
+    # The iPhone Duo runs any app linked against a pre-27.1 SDK in
+    # compatibility mode: a phone-sized window on the inner screen (#918).
+    # macos-latest defaults to Xcode 26.6; this image defaults to 27.1.
+    runs-on: xcode-27
     # Signing secrets live in this environment, which only main can deploy to.
     environment: testflight
     # Leave time for archiving/uploading before the processing and group waits.

@@ -491,8 +491,9 @@ control edits that draft:
   falls inside the morning or evening golden hour.
 - **On**, and **Delete**, for an existing rule.
 - **Save.** Without Premium it opens the Premium sheet and nothing is written.
-  Notification permission is requested on the first save, never at launch; a denial still saves
-  the rule, and the Alerts screen says why it is quiet.
+  Notification permission is requested on the first save, never at launch, and after the rule is
+  written and the sheet closed, so the prompt holds nothing up; a denial still saves the rule,
+  and the Alerts screen says why it is quiet.
 
 Reading is free here. A free user types "next lower low in daylight", sees "Hope Bay - Lower low tide"
 with "Does not repeat", and is asked to support the app only when they ask to be told.
