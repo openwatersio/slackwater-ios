@@ -12,7 +12,7 @@ let package = Package(
         // 4), so no post-rename semver tag exists yet. Becomes `from:` at the
         // deliberate 1.0.0 release.
         .package(url: "https://github.com/openwatersio/slackwater",
-                 revision: "9945f90ddcb32f92f82d2c23abae171602dc704e"),
+                 revision: "026802e30c28b745be62ede276c9c5f2efc145f1"),
     ],
     targets: [
         .executableTarget(

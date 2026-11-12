@@ -47,7 +47,7 @@ packages:
     # vector prediction in slackwater#508, and the shared readings in slackwater#510.
     url: https://github.com/openwatersio/slackwater
     # Minimum-current event kinds require this pin across phone, watch, and widgets.
-    revision: ebc6e6a74fadf8d024680e28485a0acaadbc49ce
+    revision: 026802e30c28b745be62ede276c9c5f2efc145f1
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.
