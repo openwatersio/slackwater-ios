@@ -153,7 +153,9 @@ own_sim() {
 dests=()
 for sim in "${sims[@]}"; do
   if (( ${+SLACKWATER_SIMS} )); then
-    dests+=("platform=iOS Simulator,name=$sim")
+    # SLACKWATER_SIM_OS pins the runtime; without it xcodebuild takes the
+    # newest one that has the device (CI sets it, see .github/workflows/ci.yml).
+    dests+=("platform=iOS Simulator,name=$sim${SLACKWATER_SIM_OS:+,OS=$SLACKWATER_SIM_OS}")
   else
     dests+=("platform=iOS Simulator,id=$(own_sim "$sim")")
   fi

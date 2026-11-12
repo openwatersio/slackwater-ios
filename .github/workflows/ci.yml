@@ -268,6 +268,10 @@ jobs:
       group: ci-app-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: xcode-27  # same image as the build job, see there
+    env:
+      # The simulator runtime every step below boots and tests on; the
+      # cold-boot comment below says why it is pinned, and to this one.
+      SLACKWATER_SIM_OS: "27.0"
     # Balance lanes so a typical iPad test session stays under about 45 min:
     # setup before it takes about 10, and the rerun step below can add a few
     # tests' worth. The cap sits higher because hosted runners vary more than
@@ -335,21 +339,27 @@ jobs:
       # front of `-downloadPlatform`, which fails the same way for the same
       # reason.
       #
-      # This reads like a version problem and is not one. The image's Xcode
-      # 27.1 has no iOS 27.1 runtime for these devices (that runtime carries
-      # only the iPhone Duo), so the iPhone 17 and iPad both run on the 27.2
-      # runtime — the same pairing a developer with Xcode 27.1 gets locally.
-      # Switching DEVELOPER_DIR to another Xcode also turns the lane green,
-      # which is what makes this worth writing down: it works only because
-      # switching re-enumerates the devices, so it treats the symptom and
-      # leaves a version to maintain forever.
+      # This reads like a version problem and is not one. Switching
+      # DEVELOPER_DIR to another Xcode also turns the lane green, which is
+      # what makes this worth writing down: it works only because switching
+      # re-enumerates the devices, so it treats the symptom and leaves a
+      # version to maintain forever.
+      #
+      # The runtime IS pinned, by SLACKWATER_SIM_OS. The image's Xcode 27.1
+      # has no iOS 27.1 runtime for these devices (that runtime carries only
+      # the iPhone Duo), so an unpinned destination takes the newest runtime
+      # that has them: 27.2, a pre-release build. On it the notification
+      # permission prompt never appeared after Save in two of three runs of
+      # AlertLineUITests.testSavingTurnsTheLineToSet, with the app's
+      # requestAuthorization never returning (#920). The same test passes on
+      # a local 27.2 and 27.0, so this is the hosted runtime, not the suite.
+      # 27.0 is the GA runtime that has both devices.
       #
       # Then boot the device the tests run on (SLACKWATER_NO_CLONE below), so
       # its first boot is paid here and not by the first test's launch. On a
       # cold clone that launch took 26–34 s, the app never went idle, and the
       # accessibility query timed out: a different first test in each iPad
       # lane failed that way, rerun included, on three pushes in a row.
-      # tail: runtimes list oldest first, and `-destination name=` takes the newest.
       #
       # A booted device still left the app's first launch slow: 37–62 s to
       # ready against ~10 s for every later test. So launch the app once here,
@@ -361,9 +371,9 @@ jobs:
       # XCUITest answer "Don't Allow", leaving the device denied for the shard.
       # ponytail: fixed 45 s settle; poll for the app going idle if it proves short.
       - run: |
-          udid=$(xcrun simctl list devices available | grep -F "$DEVICE (" | tail -1 \
+          udid=$(xcrun simctl list devices "iOS $SLACKWATER_SIM_OS" available | grep -F "$DEVICE (" | tail -1 \
             | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
-          [ -n "$udid" ] || { echo "no simulator named '$DEVICE'" >&2; exit 1; }
+          [ -n "$udid" ] || { echo "no simulator named '$DEVICE' on iOS $SLACKWATER_SIM_OS" >&2; exit 1; }
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
           xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch \
