@@ -81,13 +81,21 @@ pids=()
 for pattern in "SlackwaterCI-$slot-" $fixed $clones $xctest_clones; do
     pids+=($(pgrep -f "$pattern" || true))
 done
+# A process can exit between pgrep and kill, and kill then fails. That is
+# the outcome the kill wanted, so a failed kill counts only while the
+# process is still there afterwards; otherwise a job that ended on its own
+# would turn the cleanup, and the job, red.
 killed=()
 for pid in ${(u)pids}; do
     name=$(ps -p $pid -o comm= 2>/dev/null || true)
     case ${name:t} in
         xcodebuild|Simulator|xctest)
             killed+=($pid)
-            if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || failed=1; fi
+            if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then
+                print -r -- "kill $pid"
+            else
+                kill $pid 2>/dev/null || ! kill -0 $pid 2>/dev/null || failed=1
+            fi
             ;;
     esac
 done
@@ -103,7 +111,8 @@ else
         (( $#killed )) || break
         sleep 1
     done
-    for pid in $killed; do kill -9 $pid 2>/dev/null || true; done
+    # The same race: one that exits after the last check is gone, not stuck.
+    for pid in $killed; do kill -9 $pid 2>/dev/null || ! kill -0 $pid 2>/dev/null || failed=1; done
 fi
 
 for udid in $clones; do
