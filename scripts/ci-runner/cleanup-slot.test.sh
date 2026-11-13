@@ -5,7 +5,11 @@ fixture=$root/scripts/ci-runner/fixtures/simctl-devices.json
 
 # kill lines come from scanning real processes, so only simctl lines are compared.
 run() {
-    CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture zsh "$root/scripts/ci-runner/cleanup-slot.sh" "$1" | grep '^simctl' | sort || true
+    local out
+    out=$(CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture zsh "$root/scripts/ci-runner/cleanup-slot.sh" "$1") || {
+        printf 'cleanup-slot.sh %s exited non-zero\n' "$1" >&2; exit 1
+    }
+    print -r -- "$out" | grep '^simctl' | sort || true
 }
 
 expected=$(printf '%s\n' \

@@ -8,6 +8,7 @@ set -eu
 slot=${1:?usage: cleanup-slot.sh <slot>}
 phone=SlackwaterCI-$slot-iPhone
 pad=SlackwaterCI-$slot-iPad
+failed=0
 
 if [[ -n ${SIMCTL_DEVICES_JSON:-} ]]; then
     devices=$(<"$SIMCTL_DEVICES_JSON")
@@ -23,7 +24,8 @@ simctl() {
     elif [[ $1 == shutdown ]]; then
         xcrun simctl "$@" 2>/dev/null || true
     else
-        xcrun simctl "$@"
+        # Best-effort: one stuck device must not stop the rest of the cleanup.
+        xcrun simctl "$@" || { print -u2 -r -- "cleanup-slot: simctl $* failed"; failed=1; }
     fi
 }
 
@@ -43,7 +45,7 @@ for udid in $fixed; do
         name=$(ps -p $pid -o comm= 2>/dev/null || true)
         case ${name:t} in
             xcodebuild|Simulator|xctest)
-                if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || true; fi
+                if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || failed=1; fi
                 ;;
         esac
     done
@@ -58,3 +60,5 @@ done
 for udid in $fixed; do
     simctl erase $udid
 done
+
+exit $failed
