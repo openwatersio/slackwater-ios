@@ -59,10 +59,12 @@ studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
 %w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
   raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
 end
-# The hosted path builds on the xcode-27 image's Xcode; the Studio must match it.
-raise "the workflow must pin STUDIO_XCODE_VERSION" unless workflow.dig("env", "STUDIO_XCODE_VERSION").to_s.match?(/\A\d+\.\d+(\.\d+)?\z/)
-xcode_check = studio.fetch("steps")[1].fetch("run", "")
-raise "studio must check xcodebuild -version right after checkout" unless studio.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?('"Xcode $STUDIO_XCODE_VERSION"')
+# Both paths assert the same Xcode, the one the xcode-27 image carries.
+raise "the workflow must pin CI_XCODE_VERSION" unless workflow.dig("env", "CI_XCODE_VERSION").to_s.match?(/\A\d+\.\d+(\.\d+)?\z/)
+[["studio", studio], ["build", jobs.fetch("build")]].each do |label, job|
+  xcode_check = job.fetch("steps")[1].fetch("run", "")
+  raise "#{label} must check xcodebuild -version right after checkout" unless job.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?('"Xcode $CI_XCODE_VERSION"')
+end
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
 # Between jobs the Studio runs install.sh's copies of the runner scripts, so
 # every job compares them with the checkout, right after the first cleanup.

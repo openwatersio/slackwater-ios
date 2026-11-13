@@ -9,11 +9,12 @@ on:
     branches: [main]
 
 env:
-  # The Xcode the xcode-27 image carries, which the hosted path builds with
-  # and Nightly archives with. The studio job fails unless the Studio's
-  # selected Xcode is this one, so both paths test against the same SDK.
-  # Change it with the image.
-  STUDIO_XCODE_VERSION: "27.1"
+  # The Xcode the xcode-27 image carries. Both paths assert it: the hosted
+  # build job fails if the image moves to another Xcode, and the studio job
+  # fails unless the Studio's selected Xcode is this one, so both test
+  # against the same SDK. Nightly archives on the same image (nightly.yml)
+  # and does not check it. Change it with the image.
+  CI_XCODE_VERSION: "27.1"
 
 jobs:
   # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
@@ -250,6 +251,16 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The studio job asserts the same version, so an image that moves to
+      # another Xcode fails here instead of quietly testing a different SDK.
+      - name: Check the Xcode version
+        run: |
+          actual=$(xcodebuild -version | head -1)
+          [ "$actual" = "Xcode $CI_XCODE_VERSION" ] || {
+            echo "::error::the xcode-27 image's Xcode is '$actual', not Xcode $CI_XCODE_VERSION; update CI_XCODE_VERSION with the image"
+            exit 1
+          }
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -587,8 +598,8 @@ jobs:
       - name: Check the Xcode version
         run: |
           actual=$(xcodebuild -version | head -1)
-          [ "$actual" = "Xcode $STUDIO_XCODE_VERSION" ] || {
-            echo "::error::the Studio's selected Xcode is '$actual', not Xcode $STUDIO_XCODE_VERSION (see xcode-select -p)"
+          [ "$actual" = "Xcode $CI_XCODE_VERSION" ] || {
+            echo "::error::the Studio's selected Xcode is '$actual', not Xcode $CI_XCODE_VERSION (see xcode-select -p)"
             exit 1
           }
 
