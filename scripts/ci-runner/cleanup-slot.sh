@@ -9,12 +9,30 @@ slot=${1:?usage: cleanup-slot.sh <slot>}
 phone=SlackwaterCI-$slot-iPhone
 pad=SlackwaterCI-$slot-iPad
 failed=0
+empty='{"devices":{}}'
 
-if [[ -n ${SIMCTL_DEVICES_JSON:-} ]]; then
-    devices=$(<"$SIMCTL_DEVICES_JSON")
-else
-    devices=$(xcrun simctl list devices -j)
-fi
+# Prints the device list of one set: the file named by $1 when it is set,
+# otherwise simctl's listing of set $2 (the default set when empty). A list
+# that cannot be read or is not a device list is a failure, never an empty
+# set: the caller marks the cleanup failed and skips that set.
+list_set() {
+    local out
+    if [[ -n $1 ]]; then
+        out=$(cat -- "$1" 2>/dev/null) || return 1
+    elif [[ -n $2 ]]; then
+        out=$(xcrun simctl --set "$2" list devices -j 2>/dev/null) || return 1
+    else
+        out=$(xcrun simctl list devices -j 2>/dev/null) || return 1
+    fi
+    print -r -- "$out" | jq -e '.devices | type == "object"' >/dev/null 2>&1 || return 1
+    print -r -- "$out"
+}
+
+devices=$(list_set "${SIMCTL_DEVICES_JSON:-}" '') || {
+    print -u2 -r -- "cleanup-slot: could not list the default simulator set; skipping it"
+    devices=$empty
+    failed=1
+}
 
 # Prints the command in dry-run mode. Otherwise runs simctl, tolerating the
 # failure of a shutdown on a device that is already down.
@@ -40,13 +58,16 @@ fixed=(${(f)"$(print -r -- "$devices" | jq -r --arg a "$phone" --arg b "$pad" \
 # xcodebuild keeps its parallel-test clones in a separate device set that a
 # plain `simctl list` never shows; a cancelled run leaves them booted there.
 # Their names contain the slot's name ("Clone 1 of SlackwaterCI-1-iPhone").
-# SIMCTL_XCTEST_DEVICES_JSON=<path> overrides the listing. A missing set is fine.
+# SIMCTL_XCTEST_DEVICES_JSON=<path> overrides the listing. A missing set
+# directory is an empty set; a set that is there and cannot be listed fails.
 xctest_set=$HOME/Library/Developer/XCTestDevices
-xctest_devices='{"devices":{}}'
-if [[ -n ${SIMCTL_XCTEST_DEVICES_JSON:-} ]]; then
-    xctest_devices=$(<"$SIMCTL_XCTEST_DEVICES_JSON")
-elif [[ -d $xctest_set ]]; then
-    xctest_devices=$(xcrun simctl --set "$xctest_set" list devices -j 2>/dev/null || print -r -- '{"devices":{}}')
+xctest_devices=$empty
+if [[ -n ${SIMCTL_XCTEST_DEVICES_JSON:-} || -d $xctest_set ]]; then
+    xctest_devices=$(list_set "${SIMCTL_XCTEST_DEVICES_JSON:-}" "$xctest_set") || {
+        print -u2 -r -- "cleanup-slot: could not list $xctest_set; skipping it"
+        xctest_devices=$empty
+        failed=1
+    }
 fi
 xctest_clones=(${(f)"$(print -r -- "$xctest_devices" | jq -r --arg p "SlackwaterCI-$slot-" \
     '.devices[][] | select(.name | contains($p)) | .udid')"})
