@@ -6,12 +6,12 @@
 # A failing hook alone is not enough: the runner marks the job failed but its
 # steps runner still starts, and a step under `if: always()` runs. So a
 # refusal kills this job's Runner.Worker before any step can start. The
-# ephemeral runner then exits and launchd brings up a fresh one.
+# ephemeral runner then exits and launchd brings up a fresh one. With no
+# Runner.Worker above it, as when run by hand, it only exits 1.
 #
-# Only when this file is the hook the runner's .env names: the CI jobs run
-# this script's test inside a real job, under a Runner.Worker of their own,
-# from the checkout's copy. A workflow cannot change which file the runner
-# calls. Run by hand or from the test, it only exits 1.
+# The CI jobs run this script's test inside a real job, under a Runner.Worker
+# of their own, so the test puts a stand-in ps first on PATH for every case:
+# no refusal there can find a real Runner.Worker.
 set -eu
 trusted=0
 case "$GITHUB_EVENT_NAME" in
@@ -34,7 +34,6 @@ esac
 [ "$trusted" = 1 ] && exit 0
 
 printf 'refusing %s from %s: not a trusted run for this runner\n' "$GITHUB_EVENT_NAME" "$GITHUB_ACTOR" >&2
-[ -n "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ] && [ "$0" -ef "$ACTIONS_RUNNER_HOOK_JOB_STARTED" ] || exit 1
 pid=$$
 while [ "$pid" -gt 1 ]; do
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ') || break

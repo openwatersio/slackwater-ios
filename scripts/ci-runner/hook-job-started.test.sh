@@ -2,10 +2,17 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 event=$(mktemp)
-trap 'rm -f "$event"' EXIT
-# CI runs this inside a real job, under a Runner.Worker; without the runner's
-# hook path the refusals below can never kill it.
-unset ACTIONS_RUNNER_HOOK_JOB_STARTED
+stub=$(mktemp -d)
+trap 'rm -f "$event" "$event.err"; rm -rf "$stub"' EXIT
+# CI runs this inside a real job, under a Runner.Worker, and every refusal
+# below walks its ancestry. A stand-in ps first on PATH reports a parent of
+# pid 1 named sh, so no case can ever find, or kill, a real Runner.Worker.
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' \"\$2\" >> '$stub/calls'" \
+    'case "$2" in ppid=) echo 1 ;; comm=) echo /bin/sh ;; esac' > "$stub/ps"
+chmod +x "$stub/ps"
+PATH="$stub:$PATH"
+export PATH
+[ "$(command -v ps)" = "$stub/ps" ] || { printf 'the stand-in ps is not first on PATH\n' >&2; exit 1; }
 check() {
     expected=$1
     GITHUB_EVENT_NAME=$2
@@ -39,27 +46,16 @@ check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"user":{"
 check 1 workflow_dispatch refs/heads/main $repo clarkbw '{}'
 check 1 pull_request refs/pull/1/merge $repo clarkbw '{}'
 
-# A refusal with no Runner.Worker above it, as here, kills nothing: it says
-# why once and exits 1.
+# A refusal with no Runner.Worker above it kills nothing: it says why once
+# and exits 1. It still walks its ancestry, through the stand-in ps: one
+# parent lookup, one name lookup, then pid 1 ends the walk.
 printf '{}\n' > "$event"
+: > "$stub/calls"
 if GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature sh "$root/scripts/ci-runner/hook-job-started.sh" 2>"$event.err"; then
     printf 'the refusal exited 0\n' >&2; exit 1
 fi
 refusals=$(grep -c '^refusing ' "$event.err" || true)
 lines=$(wc -l < "$event.err" | tr -d ' ')
-rm -f "$event.err"
 [ "$refusals" = 1 ] && [ "$lines" = 1 ] || { printf 'the refusal printed %s lines, %s of them refusing\n' "$lines" "$refusals" >&2; exit 1; }
-
-# As the runner's own hook, the refusal walks its ancestry. A stand-in ps
-# reports a parent of launchd's pid 1, named sh, so the walk finds no
-# Runner.Worker, ends, and kills nothing; no real process is read.
-stub=$(mktemp -d)
-printf '%s\n' '#!/bin/sh' 'case "$2" in ppid=) echo 1 ;; comm=) echo /bin/sh ;; esac' > "$stub/ps"
-chmod +x "$stub/ps"
-if PATH="$stub:$PATH" ACTIONS_RUNNER_HOOK_JOB_STARTED="$root/scripts/ci-runner/hook-job-started.sh" \
-    GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature sh "$root/scripts/ci-runner/hook-job-started.sh" 2>"$stub/err"; then
-    rm -rf "$stub"; printf 'the runner-hook refusal exited 0\n' >&2; exit 1
-fi
-refusals=$(grep -c '^refusing ' "$stub/err" || true)
-rm -rf "$stub"
-[ "$refusals" = 1 ] || { printf 'the runner-hook refusal printed %s refusing lines\n' "$refusals" >&2; exit 1; }
+walk=$(cat "$stub/calls")
+[ "$walk" = "$(printf '%s\n' ppid= comm=)" ] || { printf 'the refusal walked its ancestry as:\n%s\n' "$walk" >&2; exit 1; }
