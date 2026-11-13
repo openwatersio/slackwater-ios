@@ -77,9 +77,17 @@ cat >"$scratch/devices.json" <<'JSON'
   {"name": "iPhone 17", "udid": "CCCCCCCC-0000-0000-0000-000000000001", "state": "Shutdown"}
 ]}}
 JSON
+# xcodebuild's clone set: an old clone, and a slot's clone that stays.
+cat >"$scratch/xctest.json" <<'JSON'
+{"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
+  {"name": "Clone 2 of SlackwaterCI-iPad", "udid": "DDDDDDDD-0000-0000-0000-000000000001", "state": "Booted"},
+  {"name": "Clone 1 of SlackwaterCI-1-iPhone", "udid": "DDDDDDDD-0000-0000-0000-000000000002", "state": "Shutdown"}
+]}}
+JSON
 install() {
     env HOME="$home" RUNNER_DRY_RUN=1 RUNNER_VERSION=v2.330.0 \
         RUNNER_LOADED_LABELS="$scratch/loaded" SIMCTL_DEVICES_JSON="$scratch/devices.json" \
+        SIMCTL_XCTEST_DEVICES_JSON="$scratch/xctest.json" \
         sh "$dir/install.sh"
 }
 uid=$(id -u)
@@ -100,6 +108,8 @@ expected=$(
         'xcrun simctl delete AAAAAAAA-0000-0000-0000-000000000002' \
         'xcrun simctl shutdown AAAAAAAA-0000-0000-0000-000000000003' \
         'xcrun simctl delete AAAAAAAA-0000-0000-0000-000000000003' \
+        "xcrun simctl --set $home/Library/Developer/XCTestDevices shutdown DDDDDDDD-0000-0000-0000-000000000001" \
+        "xcrun simctl --set $home/Library/Developer/XCTestDevices delete DDDDDDDD-0000-0000-0000-000000000001" \
         "mkdir -p $home/Library/LaunchAgents $home/Library/Logs"
     for n in 1 2 3; do
         r=$home/actions-runner/studio-$n
@@ -146,6 +156,7 @@ cat >"$scratch/devices.json" <<'JSON'
   {"name": "SlackwaterCI-3-iPhone", "udid": "5"}, {"name": "SlackwaterCI-3-iPad", "udid": "6"}
 ]}}
 JSON
+printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
 out=$(install)
 same 'install when installed' '' "$out"
 

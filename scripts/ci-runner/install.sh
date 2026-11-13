@@ -9,7 +9,8 @@
 # RUNNER_DRY_RUN=1 prints the commands instead of running them. For tests,
 # RUNNER_VERSION=<tag> skips the release lookup, RUNNER_LOADED_LABELS=<file>
 # (one label per line) stands in for asking launchd which jobs are loaded, and
-# SIMCTL_DEVICES_JSON=<file> for `xcrun simctl list devices -j`.
+# SIMCTL_DEVICES_JSON=<file> for `xcrun simctl list devices -j`, and
+# SIMCTL_XCTEST_DEVICES_JSON=<file> for the same listing of XCTestDevices.
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 uid=$(id -u)
@@ -83,6 +84,29 @@ for udid in $(printf '%s\n' "$devices" | jq -r '.devices[][] | select(.name | te
     fi
     run xcrun simctl delete "$udid"
 done
+# xcodebuild's parallel-test clones of them live in a set of their own, which
+# a plain `simctl list` never shows ("Clone 1 of SlackwaterCI-iPhone").
+# SIMCTL_XCTEST_DEVICES_JSON=<file> stands in for its listing.
+xctest_set=$HOME/Library/Developer/XCTestDevices
+xctest_devices=
+if [ -n "${SIMCTL_XCTEST_DEVICES_JSON:-}" ]; then
+    xctest_devices=$(cat "$SIMCTL_XCTEST_DEVICES_JSON")
+elif [ -d "$xctest_set" ]; then
+    xctest_devices=$(xcrun simctl --set "$xctest_set" list devices -j) || {
+        printf 'install.sh: could not list %s; its old clones stay\n' "$xctest_set" >&2
+        xctest_devices=
+    }
+fi
+if [ -n "$xctest_devices" ]; then
+    for udid in $(printf '%s\n' "$xctest_devices" | jq -r '.devices[][] | select(.name | test("SlackwaterCI-[A-Za-z]")) | .udid'); do
+        if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+            run xcrun simctl --set "$xctest_set" shutdown "$udid"
+        else
+            xcrun simctl --set "$xctest_set" shutdown "$udid" 2>/dev/null || true
+        fi
+        run xcrun simctl --set "$xctest_set" delete "$udid"
+    done
+fi
 
 if [ ! -d "$agents" ] || [ ! -d "$HOME/Library/Logs" ]; then
     run mkdir -p "$agents" "$HOME/Library/Logs"
