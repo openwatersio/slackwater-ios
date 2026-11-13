@@ -69,6 +69,25 @@ has_device() {
         'any(.devices | to_entries[] | select(.key | endswith($r)) | .value[]; .name == $n and .isAvailable == true)' >/dev/null
 }
 
+# Two available devices of one slot name on the pinned runtime are both the
+# slot's as far as cleanup-slot.sh and the jobs can tell. Which one to keep is
+# the operator's call, so stop before changing anything.
+duplicates=0
+for slot in 1 2 3; do
+    for device in iPhone iPad; do
+        name=SlackwaterCI-$slot-$device
+        udids=$(printf '%s\n' "$devices" | jq -r --arg n "$name" --arg r "${runtime##*.}" \
+            '[.devices | to_entries[] | select(.key | endswith($r)) | .value[]
+              | select(.name == $n and .isAvailable == true) | .udid] | select(length > 1) | join(" ")')
+        if [ -n "$udids" ]; then
+            printf 'install.sh: more than one available %s on %s: %s\n' "$name" "${runtime##*.}" "$udids" >&2
+            printf 'install.sh:   keep one, delete each of the others with: xcrun simctl delete <udid>\n' >&2
+            duplicates=1
+        fi
+    done
+done
+[ "$duplicates" = 0 ] || exit 1
+
 # The old runner: one organisation-level runner named studio in the
 # slackwater-nightly group, served by its own launchd agent.
 if is_loaded "$old_label"; then

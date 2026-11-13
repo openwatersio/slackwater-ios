@@ -199,6 +199,23 @@ grep -q 'create' "$scratch/out" && fail "install.sh created a device beside a ma
 grep -q 'is not a device list' "$scratch/err" || fail "install.sh on a malformed XCTestDevices listing said: $(cat "$scratch/err")"
 printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
 
+# Two available devices of one slot name on the pinned runtime: install.sh
+# names both and stops before changing anything, rather than pick one.
+cp "$scratch/devices.json" "$scratch/installed.json"
+cat >"$scratch/devices.json" <<'JSON'
+{"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
+  {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
+  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
+  {"name": "SlackwaterCI-2-iPhone", "udid": "7", "isAvailable": true},
+  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+]}}
+JSON
+if install >"$scratch/out" 2>"$scratch/err"; then fail 'install.sh accepted two SlackwaterCI-2-iPhone devices'; fi
+same 'install with a duplicate device' '' "$(cat "$scratch/out")"
+grep -q 'SlackwaterCI-2-iPhone on iOS-27-0: 3 7$' "$scratch/err" || fail "install.sh on a duplicate device said: $(cat "$scratch/err")"
+grep -q 'xcrun simctl delete <udid>' "$scratch/err" || fail "install.sh did not say how to delete a duplicate: $(cat "$scratch/err")"
+mv "$scratch/installed.json" "$scratch/devices.json"
+
 # A changed plist reloads its job.
 printf '<!-- old -->\n' >>"$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.2.plist"
 plist=$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.2.plist
