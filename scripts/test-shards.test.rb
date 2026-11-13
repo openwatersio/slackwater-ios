@@ -59,6 +59,24 @@ studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
 %w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
   raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
 end
+# install.sh creates the Studio's simulators on the hosted app job's runtime
+# and device types, copied by hand. Runtime: iOS-<SLACKWATER_SIM_OS with the
+# dot as a hyphen>. Device type: the matrix's device name with spaces as
+# hyphens and parentheses dropped, plus a memory suffix (-12GB) where the
+# simulator has one, which the device name never shows.
+install_sh = File.read("#{root}/scripts/ci-runner/install.sh")
+install_runtime = install_sh[/^runtime=com\.apple\.CoreSimulator\.SimRuntime\.(\S+)$/, 1]
+sim_os = app.fetch("env").fetch("SLACKWATER_SIM_OS")
+raise "install.sh's runtime #{install_runtime} is not iOS #{sim_os}, the app job's SLACKWATER_SIM_OS" unless install_runtime == "iOS-#{sim_os.tr('.', '-')}"
+hosted_devices = app.fetch("strategy").fetch("matrix").fetch("device").scan(/'(\[[^\]]*\])'/).flatten.flat_map { |list| JSON.parse(list) }.uniq
+install_types = { "iPhone" => install_sh[/^iphone_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1],
+                  "iPad" => install_sh[/^ipad_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1] }
+raise "the hosted app job names #{hosted_devices}, not one iPhone and one iPad" unless hosted_devices.size == 2 && install_types.keys.all? { |kind| hosted_devices.one? { |d| d.start_with?("#{kind} ") } }
+install_types.each do |kind, type|
+  device = hosted_devices.find { |d| d.start_with?("#{kind} ") }
+  derived = device.tr(" ", "-").delete("()")
+  raise "install.sh's #{kind} type #{type.inspect} is not the hosted #{device.inspect} (#{derived})" unless type.to_s.match?(/\A#{Regexp.escape(derived)}(-\d+GB)?\z/)
+end
 # Both paths assert the same Xcode, the one the xcode-27 image carries.
 raise "the workflow must pin CI_XCODE_VERSION" unless workflow.dig("env", "CI_XCODE_VERSION").to_s.match?(/\A\d+\.\d+(\.\d+)?\z/)
 [["studio", studio], ["build", jobs.fetch("build")]].each do |label, job|
