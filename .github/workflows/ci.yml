@@ -758,6 +758,14 @@ jobs:
       # its own workers, clones the slot's device for them, and applies its
       # own PERF_SCALE default of 2, which it chose for overlapped runs on
       # this machine. SLACKWATER_SIMS comes from the step above.
+      #
+      # SLACKWATER_SIM_OS is pinned here as on the hosted path, and for a
+      # sharper reason: a `name=` destination with no OS means OS:latest,
+      # which is the newest runtime this Mac has installed, not the newest
+      # one that has the device. The Studio carries several iOS runtimes,
+      # and the slot's device exists only on CI_SIM_OS, so without the pin
+      # xcodebuild listed the device and still reported "Unable to find a
+      # device matching" (the first Studio run, #926).
       - id: tests
         continue-on-error: true
         run: |
@@ -769,6 +777,7 @@ jobs:
           ./scripts/test.sh ${MODE:+"$MODE"}
         env:
           MODE: ${{ github.event_name == 'push' && '--full' || '' }}
+          SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
 
       # The hosted app job's failure messages, rerun and verdict; the comments
       # there say why each exists.
@@ -803,6 +812,7 @@ jobs:
             || { scripts/test-failures.sh build/*.xcresult | grep -v attempt1; exit 1; }
         env:
           SLACKWATER_ONLY: ${{ steps.failures.outputs.failed }}
+          SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
 
       - name: Test result
         if: always()

@@ -154,9 +154,10 @@ own_sim() {
 dests=()
 for sim in "${sims[@]}"; do
   if (( ${+SLACKWATER_SIMS} )); then
-    # SLACKWATER_SIM_OS pins the runtime; without it xcodebuild takes the
-    # newest one that has the device (the hosted CI path sets it, see
-    # .github/workflows/ci.yml).
+    # SLACKWATER_SIM_OS pins the runtime. Without it the destination means
+    # OS:latest, the newest runtime installed on this Mac, and a device that
+    # exists only on an older one is "Unable to find a device matching" even
+    # though xcodebuild lists it. Both CI paths set it (.github/workflows/ci.yml).
     dests+=("platform=iOS Simulator,name=$sim${SLACKWATER_SIM_OS:+,OS=$SLACKWATER_SIM_OS}")
   else
     dests+=("platform=iOS Simulator,id=$(own_sim "$sim")")
