@@ -99,7 +99,10 @@ jobs:
   # or the hosted build plus shards (build and app jobs). This is not the
   # guard. A pull request runs the workflow from its own head and can delete
   # this job; the runners' job-started hook enforces the same trust rule where
-  # a pull request cannot edit it (scripts/ci-runner/hook-job-started.sh).
+  # a pull request cannot edit it (scripts/ci-runner/hook-job-started.sh), and
+  # kills a refused job before any step runs. A fork's edited workflow never
+  # starts without a maintainer's click while the repository's "Require
+  # approval for all outside collaborators" setting stays on.
   #
   # Trusted is a push to main or a pull request from a branch in this
   # repository, which only people with push access can create. Dependabot's

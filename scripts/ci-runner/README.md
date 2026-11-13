@@ -12,6 +12,8 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 
 `install.sh` copies `reregister.sh`, the hook and the cleanup script into each runner directory, and those copies are what run. Between jobs there is no checkout to run them from.
 
+A failing job-started hook alone does not stop a job: the runner marks it failed, but its steps still start, and a step under `if: always()` runs. So the hook, on a refusal, kills the job's `Runner.Worker` before any step runs. The ephemeral runner exits and launchd brings up a fresh one. The hook is the second fence. The first is the repository setting "Require approval for all outside collaborators" (Settings, Actions, General, Fork pull request workflows), which must stay on, so a fork's edited workflow never even starts without a maintainer's click.
+
 ## Install
 
 1. Create a fine-grained personal access token at github.com, Settings, Developer settings, Fine-grained tokens. Resource owner `openwatersio`, repository access only `openwatersio/slackwater-ios`, repository permission Administration: Read and write. Nothing else. It mints the short-lived runner registration tokens and nothing more.
