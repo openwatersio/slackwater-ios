@@ -36,7 +36,8 @@ same 'reregister .env' "$(printf '%s\n' \
     "would write $runner/.env:" \
     'SLACKWATER_CI_SLOT=2' \
     "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner/hook-job-started.sh" \
-    "PATH=$home/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")" "$(cat "$scratch/err")"
+    "PATH=$home/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    "MISE_TRUSTED_CONFIG_PATHS=$runner/_work")" "$(cat "$scratch/err")"
 
 # A runner killed mid-job leaves its local registration behind, which
 # config.sh refuses to overwrite; it is removed first, with a removal token.

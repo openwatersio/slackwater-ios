@@ -46,11 +46,14 @@ fi
 
 # The runner loads .env into every job's environment. The workflow reads the
 # slot from it, and it pins the PATH the jobs see, whatever PATH config.sh
-# captured into .path when it ran.
+# captured into .path when it ran. Jobs check out under _work, a path mise
+# has never been told to trust, so without MISE_TRUSTED_CONFIG_PATHS the
+# node shim can refuse the checkout's mise.toml.
 env_file=$(printf '%s\n' \
     "SLACKWATER_CI_SLOT=$SLOT" \
     "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner_dir/hook-job-started.sh" \
-    "PATH=$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+    "PATH=$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    "MISE_TRUSTED_CONFIG_PATHS=$runner_dir/_work")
 if [ -n "${RUNNER_DRY_RUN:-}" ]; then
     printf 'would write %s/.env:\n%s\n' "$runner_dir" "$env_file" >&2
 else
