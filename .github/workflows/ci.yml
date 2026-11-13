@@ -622,8 +622,12 @@ jobs:
       # not in the `env` expression context, so the device name is built in
       # the shell and handed on through GITHUB_ENV. Set this late: the runner
       # mode tests above run test.sh with and without SLACKWATER_SIMS.
+      # SHOT_DIR: three slots share this Mac's /tmp, so the default would upload
+      # another slot's screenshots; RUNNER_TEMP is this runner's and emptied per job.
       - name: Name the slot's device
-        run: echo "SLACKWATER_SIMS=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE" >> "$GITHUB_ENV"
+        run: |
+          echo "SLACKWATER_SIMS=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE" >> "$GITHUB_ENV"
+          echo "SHOT_DIR=$RUNNER_TEMP/slackwater-shots" >> "$GITHUB_ENV"
         env:
           DEVICE: ${{ matrix.device }}
 
@@ -714,7 +718,7 @@ jobs:
         with:
           name: test-evidence-studio-${{ matrix.device }}
           path: |
-            /tmp/slackwater-shots
+            ${{ runner.temp }}/slackwater-shots
             build/*.xcresult
             build/results-*.log
           if-no-files-found: ignore
