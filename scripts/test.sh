@@ -81,7 +81,8 @@ mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 # calibrated on this Mac running one suite alone. Several worktrees now run at
 # once, and under overlap the same tests ran ~2× slower (31/42/45 s alone,
 # 50/91/71 s overlapped) and three of twelve tripped their waits. CI sets 4 for
-# its runners (.github/workflows/ci.yml) and that is taken as given.
+# its hosted runners and leaves the default on the Studio
+# (.github/workflows/ci.yml), and that is taken as given.
 export TEST_RUNNER_SLACKWATER_PERF_SCALE="${TEST_RUNNER_SLACKWATER_PERF_SCALE:-2}"
 
 # SLACKWATER_XCTESTRUN names a .xctestrun from an earlier build-for-testing
