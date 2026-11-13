@@ -13,7 +13,9 @@ env:
   # build job fails if the image moves to another Xcode, and the studio job
   # fails unless the Studio's selected Xcode is this one, so both test
   # against the same SDK. Nightly archives on the same image (nightly.yml)
-  # and does not check it. Change it with the image.
+  # and does not check it. The pin is major.minor: a patch release such as
+  # 27.1.1 still passes, so an image update within 27.1 does not fail every
+  # hosted job. Change it when the image moves to another minor version.
   CI_XCODE_VERSION: "27.1"
 
 jobs:
@@ -257,7 +259,9 @@ jobs:
       - name: Check the Xcode version
         run: |
           actual=$(xcodebuild -version | head -1)
-          [ "$actual" = "Xcode $CI_XCODE_VERSION" ] || {
+          # Major.minor, then optionally a dot and a patch number.
+          pin=${CI_XCODE_VERSION//./\\.}
+          [[ "$actual" =~ ^Xcode\ ${pin}(\.[0-9]+)?$ ]] || {
             echo "::error::the xcode-27 image's Xcode is '$actual', not Xcode $CI_XCODE_VERSION; update CI_XCODE_VERSION with the image"
             exit 1
           }
@@ -602,7 +606,9 @@ jobs:
       - name: Check the Xcode version
         run: |
           actual=$(xcodebuild -version | head -1)
-          [ "$actual" = "Xcode $CI_XCODE_VERSION" ] || {
+          # Major.minor, then optionally a dot and a patch number.
+          pin=${CI_XCODE_VERSION//./\\.}
+          [[ "$actual" =~ ^Xcode\ ${pin}(\.[0-9]+)?$ ]] || {
             echo "::error::the Studio's selected Xcode is '$actual', not Xcode $CI_XCODE_VERSION (see xcode-select -p)"
             exit 1
           }

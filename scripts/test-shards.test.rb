@@ -77,11 +77,25 @@ install_types.each do |kind, type|
   derived = device.tr(" ", "-").delete("()")
   raise "install.sh's #{kind} type #{type.inspect} is not the hosted #{device.inspect} (#{derived})" unless type.to_s.match?(/\A#{Regexp.escape(derived)}(-\d+GB)?\z/)
 end
-# Both paths assert the same Xcode, the one the xcode-27 image carries.
-raise "the workflow must pin CI_XCODE_VERSION" unless workflow.dig("env", "CI_XCODE_VERSION").to_s.match?(/\A\d+\.\d+(\.\d+)?\z/)
+# Both paths assert the same Xcode, the one the xcode-27 image carries. The
+# pin is major.minor, and a patch release of it passes: an image moving from
+# 27.1 to 27.1.1 must not fail every hosted job.
+raise "the workflow must pin CI_XCODE_VERSION as major.minor" unless workflow.dig("env", "CI_XCODE_VERSION").to_s.match?(/\A\d+\.\d+\z/)
+xcode_cases = { "Xcode 27.1" => true, "Xcode 27.1.1" => true, "Xcode 27.1.12" => true, "Xcode 27.10" => false,
+                "Xcode 27.2" => false, "Xcode 27.1beta" => false, "Xcode 27.1." => false, "Xcode 2701" => false, "Xcode 27.1.1 " => false }
 [["studio", studio], ["build", jobs.fetch("build")]].each do |label, job|
   xcode_check = job.fetch("steps")[1].fetch("run", "")
-  raise "#{label} must check xcodebuild -version right after checkout" unless job.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?('"Xcode $CI_XCODE_VERSION"')
+  raise "#{label} must check xcodebuild -version right after checkout" unless job.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?("CI_XCODE_VERSION")
+  # Run the step as a macOS run step does (bash -e), against a stand-in xcodebuild.
+  require "tmpdir"
+  Dir.mktmpdir do |dir|
+    xcode_cases.each do |line, pass|
+      File.write("#{dir}/xcodebuild", "#!/bin/sh\nprintf '%s\\nBuild version 1A1\\n' '#{line}'\n")
+      File.chmod(0o755, "#{dir}/xcodebuild")
+      ok = system({ "PATH" => "#{dir}:/usr/bin:/bin", "CI_XCODE_VERSION" => "27.1" }, "/bin/bash", "-e", "-c", xcode_check, out: File::NULL, err: File::NULL)
+      raise "#{label}'s Xcode check #{pass ? 'refuses' : 'accepts'} #{line.inspect} against 27.1" unless ok == pass
+    end
+  end
 end
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
 # Between jobs the Studio runs install.sh's copies of the runner scripts, so
