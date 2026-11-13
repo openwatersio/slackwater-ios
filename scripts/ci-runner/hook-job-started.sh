@@ -71,7 +71,9 @@ case "$GITHUB_EVENT_NAME" in
         branch=$("$jq" -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH")
         # A bot's pull request is refused, and so is anything on a dependabot/
         # branch, whoever pushed to it last: nobody wrote the bumped packages.
-        # Any field missing reads empty and is refused.
+        # Any field missing reads empty and is refused. Lowercased first: the
+        # workflow's startsWith() ignores case, so Dependabot/x must match too.
+        branch=$(printf '%s' "$branch" | /usr/bin/tr '[:upper:]' '[:lower:]')
         case "$branch" in
             '' | dependabot/*) ;;
             *) if [ "$head" = "$GITHUB_REPOSITORY" ] && [ "$author" = User ]; then trusted=1; fi ;;

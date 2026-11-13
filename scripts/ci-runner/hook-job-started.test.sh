@@ -66,6 +66,9 @@ check 1 pull_request refs/pull/1/merge $repo 'dependabot[bot]' "$(pr $repo Bot d
 check 1 pull_request refs/pull/1/merge $repo 'renovate[bot]' "$(pr $repo Bot renovate/x)"
 # A person who rebased or edited a Dependabot branch does not make its bumps trusted.
 check 1 pull_request refs/pull/1/merge $repo clarkbw "$(pr $repo User dependabot/npm_and_yarn/x-1.2.3)"
+# The route's startsWith() ignores case, so the hook must too.
+check 1 pull_request refs/pull/1/merge $repo clarkbw "$(pr $repo User Dependabot/x)"
+check 1 pull_request refs/pull/1/merge $repo clarkbw "$(pr $repo User DEPENDABOT/x)"
 # Missing fields fail closed.
 check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"head":{"ref":"feature","repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
 check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"user":{"type":"User"},"head":{"repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
