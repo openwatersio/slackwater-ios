@@ -91,7 +91,7 @@ drift = studio.fetch("steps")[3]
 drift_run = drift.fetch("run", "")
 raise "studio must check its installed runner scripts after the first cleanup" unless drift["name"] == "Installed runner scripts match the checkout" &&
   drift_run.include?('dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED"') && drift_run.include?("cmp -s - ") &&
-  drift_run.include?("git fetch --depth 1 origin main") && drift_run.include?('git show "origin/main:scripts/ci-runner/$script"') &&
+  drift_run.include?("git fetch --depth 1 origin +refs/heads/main:refs/remotes/origin/main") && drift_run.include?('git show "origin/main:scripts/ci-runner/$script"') &&
   drift_run.include?('if [ "$EVENT" = push ]; then') && drift_run.include?('cat "scripts/ci-runner/$script"') &&
   drift.dig("env", "EVENT") == "${{ github.event_name }}" &&
   drift_run.include?("sh scripts/ci-runner/install.sh") && drift_run.include?('[ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]') &&

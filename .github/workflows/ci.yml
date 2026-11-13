@@ -627,7 +627,7 @@ jobs:
             exit 1
           fi
           dir=$(dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED")
-          if [ "$EVENT" != push ]; then git fetch --depth 1 origin main; fi
+          if [ "$EVENT" != push ]; then git fetch --depth 1 origin +refs/heads/main:refs/remotes/origin/main; fi
           stale=0
           for script in hook-job-started.sh cleanup-slot.sh reregister.sh; do
             if [ "$EVENT" = push ]; then
