@@ -174,6 +174,14 @@ struct ChsQueue {
         min(pow(2, Double(max(attempts, 1) - 1)) * 60, 15 * 60)
     }
 
+    /// How long to sleep before a retry due at `due`, on the app clock: `due`
+    /// was computed from `appNow()`, which a Debug launch can pin, so a sleep
+    /// measured from the real clock would end at once or never. At least a
+    /// second, so a retry already due still yields the loop.
+    static func retryWait(until due: Date, now: Date = appNow()) -> TimeInterval {
+        max(due.timeIntervalSince(now), 1)
+    }
+
     mutating func deferRetry(_ id: String, error: String, at now: Date = appNow()) {
         guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
         jobs[i].attempts += 1
@@ -188,6 +196,16 @@ struct ChsQueue {
             guard job.status == .pending, let due = job.retryAfter, due > now else { return nil }
             return due
         }.min()
+    }
+
+    /// A retry timer that slept until `due` has fired: the jobs it slept for
+    /// are eligible now. Checking `appNow()` instead would never release them
+    /// under a pinned Debug clock, which stands still at the instant it was
+    /// given.
+    mutating func releaseRetries(dueBy due: Date) {
+        for i in jobs.indices where jobs[i].status == .pending && (jobs[i].retryAfter ?? .distantFuture) <= due {
+            jobs[i].retryAfter = nil
+        }
     }
 
     func deferred(at now: Date = appNow()) -> Int {

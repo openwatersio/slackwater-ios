@@ -15,7 +15,7 @@ enum LocalStationKind {
 
 @MainActor enum LocalStationQuery {
     static func nearest(_ kind: LocalStationKind,
-                        to anchor: (lat: Double, lon: Double)?, at now: Date = .now, on date: Date? = nil) -> WidgetRecord? {
+                        to anchor: (lat: Double, lon: Double)?, at now: Date = appNow(), on date: Date? = nil) -> WidgetRecord? {
         guard let anchor else { return nil }
         return RankedStations.near(lat: anchor.lat, lon: anchor.lon).ranked.lazy
             .filter { $0.series == (kind == .tide ? .tide : .current) }
@@ -108,7 +108,7 @@ struct TideShortcutResult {
 }
 
 @MainActor enum TideShortcutQuery {
-    static func next(_ kind: TideShortcutKind, at selected: WidgetRecord?, after now: Date = .now) -> TideShortcutResult? {
+    static func next(_ kind: TideShortcutKind, at selected: WidgetRecord?, after now: Date = appNow()) -> TideShortcutResult? {
         guard let selected, case .tide(let record, let engine) = selected,
               let extreme = engine.extremes(from: now, to: now.addingTimeInterval(172_800))
                 .first(where: { $0.time > now && ($0.kind == .high) == (kind == .high) }) else { return nil }
@@ -183,7 +183,7 @@ struct SlackWindowShortcutResult {
     }
 
     static func next(at selected: WidgetRecord?,
-                     after now: Date = .now) -> SlackWindowShortcutResult? {
+                     after now: Date = appNow()) -> SlackWindowShortcutResult? {
         guard let selected, case .current(let record, let engine) = selected,
               !slackWindowIsOff(slackThresholdKn) else { return nil }
         let events = engine.events(from: now.addingTimeInterval(-21_600), to: now.addingTimeInterval(172_800))

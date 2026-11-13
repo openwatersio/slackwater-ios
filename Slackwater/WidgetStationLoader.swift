@@ -34,9 +34,9 @@ enum WidgetStationLoader {
         return locator.load { directory in try recordSource(id: id, directory: directory) } ?? { _ in nil }
     }
 
-    /// Online gates need a saved window; widgets cannot request one themselves.
+    /// Online gates need a saved window covering `date`; widgets cannot request one themselves.
     static func loadRecord(
-        id: String, at date: Date = .now, locator: CatalogFileLocator = .shared,
+        id: String, at date: Date = appNow(), locator: CatalogFileLocator = .shared,
         successors: [String: String] = StationSuccessors.bundled
     ) -> WidgetRecord? {
         recordSource(id: id, locator: locator, successors: successors)(date)
