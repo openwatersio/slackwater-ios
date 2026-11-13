@@ -17,7 +17,7 @@ uid=$(id -u)
 agents=$HOME/Library/LaunchAgents
 old_label=actions.runner.openwatersio.studio
 old_dir=$HOME/actions-runner/slackwater-ios
-# The devices and runtime the hosted app job names (SLACKWATER_SIM_OS there).
+# The devices the hosted app job names, and the runtime CI_SIM_OS in ci.yml names.
 iphone_type=com.apple.CoreSimulator.SimDeviceType.iPhone-17
 ipad_type=com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB
 runtime=com.apple.CoreSimulator.SimRuntime.iOS-27-0

@@ -59,15 +59,62 @@ studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
 %w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
   raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
 end
-# install.sh creates the Studio's simulators on the hosted app job's runtime
-# and device types, copied by hand. Runtime: iOS-<SLACKWATER_SIM_OS with the
-# dot as a hyphen>. Device type: the matrix's device name with spaces as
-# hyphens and parentheses dropped, plus a memory suffix (-12GB) where the
-# simulator has one, which the device name never shows.
+# install.sh creates the Studio's simulators on CI_SIM_OS, the runtime the
+# hosted app job tests on, and on its device types, copied by hand. Runtime:
+# iOS-<CI_SIM_OS with the dot as a hyphen>. Device type: the matrix's device
+# name with spaces as hyphens and parentheses dropped, plus a memory suffix
+# (-12GB) where the simulator has one, which the device name never shows.
 install_sh = File.read("#{root}/scripts/ci-runner/install.sh")
 install_runtime = install_sh[/^runtime=com\.apple\.CoreSimulator\.SimRuntime\.(\S+)$/, 1]
-sim_os = app.fetch("env").fetch("SLACKWATER_SIM_OS")
-raise "install.sh's runtime #{install_runtime} is not iOS #{sim_os}, the app job's SLACKWATER_SIM_OS" unless install_runtime == "iOS-#{sim_os.tr('.', '-')}"
+sim_os = workflow.dig("env", "CI_SIM_OS").to_s
+raise "the workflow must pin CI_SIM_OS as major.minor" unless sim_os.match?(/\A\d+\.\d+\z/)
+raise "install.sh's runtime #{install_runtime} is not iOS #{sim_os}, the workflow's CI_SIM_OS" unless install_runtime == "iOS-#{sim_os.tr('.', '-')}"
+# Every hosted step that boots or tests takes its runtime from CI_SIM_OS. A
+# job-level env cannot read the env context, so each step sets it.
+raise "the app job must not pin its own runtime" if app.fetch("env", {}).key?("SLACKWATER_SIM_OS")
+app.fetch("steps").select { |s| s.fetch("run", "").match?(/SLACKWATER_SIM_OS|scripts\/test\.sh/) }.tap do |steps|
+  raise "expected the warm-up, tests and rerun steps to use the runtime, got #{steps.size}" unless steps.size == 3
+  steps.each do |s|
+    raise "app step #{s['id'] || s['name'] || s['run'][0, 40]} must set SLACKWATER_SIM_OS from CI_SIM_OS" unless s.dig("env", "SLACKWATER_SIM_OS") == "${{ env.CI_SIM_OS }}"
+  end
+end
+# The Studio's devices stay on the runtime install.sh made them on, so the
+# step that names the slot's device fails unless it is on CI_SIM_OS. Run it
+# against a stand-in xcrun listing devices on various runtimes.
+name_step = studio.fetch("steps").find { |s| s["name"] == "Name the slot's device" } or raise "missing the studio step that names the slot's device"
+name_run = name_step.fetch("run")
+require "tmpdir"
+runtime_key = ->(v) { "com.apple.CoreSimulator.SimRuntime.iOS-#{v}" }
+device = ->(name, available = true) { { "name" => name, "udid" => "U-#{name}", "isAvailable" => available, "state" => "Shutdown" } }
+runtime_cases = {
+  "on CI_SIM_OS" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone")], runtime_key.call("26-4") => [device.call("Other")] }, true],
+  "on another runtime" => [{ runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "unavailable on CI_SIM_OS" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone", false)], runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "on both runtimes" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone")], runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "missing" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-1-iPhone")] }, false],
+  "on a minor that only starts the same" => [{ runtime_key.call("27-01") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+}
+Dir.mktmpdir do |dir|
+  jq = %w[/usr/bin/jq /opt/homebrew/bin/jq /usr/local/bin/jq].find { |p| File.executable?(p) } or raise "the studio runtime check needs jq"
+  File.symlink(jq, "#{dir}/jq")
+  runtime_cases.each do |label, (devices, pass)|
+    File.write("#{dir}/devices.json", JSON.generate("devices" => devices))
+    File.write("#{dir}/xcrun", "#!/bin/sh\n[ \"$*\" = 'simctl list devices -j' ] || exit 64\ncat '#{dir}/devices.json'\n")
+    File.chmod(0o755, "#{dir}/xcrun")
+    File.write("#{dir}/env", "")
+    env = { "PATH" => "#{dir}:/usr/bin:/bin", "CI_SIM_OS" => sim_os, "SLACKWATER_CI_SLOT" => "2", "DEVICE" => "iPhone",
+            "GITHUB_ENV" => "#{dir}/env", "RUNNER_TEMP" => dir }
+    out = IO.popen(env, ["/bin/bash", "-e", "-c", name_run], err: [:child, :out], &:read)
+    ok = $?.success?
+    raise "the studio runtime check #{pass ? 'refuses' : 'accepts'} a slot device #{label}: #{out}" unless ok == pass
+    if pass
+      raise "the studio runtime check must still name the device" unless File.read("#{dir}/env").include?("SLACKWATER_SIMS=SlackwaterCI-2-iPhone\n")
+    else
+      raise "the studio runtime refusal must name both runtimes and install.sh: #{out}" unless out.include?("not iOS-#{sim_os.tr('.', '-')}") && out.include?("on runtime '") && out.include?("scripts/ci-runner/install.sh")
+      raise "a refused runtime must not name the device" if File.read("#{dir}/env").include?("SLACKWATER_SIMS")
+    end
+  end
+end
 hosted_devices = app.fetch("strategy").fetch("matrix").fetch("device").scan(/'(\[[^\]]*\])'/).flatten.flat_map { |list| JSON.parse(list) }.uniq
 install_types = { "iPhone" => install_sh[/^iphone_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1],
                   "iPad" => install_sh[/^ipad_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1] }

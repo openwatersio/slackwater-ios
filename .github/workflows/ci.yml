@@ -17,6 +17,11 @@ env:
   # 27.1.1 still passes, so an image update within 27.1 does not fail every
   # hosted job. Change it when the image moves to another minor version.
   CI_XCODE_VERSION: "27.1"
+  # The simulator runtime both paths test on. The hosted app job passes it to
+  # test.sh as SLACKWATER_SIM_OS (its cold-boot comment says why it is pinned,
+  # and to this one); the studio job fails unless the slot's device is on it,
+  # and install.sh's runtime= must name it (the shard test checks).
+  CI_SIM_OS: "27.0"
 
 jobs:
   # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
@@ -335,10 +340,8 @@ jobs:
       group: ci-app-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: xcode-27  # same image as the build job, see there
-    env:
-      # The simulator runtime every step below boots and tests on; the
-      # cold-boot comment below says why it is pinned, and to this one.
-      SLACKWATER_SIM_OS: "27.0"
+    # Every step below that boots or tests sets SLACKWATER_SIM_OS from
+    # CI_SIM_OS itself: a job's env cannot read the workflow's env context.
     # Balance lanes so a typical iPad test session stays under about 45 min:
     # setup before it takes about 10, and the rerun step below can add a few
     # tests' worth. The cap sits higher because hosted runners vary more than
@@ -412,11 +415,12 @@ jobs:
       # re-enumerates the devices, so it treats the symptom and leaves a
       # version to maintain forever.
       #
-      # The runtime IS pinned, by SLACKWATER_SIM_OS. The image's Xcode,
-      # CI_XCODE_VERSION at the top of this file, has no runtime of its own
+      # The runtime IS pinned, by SLACKWATER_SIM_OS, which each step sets
+      # from CI_SIM_OS at the top of this file. The image's Xcode,
+      # CI_XCODE_VERSION there, has no runtime of its own
       # version for these devices (iOS 27.1 carries only the iPhone Duo), so
       # an unpinned destination takes the newest runtime that has them, a
-      # pre-release build. SLACKWATER_SIM_OS names the GA runtime that has
+      # pre-release build. CI_SIM_OS names the GA runtime that has
       # both devices. The pin keeps the lanes off pre-release runtimes;
       # it is not a fix for the hosted iOS 27 simulators sometimes never
       # drawing the notification permission prompt, which showed on 27.0 too
@@ -451,6 +455,7 @@ jobs:
           xcrun simctl uninstall "$udid" io.openwaters.slackwater
         env:
           DEVICE: ${{ matrix.device }}
+          SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
 
       # SLACKWATER_SIMS must name ONE device — it overrides the script's
       # fast/full device list outright.
@@ -482,6 +487,7 @@ jobs:
         env:
           MODE: ${{ github.event_name == 'push' && '--full' || '' }}
           SLACKWATER_SIMS: ${{ matrix.device }}
+          SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
           SLACKWATER_WORKERS: 1
           SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
@@ -531,6 +537,7 @@ jobs:
             || { scripts/test-failures.sh build/*.xcresult | grep -v attempt1; exit 1; }
         env:
           SLACKWATER_SIMS: ${{ matrix.device }}
+          SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
           SLACKWATER_WORKERS: 1
           SLACKWATER_NO_CLONE: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
@@ -702,9 +709,22 @@ jobs:
       # not in the `env` expression context, so the device name is built in
       # the shell and handed on through GITHUB_ENV. Set this late: the runner
       # mode tests above run test.sh with and without SLACKWATER_SIMS.
+      #
+      # install.sh created the slot's devices on one runtime, and nothing
+      # moves them when CI_SIM_OS does, so a device on another runtime fails
+      # here instead of quietly testing a different iOS than the hosted lane.
       - name: Name the slot's device
         run: |
-          echo "SLACKWATER_SIMS=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE" >> "$GITHUB_ENV"
+          name=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE
+          want=iOS-${CI_SIM_OS//./-}
+          # The runtime key of each available device by that name, as iOS-<major>-<minor>.
+          runtime=$(xcrun simctl list devices -j | jq -r --arg n "$name" \
+            '[.devices | to_entries[] | select(any(.value[]; .name == $n and .isAvailable)) | .key | sub(".*\\."; "")] | join(",")')
+          if [ "$runtime" != "$want" ]; then
+            echo "::error::$name is on runtime '${runtime:-none}', not $want (CI_SIM_OS $CI_SIM_OS). Rerun sh scripts/ci-runner/install.sh on the Studio"
+            exit 1
+          fi
+          echo "SLACKWATER_SIMS=$name" >> "$GITHUB_ENV"
           # Three slots share this Mac's /tmp, where test.sh's default would mix
           # their screenshots. RUNNER_TEMP is this runner's own and is emptied per job.
           echo "SHOT_DIR=$RUNNER_TEMP/slackwater-shots" >> "$GITHUB_ENV"
@@ -717,7 +737,8 @@ jobs:
       # state: the location prompt already handled (see the hosted comment)
       # and the first-launch caches already written. The device is shut down
       # at the end because test.sh has only ever cloned a shut-down device.
-      # No runtime filter: the slot's devices are unique by name.
+      # No runtime filter: the slot's devices are unique by name, and the
+      # step above checked the runtime.
       - run: |
           udid=$(xcrun simctl list devices available | grep -F "$SLACKWATER_SIMS (" | tail -1 \
             | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
