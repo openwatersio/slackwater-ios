@@ -58,7 +58,9 @@ studio = [dict(id=i, run_attempt=1, name=n, status="completed", conclusion="succ
           for i, n in enumerate(("App tests · iPhone (Studio)", "App tests · iPad (Studio)"), start=50)]
 check([run], studio, True)
 check([run], studio[:1], False)
-check([run], studio[:1] + jobs, False)
+check([run], studio[:1] + jobs, True)
+check([run], studio + jobs, True)
+check([run], studio[:1] + jobs[:7], False)
 check([run], [{**studio[1], "conclusion": "failure"}, studio[0]], False)
 print("nightly exact-commit validation checks passed")
 

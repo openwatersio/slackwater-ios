@@ -66,9 +66,8 @@ def validate_jobs(run, repository):
             latest[job["name"]] = job
     successful = {job["name"] for job in latest.values()
                   if job["status"] == "completed" and job["conclusion"] == "success"}
-    # One run validates on the hosted shards or on the Studio, never a mix of both.
-    if successful & STUDIO_JOBS and successful & (HOSTED_JOBS - {"Build for testing"}):
-        raise ValueError("run mixes Studio and hosted app validation")
+    # Either set in full validates the run, whatever else succeeded beside it.
+    # Two partial sets never add up to one.
     if HOSTED_JOBS <= successful or STUDIO_JOBS <= successful:
         return
     missing = min((HOSTED_JOBS - successful, STUDIO_JOBS - successful), key=len)
