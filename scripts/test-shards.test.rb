@@ -59,7 +59,11 @@ studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
 %w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
   raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
 end
-raise "studio must clean its slot first and last" unless [studio.fetch("steps")[1], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
+# The hosted path builds on the xcode-27 image's Xcode; the Studio must match it.
+raise "the workflow must pin STUDIO_XCODE_VERSION" unless workflow.dig("env", "STUDIO_XCODE_VERSION").to_s.match?(/\A\d+\.\d+(\.\d+)?\z/)
+xcode_check = studio.fetch("steps")[1].fetch("run", "")
+raise "studio must check xcodebuild -version right after checkout" unless studio.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?('"Xcode $STUDIO_XCODE_VERSION"')
+raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
 # build.if and studio.if must stay exact complements, or a run takes both
 # paths or neither. An unquoted `true` compares a string output to a boolean
 # and is never equal, so it would silently route every run hosted.

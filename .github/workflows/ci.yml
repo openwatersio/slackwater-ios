@@ -8,6 +8,13 @@ on:
   push:
     branches: [main]
 
+env:
+  # The Xcode the xcode-27 image carries, which the hosted path builds with
+  # and Nightly archives with. The studio job fails unless the Studio's
+  # selected Xcode is this one, so both paths test against the same SDK.
+  # Change it with the image.
+  STUDIO_XCODE_VERSION: "27.1"
+
 jobs:
   # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
   # public-repo macOS pools can queue at peak — a docs-only change should not
@@ -570,6 +577,16 @@ jobs:
         device: ${{ fromJSON(github.event_name == 'push' && '["iPhone", "iPad"]' || '["iPhone"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The hosted path runs on the xcode-27 image, and Nightly archives
+      # there; the Studio uses whichever Xcode is selected on the machine.
+      - name: Check the Xcode version
+        run: |
+          actual=$(xcodebuild -version | head -1)
+          [ "$actual" = "Xcode $STUDIO_XCODE_VERSION" ] || {
+            echo "::error::the Studio's selected Xcode is '$actual', not Xcode $STUDIO_XCODE_VERSION (see xcode-select -p)"
+            exit 1
+          }
 
       # A cancelled job or a killed runner can leave the slot's clones booted
       # and its devices dirty. Clean before, and again after under always().
