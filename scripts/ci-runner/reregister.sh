@@ -45,7 +45,8 @@ if [ -n "${SLACKWATER_CI_SCRIPTS:-}" ]; then
 fi
 
 # The runner loads .env into every job's environment. The workflow reads the
-# slot from it, and launchd's PATH does not reach the job otherwise.
+# slot from it, and it pins the PATH the jobs see, whatever PATH config.sh
+# captured into .path when it ran.
 env_file=$(printf '%s\n' \
     "SLACKWATER_CI_SLOT=$SLOT" \
     "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner_dir/hook-job-started.sh" \

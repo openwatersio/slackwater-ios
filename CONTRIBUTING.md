@@ -96,9 +96,9 @@ Tests for the bundled data are separate and fast: `cd tools && node --test`. (`n
 
 ### Local test runs
 
-Local test runs share this Mac with other worktrees and sessions. CI runs on GitHub-hosted runners. Runs in different worktrees run at once: each takes only its own `build/xcodebuild.lock`, and overlapped runs on their own devices do not kill each other (measured; `scripts/test.sh` has the numbers and the history). Overlap makes UI waits ~2× slower, which the script's `TEST_RUNNER_SLACKWATER_PERF_SCALE` default absorbs; if a test fails only under overlap, re-run it alone to check whether the wait budget is responsible. What the script cannot tell you:
+Local test runs share this Mac with other worktrees and sessions, and, when CI takes the Studio path, with up to three CI jobs on devices of their own (see [CI](#ci) below); the hosted path runs on GitHub-hosted runners. Runs in different worktrees run at once: each takes only its own `build/xcodebuild.lock`, and overlapped runs on their own devices do not kill each other (measured; `scripts/test.sh` has the numbers and the history). Overlap makes UI waits ~2× slower, which the script's `TEST_RUNNER_SLACKWATER_PERF_SCALE` default absorbs; if a test fails only under overlap, re-run it alone to check whether the wait budget is responsible. What the script cannot tell you:
 
-- **Run the shard you touched, not the suite.** CI's shard variables work locally: `SLACKWATER_ONLY=SlackwaterUITests/DetailAndScrubTests ./scripts/test.sh` is ~8 minutes against 17 for the fast run. `--full` is 65 minutes and holds the worktree's lock for all of it; it is the pre-release check, and every push to `main` runs it on hosted runners, so it is not a local gate for a PR.
+- **Run the shard you touched, not the suite.** CI's shard variables work locally: `SLACKWATER_ONLY=SlackwaterUITests/DetailAndScrubTests ./scripts/test.sh` is ~8 minutes against 17 for the fast run. `--full` is 65 minutes and holds the worktree's lock for all of it; it is the pre-release check, and every push to `main` runs it in CI, on the Studio or the hosted runners, so it is not a local gate for a PR.
 - **Compile-check before (and instead of) the suite** — a minute versus fifteen, and it takes only this worktree's lock, so another worktree's test run never blocks it:
 
   ```sh

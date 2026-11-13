@@ -155,7 +155,8 @@ dests=()
 for sim in "${sims[@]}"; do
   if (( ${+SLACKWATER_SIMS} )); then
     # SLACKWATER_SIM_OS pins the runtime; without it xcodebuild takes the
-    # newest one that has the device (CI sets it, see .github/workflows/ci.yml).
+    # newest one that has the device (the hosted CI path sets it, see
+    # .github/workflows/ci.yml).
     dests+=("platform=iOS Simulator,name=$sim${SLACKWATER_SIM_OS:+,OS=$SLACKWATER_SIM_OS}")
   else
     dests+=("platform=iOS Simulator,id=$(own_sim "$sim")")
@@ -230,8 +231,8 @@ for i in {1..$#sims}; do
   # on 16 GB, so the default is one per 8 GB. It stops at four: the fast plan
   # has seven UI classes and xcodebuild distributes whole classes, so the
   # longest (DetailAndScrub) bounds the run past that, and every erased clone's
-  # first boot spends ~10 cores on iOS widget rendering for a minute. CI sets
-  # SLACKWATER_WORKERS=1 — a hosted arm runner has ~7 GB.
+  # first boot spends ~10 cores on iOS widget rendering for a minute. The
+  # hosted CI path sets SLACKWATER_WORKERS=1 — a hosted arm runner has ~7 GB.
   workers=$(( $(sysctl -n hw.memsize) / 8589934592 ))
   (( workers < 2 )) && workers=2
   (( workers > 4 )) && workers=4

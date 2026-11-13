@@ -39,7 +39,14 @@ A failing job-started hook alone does not stop a job: the runner marks it failed
 
    Before that it retires the old runner: it unloads and deletes the `actions.runner.openwatersio.studio` agent and deletes the old `SlackwaterCI-iPhone` and `SlackwaterCI-iPad` simulators and their clones, including xcodebuild's in `~/Library/Developer/XCTestDevices`. The old runner was registered with the organisation, and its removal token can only be minted with an organisation admin token, so `install.sh` prints two commands, marked `operator:`, for you to run with one: the `config.sh remove` for `~/actions-runner/slackwater-ios`, and the `gh api` call that deletes the `slackwater-nightly` runner group. It keeps printing them while the old runner's `.runner` file is still there.
 
-4. Turn the Studio path on. In the repository's Settings, Secrets and variables, Actions, Variables, set `CI_STUDIO` to `on`, or:
+4. Resolve each slot's packages once from a Terminal. A slot's first build downloads MapLibre through SwiftPM, which reads github.com credentials from the login Keychain and raises a permission dialog that a launchd job cannot show, so the job hangs. CONTRIBUTING.md, "The first `xcodebuild` in a new worktree can hang silently", has the detail. From a checkout where `xcodegen generate` has run, for each slot `<n>` from 1 to 3, run this and choose Always Allow:
+
+   ```sh
+   xcodebuild -resolvePackageDependencies -project Slackwater.xcodeproj -scheme Slackwater \
+     -clonedSourcePackagesDirPath "$HOME/Library/Caches/slackwater-ci/studio-<n>/SourcePackages"
+   ```
+
+5. Turn the Studio path on. In the repository's Settings, Secrets and variables, Actions, Variables, set `CI_STUDIO` to `on`, or:
 
    ```sh
    gh variable set CI_STUDIO --body on --repo openwatersio/slackwater-ios
