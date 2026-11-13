@@ -113,8 +113,10 @@ end
 run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
 %w[build app studio].each do |job|
   template = workflow.fetch("jobs").fetch(job).dig("concurrency", "group")
-  # The Studio's iPhone job shares the hosted build's group, so a PR that
-  # switches paths between pushes still cancels the other path's old job.
+  # The Studio's iPhone job shares the hosted build's group. A PR push that
+  # switches to hosted cancels the old Studio job; one that switches to the
+  # Studio cancels the old hosted build only while it is pending or running,
+  # since its shards then sit in ci-app-* groups and run to the end.
   expected = "ci-#{job == 'studio' ? 'build' : job}-#{run_or_ref}"
   expected += "-${{ matrix.shard.name }}-${{ matrix.device }}" if job == "app"
   expected += "${{ matrix.device == 'iPad' && '-ipad' || '' }}" if job == "studio"

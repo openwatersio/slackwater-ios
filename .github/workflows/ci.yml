@@ -570,10 +570,13 @@ jobs:
     name: App tests · ${{ matrix.device }} (Studio)
     needs: [changes, route]
     if: needs.route.outputs.studio == 'true'
-    # The iPhone job shares the hosted build's group, so a PR push that
-    # switches paths (CI_STUDIO flipped between pushes) still cancels the
-    # earlier run's job on the other path. The iPad job runs only on pushes
-    # to main, whose groups are per run anyway.
+    # The iPhone job shares the hosted build's group, which covers a PR push
+    # that switches paths (CI_STUDIO flipped between pushes) only in part. A
+    # push that goes hosted after one that went here cancels this job. One
+    # that comes here after a hosted push cancels the hosted build only while
+    # it is pending or running; once it is done, its shards sit in their own
+    # ci-app-* groups and run to the end beside this job. The iPad job runs
+    # only on pushes to main, whose groups are per run anyway.
     concurrency:
       group: ci-build-${{ github.event_name == 'push' && github.run_id || github.ref }}${{ matrix.device == 'iPad' && '-ipad' || '' }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
