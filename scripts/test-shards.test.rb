@@ -81,9 +81,11 @@ end
 run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
 %w[build app studio].each do |job|
   template = workflow.fetch("jobs").fetch(job).dig("concurrency", "group")
-  expected = "ci-#{job}-#{run_or_ref}"
+  # The Studio's iPhone job shares the hosted build's group, so a PR that
+  # switches paths between pushes still cancels the other path's old job.
+  expected = "ci-#{job == 'studio' ? 'build' : job}-#{run_or_ref}"
   expected += "-${{ matrix.shard.name }}-${{ matrix.device }}" if job == "app"
-  expected += "-${{ matrix.device }}" if job == "studio"
+  expected += "${{ matrix.device == 'iPad' && '-ipad' || '' }}" if job == "studio"
   raise "main #{job} groups must be unique per run" unless template == expected
   group = ->(event, run, ref) { template.sub(run_or_ref, event == "push" ? run.to_s : ref) }
   raise "main attempts share a pending slot" if group.call("push", 1, "refs/heads/main") == group.call("push", 2, "refs/heads/main")
