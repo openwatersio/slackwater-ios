@@ -73,19 +73,40 @@ check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"user":{"
 check 1 workflow_dispatch refs/heads/main $repo clarkbw '{}'
 check 1 pull_request refs/pull/1/merge $repo clarkbw '{}'
 
-# A refusal with no Runner.Worker above it kills nothing: it says why once
-# and exits 1. It still walks its ancestry, through the stand-in ps: one
-# parent lookup, one name lookup, then pid 1 ends the walk.
+# A refusal with no Runner.Worker above it kills nothing: it says why, says
+# it killed nothing, and exits 1. It still walks its ancestry, through the
+# stand-in ps: one parent lookup, one name lookup, then pid 1 ends the walk.
+missed='no Runner.Worker above the hook; the job was not killed'
+# Checks that $event.err ends with one refusal line, then the miss line. A
+# hook that aborts may print the shell's own error first; with $2 set to
+# exact, nothing else may come before them.
+said_missed() {
+    refusals=$(grep -c '^refusing ' "$event.err" || true)
+    lines=$(wc -l < "$event.err" | tr -d ' ')
+    last=$(tail -n 2 "$event.err")
+    { [ "$refusals" = 1 ] && [ "${last#refusing *
+}" = "$missed" ] && { [ "${2:-}" != exact ] || [ "$lines" = 2 ]; }; } ||
+        { printf 'the hook %s said:\n%s\n' "$1" "$(cat "$event.err")" >&2; exit 1; }
+}
 printf '{}\n' > "$event"
 : > "$stub/calls"
 if hook GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature 2>"$event.err"; then
     printf 'the refusal exited 0\n' >&2; exit 1
 fi
-refusals=$(grep -c '^refusing ' "$event.err" || true)
-lines=$(wc -l < "$event.err" | tr -d ' ')
-[ "$refusals" = 1 ] && [ "$lines" = 1 ] || { printf 'the refusal printed %s lines, %s of them refusing\n' "$lines" "$refusals" >&2; exit 1; }
+said_missed 'refusing with no Runner.Worker' exact
 walk=$(cat "$stub/calls")
 [ "$walk" = "$(printf '%s\n' ppid= comm=)" ] || { printf 'the refusal walked its ancestry as:\n%s\n' "$walk" >&2; exit 1; }
+
+# A ps that fails ends the walk at its first lookup, and the hook says so.
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' \"\$2\" >> '$stub/calls'" 'exit 1' > "$stub/badps"
+chmod +x "$stub/badps"
+: > "$stub/calls"
+if hook HOOK_PS="$stub/badps" GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature 2>"$event.err"; then
+    printf 'the refusal with a failing ps exited 0\n' >&2; exit 1
+fi
+said_missed 'refusing with a failing ps' exact
+walk=$(cat "$stub/calls")
+[ "$walk" = ppid= ] || { printf 'the refusal with a failing ps walked its ancestry as:\n%s\n' "$walk" >&2; exit 1; }
 
 # A hook that aborts before it decides is a refusal: it exits non-zero, says
 # why once, and walks its ancestry to kill the job like any other refusal.
@@ -94,7 +115,7 @@ aborts() {
     what=$1; shift
     : > "$stub/calls"
     if hook "$@" 2>"$event.err"; then printf 'the hook exited 0 %s\n' "$what" >&2; exit 1; fi
-    [ "$(grep -c '^refusing ' "$event.err" || true)" = 1 ] || { printf 'the hook %s said:\n%s\n' "$what" "$(cat "$event.err")" >&2; exit 1; }
+    said_missed "$what"
     walk=$(cat "$stub/calls")
     [ "$walk" = "$(printf '%s\n' ppid= comm=)" ] || { printf 'the hook %s walked its ancestry as:\n%s\n' "$what" "$walk" >&2; exit 1; }
 }
@@ -113,9 +134,13 @@ aborts 'with GITHUB_EVENT_NAME unset' -u GITHUB_EVENT_NAME
 sleeper=$(sh -c 'sleep 60 >/dev/null 2>&1 & echo $!')
 [ "$(/bin/ps -o comm= -p "$sleeper" 2>/dev/null)" = sleep ] || { printf 'the kill test could not start its sleep\n' >&2; exit 1; }
 printf '{}\n' > "$event"
-if hook STUB_WORKER="$sleeper" GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature 2>/dev/null; then
+if hook STUB_WORKER="$sleeper" GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/feature 2>"$event.err"; then
     printf 'the refusal under a Runner.Worker exited 0\n' >&2; exit 1
 fi
+# The kill leaves only the refusal line: no miss line.
+refusals=$(grep -c '^refusing ' "$event.err" || true)
+lines=$(wc -l < "$event.err" | tr -d ' ')
+[ "$refusals" = 1 ] && [ "$lines" = 1 ] || { printf 'the refusal under a Runner.Worker said:\n%s\n' "$(cat "$event.err")" >&2; exit 1; }
 tries=0
 while kill -0 "$sleeper" 2>/dev/null; do
     tries=$((tries + 1))

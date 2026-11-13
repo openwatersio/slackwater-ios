@@ -7,7 +7,9 @@
 # steps runner still starts, and a step under `if: always()` runs. So a
 # refusal kills this job's Runner.Worker before any step can start. The
 # ephemeral runner then exits and launchd brings up a fresh one. With no
-# Runner.Worker above it, as when run by hand, it only exits 1.
+# Runner.Worker above it, as when run by hand or when ps fails, it prints a
+# second line, "no Runner.Worker above the hook; the job was not killed",
+# and exits 1.
 #
 # Every tool is called by absolute path. The PATH reregister.sh writes into
 # .env starts with directories the Studio's user can write, so a name looked
@@ -24,7 +26,8 @@ ps=${HOOK_PS:-/bin/ps}
 jq=${HOOK_JQ:-/usr/bin/jq}
 refused=0
 
-# Says why once, then walks up to this job's Runner.Worker and kills it.
+# Says why once, then walks up to this job's Runner.Worker and kills it, or
+# says that it found none.
 refuse() {
     refused=1
     printf 'refusing %s from %s: not a trusted run for this runner\n' \
@@ -37,9 +40,10 @@ refuse() {
             # Gives the worker a moment to flush the line above to the job log.
             /bin/sleep 1
             kill -9 "$pid" || true
-            break
+            return 0
         fi
     done
+    printf 'no Runner.Worker above the hook; the job was not killed\n' >&2
 }
 
 # Under set -eu, a missing jq, an unreadable event file or an unset variable
