@@ -610,19 +610,28 @@ jobs:
 
       # Between jobs the Studio runs the copies install.sh placed in the
       # runner directory, and nothing re-syncs them. A copy that differs from
-      # the checkout is stale, or was rewritten by an earlier job. The hook's
-      # path in the runner's .env names that directory; with no path there,
-      # the runner was not installed the way the README says.
+      # main's is stale, or was rewritten by an earlier job. A push to main
+      # compares with its checkout; a pull request, which may edit the
+      # scripts, compares with main's, which the runners should hold. The
+      # hook's path in the runner's .env names that directory; with no path
+      # there, the runner was not installed the way the README says.
       - name: Installed runner scripts match the checkout
+        env:
+          EVENT: ${{ github.event_name }}
         run: |
           if [ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]; then
             echo "::error::ACTIONS_RUNNER_HOOK_JOB_STARTED is not set: this runner was not installed as scripts/ci-runner/README.md says. Run sh scripts/ci-runner/install.sh on the Studio"
             exit 1
           fi
           dir=$(dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED")
+          if [ "$EVENT" != push ]; then git fetch --depth 1 origin main; fi
           stale=0
           for script in hook-job-started.sh cleanup-slot.sh reregister.sh; do
-            cmp -s "scripts/ci-runner/$script" "$dir/$script" || {
+            if [ "$EVENT" = push ]; then
+              cat "scripts/ci-runner/$script"
+            else
+              git show "origin/main:scripts/ci-runner/$script"
+            fi | cmp -s - "$dir/$script" || {
               echo "::error::$dir/$script does not match scripts/ci-runner/$script. Run sh scripts/ci-runner/install.sh on the Studio"
               stale=1
             }

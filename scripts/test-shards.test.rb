@@ -85,11 +85,15 @@ raise "the workflow must pin CI_XCODE_VERSION" unless workflow.dig("env", "CI_XC
 end
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
 # Between jobs the Studio runs install.sh's copies of the runner scripts, so
-# every job compares them with the checkout, right after the first cleanup.
+# every job compares them right after the first cleanup: a push to main with
+# its checkout, a pull request with main's copies, which the runners hold.
 drift = studio.fetch("steps")[3]
 drift_run = drift.fetch("run", "")
 raise "studio must check its installed runner scripts after the first cleanup" unless drift["name"] == "Installed runner scripts match the checkout" &&
-  drift_run.include?('dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED"') && drift_run.include?("cmp -s") &&
+  drift_run.include?('dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED"') && drift_run.include?("cmp -s - ") &&
+  drift_run.include?("git fetch --depth 1 origin main") && drift_run.include?('git show "origin/main:scripts/ci-runner/$script"') &&
+  drift_run.include?('if [ "$EVENT" = push ]; then') && drift_run.include?('cat "scripts/ci-runner/$script"') &&
+  drift.dig("env", "EVENT") == "${{ github.event_name }}" &&
   drift_run.include?("sh scripts/ci-runner/install.sh") && drift_run.include?('[ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]') &&
   %w[hook-job-started.sh cleanup-slot.sh reregister.sh].all? { |script| drift_run.include?(script) }
 # build.if and studio.if must stay exact complements, or a run takes both
