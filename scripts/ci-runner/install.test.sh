@@ -26,7 +26,7 @@ rereg() {
 if (cd "$runner" && env -u SLOT HOME="$home" RUNNER_DRY_RUN=1 RUNNER_TOKEN_CMD='echo tok' sh "$dir/reregister.sh") >"$scratch/out" 2>&1; then
     fail 'reregister.sh ran without SLOT'
 fi
-[ ! -s "$scratch/out" ] || grep -q SLOT "$scratch/out" || fail "reregister.sh without SLOT said: $(cat "$scratch/out")"
+grep -q SLOT "$scratch/out" || fail "reregister.sh without SLOT said: $(cat "$scratch/out")"
 if rereg SLOT=4 >/dev/null 2>&1; then fail 'reregister.sh accepted slot 4'; fi
 
 config="./config.sh --unattended --ephemeral --replace --url https://github.com/openwatersio/slackwater-ios --token tok --name studio-2 --labels studio --work _work"
@@ -39,15 +39,15 @@ same 'reregister .env' "$(printf '%s\n' \
     "PATH=/opt/homebrew/bin:$home/.local/share/mise/shims:/usr/bin:/bin:/usr/sbin:/sbin")" "$(cat "$scratch/err")"
 
 # A runner killed mid-job leaves its local registration behind, which
-# config.sh refuses to overwrite; it is removed first.
+# config.sh refuses to overwrite; it is removed first, with a removal token.
 : >"$runner/.runner"
-out=$(rereg SLOT=2 2>/dev/null)
-same 'reregister with a stale registration' "$(printf '%s\n' 'zsh ./cleanup-slot.sh 2' './config.sh remove --token tok' "$config" './run.sh')" "$out"
+out=$(rereg SLOT=2 RUNNER_TOKEN_CMD='[ "$1" = remove-token ] && echo rm || echo tok' 2>/dev/null)
+same 'reregister with a stale registration' "$(printf '%s\n' 'zsh ./cleanup-slot.sh 2' './config.sh remove --token rm' "$config" './run.sh')" "$out"
 rm "$runner/.runner"
 
 out=$(rereg SLOT=2 SLACKWATER_CI_SCRIPTS=/checkout/scripts/ci-runner 2>/dev/null)
 same 'reregister with a scripts refresh' "$(printf '%s\n' \
-    "cp /checkout/scripts/ci-runner/hook-job-started.sh /checkout/scripts/ci-runner/cleanup-slot.sh /checkout/scripts/ci-runner/reregister.sh $runner/" \
+    "cp /checkout/scripts/ci-runner/hook-job-started.sh /checkout/scripts/ci-runner/cleanup-slot.sh $runner/" \
     'zsh ./cleanup-slot.sh 2' "$config" './run.sh')" "$out"
 
 # The plist template renders to a valid property list.
@@ -65,7 +65,7 @@ home=$scratch/install-home
 mkdir -p "$home/actions-runner/slackwater-ios" "$home/Library/LaunchAgents"
 : >"$home/actions-runner/slackwater-ios/.runner"
 : >"$home/Library/LaunchAgents/actions.runner.openwatersio.studio.plist"
-printf '%s\n' 'PID	Status	Label' '-	0	actions.runner.openwatersio.studio' '123	0	com.apple.other' >"$scratch/launchctl"
+printf '%s\n' actions.runner.openwatersio.studio com.apple.other >"$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-iPhone", "udid": "AAAAAAAA-0000-0000-0000-000000000001", "state": "Shutdown"},
@@ -77,7 +77,7 @@ cat >"$scratch/devices.json" <<'JSON'
 JSON
 install() {
     env HOME="$home" RUNNER_DRY_RUN=1 RUNNER_VERSION=v2.330.0 \
-        RUNNER_LAUNCHCTL_LIST="$scratch/launchctl" SIMCTL_DEVICES_JSON="$scratch/devices.json" \
+        RUNNER_LOADED_LABELS="$scratch/loaded" SIMCTL_DEVICES_JSON="$scratch/devices.json" \
         sh "$dir/install.sh"
 }
 uid=$(id -u)
@@ -107,7 +107,9 @@ expected=$(
             "curl -fsSL -o $r/runner.tar.gz $url" \
             "tar -xzf $r/runner.tar.gz -C $r" \
             "rm $r/runner.tar.gz" \
-            "cp $dir/hook-job-started.sh $dir/cleanup-slot.sh $dir/reregister.sh $r/"
+            "cp $dir/hook-job-started.sh $r/.hook-job-started.sh.new" "mv -f $r/.hook-job-started.sh.new $r/hook-job-started.sh" \
+            "cp $dir/cleanup-slot.sh $r/.cleanup-slot.sh.new" "mv -f $r/.cleanup-slot.sh.new $r/cleanup-slot.sh" \
+            "cp $dir/reregister.sh $r/.reregister.sh.new" "mv -f $r/.reregister.sh.new $r/reregister.sh"
         [ "$n" = 1 ] || printf '%s\n' "xcrun simctl create SlackwaterCI-$n-iPhone $iphone $runtime"
         printf '%s\n' \
             "xcrun simctl create SlackwaterCI-$n-iPad $ipad $runtime" \
@@ -129,13 +131,12 @@ for n in 1 2 3; do
     cp "$dir/hook-job-started.sh" "$dir/cleanup-slot.sh" "$dir/reregister.sh" "$r/"
     sed -e "s|@SLOT@|$n|g" -e "s|@RUNNER_DIR@|$r|g" -e "s|@HOME@|$home|g" "$dir/launchd.plist.template" \
         >"$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.$n.plist"
-    printf '%s\n' "-	0	io.openwaters.slackwater.ci-runner.$n" >>"$scratch/launchctl"
+    printf '%s\n' "io.openwaters.slackwater.ci-runner.$n" >>"$scratch/loaded"
 done
 mkdir -p "$home/Library/Logs"
 rm -rf "$home/actions-runner/slackwater-ios" "$home/Library/LaunchAgents/actions.runner.openwatersio.studio.plist"
-printf '%s\n' 'PID	Status	Label' >"$scratch/launchctl.new"
-grep ci-runner "$scratch/launchctl" >>"$scratch/launchctl.new"
-mv "$scratch/launchctl.new" "$scratch/launchctl"
+grep ci-runner "$scratch/loaded" >"$scratch/loaded.new"
+mv "$scratch/loaded.new" "$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-1-iPhone", "udid": "1"}, {"name": "SlackwaterCI-1-iPad", "udid": "2"},

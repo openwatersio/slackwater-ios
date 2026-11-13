@@ -7,7 +7,8 @@
 # SLOT=<1-3> is required. SLACKWATER_CI_SCRIPTS=<dir> refreshes the hook and
 # cleanup scripts from a checkout first; without it the copies already in the
 # runner directory run. RUNNER_TOKEN_CMD=<command> replaces the token minting,
-# which otherwise reads a fine-grained token from the login Keychain.
+# which otherwise reads a fine-grained token from the login Keychain; it gets
+# the token kind, registration-token or remove-token, as $1.
 # RUNNER_DRY_RUN=1 prints the commands instead of running them, and the .env
 # it would write on stderr.
 set -eu
@@ -26,7 +27,7 @@ run() {
 # Prints a short-lived registration or removal token for this repository.
 mint() {
     if [ -n "${RUNNER_TOKEN_CMD:-}" ]; then
-        sh -c "$RUNNER_TOKEN_CMD"
+        sh -c "$RUNNER_TOKEN_CMD" sh "$1"
     elif [ -n "${RUNNER_DRY_RUN:-}" ]; then
         printf 'DRY_RUN_TOKEN\n'
     else
@@ -37,9 +38,10 @@ mint() {
     fi
 }
 
+# Never this script itself: sh reads it as it runs, and cp rewrites the same
+# file in place. install.sh replaces it.
 if [ -n "${SLACKWATER_CI_SCRIPTS:-}" ]; then
-    run cp "$SLACKWATER_CI_SCRIPTS/hook-job-started.sh" "$SLACKWATER_CI_SCRIPTS/cleanup-slot.sh" \
-        "$SLACKWATER_CI_SCRIPTS/reregister.sh" "$runner_dir/"
+    run cp "$SLACKWATER_CI_SCRIPTS/hook-job-started.sh" "$SLACKWATER_CI_SCRIPTS/cleanup-slot.sh" "$runner_dir/"
 fi
 
 # The runner loads .env into every job's environment. The workflow reads the

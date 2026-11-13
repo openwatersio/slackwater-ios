@@ -7,9 +7,9 @@
 # rewritten and its job reloaded.
 #
 # RUNNER_DRY_RUN=1 prints the commands instead of running them. For tests,
-# RUNNER_VERSION=<tag> skips the release lookup, RUNNER_LAUNCHCTL_LIST=<file>
-# and SIMCTL_DEVICES_JSON=<file> stand in for `launchctl list` and
-# `xcrun simctl list devices -j`.
+# RUNNER_VERSION=<tag> skips the release lookup, RUNNER_LOADED_LABELS=<file>
+# (one label per line) stands in for asking launchd which jobs are loaded, and
+# SIMCTL_DEVICES_JSON=<file> for `xcrun simctl list devices -j`.
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 uid=$(id -u)
@@ -38,13 +38,14 @@ for tool in $tools; do
     command -v "$tool" >/dev/null || { printf 'install.sh: %s is not on PATH\n' "$tool" >&2; exit 1; }
 done
 
-if [ -n "${RUNNER_LAUNCHCTL_LIST:-}" ]; then
-    loaded=$(cat "$RUNNER_LAUNCHCTL_LIST")
-else
-    loaded=$(launchctl list)
-fi
+# Asks the GUI domain by name: `launchctl list` reads the caller's domain,
+# which over ssh is not gui/<uid>.
 is_loaded() {
-    printf '%s\n' "$loaded" | awk -v label="$1" '$3 == label { found = 1 } END { exit !found }'
+    if [ -n "${RUNNER_LOADED_LABELS:-}" ]; then
+        grep -qxF "$1" "$RUNNER_LOADED_LABELS"
+    else
+        launchctl print "gui/$uid/$1" >/dev/null 2>&1
+    fi
 }
 if [ -n "${SIMCTL_DEVICES_JSON:-}" ]; then
     devices=$(cat "$SIMCTL_DEVICES_JSON")
@@ -106,14 +107,15 @@ for slot in 1 2 3; do
         run rm "$dir/runner.tar.gz"
     fi
 
-    # reregister.sh runs these copies; between jobs there is no checkout.
-    stale=
+    # reregister.sh runs these copies; between jobs there is no checkout. A
+    # copy lands beside the old file and is moved over it, so a running
+    # reregister.sh keeps reading the old file instead of rewritten text.
     for script in hook-job-started.sh cleanup-slot.sh reregister.sh; do
-        cmp -s "$here/$script" "$dir/$script" || stale=1
+        if ! cmp -s "$here/$script" "$dir/$script"; then
+            run cp "$here/$script" "$dir/.$script.new"
+            run mv -f "$dir/.$script.new" "$dir/$script"
+        fi
     done
-    if [ -n "$stale" ]; then
-        run cp "$here/hook-job-started.sh" "$here/cleanup-slot.sh" "$here/reregister.sh" "$dir/"
-    fi
 
     for device in iPhone iPad; do
         name=SlackwaterCI-$slot-$device

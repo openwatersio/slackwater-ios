@@ -45,9 +45,13 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 
 Every step checks before it acts, so a second run changes nothing that is in place. It does not download a runner into a directory that has one, recreate a simulator that exists, or reload a job that is loaded with the current plist. It does recopy the scripts when the checkout's copies differ, so run it after changing any of them. A plist that differs from the template is rewritten and its job reloaded, which stops that slot's runner, mid-job if it has one. In dry-run mode nothing is changed, so two dry runs print the same commands.
 
+### Only while someone is logged in
+
+The jobs are LaunchAgents in the user's GUI session, and they read the token from the login Keychain. Both exist only while the user is logged in and the Keychain is unlocked. After a reboot without automatic login the Studio serves no slots until someone logs in, and Studio runs queue until then.
+
 ## Check it
 
-`launchctl list | grep slackwater` shows the three jobs. The first column is the process ID while `reregister.sh` or the runner is up; the second is the last exit status, which should be 0:
+`launchctl list | grep slackwater`, in a Terminal on the Studio (over ssh it reads another launchd domain and shows nothing), shows the three jobs. The first column is the process ID while `reregister.sh` or the runner is up; the second is the last exit status, which should be 0:
 
 ```
 41211	0	io.openwaters.slackwater.ci-runner.1
@@ -80,4 +84,4 @@ The runners themselves can stay loaded. To stop a slot outright, `launchctl boot
 
 ## Tests
 
-`sh scripts/ci-runner/install.test.sh` drives both scripts with `RUNNER_DRY_RUN=1` against a temporary `HOME`, with stand-ins for `launchctl list` and the simulator list. It never registers a runner, loads a job, or touches a simulator.
+`sh scripts/ci-runner/install.test.sh` drives both scripts with `RUNNER_DRY_RUN=1` against a temporary `HOME`, with stand-ins for launchd's loaded jobs and the simulator list. It never registers a runner, loads a job, or touches a simulator.
