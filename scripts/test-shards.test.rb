@@ -56,8 +56,17 @@ raise "studio names #{names} are not nightly-validation.py's #{studio_jobs}" unl
 studio_env = studio.fetch("steps").flat_map { |s| (s["env"] || {}).keys } + (studio["env"] || {}).keys
 # Steps can also set env through $GITHUB_ENV, so read their scripts too.
 studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
-%w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
+%w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE].each do |var|
   raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
+end
+# The Studio pins the runtime on every test.sh step too: a `name=` destination
+# without an OS resolves to the newest runtime installed on the Mac, and the
+# slot's device lives only on CI_SIM_OS (the first Studio run failed this way).
+studio.fetch("steps").select { |s| s.fetch("run", "").include?("scripts/test.sh") }.tap do |steps|
+  raise "expected the studio tests and rerun steps to run test.sh, got #{steps.size}" unless steps.size == 2
+  steps.each do |s|
+    raise "studio step #{s['id'] || s['name']} must set SLACKWATER_SIM_OS from CI_SIM_OS" unless s.dig("env", "SLACKWATER_SIM_OS") == "${{ env.CI_SIM_OS }}"
+  end
 end
 # install.sh creates the Studio's simulators on CI_SIM_OS, the runtime the
 # hosted app job tests on, and on its device types, copied by hand. Runtime:
