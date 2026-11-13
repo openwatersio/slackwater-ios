@@ -1,0 +1,9 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
+      {"name": "Clone 1 of SlackwaterCI-1-iPhone", "udid": "33333333-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true},
+      {"name": "Clone 2 of SlackwaterCI-1-iPad", "udid": "33333333-0000-0000-0000-000000000002", "state": "Shutdown", "isAvailable": true},
+      {"name": "Clone 1 of SlackwaterCI-2-iPhone", "udid": "44444444-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true}
+    ]
+  }
+}
