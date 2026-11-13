@@ -14,6 +14,8 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 
 A failing job-started hook alone does not stop a job: the runner marks it failed, but its steps still start, and a step under `if: always()` runs. So the hook, on a refusal, kills the job's `Runner.Worker` before any step runs. The ephemeral runner exits and launchd brings up a fresh one. The hook is the second fence. The first is the repository setting "Require approval for all outside collaborators" (Settings, Actions, General, Fork pull request workflows), which must stay on, so a fork's edited workflow never even starts without a maintainer's click.
 
+Neither fence stops a trusted job. It runs as the Studio's user, who owns the runner directories, so a dependency pulled in by a trusted pull request could rewrite the installed hook, and the fork fence rests on every earlier trusted job as well as on that setting. Every Studio job's "Installed runner scripts match the checkout" step catches a rewritten hook on the next push to `main`. The hardening to do next is running the runners as a separate macOS user that cannot write those directories, tracked in [#923](https://github.com/openwatersio/slackwater-ios/issues/923).
+
 ## Install
 
 1. Create a fine-grained personal access token at github.com, Settings, Developer settings, Fine-grained tokens. Resource owner `openwatersio`, repository access only `openwatersio/slackwater-ios`, repository permission Administration: Read and write. Nothing else. It mints the short-lived runner registration tokens and nothing more.
