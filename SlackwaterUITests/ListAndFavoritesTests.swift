@@ -58,8 +58,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssertFalse(app.buttons["FT"].exists)
         XCTAssertFalse(app.buttons["M"].exists)
         // Tile copy: coordinates only — no "to station"/match-grade sentence.
+        // "My Location" above is also the loading tile's label, so the hero
+        // tile may not have replaced it yet; wait for the coordinates rather
+        // than read them once. Under four parallel clones on the Studio the
+        // ranking took long enough that an immediate read saw the loading tile.
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS '°N'")).firstMatch.exists)
+            NSPredicate(format: "label CONTAINS '°N'")).firstMatch.appears(within: 10))
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'to station'")).firstMatch.exists)
         // No recents yet on a clean run.
