@@ -232,8 +232,9 @@ its screen recording and UI hierarchy, which are XCTest attachments.
 Two smaller pieces of the same story:
 
 - `SLACKWATER_SIMS` names the devices to run on, overriding the fast/full list
-  outright. CI passes the runner image's stock `iPhone 17` to keep the hosted lane
-  iPhone-only; locally it is how you run on a clean device instead of the base one.
+  outright. CI's hosted path passes the runner image's stock `iPhone 17` to keep
+  that lane iPhone-only, and the Studio path passes the slot's own
+  `SlackwaterCI-<slot>-<device>`; locally it is how you run on a clean device instead of the base one.
 - Every run writes screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
   otherwise, so two local runs overwrite each other's images.
 

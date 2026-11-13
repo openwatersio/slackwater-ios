@@ -408,11 +408,12 @@ jobs:
       # re-enumerates the devices, so it treats the symptom and leaves a
       # version to maintain forever.
       #
-      # The runtime IS pinned, by SLACKWATER_SIM_OS. The image's Xcode 27.1
-      # has no iOS 27.1 runtime for these devices (that runtime carries only
-      # the iPhone Duo), so an unpinned destination takes the newest runtime
-      # that has them: 27.2, a pre-release build. 27.0 is the GA runtime that
-      # has both devices. The pin keeps the lanes off pre-release runtimes;
+      # The runtime IS pinned, by SLACKWATER_SIM_OS. The image's Xcode,
+      # CI_XCODE_VERSION at the top of this file, has no runtime of its own
+      # version for these devices (iOS 27.1 carries only the iPhone Duo), so
+      # an unpinned destination takes the newest runtime that has them, a
+      # pre-release build. SLACKWATER_SIM_OS names the GA runtime that has
+      # both devices. The pin keeps the lanes off pre-release runtimes;
       # it is not a fix for the hosted iOS 27 simulators sometimes never
       # drawing the notification permission prompt, which showed on 27.0 too
       # (#920, #921) and which the alert sheet now tolerates by saving and
