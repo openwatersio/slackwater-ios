@@ -622,20 +622,22 @@ jobs:
       # not in the `env` expression context, so the device name is built in
       # the shell and handed on through GITHUB_ENV. Set this late: the runner
       # mode tests above run test.sh with and without SLACKWATER_SIMS.
-      # SHOT_DIR: three slots share this Mac's /tmp, so the default would upload
-      # another slot's screenshots; RUNNER_TEMP is this runner's and emptied per job.
       - name: Name the slot's device
         run: |
           echo "SLACKWATER_SIMS=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE" >> "$GITHUB_ENV"
+          # Three slots share this Mac's /tmp, where test.sh's default would mix
+          # their screenshots. RUNNER_TEMP is this runner's own and is emptied per job.
           echo "SHOT_DIR=$RUNNER_TEMP/slackwater-shots" >> "$GITHUB_ENV"
         env:
           DEVICE: ${{ matrix.device }}
 
-      # The hosted app job's warm-up, for the same reason: the slot's devices
-      # are erased by the cleanup above, so the app's first launch on them is
-      # as slow as on a fresh runner and raises the same location prompt. See
-      # the comment there. No runtime filter: the slot's devices are unique by
-      # name.
+      # The hosted app job's warm-up, adapted. The cleanup above erased the
+      # slot's device, and test.sh runs the tests on xcodebuild clones of it.
+      # The clones boot cold themselves, but they inherit the device's disk
+      # state: the location prompt already handled (see the hosted comment)
+      # and the first-launch caches already written. The device is shut down
+      # at the end because test.sh has only ever cloned a shut-down device.
+      # No runtime filter: the slot's devices are unique by name.
       - run: |
           udid=$(xcrun simctl list devices available | grep -F "$SLACKWATER_SIMS (" | tail -1 \
             | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
@@ -647,6 +649,7 @@ jobs:
           sleep 45
           xcrun simctl terminate "$udid" io.openwaters.slackwater || true
           xcrun simctl uninstall "$udid" io.openwaters.slackwater
+          xcrun simctl shutdown "$udid"
 
       # As the hosted app job, minus its hosted-runner settings: test.sh sizes
       # its own workers, clones the slot's device for them, and applies its

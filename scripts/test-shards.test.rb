@@ -54,10 +54,16 @@ studio_jobs = File.read("#{root}/scripts/nightly-validation.py")[/^STUDIO_JOBS =
 names = studio_devices.map { |device| studio.fetch("name").gsub("${{ matrix.device }}", device) }
 raise "studio names #{names} are not nightly-validation.py's #{studio_jobs}" unless names.sort == studio_jobs.sort && !names.empty?
 studio_env = studio.fetch("steps").flat_map { |s| (s["env"] || {}).keys } + (studio["env"] || {}).keys
+# Steps can also set env through $GITHUB_ENV, so read their scripts too.
+studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
 %w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
-  raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var)
+  raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
 end
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[1], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
+# build.if and studio.if must stay exact complements, or a run takes both
+# paths or neither. An unquoted `true` compares a string output to a boolean
+# and is never equal, so it would silently route every run hosted.
+raise "studio must run exactly when route picks it" unless studio.fetch("if") == "needs.route.outputs.studio == 'true'"
 raise "the hosted build must yield to the Studio" unless jobs.fetch("build").fetch("if") == "needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'"
 raise "Required checks must wait for both paths" unless (%w[route studio build app] - jobs.fetch("required").fetch("needs")).empty?
 
