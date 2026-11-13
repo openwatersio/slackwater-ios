@@ -56,7 +56,11 @@ else
     printf '%s\n' "$env_file" >"$runner_dir/.env"
 fi
 
-run zsh ./cleanup-slot.sh "$SLOT"
+# A failed cleanup must not stop the registration: launchd would restart
+# this every few seconds and the slot would never come up, with nothing on
+# GitHub to say why. The job's own "Clean the slot" step fails visibly.
+run zsh ./cleanup-slot.sh "$SLOT" ||
+    printf 'reregister.sh: cleanup of slot %s failed; registering anyway\n' "$SLOT" >&2
 
 # An ephemeral runner removes its local registration when its job ends. One
 # killed mid-job (a reboot, a crash) leaves it, and config.sh refuses to
