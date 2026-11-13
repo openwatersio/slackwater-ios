@@ -53,8 +53,11 @@ if [ -n "${SIMCTL_DEVICES_JSON:-}" ]; then
 else
     devices=$(xcrun simctl list devices -j)
 fi
+# A device counts only on the pinned runtime and while it is available: one
+# left on an older or deleted runtime is not one the jobs can boot.
 has_device() {
-    printf '%s\n' "$devices" | jq -e --arg n "$1" 'any(.devices[][]; .name == $n)' >/dev/null
+    printf '%s\n' "$devices" | jq -e --arg n "$1" --arg r "${runtime##*.}" \
+        'any(.devices | to_entries[] | select(.key | endswith($r)) | .value[]; .name == $n and .isAvailable == true)' >/dev/null
 }
 
 # The old runner: one organisation-level runner named studio in the

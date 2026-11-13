@@ -70,18 +70,18 @@ mkdir -p "$home/actions-runner/slackwater-ios" "$home/Library/LaunchAgents"
 printf '%s\n' actions.runner.openwatersio.studio com.apple.other >"$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-  {"name": "SlackwaterCI-iPhone", "udid": "AAAAAAAA-0000-0000-0000-000000000001", "state": "Shutdown"},
-  {"name": "SlackwaterCI-iPad", "udid": "AAAAAAAA-0000-0000-0000-000000000002", "state": "Shutdown"},
-  {"name": "Clone 1 of SlackwaterCI-iPhone", "udid": "AAAAAAAA-0000-0000-0000-000000000003", "state": "Booted"},
-  {"name": "SlackwaterCI-1-iPhone", "udid": "BBBBBBBB-0000-0000-0000-000000000001", "state": "Shutdown"},
-  {"name": "iPhone 17", "udid": "CCCCCCCC-0000-0000-0000-000000000001", "state": "Shutdown"}
+  {"name": "SlackwaterCI-iPhone", "udid": "AAAAAAAA-0000-0000-0000-000000000001", "state": "Shutdown", "isAvailable": true},
+  {"name": "SlackwaterCI-iPad", "udid": "AAAAAAAA-0000-0000-0000-000000000002", "state": "Shutdown", "isAvailable": true},
+  {"name": "Clone 1 of SlackwaterCI-iPhone", "udid": "AAAAAAAA-0000-0000-0000-000000000003", "state": "Booted", "isAvailable": true},
+  {"name": "SlackwaterCI-1-iPhone", "udid": "BBBBBBBB-0000-0000-0000-000000000001", "state": "Shutdown", "isAvailable": true},
+  {"name": "iPhone 17", "udid": "CCCCCCCC-0000-0000-0000-000000000001", "state": "Shutdown", "isAvailable": true}
 ]}}
 JSON
 # xcodebuild's clone set: an old clone, and a slot's clone that stays.
 cat >"$scratch/xctest.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-  {"name": "Clone 2 of SlackwaterCI-iPad", "udid": "DDDDDDDD-0000-0000-0000-000000000001", "state": "Booted"},
-  {"name": "Clone 1 of SlackwaterCI-1-iPhone", "udid": "DDDDDDDD-0000-0000-0000-000000000002", "state": "Shutdown"}
+  {"name": "Clone 2 of SlackwaterCI-iPad", "udid": "DDDDDDDD-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true},
+  {"name": "Clone 1 of SlackwaterCI-1-iPhone", "udid": "DDDDDDDD-0000-0000-0000-000000000002", "state": "Shutdown", "isAvailable": true}
 ]}}
 JSON
 install() {
@@ -151,14 +151,35 @@ grep ci-runner "$scratch/loaded" >"$scratch/loaded.new"
 mv "$scratch/loaded.new" "$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-  {"name": "SlackwaterCI-1-iPhone", "udid": "1"}, {"name": "SlackwaterCI-1-iPad", "udid": "2"},
-  {"name": "SlackwaterCI-2-iPhone", "udid": "3"}, {"name": "SlackwaterCI-2-iPad", "udid": "4"},
-  {"name": "SlackwaterCI-3-iPhone", "udid": "5"}, {"name": "SlackwaterCI-3-iPad", "udid": "6"}
+  {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
+  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
+  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
 ]}}
 JSON
 printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
 out=$(install)
 same 'install when installed' '' "$out"
+
+# A device left on another runtime, or one whose runtime is gone, is not
+# there: install.sh creates it on the pinned one.
+cp "$scratch/devices.json" "$scratch/installed.json"
+cat >"$scratch/devices.json" <<'JSON'
+{"devices": {
+  "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
+    {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
+    {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": false}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
+    {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}
+  ],
+  "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
+    {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+  ]
+}}
+JSON
+out=$(install)
+same 'install with devices off the pinned runtime' "$(printf '%s\n' \
+    "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime" \
+    "xcrun simctl create SlackwaterCI-3-iPad $ipad $runtime")" "$out"
+mv "$scratch/installed.json" "$scratch/devices.json"
 
 # A changed plist reloads its job.
 printf '<!-- old -->\n' >>"$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.2.plist"
