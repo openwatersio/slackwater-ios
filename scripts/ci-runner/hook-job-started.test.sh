@@ -16,15 +16,28 @@ check() {
     GITHUB_EVENT_PATH=$event
     export GITHUB_EVENT_NAME GITHUB_REF GITHUB_REPOSITORY GITHUB_ACTOR GITHUB_EVENT_PATH
     if sh "$root/scripts/ci-runner/hook-job-started.sh" 2>/dev/null; then actual=0; else actual=1; fi
-    [ "$actual" = "$expected" ] || { printf 'unexpected hook result for %s from %s on %s\n' "$2" "$5" "$3" >&2; exit 1; }
+    [ "$actual" = "$expected" ] || { printf 'unexpected hook result for %s from %s on %s: %s\n' "$2" "$5" "$3" "$6" >&2; exit 1; }
 }
-check 0 push    refs/heads/main    openwatersio/slackwater-ios clarkbw        '{}'
-check 1 push    refs/heads/feature openwatersio/slackwater-ios clarkbw        '{}'
-check 0 pull_request refs/pull/1/merge openwatersio/slackwater-ios clarkbw '{"pull_request":{"head":{"repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
-check 1 pull_request refs/pull/1/merge openwatersio/slackwater-ios someone '{"pull_request":{"head":{"repo":{"full_name":"someone/slackwater-ios"}}}}'
-check 1 pull_request refs/pull/1/merge openwatersio/slackwater-ios 'dependabot[bot]' '{"pull_request":{"head":{"repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
-check 1 workflow_dispatch refs/heads/main openwatersio/slackwater-ios clarkbw '{}'
-check 1 pull_request refs/pull/1/merge openwatersio/slackwater-ios clarkbw '{}'
+# A pull request event: head repository, author type, head branch.
+pr() {
+    printf '{"pull_request":{"user":{"type":"%s"},"head":{"ref":"%s","repo":{"full_name":"%s"}}}}' "$2" "$3" "$1"
+}
+repo=openwatersio/slackwater-ios
+check 0 push    refs/heads/main    $repo clarkbw        '{}'
+check 1 push    refs/heads/feature $repo clarkbw        '{}'
+check 0 pull_request refs/pull/1/merge $repo clarkbw "$(pr $repo User feature)"
+check 1 pull_request refs/pull/1/merge $repo someone "$(pr someone/slackwater-ios User feature)"
+check 1 pull_request refs/pull/1/merge $repo 'dependabot[bot]' "$(pr $repo Bot dependabot/npm_and_yarn/x-1.2.3)"
+# Another bot's pull request from a branch here.
+check 1 pull_request refs/pull/1/merge $repo 'renovate[bot]' "$(pr $repo Bot renovate/x)"
+# A person who rebased or edited a Dependabot branch does not make its bumps trusted.
+check 1 pull_request refs/pull/1/merge $repo clarkbw "$(pr $repo User dependabot/npm_and_yarn/x-1.2.3)"
+# Missing fields fail closed.
+check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"head":{"ref":"feature","repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
+check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"user":{"type":"User"},"head":{"repo":{"full_name":"openwatersio/slackwater-ios"}}}}'
+check 1 pull_request refs/pull/1/merge $repo clarkbw '{"pull_request":{"user":{"type":"User"},"head":{"ref":"feature"}}}'
+check 1 workflow_dispatch refs/heads/main $repo clarkbw '{}'
+check 1 pull_request refs/pull/1/merge $repo clarkbw '{}'
 
 # A refusal with no Runner.Worker above it, as here, kills nothing: it says
 # why once and exits 1.

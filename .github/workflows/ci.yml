@@ -104,10 +104,12 @@ jobs:
   # starts without a maintainer's click while the repository's "Require
   # approval for all outside collaborators" setting stays on.
   #
-  # Trusted is a push to main or a pull request from a branch in this
-  # repository, which only people with push access can create. Dependabot's
-  # branches are here too, but nobody pushed their contents, so a bumped
-  # package meets the hosted path first. CI_STUDIO is the off switch for when
+  # Trusted is a push to main, or a pull request opened by a person (author
+  # type User) from a branch in this repository, which only people with push
+  # access can create, other than a dependabot/ branch. Other bots' pull
+  # requests go hosted too. Nobody wrote a Dependabot branch's bumped
+  # packages, including when a person rebases or edits one, so they meet the
+  # hosted path first. CI_STUDIO is the off switch for when
   # the Studio is away: set it to anything but `on` and the next run goes
   # hosted, instead of queueing for a runner that is not coming back.
   route:
@@ -120,7 +122,7 @@ jobs:
     steps:
       - id: route
         env:
-          TRUSTED: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+          TRUSTED: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.type == 'User' && !startsWith(github.event.pull_request.head.ref, 'dependabot/')) }}
           CI_STUDIO: ${{ vars.CI_STUDIO }}
           APP_NEEDED: ${{ needs.changes.outputs.app }}
         run: |
@@ -231,8 +233,9 @@ jobs:
     concurrency:
       group: ci-build-${{ github.event_name == 'push' && github.run_id || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    # The hosted path, for forks, Dependabot, and whenever CI_STUDIO is off.
-    # Skipping it here skips the shards too, since app needs this job.
+    # The hosted path, for forks, bots, Dependabot branches, and whenever
+    # CI_STUDIO is off. Skipping it here skips the shards too, since app needs
+    # this job.
     if: needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'
     # The same image Nightly archives on (nightly.yml), so the suite runs
     # against the SDK the shipped build links. macos-latest defaults to Xcode

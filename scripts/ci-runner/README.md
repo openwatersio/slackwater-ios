@@ -7,7 +7,7 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 | `install.sh` | Sets up the three slots and retires the old organisation runner. |
 | `reregister.sh` | What each launchd job runs: clean, register, run one job. |
 | `launchd.plist.template` | The launchd job, rendered once per slot. |
-| `hook-job-started.sh` | Refuses any job that is not a push to main or a same-repository pull request. |
+| `hook-job-started.sh` | Refuses any job that is not a push to main or a pull request a person opened from a branch in this repository other than `dependabot/*`. |
 | `cleanup-slot.sh` | Deletes the slot's simulator clones and erases its two devices. |
 
 `install.sh` copies `reregister.sh`, the hook and the cleanup script into each runner directory, and those copies are what run. Between jobs there is no checkout to run them from.

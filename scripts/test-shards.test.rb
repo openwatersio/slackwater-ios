@@ -65,6 +65,9 @@ raise "studio must clean its slot first and last" unless [studio.fetch("steps")[
 # and is never equal, so it would silently route every run hosted.
 raise "studio must run exactly when route picks it" unless studio.fetch("if") == "needs.route.outputs.studio == 'true'"
 raise "the hosted build must yield to the Studio" unless jobs.fetch("build").fetch("if") == "needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'"
+# The route's trust rule must match scripts/ci-runner/hook-job-started.sh.
+trusted = jobs.fetch("route").fetch("steps").first.fetch("env").fetch("TRUSTED")
+raise "route must trust a push to main or a person's same-repository, non-Dependabot pull request" unless trusted == "${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.type == 'User' && !startsWith(github.event.pull_request.head.ref, 'dependabot/')) }}"
 raise "Required checks must wait for both paths" unless (%w[route studio build app] - jobs.fetch("required").fetch("needs")).empty?
 
 %w[build app studio].each do |job|

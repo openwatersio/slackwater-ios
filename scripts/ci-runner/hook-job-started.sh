@@ -1,7 +1,7 @@
 #!/bin/sh
-# Refuse any job that is not a push to main or a same-repository pull request
-# from a human. Runs on the runner before every job, where a pull request
-# cannot edit it.
+# Refuse any job that is not a push to main or a pull request from a person,
+# on a branch in this repository other than a dependabot/ one. Runs on the
+# runner before every job, where a pull request cannot edit it.
 #
 # A failing hook alone is not enough: the runner marks the job failed but its
 # steps runner still starts, and a step under `if: always()` runs. So a
@@ -20,7 +20,15 @@ case "$GITHUB_EVENT_NAME" in
         ;;
     pull_request)
         head=$(jq -r '.pull_request.head.repo.full_name // empty' "$GITHUB_EVENT_PATH")
-        if [ "$head" = "$GITHUB_REPOSITORY" ] && [ "$GITHUB_ACTOR" != 'dependabot[bot]' ]; then trusted=1; fi
+        author=$(jq -r '.pull_request.user.type // empty' "$GITHUB_EVENT_PATH")
+        branch=$(jq -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH")
+        # A bot's pull request is refused, and so is anything on a dependabot/
+        # branch, whoever pushed to it last: nobody wrote the bumped packages.
+        # Any field missing reads empty and is refused.
+        case "$branch" in
+            '' | dependabot/*) ;;
+            *) if [ "$head" = "$GITHUB_REPOSITORY" ] && [ "$author" = User ]; then trusted=1; fi ;;
+        esac
         ;;
 esac
 [ "$trusted" = 1 ] && exit 0
