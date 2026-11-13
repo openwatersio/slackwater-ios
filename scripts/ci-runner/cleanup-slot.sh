@@ -37,11 +37,6 @@ clones=(${(f)"$(print -r -- "$devices" | jq -r --arg p "SlackwaterCI-$slot-" --a
 fixed=(${(f)"$(print -r -- "$devices" | jq -r --arg a "$phone" --arg b "$pad" \
     '.devices[][] | select(.name == $a or .name == $b) | .udid')"})
 
-for udid in $clones; do
-    simctl shutdown $udid
-    simctl delete $udid
-done
-
 # xcodebuild keeps its parallel-test clones in a separate device set that a
 # plain `simctl list` never shows; a cancelled run leaves them booted there.
 # Their names contain the slot's name ("Clone 1 of SlackwaterCI-1-iPhone").
@@ -55,24 +50,35 @@ elif [[ -d $xctest_set ]]; then
 fi
 xctest_clones=(${(f)"$(print -r -- "$xctest_devices" | jq -r --arg p "SlackwaterCI-$slot-" \
     '.devices[][] | select(.name | contains($p)) | .udid')"})
+
+# Kill what still holds the slot's devices so nothing can hold one while it is
+# erased. The name pattern is the one that matters: scripts/test.sh passes
+# `-destination 'platform=iOS Simulator,name=SlackwaterCI-<slot>-iPhone'`, with
+# no UDID, and its workers run on clones with UDIDs of their own. The UDIDs
+# catch anything started against a device directly.
+pids=()
+for pattern in "SlackwaterCI-$slot-" $fixed $clones $xctest_clones; do
+    pids+=($(pgrep -f "$pattern" || true))
+done
+for pid in ${(u)pids}; do
+    name=$(ps -p $pid -o comm= 2>/dev/null || true)
+    case ${name:t} in
+        xcodebuild|Simulator|xctest)
+            if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || failed=1; fi
+            ;;
+    esac
+done
+
+for udid in $clones; do
+    simctl shutdown $udid
+    simctl delete $udid
+done
 simset=$xctest_set
 for udid in $xctest_clones; do
     simctl shutdown $udid
     simctl delete $udid
 done
 simset=
-
-for udid in $fixed; do
-    # Kill first so a lingering process cannot hold the device while it erases.
-    for pid in $(pgrep -f "$udid" || true); do
-        name=$(ps -p $pid -o comm= 2>/dev/null || true)
-        case ${name:t} in
-            xcodebuild|Simulator|xctest)
-                if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || failed=1; fi
-                ;;
-        esac
-    done
-done
 
 # Erase refuses a booted device, so shut down any fixed device not already down.
 up=(${(f)"$(print -r -- "$devices" | jq -r --arg a "$phone" --arg b "$pad" \
