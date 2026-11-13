@@ -144,6 +144,8 @@ xcode_cases = { "Xcode 27.1" => true, "Xcode 27.1.1" => true, "Xcode 27.1.12" =>
     end
   end
 end
+warm_up = studio.fetch("steps").select { |s| s.fetch("run", "").include?("simctl bootstatus") }
+raise "studio's warm-up must stop at 10 min, before a sick simulator holds the slot to the job cap" unless warm_up.size == 1 && warm_up.first["timeout-minutes"] == 10
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
 # Between jobs the Studio runs install.sh's copies of the runner scripts, so
 # every job compares them right after the first cleanup: a push to main with

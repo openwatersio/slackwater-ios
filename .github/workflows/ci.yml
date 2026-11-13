@@ -739,7 +739,9 @@ jobs:
       # at the end because test.sh has only ever cloned a shut-down device.
       # No runtime filter: the slot's devices are unique by name, and the
       # step above checked the runtime.
-      - run: |
+      # A sick simulator otherwise holds the slot until the job's 90-min cap.
+      - timeout-minutes: 10
+        run: |
           udid=$(xcrun simctl list devices available | grep -F "$SLACKWATER_SIMS (" | tail -1 \
             | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
           [ -n "$udid" ] || { echo "no simulator named '$SLACKWATER_SIMS'" >&2; exit 1; }
