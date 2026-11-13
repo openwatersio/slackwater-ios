@@ -1,6 +1,6 @@
 # Studio CI runners
 
-The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slots 1 to 3. Each slot has its own runner directory, `~/actions-runner/studio-<slot>/`, its own two simulators, `SlackwaterCI-<slot>-iPhone` and `SlackwaterCI-<slot>-iPad`, and its own launchd job, `io.openwaters.slackwater.ci-runner.<slot>`. A runner takes one job and exits. launchd starts `reregister.sh` again, which cleans the slot's simulators, registers a fresh runner with a new token, and waits for the next job. The design is in `docs/superpowers/specs/2026-11-12-studio-ci-runner-design.md`.
+The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slots 1 to 3. Each slot has its own runner directory, `~/actions-runner/studio-<slot>/`, its own two simulators, `SlackwaterCI-<slot>-iPhone` and `SlackwaterCI-<slot>-iPad`, and its own launchd job, `io.openwaters.slackwater.ci-runner.<slot>`. A runner takes one job and exits. launchd starts `reregister.sh` again, which cleans the slot's simulators, registers a fresh runner with a new token, and waits for the next job. The design is in [#923](https://github.com/openwatersio/slackwater-ios/issues/923).
 
 | File | What it does |
 | --- | --- |
