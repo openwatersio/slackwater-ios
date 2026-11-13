@@ -53,6 +53,15 @@ if [ -n "${SIMCTL_DEVICES_JSON:-}" ]; then
 else
     devices=$(xcrun simctl list devices -j)
 fi
+# Anything but a device list would read as no devices at all: has_device
+# would find none and simctl create would run beside the existing ones.
+is_device_list() {
+    printf '%s\n' "$1" | jq -e '.devices | type == "object"' >/dev/null 2>&1
+}
+is_device_list "$devices" || {
+    printf 'install.sh: xcrun simctl list devices -j did not print a device list\n' >&2
+    exit 1
+}
 # A device counts only on the pinned runtime and while it is available: one
 # left on an older or deleted runtime is not one the jobs can boot.
 has_device() {
@@ -99,6 +108,10 @@ elif [ -d "$xctest_set" ]; then
         printf 'install.sh: could not list %s; its old clones stay\n' "$xctest_set" >&2
         xctest_devices=
     }
+fi
+if [ -n "$xctest_devices" ] && ! is_device_list "$xctest_devices"; then
+    printf 'install.sh: the listing of %s is not a device list\n' "$xctest_set" >&2
+    exit 1
 fi
 if [ -n "$xctest_devices" ]; then
     for udid in $(printf '%s\n' "$xctest_devices" | jq -r '.devices[][] | select(.name | test("SlackwaterCI-[A-Za-z]")) | .udid'); do

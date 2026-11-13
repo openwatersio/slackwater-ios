@@ -185,6 +185,20 @@ same 'install with devices off the pinned runtime' "$(printf '%s\n' \
     "xcrun simctl create SlackwaterCI-3-iPad $ipad $runtime")" "$out"
 mv "$scratch/installed.json" "$scratch/devices.json"
 
+# A listing that is not a device list stops the install before any simulator
+# is created: read as empty, it would put new devices beside the old ones.
+cp "$scratch/devices.json" "$scratch/installed.json"
+printf '%s\n' '{"error": "CoreSimulatorService connection became invalid"}' >"$scratch/devices.json"
+if install >"$scratch/out" 2>"$scratch/err"; then fail 'install.sh accepted a malformed device listing'; fi
+grep -q 'create' "$scratch/out" && fail "install.sh created a device from a malformed listing: $(cat "$scratch/out")"
+grep -q 'did not print a device list' "$scratch/err" || fail "install.sh on a malformed listing said: $(cat "$scratch/err")"
+mv "$scratch/installed.json" "$scratch/devices.json"
+printf '%s\n' 'not json' >"$scratch/xctest.json"
+if install >"$scratch/out" 2>"$scratch/err"; then fail 'install.sh accepted a malformed XCTestDevices listing'; fi
+grep -q 'create' "$scratch/out" && fail "install.sh created a device beside a malformed XCTestDevices listing: $(cat "$scratch/out")"
+grep -q 'is not a device list' "$scratch/err" || fail "install.sh on a malformed XCTestDevices listing said: $(cat "$scratch/err")"
+printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
+
 # A changed plist reloads its job.
 printf '<!-- old -->\n' >>"$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.2.plist"
 plist=$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.2.plist
