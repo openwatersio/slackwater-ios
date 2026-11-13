@@ -81,14 +81,30 @@ pids=()
 for pattern in "SlackwaterCI-$slot-" $fixed $clones $xctest_clones; do
     pids+=($(pgrep -f "$pattern" || true))
 done
+killed=()
 for pid in ${(u)pids}; do
     name=$(ps -p $pid -o comm= 2>/dev/null || true)
     case ${name:t} in
         xcodebuild|Simulator|xctest)
+            killed+=($pid)
             if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then print -r -- "kill $pid"; else kill $pid || failed=1; fi
             ;;
     esac
 done
+# A killed xcodebuild can take a few seconds to let go of its devices, and a
+# shutdown or delete before then fails. Wait up to 10 s, then kill -9.
+if [[ -n ${CLEANUP_DRY_RUN:-} ]]; then
+    for pid in $killed; do print -r -- "wait $pid"; done
+else
+    for _ in {1..10}; do
+        alive=()
+        for pid in $killed; do kill -0 $pid 2>/dev/null && alive+=($pid); done
+        killed=($alive)
+        (( $#killed )) || break
+        sleep 1
+    done
+    for pid in $killed; do kill -9 $pid 2>/dev/null || true; done
+fi
 
 for udid in $clones; do
     simctl shutdown $udid
