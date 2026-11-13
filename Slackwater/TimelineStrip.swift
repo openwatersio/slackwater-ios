@@ -1279,7 +1279,7 @@ struct TimelineCanvas: View {
                     CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.zeroY),
                                      color: SN.go.opacity(fade(e.time)))
                 }
-            case .maxFlood, .maxEbb:
+            case .maxFlood, .maxEbb, .minFlood, .minEbb:
                 guard data.clearsLabelEdges(e.time) else { continue }
                 // No dot at any station (§5.4). The speed hangs off
                 // the peak, below a crest and above a trough,
@@ -1287,7 +1287,7 @@ struct TimelineCanvas: View {
                 // ink — the fill and the line say nothing about direction,
                 // and neither does the arrow's colour. No unit: the lead
                 // reading carries it once; a schematic shape has none to print.
-                let flood = e.kind == .maxFlood
+                let flood = e.kind.isFlood
                 let ink = SN.foam.opacity(fade(e.time))
                 CurveDrawing.hangLabel(ctx, at: CGPoint(x: x, y: geo.curY(e.speed)),
                                        toward: maxHangToward(speed: e.speed,
@@ -1322,7 +1322,7 @@ func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack, eclipse, solarEclipse
+    case high, low, flood, ebb, minFlood, minEbb, slack, eclipse, solarEclipse
 }
 
 struct ScheduleEntry: Identifiable {
@@ -1538,7 +1538,7 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.graphLow, in: Capsule())
-        case .flood, .ebb:
+        case .flood, .ebb, .minFlood, .minEbb:
             // Direction-first (#59): arrow + cardinal lead, the flood/ebb
             // word demotes to a dimmer label for those who want it. 0.9, not
             // lower: navyDeep at 0.7 over the flood blue is 3.6:1, under
@@ -1550,7 +1550,11 @@ struct MultiDaySchedule: View {
                     CompassArrow(deg: deg)
                     Text(formatSet(deg, format: setFormat))
                 }
-                if e.pill == .flood {
+                if e.pill == .minFlood {
+                    Text("Minimum flood").opacity(0.9)
+                } else if e.pill == .minEbb {
+                    Text("Minimum ebb").opacity(0.9)
+                } else if e.pill == .flood {
                     Text("Flood").opacity(0.9)
                 } else {
                     Text("Ebb").opacity(0.9)
@@ -1560,7 +1564,7 @@ struct MultiDaySchedule: View {
             .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(SN.navyDeep)
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(e.pill == .flood ? SN.rising : SN.falling, in: Capsule())
+            .background(e.pill == .flood || e.pill == .minFlood ? SN.rising : SN.falling, in: Capsule())
         case .slack:
             HStack(spacing: 3) {
                 Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")

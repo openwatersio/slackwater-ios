@@ -46,7 +46,8 @@ packages:
     # Includes the IWLS recipe grids and client-owned persistent chunk cache in slackwater#460,
     # vector prediction in slackwater#508, and the shared readings in slackwater#510.
     url: https://github.com/openwatersio/slackwater
-    revision: 9945f90ddcb32f92f82d2c23abae171602dc704e
+    # Minimum-current event kinds require this pin across phone, watch, and widgets.
+    revision: 5b3478d24a31136429867918bcfd163e59c53372
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.

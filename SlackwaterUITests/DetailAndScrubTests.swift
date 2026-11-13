@@ -850,6 +850,26 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "share must sit inboard of the star: \(places[0].maxX) vs \(places[1].minX)")
     }
 
+    func testTrialIslandMinimumRemainsAStopWhileNextMaxSkipsIt() throws {
+        let app = XCUIApplication()
+        var arguments = testArguments(["-locDenied", "-scrubInstant", "2026-11-10T18:02:00Z"])
+        let now = try XCTUnwrap(arguments.firstIndex(of: "-nowEpoch"))
+        arguments[now + 1] = "1794333720"
+        app.launchArguments = arguments
+        app.launch()
+        openSearch(app, "Trial Island")
+        pickSearchResult(app, app.staticTexts["Trial Island, 4.5 nm SSW of"].firstMatch)
+        let pill = commentaryPill(app)
+        XCTAssertTrue(waitFor(pill, "label BEGINSWITH 'Minimum ebb current in '"))
+        let tile = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS[c] 'next max' AND label CONTAINS '2.1'")).firstMatch
+        XCTAssertTrue(tile.appears(within: 10), "the lull became the next maximum")
+        save(app, "trial-island-before-minimum.png")
+        pill.tap()
+        XCTAssertTrue(waitFor(leadReading(app), "label BEGINSWITH 'Minimum ebb,' AND label CONTAINS '0.0 kn'"))
+        save(app, "trial-island-minimum.png")
+    }
+
     /// #222: the Moon tile is the way into the moon's own facts, and the
     /// eclipse rows are destinations — tapping one moves the window to it.
     func testMoonOrientationAcrossTheDetailAndSheet() throws {

@@ -301,12 +301,13 @@ extension CurrentStationRecord {
 }
 
 extension CurrentEvent {
-    /// "Slack" / "Max flood" / "Max ebb" — web StationCard TURN_LABEL.
     var turnLabel: String {
         switch kind {
         case .slack: String(localized: "Slack", comment: "Current event: water is near zero speed.")
         case .maxFlood: String(localized: "Max flood", comment: "Maximum flood-current event label.")
         case .maxEbb: String(localized: "Max ebb", comment: "Maximum ebb-current event label.")
+        case .minFlood: String(localized: "Minimum flood", comment: "Local minimum speed while the current continues in the flood direction without reversing.")
+        case .minEbb: String(localized: "Minimum ebb", comment: "Local minimum speed while the current continues in the ebb direction without reversing.")
         }
     }
 }

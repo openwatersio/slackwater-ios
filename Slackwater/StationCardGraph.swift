@@ -476,7 +476,7 @@ extension CurrentStationRecord {
                                  spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs(event.speed), unit: unit)) \(speedUnitLabel(unit))",
                                  timeText: cardTime(event.time, tz),
                                  high: maxHangToward(speed: event.speed, before: before) > 0,
-                                 // The curve keeps the major axis: a max sets along the published bearing.
+                                 // The curve keeps the major axis and its published phase bearing.
                                  deg: event.speed >= 0 ? floodDirection : ebbDirection)
                 },
             now: now,

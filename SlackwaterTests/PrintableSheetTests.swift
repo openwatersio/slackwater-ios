@@ -5,6 +5,30 @@ import XCTest
 
 @MainActor
 final class PrintableSheetTests: XCTestCase {
+    func testCurrentMinimumKeepsItsNameSpeedAndSetInPrint() {
+        let minimum = day(10).addingTimeInterval(14 * 3600)
+        let facts = PrintFacts(name: "Trial Island", region: "Strait of Juan de Fuca", units: "knots",
+                               datum: nil, source: "NOAA", link: nil)
+        for span in [PrintSpan.week, .month] {
+            let page = PrintablePage(span: span, range: day(10)..<day(11), tz: tz,
+                                     kind: .current(floodDeg: 45, ebbDeg: 235), facts: facts,
+                                     days: [PrintDay(start: day(10), sunrise: nil, sunset: nil,
+                                                     entries: [ScheduleEntry(time: minimum, pill: .minEbb,
+                                                                             value: "0.0 kn", arrowDeg: 235),
+                                                               ScheduleEntry(time: minimum.addingTimeInterval(3600), pill: .ebb,
+                                                                             value: "2.1 kn", arrowDeg: 235)])],
+                                     nights: [], covered: nil, printedAt: day(10))
+            let html = printableHTML(page, setFormat: "degrees")
+            XCTAssertTrue(html.contains("Minimum ebb"))
+            XCTAssertTrue(html.contains("0.0 kn"))
+            XCTAssertTrue(html.contains(chartTime(minimum, tz)))
+            XCTAssertTrue(html.contains("2.1 kn"))
+            XCTAssertEqual(html.components(separatedBy: chartTime(minimum, tz)).count, 2)
+            if span == .week { XCTAssertTrue(html.contains("235°")) }
+            else { XCTAssertTrue(html.contains("<span class=\"note\">Minimum ebb")) }
+        }
+    }
+
     func testThePDFHoldsThePageOnPaperOfTheLocalesSize() throws {
         let rows = (1...200).map { "<tr><td>Row \($0)</td></tr>" }.joined()
         let html = "<!doctype html><html><body><h1>Friday Harbor</h1><table>\(rows)</table></body></html>"

@@ -871,6 +871,8 @@ func commentaryEventStop(_ label: String, at time: Date,
     case "Slack window closes": (visible, spoken, systemImage) = (String(localized: "Slack window", comment: "Current event: the water slows under the person's slack-window speed."), String(localized: "Slack window closes", comment: "VoiceOver current-event label: the water speeds up past the person's slack-window speed."), "arrow.left.and.line.vertical.and.arrow.right")
     case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), nil)
     case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), nil)
+    case "Minimum flood": (visible, spoken, systemImage) = (String(localized: "Minimum flood", comment: "Local minimum speed while the current continues in the flood direction without reversing."), String(localized: "Minimum flood current", comment: "VoiceOver event label for the weakest flood current without a reversal."), nil)
+    case "Minimum ebb": (visible, spoken, systemImage) = (String(localized: "Minimum ebb", comment: "Local minimum speed while the current continues in the ebb direction without reversing."), String(localized: "Minimum ebb current", comment: "VoiceOver event label for the weakest ebb current without a reversal."), nil)
     default: return CommentaryStop(time: time, label: prefix + label, spokenLabel: label)
     }
     // The prefix is the printed provisional tilde, which VoiceOver would read as a word.

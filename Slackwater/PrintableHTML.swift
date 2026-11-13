@@ -106,6 +106,8 @@ func eventWord(_ pill: SchedulePill) -> String {
     case .low: String(localized: "Low", comment: "Low-tide event label.")
     case .flood: String(localized: "Max flood", comment: "Maximum flood-current event label.")
     case .ebb: String(localized: "Max ebb", comment: "Maximum ebb-current event label.")
+    case .minFlood: String(localized: "Minimum flood", comment: "Local minimum speed while the current continues in the flood direction without reversing.")
+    case .minEbb: String(localized: "Minimum ebb", comment: "Local minimum speed while the current continues in the ebb direction without reversing.")
     case .slack: String(localized: "Slack", comment: "Slack-water event label.")
     case .eclipse: String(localized: "Lunar eclipse", comment: "Lunar eclipse event label.")
     case .solarEclipse: String(localized: "Solar eclipse", comment: "Solar eclipse event label in a printed table, sentence case.")
@@ -158,9 +160,9 @@ private func weekTable(_ page: PrintablePage, setFormat: String) -> String {
             case .tide:
                 out += "<td>\(htmlEscape(isEclipse ? "—" : (e.value ?? "—")))</td>"
             case .current:
-                let isMax = e.pill == .flood || e.pill == .ebb
-                out += "<td>\(htmlEscape(isMax ? (e.value ?? "—") : "—"))</td>"
-                let set = isMax ? e.arrowDeg.map { formatSet($0, format: setFormat) } : nil
+                let hasSpeed = e.pill == .flood || e.pill == .ebb || e.pill == .minFlood || e.pill == .minEbb
+                out += "<td>\(htmlEscape(hasSpeed ? (e.value ?? "—") : "—"))</td>"
+                let set = hasSpeed ? e.arrowDeg.map { formatSet($0, format: setFormat) } : nil
                 out += "<td>\(htmlEscape(set ?? "—"))</td>"
             case .derivedGate:
                 break
@@ -193,6 +195,9 @@ private func monthTable(_ page: PrintablePage) -> String {
         var label = htmlEscape(dayFmt.string(from: day.start))
         for e in day.entries where e.pill == .eclipse || e.pill == .solarEclipse {
             label += "<span class=\"note\">\(htmlEscape(eventWord(e.pill))) \(htmlEscape(chartTime(e.time, tz)))</span>"
+        }
+        for e in day.entries where e.pill == .minFlood || e.pill == .minEbb {
+            label += "<span class=\"note\">\(htmlEscape(eventWord(e.pill))) \(htmlEscape(chartTime(e.time, tz))) \(htmlEscape(e.value ?? ""))</span>"
         }
         out += "<tr class=\"mday\"><td>\(label)</td>"
         for col in columns {

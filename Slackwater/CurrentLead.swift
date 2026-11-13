@@ -35,7 +35,7 @@ struct CurrentLead: View {
     private var readingColor: Color { (provisional || bounded) ? SN.amber : ink }
 
     /// The stops the commentary walks: a slack window's opening, the slack
-    /// inside it, the window's closing, each max, and the sun's
+    /// inside it, the window's closing, each maximum or minimum, and the sun's
     /// next rise or set when it beats all of them. The slack is its core's
     /// opening, or one stop at a core dot's centre or at a slack no core holds.
     /// A window too short to draw has no stops; the slack inside it does.
@@ -58,7 +58,15 @@ struct CurrentLead: View {
             }
         }
         for e in timeline.currentEvents where e.kind != .slack {
-            stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
+            let label: String
+            switch e.kind {
+            case .maxFlood: label = "Max flood"
+            case .maxEbb: label = "Max ebb"
+            case .minFlood: label = "Minimum flood"
+            case .minEbb: label = "Minimum ebb"
+            case .slack: continue
+            }
+            stops.append((e.time, label))
         }
         let drawn = timeline.drawnSpan
         // The tilde belongs to the water's numbers, not to the sun's clock,
@@ -78,9 +86,7 @@ struct CurrentLead: View {
     /// reader is deciding whether to go now, and the number that answers that
     /// is how hard it will be running when they get there.
     var nextMax: (label: String, value: String, caption: String)? {
-        guard let e = timeline.currentEvents
-            .filter({ $0.kind != .slack && $0.time > scrubTime })
-            .min(by: { $0.time < $1.time }) else { return nil }
+        guard let e = nextMaxEvent else { return nil }
         return (String(localized: "Next max", comment: "Current summary label for the next maximum speed."),
                 "\(tilde)\(formatSpeed(abs(e.speed), unit: speedUnit))\u{00a0}\(speedUnitLabel(speedUnit))",
                 maxCaption(standing: standing, kind: e.kind, time: chartTime(e.time, tz)))
@@ -92,23 +98,17 @@ struct CurrentLead: View {
     /// needs thirty.
     var nextMaxEvent: CurrentEvent? {
         timeline.currentEvents
-            .filter { $0.kind != .slack && $0.time > scrubTime }
+            .filter { $0.kind.isMaximum && $0.time > scrubTime }
             .min { $0.time < $1.time }
     }
 
-    /// At a max the water is at its fastest; otherwise it is flooding or
-    /// ebbing toward one. Snap targets land exactly on the event, hence the 1 s.
-    private var atMax: CurrentEvent? {
+    private var atTurn: CurrentEvent? {
         timeline.currentEvents.first { $0.kind != .slack && abs($0.time.timeIntervalSince(scrubTime)) < 1 }
     }
 
     private var state: String {
         if isSlack { return String(localized: "Slack", comment: "Current phase: water is near zero speed.") }
-        if let max = atMax {
-            return max.kind == .maxFlood
-                ? String(localized: "Max flood", comment: "Maximum flood-current state.")
-                : String(localized: "Max ebb", comment: "Maximum ebb-current state.")
-        }
+        if let turn = atTurn { return turn.turnLabel }
         return phase.word
     }
 
