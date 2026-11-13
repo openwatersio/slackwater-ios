@@ -24,6 +24,8 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 
    To replace it later, add `-U`.
 
+   A trusted job runs as your user and can read this token with `security find-generic-password -s slackwater-ci-runner -w`, so push access to this repository is effectively admin access to it. Scope the token to this repository only.
+
 3. From a checkout of this repository, preview the install, then run it:
 
    ```sh
@@ -59,7 +61,7 @@ The jobs are LaunchAgents in the user's GUI session, and they read the token fro
 41219	0	io.openwaters.slackwater.ci-runner.3
 ```
 
-GitHub sees three runners, `studio-1` to `studio-3`, online and ephemeral, with labels `self-hosted`, `macOS`, `studio`:
+GitHub sees three runners, `studio-1` to `studio-3`, online and ephemeral, with labels `self-hosted`, `macOS`, `ARM64`, which `config.sh` adds, and `studio`:
 
 ```sh
 gh api repos/openwatersio/slackwater-ios/actions/runners \
@@ -67,9 +69,9 @@ gh api repos/openwatersio/slackwater-ios/actions/runners \
 ```
 
 ```
-studio-1	online	false	true	self-hosted,macOS,studio
-studio-2	online	true	true	self-hosted,macOS,studio
-studio-3	online	false	true	self-hosted,macOS,studio
+studio-1	online	false	true	self-hosted,macOS,ARM64,studio
+studio-2	online	true	true	self-hosted,macOS,ARM64,studio
+studio-3	online	false	true	self-hosted,macOS,ARM64,studio
 ```
 
 A busy runner is running a job. When it finishes, it disappears from the list for a few seconds and comes back under the same name.

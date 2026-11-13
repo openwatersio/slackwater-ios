@@ -271,7 +271,7 @@ git commit -m "Install three ephemeral CI runners on the Studio"
 
 - [ ] **Step 1: Store the token and install**
 
-Run `security add-generic-password -s slackwater-ci-runner -a runner -w` with a fine-grained token scoped to this repository, then `SLACKWATER_CI_SCRIPTS=$PWD sh scripts/ci-runner/install.sh`.
+Run `security add-generic-password -s slackwater-ci-runner -a runner -w` with a fine-grained token scoped to this repository, then follow `scripts/ci-runner/README.md`.
 
 - [ ] **Step 2: Verify the runners**
 
@@ -284,11 +284,11 @@ Expected: `studio-1`, `studio-2`, `studio-3`, each `online`, each with `self-hos
 
 - [ ] **Step 4: Prove the refusals and the fallback**
 
-From a fork or a throwaway account, open a pull request whose `ci.yml` puts the Studio labels on a job. Expected: the job fails at its first step with the hook's `refusing` line. Set `CI_STUDIO` to `off`, re-run the branch's pull request. Expected: `Build for testing` and the six shards run on hosted runners and the required check passes. Set it back to `on`.
+From a fork or a throwaway account, open a pull request whose `ci.yml` puts the Studio labels on a job. Expected: the job fails before any step runs, with the hook's `refusing` line. Set `CI_STUDIO` to `off`, re-run the branch's pull request. Expected: `Build for testing` and the six shards run on hosted runners and the required check passes. Set it back to `on`.
 
 - [ ] **Step 5: Prove cleanup after a cancel**
 
-Cancel a Studio run during its tests. Expected: within a minute `xcrun simctl list devices | grep SlackwaterCI-` shows exactly six devices, all `Shutdown`, and `launchctl list | grep slackwater` shows the slot's job alive with a new PID.
+Cancel a Studio run during its tests. Expected: within a minute `xcrun simctl list devices | grep SlackwaterCI-` shows exactly six devices, all `Shutdown`, and `launchctl list | grep slackwater` shows the slot's job alive with a new PID. `pgrep -fl "SlackwaterCI-"` shows no `xcodebuild`, `Simulator`, or `xctest` process after the cancel.
 
 - [ ] **Step 6: Merge and watch main**
 
