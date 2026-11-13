@@ -36,7 +36,7 @@ same 'reregister .env' "$(printf '%s\n' \
     "would write $runner/.env:" \
     'SLACKWATER_CI_SLOT=2' \
     "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner/hook-job-started.sh" \
-    "PATH=/opt/homebrew/bin:$home/.local/share/mise/shims:/usr/bin:/bin:/usr/sbin:/sbin")" "$(cat "$scratch/err")"
+    "PATH=$home/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")" "$(cat "$scratch/err")"
 
 # A runner killed mid-job leaves its local registration behind, which
 # config.sh refuses to overwrite; it is removed first, with a removal token.
@@ -58,6 +58,8 @@ plutil -lint -s "$scratch/rendered.plist" || fail 'rendered plist does not lint'
 [ "$(plutil -extract ProgramArguments.1 raw "$scratch/rendered.plist")" = "$home/actions-runner/studio-1/reregister.sh" ] || fail 'plist program'
 [ "$(plutil -extract EnvironmentVariables.SLOT raw "$scratch/rendered.plist")" = 1 ] || fail 'plist slot'
 [ "$(plutil -extract KeepAlive raw "$scratch/rendered.plist")" = true ] || fail 'plist KeepAlive'
+# mise's shims come first, so node is mise.toml's and not Homebrew's.
+[ "$(plutil -extract EnvironmentVariables.PATH raw "$scratch/rendered.plist")" = "$home/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" ] || fail 'plist PATH'
 
 # install.sh, on a machine that still has the old organisation runner, its
 # launchd agent, the old simulators, and one of the new ones already.

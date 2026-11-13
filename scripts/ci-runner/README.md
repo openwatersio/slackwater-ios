@@ -31,7 +31,7 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
    sh scripts/ci-runner/install.sh
    ```
 
-   It needs `gh`, `jq`, `curl` and Xcode's `xcrun` on PATH, and the iOS 27.0 runtime installed. For each slot it downloads the current `actions/runner` release for `osx-arm64` if the directory has none, copies the scripts, creates the two simulators if they are missing, writes the launchd plist into `~/Library/LaunchAgents/`, and loads it.
+   It needs `gh`, `jq`, `curl` and Xcode's `xcrun` on PATH, and the iOS 27.0 runtime installed. Jobs get `node` from mise, at the version in `mise.toml`, and `xcodegen` and `jq` from Homebrew, so `mise install` must have been run on the Studio. For each slot it downloads the current `actions/runner` release for `osx-arm64` if the directory has none, copies the scripts, creates the two simulators if they are missing, writes the launchd plist into `~/Library/LaunchAgents/`, and loads it.
 
    Before that it retires the old runner: it unloads and deletes the `actions.runner.openwatersio.studio` agent and deletes the old `SlackwaterCI-iPhone` and `SlackwaterCI-iPad` simulators and their clones. The old runner was registered with the organisation, and its removal token can only be minted with an organisation admin token, so `install.sh` prints two commands, marked `operator:`, for you to run with one: the `config.sh remove` for `~/actions-runner/slackwater-ios`, and the `gh api` call that deletes the `slackwater-nightly` runner group. It keeps printing them while the old runner's `.runner` file is still there.
 

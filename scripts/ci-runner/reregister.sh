@@ -49,7 +49,7 @@ fi
 env_file=$(printf '%s\n' \
     "SLACKWATER_CI_SLOT=$SLOT" \
     "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner_dir/hook-job-started.sh" \
-    "PATH=/opt/homebrew/bin:$HOME/.local/share/mise/shims:/usr/bin:/bin:/usr/sbin:/sbin")
+    "PATH=$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
 if [ -n "${RUNNER_DRY_RUN:-}" ]; then
     printf 'would write %s/.env:\n%s\n' "$runner_dir" "$env_file" >&2
 else
