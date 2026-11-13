@@ -44,8 +44,16 @@ let locationAskedKey = "slackwater.seenGate"
 
     override private init() {
         status = manager.authorizationStatus
+        // A synthetic fix is precise unless a test asks for the approximate
+        // state. The manager's own answer is the device's persisted choice,
+        // and on CI another class on the same simulator may already have let
+        // XCUITest dismiss the location prompt, which reads as reduced
+        // accuracy; a fixed-location test then showed "Approximate location"
+        // and no coordinates (ListAndFavoritesTests.testM41GroupedListAndRecents
+        // on the Studio, #929).
         accuracyAuthorization = CommandLine.arguments.contains("-locApproximate")
-            ? .reducedAccuracy : manager.accuracyAuthorization
+            ? .reducedAccuracy
+            : (Self.testFix != nil ? .fullAccuracy : manager.accuracyAuthorization)
         super.init()
         locating = Self.testAuthorizedNoFix
         // Test locations must not be overwritten by the simulator's cached fix
