@@ -52,8 +52,14 @@ simctl() {
 
 clones=(${(f)"$(print -r -- "$devices" | jq -r --arg p "SlackwaterCI-$slot-" --arg a "$phone" --arg b "$pad" \
     '.devices[][] | select((.name | startswith($p)) and .name != $a and .name != $b) | .udid')"})
+# Only available fixed devices: one whose runtime an Xcode update dropped is
+# still listed, and erasing it fails with nothing but xcrun's message.
 fixed=(${(f)"$(print -r -- "$devices" | jq -r --arg a "$phone" --arg b "$pad" \
-    '.devices[][] | select(.name == $a or .name == $b) | .udid')"})
+    '.devices[][] | select((.name == $a or .name == $b) and .isAvailable == true) | .udid')"})
+# The slot's names that exist only as unavailable devices.
+unavailable=(${(f)"$(print -r -- "$devices" | jq -r --arg a "$phone" --arg b "$pad" \
+    '[.devices[][] | select(.name == $a or .name == $b)] | group_by(.name)[]
+     | select(all(.isAvailable != true)) | .[0].name')"})
 
 # xcodebuild keeps its parallel-test clones in a separate device set that a
 # plain `simctl list` never shows; a cancelled run leaves them booted there.
@@ -134,6 +140,10 @@ for udid in $up; do
 done
 for udid in $fixed; do
     simctl erase $udid
+done
+for name in $unavailable; do
+    print -u2 -r -- "fixed device $name is not available on any runtime; rerun scripts/ci-runner/install.sh"
+    failed=1
 done
 
 exit $failed

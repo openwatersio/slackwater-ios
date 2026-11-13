@@ -6,7 +6,12 @@
       {"name": "SlackwaterCI-1-iPhone-Clone-1", "udid": "11111111-0000-0000-0000-000000000003", "state": "Booted", "isAvailable": true},
       {"name": "SlackwaterCI-1-iPad-Clone-2", "udid": "11111111-0000-0000-0000-000000000004", "state": "Creating", "isAvailable": true},
       {"name": "SlackwaterCI-2-iPhone", "udid": "22222222-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true},
-      {"name": "iPhone 17", "udid": "99999999-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true}
+      {"name": "iPhone 17", "udid": "99999999-0000-0000-0000-000000000001", "state": "Booted", "isAvailable": true},
+      {"name": "SlackwaterCI-4-iPad", "udid": "44444444-0000-0000-0000-000000000002", "state": "Shutdown", "isAvailable": true}
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-25-0": [
+      {"name": "SlackwaterCI-1-iPhone", "udid": "11111111-0000-0000-0000-000000000005", "state": "Shutdown", "isAvailable": false},
+      {"name": "SlackwaterCI-4-iPhone", "udid": "44444444-0000-0000-0000-000000000001", "state": "Shutdown", "isAvailable": false}
     ]
   }
 }

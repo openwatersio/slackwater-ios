@@ -30,6 +30,23 @@ actual=$(run 1)
 actual=$(run 3)
 [[ -z "$actual" ]] || { printf 'slot 3 should be empty:\n%s\n' "$actual" >&2; exit 1; }
 
+# A fixed device left only on a dropped runtime (isAvailable false) is not
+# erased, says to rerun install.sh, and fails the cleanup; the slot's other
+# device is still erased. Slot 1 above also has an unavailable iPhone, on
+# iOS 25, beside its available one: that one is skipped without a failure.
+if out=$(CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$xctest_fixture \
+    zsh "$root/scripts/ci-runner/cleanup-slot.sh" 4 2>"${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"); then
+    rm -f "${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"
+    printf 'cleanup-slot.sh exited 0 with an unavailable fixed device\n' >&2; exit 1
+fi
+err=$(<"${TMPDIR:-/tmp}/cleanup-slot-test-err.$$")
+rm -f "${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"
+actual=$(print -r -- "$out" | grep '^simctl' | sort || true)
+[[ "$actual" == 'simctl erase 44444444-0000-0000-0000-000000000002' ]] || { printf 'unavailable fixed device mismatch:\n%s\n' "$actual" >&2; exit 1; }
+[[ "$err" == 'fixed device SlackwaterCI-4-iPhone is not available on any runtime; rerun scripts/ci-runner/install.sh' ]] || {
+    printf 'unexpected stderr for an unavailable fixed device:\n%s\n' "$err" >&2; exit 1
+}
+
 # An XCTestDevices set that is there but cannot be listed fails the cleanup
 # and is skipped, while the default set is still cleaned.
 scratch=$(mktemp -d)
