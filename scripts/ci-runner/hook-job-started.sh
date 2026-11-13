@@ -13,6 +13,38 @@
 # of their own, so the test puts a stand-in ps first on PATH for every case:
 # no refusal there can find a real Runner.Worker.
 set -eu
+refused=0
+
+# Says why once, then walks up to this job's Runner.Worker and kills it.
+refuse() {
+    refused=1
+    printf 'refusing %s from %s: not a trusted run for this runner\n' \
+        "${GITHUB_EVENT_NAME:-an unnamed event}" "${GITHUB_ACTOR:-an unknown actor}" >&2
+    pid=$$
+    while [ "$pid" -gt 1 ]; do
+        pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ') || break
+        [ -n "$pid" ] || break
+        if [ "$(ps -o comm= -p "$pid" 2>/dev/null | sed 's|.*/||')" = Runner.Worker ]; then
+            kill -9 "$pid" || true
+            break
+        fi
+    done
+}
+
+# Under set -eu, a missing jq, an unreadable event file or an unset variable
+# ends the script before it decides. That is a refusal too, and it must kill
+# the job like one: exiting non-zero alone lets the job's steps run. Only the
+# trusted exit sets allowed. The trap does not read $?: macOS's sh, bash 3.2,
+# hands it 0 after an unbound variable, and would then exit 0.
+allowed=0
+on_exit() {
+    [ "$allowed" = 1 ] && return 0
+    set +e
+    [ "$refused" = 1 ] || refuse
+    exit 1
+}
+trap on_exit EXIT
+
 trusted=0
 case "$GITHUB_EVENT_NAME" in
     push)
@@ -31,16 +63,10 @@ case "$GITHUB_EVENT_NAME" in
         esac
         ;;
 esac
-[ "$trusted" = 1 ] && exit 0
+if [ "$trusted" = 1 ]; then
+    allowed=1
+    exit 0
+fi
 
-printf 'refusing %s from %s: not a trusted run for this runner\n' "$GITHUB_EVENT_NAME" "$GITHUB_ACTOR" >&2
-pid=$$
-while [ "$pid" -gt 1 ]; do
-    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ') || break
-    [ -n "$pid" ] || break
-    if [ "$(ps -o comm= -p "$pid" 2>/dev/null | sed 's|.*/||')" = Runner.Worker ]; then
-        kill -9 "$pid"
-        break
-    fi
-done
+refuse
 exit 1
