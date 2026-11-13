@@ -95,6 +95,40 @@ jobs:
             echo "-> app lane SKIPPED (only documentation or CLA signatures changed)"
           fi
 
+  # Picks the app lane's path: the Studio's self-hosted runners (studio job)
+  # or the hosted build plus shards (build and app jobs). This is not the
+  # guard. A pull request runs the workflow from its own head and can delete
+  # this job; the runners' job-started hook enforces the same trust rule where
+  # a pull request cannot edit it (scripts/ci-runner/hook-job-started.sh).
+  #
+  # Trusted is a push to main or a pull request from a branch in this
+  # repository, which only people with push access can create. Dependabot's
+  # branches are here too, but nobody pushed their contents, so a bumped
+  # package meets the hosted path first. CI_STUDIO is the off switch for when
+  # the Studio is away: set it to anything but `on` and the next run goes
+  # hosted, instead of queueing for a runner that is not coming back.
+  route:
+    name: Route the app lane
+    needs: changes
+    runs-on: ubuntu-24.04
+    outputs:
+      trusted: ${{ steps.route.outputs.trusted }}
+      studio: ${{ steps.route.outputs.studio }}
+    steps:
+      - id: route
+        env:
+          TRUSTED: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+          CI_STUDIO: ${{ vars.CI_STUDIO }}
+          APP_NEEDED: ${{ needs.changes.outputs.app }}
+        run: |
+          studio=false
+          if [ "$APP_NEEDED" = true ] && [ "$CI_STUDIO" = on ] && [ "$TRUSTED" = true ]; then
+            studio=true
+          fi
+          echo "trusted=$TRUSTED" >> "$GITHUB_OUTPUT"
+          echo "studio=$studio" >> "$GITHUB_OUTPUT"
+          echo "app needed: $APP_NEEDED, CI_STUDIO: ${CI_STUDIO:-unset}, trusted: $TRUSTED -> studio: $studio"
+
   data:
     name: Data generators
     runs-on: ubuntu-24.04
@@ -190,11 +224,13 @@ jobs:
     name: Build for testing
     # Successful full build jobs: median 3.55 min, p90 6.55 min (100-run audit).
     timeout-minutes: 20
-    needs: changes
+    needs: [changes, route]
     concurrency:
       group: ci-build-${{ github.event_name == 'push' && github.run_id || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    if: needs.changes.outputs.app == 'true'
+    # The hosted path, for forks, Dependabot, and whenever CI_STUDIO is off.
+    # Skipping it here skips the shards too, since app needs this job.
+    if: needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'
     # The same image Nightly archives on (nightly.yml), so the suite runs
     # against the SDK the shipped build links. macos-latest defaults to Xcode
     # 26.6, whose SDK the iPhone Duo runs phone-sized (#918).
@@ -501,10 +537,196 @@ jobs:
             build/results-*.log
           if-no-files-found: ignore
 
+  # The Studio path: one job per device that builds for testing and runs the
+  # tests on the same machine, so there is no artifact round trip. Each runner
+  # is ephemeral and owns one slot, SLACKWATER_CI_SLOT from its .env, with a
+  # fixed pair of simulators named for it.
+  studio:
+    name: App tests · ${{ matrix.device }} (Studio)
+    needs: [changes, route]
+    if: needs.route.outputs.studio == 'true'
+    concurrency:
+      group: ci-studio-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.device }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: [self-hosted, macOS, studio]
+    # One job runs a device's whole suite here, build included, where the
+    # hosted path splits it six ways. A push to main is expected to finish in
+    # about 65 min; the cap leaves room for a rerun and still stops a hung
+    # xcodebuild holding a slot for GitHub's six-hour default.
+    timeout-minutes: 90
+    strategy:
+      # One device failing must not cancel the other's results.
+      fail-fast: false
+      matrix:
+        # Pull requests run the fast suite on the iPhone; a push to main runs
+        # --full on both, as the hosted app job does and for the same reason.
+        device: ${{ fromJSON(github.event_name == 'push' && '["iPhone", "iPad"]' || '["iPhone"]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # A cancelled job or a killed runner can leave the slot's clones booted
+      # and its devices dirty. Clean before, and again after under always().
+      - name: Clean the slot
+        run: zsh scripts/ci-runner/cleanup-slot.sh "$SLACKWATER_CI_SLOT"
+
+      # The checks that ride on the hosted build job. The iPhone job runs on
+      # every trusted event, so they still gate every PR and every push; the
+      # iPad job would only run them twice.
+      - name: Test runner modes
+        if: matrix.device == 'iPhone'
+        run: |
+          zsh scripts/test-modes.test.sh
+          sh scripts/test-retryable.test.sh
+          sh scripts/test-failed-selectors.test.sh
+          sh scripts/ci-runner/hook-job-started.test.sh
+          zsh scripts/ci-runner/cleanup-slot.test.sh
+          python3 scripts/localization.test.py
+
+      - name: Build fitting validator
+        if: matrix.device == 'iPhone'
+        run: swift build -c release --package-path tools/FitValidation
+
+      # The IWLS fixture is compiled into the unit-test bundle, so it is staged
+      # before the build. xcodegen and node come from the machine.
+      - name: Prepare project
+        run: |
+          node scripts/iwls-fixtures.mjs prepare
+          xcodegen generate
+
+      - name: Localization completeness
+        if: matrix.device == 'iPhone'
+        run: python3 scripts/localization.py
+
+      # Built here rather than inside test.sh because the warm-up below needs
+      # the app before the tests run. The checkout cleans build/ every job, so
+      # the packages live outside it, one directory per slot: MapLibre's binary
+      # is then fetched once per slot instead of every run, and two slots never
+      # resolve into the same directory at once.
+      - name: Build
+        timeout-minutes: 15
+        run: |
+          # `bash -e` without pipefail: the pipe into tail would report tail's
+          # status, and a failed build would go on to the tests.
+          set -o pipefail
+          xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater \
+            -testPlan Slackwater -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath "$HOME/Library/Caches/slackwater-ci/studio-$SLACKWATER_CI_SLOT/SourcePackages" \
+            | tail -40
+          # The watch app compiles for the watch simulator as the app's
+          # dependency and embeds in Debug. Its absence means it silently
+          # stopped building, not that the app is fine.
+          test -d build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app/Watch/SlackwaterWatch.app
+
+      # The runner's .env puts SLACKWATER_CI_SLOT in the process environment,
+      # not in the `env` expression context, so the device name is built in
+      # the shell and handed on through GITHUB_ENV. Set this late: the runner
+      # mode tests above run test.sh with and without SLACKWATER_SIMS.
+      - name: Name the slot's device
+        run: echo "SLACKWATER_SIMS=SlackwaterCI-$SLACKWATER_CI_SLOT-$DEVICE" >> "$GITHUB_ENV"
+        env:
+          DEVICE: ${{ matrix.device }}
+
+      # The hosted app job's warm-up, for the same reason: the slot's devices
+      # are erased by the cleanup above, so the app's first launch on them is
+      # as slow as on a fresh runner and raises the same location prompt. See
+      # the comment there. No runtime filter: the slot's devices are unique by
+      # name.
+      - run: |
+          udid=$(xcrun simctl list devices available | grep -F "$SLACKWATER_SIMS (" | tail -1 \
+            | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          [ -n "$udid" ] || { echo "no simulator named '$SLACKWATER_SIMS'" >&2; exit 1; }
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app
+          xcrun simctl launch "$udid" io.openwaters.slackwater -noCloudSync -chartPacksOff -currentFillOff -uiTestQuiet -networkKillSwitch \
+            -seedLocationAsk -seedTour
+          sleep 45
+          xcrun simctl terminate "$udid" io.openwaters.slackwater || true
+          xcrun simctl uninstall "$udid" io.openwaters.slackwater
+
+      # As the hosted app job, minus its hosted-runner settings: test.sh sizes
+      # its own workers, clones the slot's device for them, and applies its
+      # own PERF_SCALE default of 2, which it chose for overlapped runs on
+      # this machine. SLACKWATER_SIMS comes from the step above.
+      - id: tests
+        continue-on-error: true
+        run: |
+          SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun)
+          export SLACKWATER_XCTESTRUN
+          ./scripts/test.sh ${MODE:+"$MODE"} && exit 0
+          grep -q 'Unable to find a device matching' build/results-*.log || exit 1
+          echo "::warning::xcodebuild found no simulator; retrying once"
+          ./scripts/test.sh ${MODE:+"$MODE"}
+        env:
+          MODE: ${{ github.event_name == 'push' && '--full' || '' }}
+
+      # The hosted app job's failure messages, rerun and verdict; the comments
+      # there say why each exists.
+      - name: Failure messages
+        id: failures
+        if: steps.tests.outcome == 'failure'
+        run: |
+          { echo '```'; scripts/test-failures.sh build/*.xcresult; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          failed=$(for b in build/*.xcresult; do
+            xcrun xcresulttool get test-results tests --path "$b" 2>/dev/null \
+              | jq -r -f scripts/test-failed-selectors.jq
+          done | paste -sd, -)
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          if scripts/test-failures.sh build/*.xcresult | sh scripts/test-retryable.sh; then
+            echo "retryable_only=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rerun tests that timed out
+        id: rerun
+        if: steps.tests.outcome == 'failure' && steps.failures.outputs.retryable_only == 'true'
+        run: |
+          for b in build/*.xcresult build/*.log build/*.summary.json; do
+            [ -e "$b" ] || continue
+            case "$b" in
+              *.xcresult) mv "$b" "${b%.xcresult}-attempt1.xcresult" ;;
+              *.log) mv "$b" "${b%.log}-attempt1.log" ;;
+              *.summary.json) mv "$b" "${b%.summary.json}-attempt1.summary.json" ;;
+            esac
+          done
+          SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \
+            ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }} \
+            || { scripts/test-failures.sh build/*.xcresult | grep -v attempt1; exit 1; }
+        env:
+          SLACKWATER_ONLY: ${{ steps.failures.outputs.failed }}
+
+      - name: Test result
+        if: always()
+        run: test "${{ steps.tests.outcome }}" = success || test "${{ steps.rerun.outcome }}" = success
+
+      - name: Upload test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-summary-studio-${{ matrix.device }}
+          path: build/*.summary.json
+          if-no-files-found: ignore
+
+      # always() and 'cancelled' for the reasons on the hosted app job's
+      # upload: a timed-out run is the one with nothing to read elsewhere.
+      - name: Upload screenshots and results
+        if: always() && (steps.tests.outcome == 'failure' || steps.tests.outcome == 'cancelled')
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-studio-${{ matrix.device }}
+          path: |
+            /tmp/slackwater-shots
+            build/*.xcresult
+            build/results-*.log
+          if-no-files-found: ignore
+
+      - name: Clean the slot
+        if: always()
+        run: zsh scripts/ci-runner/cleanup-slot.sh "$SLACKWATER_CI_SLOT"
+
   required:
     name: Required checks
     if: always()
-    needs: [changes, data, feedback, lockfile, build, app]
+    needs: [changes, data, feedback, lockfile, route, build, app, studio]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify required jobs
@@ -514,6 +736,9 @@ jobs:
           FEEDBACK: ${{ needs.feedback.result }}
           LOCKFILE: ${{ needs.lockfile.result }}
           APP_NEEDED: ${{ needs.changes.outputs.app }}
+          TRUSTED: ${{ needs.route.outputs.trusted }}
+          STUDIO: ${{ needs.route.outputs.studio }}
+          STUDIO_RESULT: ${{ needs.studio.result }}
           BUILD: ${{ needs.build.result }}
           APP: ${{ needs.app.result }}
         run: |
@@ -522,6 +747,12 @@ jobs:
           test "$FEEDBACK" = success
           test "$LOCKFILE" = success
           if [ "$APP_NEEDED" = true ]; then
-            test "$BUILD" = success
-            test "$APP" = success
+            # Whichever path ran must pass; the one route skipped is not read.
+            echo "trusted: ${TRUSTED:-unknown}, studio: ${STUDIO:-unknown}"
+            if [ "$STUDIO" = true ]; then
+              test "$STUDIO_RESULT" = success
+            else
+              test "$BUILD" = success
+              test "$APP" = success
+            fi
           fi

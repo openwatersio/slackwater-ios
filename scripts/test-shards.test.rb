@@ -40,15 +40,37 @@ end
 end
 raise "hosted runners need one worker" unless app.fetch("steps").select { |s| s["env"]&.key?("SLACKWATER_WORKERS") }.all? { |s| s.fetch("env").fetch("SLACKWATER_WORKERS") == 1 }
 raise "docs-only workflows must not cancel app validation" if workflow.key?("concurrency")
-%w[build app].each do |job|
+
+# The Studio path: one job per device on the self-hosted runners, named as
+# Nightly's validator expects, and gated so exactly one path runs.
+jobs = workflow.fetch("jobs")
+studio = jobs.fetch("studio") { raise "missing the studio job" }
+raise "studio must target the Studio's labels" unless studio.fetch("runs-on") == %w[self-hosted macOS studio]
+devices_expr = studio.fetch("strategy").fetch("matrix").fetch("device")
+raise "studio must pick devices the way app does" unless devices_expr == %q(${{ fromJSON(github.event_name == 'push' && '["iPhone", "iPad"]' || '["iPhone"]') }})
+studio_devices = devices_expr.scan(/'(\[[^\]]*\])'/).flatten.flat_map { |list| JSON.parse(list) }.uniq
+raise "studio devices are #{studio_devices}, not iPhone and iPad" unless studio_devices.sort == %w[iPad iPhone]
+studio_jobs = File.read("#{root}/scripts/nightly-validation.py")[/^STUDIO_JOBS = frozenset\(\{([^}]*)\}\)/, 1].to_s.scan(/"([^"]+)"/).flatten
+names = studio_devices.map { |device| studio.fetch("name").gsub("${{ matrix.device }}", device) }
+raise "studio names #{names} are not nightly-validation.py's #{studio_jobs}" unless names.sort == studio_jobs.sort && !names.empty?
+studio_env = studio.fetch("steps").flat_map { |s| (s["env"] || {}).keys } + (studio["env"] || {}).keys
+%w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
+  raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var)
+end
+raise "studio must clean its slot first and last" unless [studio.fetch("steps")[1], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
+raise "the hosted build must yield to the Studio" unless jobs.fetch("build").fetch("if") == "needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'"
+raise "Required checks must wait for both paths" unless (%w[route studio build app] - jobs.fetch("required").fetch("needs")).empty?
+
+%w[build app studio].each do |job|
   raise "cancel only obsolete PR validation" unless workflow.fetch("jobs").fetch(job).dig("concurrency", "cancel-in-progress") == "${{ github.event_name == 'pull_request' }}"
 end
 # Main attempts must not share pending slots; PR attempts must share them.
 run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
-%w[build app].each do |job|
+%w[build app studio].each do |job|
   template = workflow.fetch("jobs").fetch(job).dig("concurrency", "group")
   expected = "ci-#{job}-#{run_or_ref}"
   expected += "-${{ matrix.shard.name }}-${{ matrix.device }}" if job == "app"
+  expected += "-${{ matrix.device }}" if job == "studio"
   raise "main #{job} groups must be unique per run" unless template == expected
   group = ->(event, run, ref) { template.sub(run_or_ref, event == "push" ? run.to_s : ref) }
   raise "main attempts share a pending slot" if group.call("push", 1, "refs/heads/main") == group.call("push", 2, "refs/heads/main")
