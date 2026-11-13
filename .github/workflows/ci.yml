@@ -251,6 +251,7 @@ jobs:
           sh scripts/test-failed-selectors.test.sh
           sh scripts/ci-runner/hook-job-started.test.sh
           zsh scripts/ci-runner/cleanup-slot.test.sh
+          sh scripts/ci-runner/install.test.sh
           python3 scripts/localization.test.py
 
       - name: Build fitting validator
@@ -580,6 +581,7 @@ jobs:
           sh scripts/test-failed-selectors.test.sh
           sh scripts/ci-runner/hook-job-started.test.sh
           zsh scripts/ci-runner/cleanup-slot.test.sh
+          sh scripts/ci-runner/install.test.sh
           python3 scripts/localization.test.py
 
       - name: Build fitting validator
