@@ -60,7 +60,9 @@ Every step checks before it acts, so a second run changes nothing that is in pla
 
 ### After changing the scripts
 
-Run `sh scripts/ci-runner/install.sh` on the Studio from a checkout of `main` once the change has merged. Every Studio job's "Installed runner scripts match the checkout" step compares the hook, `cleanup-slot.sh` and `reregister.sh` in the runner directory with `main`'s and fails, naming the stale file, until the copies match: a push to `main` compares with its checkout, a pull request with `main`'s copies. So a pull request that edits the scripts passes that step, and the first push to `main` after it merges fails there until `install.sh` is rerun on the Studio.
+Run `sh scripts/ci-runner/install.sh` on the Studio from a checkout of `main` once the change has merged. Every Studio job's "Installed runner scripts match the checkout" step compares the hook, `cleanup-slot.sh` and `reregister.sh` in the runner directory with `main`'s and fails, naming the stale file, until the copies match: a push to `main` compares with its checkout, a pull request with `main`'s copies. So a pull request that edits the scripts passes that step, but once it merges, every trusted pull request's Studio job and every push to `main` fails there until `install.sh` is rerun on the Studio. A queued or re-run `main` job for a commit older than the reinstall fails too, when that commit's copies differ from the ones installed.
+
+Until this runner setup first lands, `main` has no `scripts/ci-runner/`, so the step fails on every Studio job and the Studio path cannot go green. `CI_STUDIO` stays off until it merges; the first proof run is the push to `main` after the merge, or a trusted pull request opened after it.
 
 ### Only while someone is logged in
 
