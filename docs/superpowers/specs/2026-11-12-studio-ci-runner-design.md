@@ -63,7 +63,7 @@ The selector is not the guard. A pull request runs the workflow file from its ow
 
 The runners are registered to this repository, not the organisation. A repository-level runner only ever receives this repository's jobs, so no other repository's workflow can name its labels. The old registration was organisation-level, in a runner group called `slackwater-nightly` that still exists and admits public repositories. The install removes that registration and that group.
 
-Each runner has a job-started hook, set through `ACTIONS_RUNNER_HOOK_JOB_STARTED` in the runner's `.env`, that reads the event payload from `GITHUB_EVENT_PATH` and fails the job before any step runs unless the event is a push to main or a pull request whose head repository is this repository and whose actor is not Dependabot. The hook is the same rule as the selector, enforced where the pull request cannot edit it. The hook script lives in the repository under `scripts/` with a test alongside the other runner-script tests, and the install copies it into each runner's directory. A job the hook refuses shows up in the run as failed at its first step with the hook's message, so the refusal is visible rather than silent.
+Each runner has a job-started hook, set through `ACTIONS_RUNNER_HOOK_JOB_STARTED` in the runner's `.env`, that reads the event payload from `GITHUB_EVENT_PATH` and fails the job before any step runs unless the event is a push to main or a pull request whose head repository is this repository and whose actor is not Dependabot. The hook is the same rule as the selector, enforced where the pull request cannot edit it. The hook script lives in the repository under `scripts/` with a test alongside the other runner-script tests, and the install copies it into each runner's directory. A job the hook refuses shows up in the run as failed before any step runs, with the hook's message, so the refusal is visible rather than silent.
 
 ### Nightly's validator
 
@@ -105,7 +105,7 @@ Runs queue in GitHub until a runner comes back. That is the right behaviour for 
 
 ## Measured expectations
 
-These are what the design is checked against after the first week, not promises. Pull request fast suite on the Studio: under 20 minutes from push to green, against 89 to 138 minutes on 12 November. Push to main full suite: both device jobs green within about 65 minutes, against 149 to 214. Idle-timeout warnings from `scripts/test.sh` in Studio logs: none. Simulators on the Studio outside the six fixed CI devices after any CI run finishes: none with a `SlackwaterCI-` prefix. A fork pull request edited to target the Studio's labels: refused by the hook at its first step.
+These are what the design is checked against after the first week, not promises. Pull request fast suite on the Studio: under 20 minutes from push to green, against 89 to 138 minutes on 12 November. Push to main full suite: both device jobs green within about 65 minutes, against 149 to 214. Idle-timeout warnings from `scripts/test.sh` in Studio logs: none. Simulators on the Studio outside the six fixed CI devices after any CI run finishes: none with a `SlackwaterCI-` prefix. A fork pull request edited to target the Studio's labels: refused by the hook before any step runs.
 
 ## Left to the builder
 
