@@ -40,15 +40,149 @@ end
 end
 raise "hosted runners need one worker" unless app.fetch("steps").select { |s| s["env"]&.key?("SLACKWATER_WORKERS") }.all? { |s| s.fetch("env").fetch("SLACKWATER_WORKERS") == 1 }
 raise "docs-only workflows must not cancel app validation" if workflow.key?("concurrency")
-%w[build app].each do |job|
+
+# The Studio path: one job per device on the self-hosted runners, named as
+# Nightly's validator expects, and gated so exactly one path runs.
+jobs = workflow.fetch("jobs")
+studio = jobs.fetch("studio") { raise "missing the studio job" }
+raise "studio must target the Studio's labels" unless studio.fetch("runs-on") == %w[self-hosted macOS studio]
+devices_expr = studio.fetch("strategy").fetch("matrix").fetch("device")
+raise "studio must pick devices the way app does" unless devices_expr == %q(${{ fromJSON(github.event_name == 'push' && '["iPhone", "iPad"]' || '["iPhone"]') }})
+studio_devices = devices_expr.scan(/'(\[[^\]]*\])'/).flatten.flat_map { |list| JSON.parse(list) }.uniq
+raise "studio devices are #{studio_devices}, not iPhone and iPad" unless studio_devices.sort == %w[iPad iPhone]
+studio_jobs = File.read("#{root}/scripts/nightly-validation.py")[/^STUDIO_JOBS = frozenset\(\{([^}]*)\}\)/, 1].to_s.scan(/"([^"]+)"/).flatten
+names = studio_devices.map { |device| studio.fetch("name").gsub("${{ matrix.device }}", device) }
+raise "studio names #{names} are not nightly-validation.py's #{studio_jobs}" unless names.sort == studio_jobs.sort && !names.empty?
+studio_env = studio.fetch("steps").flat_map { |s| (s["env"] || {}).keys } + (studio["env"] || {}).keys
+# Steps can also set env through $GITHUB_ENV, so read their scripts too.
+studio_runs = studio.fetch("steps").map { |s| s.fetch("run", "") }.join("\n")
+%w[SLACKWATER_WORKERS SLACKWATER_NO_CLONE TEST_RUNNER_SLACKWATER_PERF_SCALE SLACKWATER_SIM_OS].each do |var|
+  raise "studio must leave #{var} to scripts/test.sh" if studio_env.include?(var) || studio_runs.include?(var)
+end
+# install.sh creates the Studio's simulators on CI_SIM_OS, the runtime the
+# hosted app job tests on, and on its device types, copied by hand. Runtime:
+# iOS-<CI_SIM_OS with the dot as a hyphen>. Device type: the matrix's device
+# name with spaces as hyphens and parentheses dropped, plus a memory suffix
+# (-12GB) where the simulator has one, which the device name never shows.
+install_sh = File.read("#{root}/scripts/ci-runner/install.sh")
+install_runtime = install_sh[/^runtime=com\.apple\.CoreSimulator\.SimRuntime\.(\S+)$/, 1]
+sim_os = workflow.dig("env", "CI_SIM_OS").to_s
+raise "the workflow must pin CI_SIM_OS as major.minor" unless sim_os.match?(/\A\d+\.\d+\z/)
+raise "install.sh's runtime #{install_runtime} is not iOS #{sim_os}, the workflow's CI_SIM_OS" unless install_runtime == "iOS-#{sim_os.tr('.', '-')}"
+# Every hosted step that boots or tests takes its runtime from CI_SIM_OS. A
+# job-level env cannot read the env context, so each step sets it.
+raise "the app job must not pin its own runtime" if app.fetch("env", {}).key?("SLACKWATER_SIM_OS")
+app.fetch("steps").select { |s| s.fetch("run", "").match?(/SLACKWATER_SIM_OS|scripts\/test\.sh/) }.tap do |steps|
+  raise "expected the warm-up, tests and rerun steps to use the runtime, got #{steps.size}" unless steps.size == 3
+  steps.each do |s|
+    raise "app step #{s['id'] || s['name'] || s['run'][0, 40]} must set SLACKWATER_SIM_OS from CI_SIM_OS" unless s.dig("env", "SLACKWATER_SIM_OS") == "${{ env.CI_SIM_OS }}"
+  end
+end
+# The Studio's devices stay on the runtime install.sh made them on, so the
+# step that names the slot's device fails unless it is on CI_SIM_OS. Run it
+# against a stand-in xcrun listing devices on various runtimes.
+name_step = studio.fetch("steps").find { |s| s["name"] == "Name the slot's device" } or raise "missing the studio step that names the slot's device"
+name_run = name_step.fetch("run")
+require "tmpdir"
+runtime_key = ->(v) { "com.apple.CoreSimulator.SimRuntime.iOS-#{v}" }
+device = ->(name, available = true) { { "name" => name, "udid" => "U-#{name}", "isAvailable" => available, "state" => "Shutdown" } }
+runtime_cases = {
+  "on CI_SIM_OS" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone")], runtime_key.call("26-4") => [device.call("Other")] }, true],
+  "on another runtime" => [{ runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "unavailable on CI_SIM_OS" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone", false)], runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "on both runtimes" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-2-iPhone")], runtime_key.call("26-4") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+  "missing" => [{ runtime_key.call("27-0") => [device.call("SlackwaterCI-1-iPhone")] }, false],
+  "on a minor that only starts the same" => [{ runtime_key.call("27-01") => [device.call("SlackwaterCI-2-iPhone")] }, false],
+}
+Dir.mktmpdir do |dir|
+  jq = %w[/usr/bin/jq /opt/homebrew/bin/jq /usr/local/bin/jq].find { |p| File.executable?(p) } or raise "the studio runtime check needs jq"
+  File.symlink(jq, "#{dir}/jq")
+  runtime_cases.each do |label, (devices, pass)|
+    File.write("#{dir}/devices.json", JSON.generate("devices" => devices))
+    File.write("#{dir}/xcrun", "#!/bin/sh\n[ \"$*\" = 'simctl list devices -j' ] || exit 64\ncat '#{dir}/devices.json'\n")
+    File.chmod(0o755, "#{dir}/xcrun")
+    File.write("#{dir}/env", "")
+    env = { "PATH" => "#{dir}:/usr/bin:/bin", "CI_SIM_OS" => sim_os, "SLACKWATER_CI_SLOT" => "2", "DEVICE" => "iPhone",
+            "GITHUB_ENV" => "#{dir}/env", "RUNNER_TEMP" => dir }
+    out = IO.popen(env, ["/bin/bash", "-e", "-c", name_run], err: [:child, :out], &:read)
+    ok = $?.success?
+    raise "the studio runtime check #{pass ? 'refuses' : 'accepts'} a slot device #{label}: #{out}" unless ok == pass
+    if pass
+      raise "the studio runtime check must still name the device" unless File.read("#{dir}/env").include?("SLACKWATER_SIMS=SlackwaterCI-2-iPhone\n")
+    else
+      raise "the studio runtime refusal must name both runtimes and install.sh: #{out}" unless out.include?("not iOS-#{sim_os.tr('.', '-')}") && out.include?("on runtime '") && out.include?("scripts/ci-runner/install.sh")
+      raise "a refused runtime must not name the device" if File.read("#{dir}/env").include?("SLACKWATER_SIMS")
+    end
+  end
+end
+hosted_devices = app.fetch("strategy").fetch("matrix").fetch("device").scan(/'(\[[^\]]*\])'/).flatten.flat_map { |list| JSON.parse(list) }.uniq
+install_types = { "iPhone" => install_sh[/^iphone_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1],
+                  "iPad" => install_sh[/^ipad_type=com\.apple\.CoreSimulator\.SimDeviceType\.(\S+)$/, 1] }
+raise "the hosted app job names #{hosted_devices}, not one iPhone and one iPad" unless hosted_devices.size == 2 && install_types.keys.all? { |kind| hosted_devices.one? { |d| d.start_with?("#{kind} ") } }
+install_types.each do |kind, type|
+  device = hosted_devices.find { |d| d.start_with?("#{kind} ") }
+  derived = device.tr(" ", "-").delete("()")
+  raise "install.sh's #{kind} type #{type.inspect} is not the hosted #{device.inspect} (#{derived})" unless type.to_s.match?(/\A#{Regexp.escape(derived)}(-\d+GB)?\z/)
+end
+# Both paths assert the same Xcode, the one the xcode-27 image carries. The
+# pin is major.minor, and a patch release of it passes: an image moving from
+# 27.1 to 27.1.1 must not fail every hosted job.
+raise "the workflow must pin CI_XCODE_VERSION as major.minor" unless workflow.dig("env", "CI_XCODE_VERSION").to_s.match?(/\A\d+\.\d+\z/)
+xcode_cases = { "Xcode 27.1" => true, "Xcode 27.1.1" => true, "Xcode 27.1.12" => true, "Xcode 27.10" => false,
+                "Xcode 27.2" => false, "Xcode 27.1beta" => false, "Xcode 27.1." => false, "Xcode 2701" => false, "Xcode 27.1.1 " => false }
+[["studio", studio], ["build", jobs.fetch("build")]].each do |label, job|
+  xcode_check = job.fetch("steps")[1].fetch("run", "")
+  raise "#{label} must check xcodebuild -version right after checkout" unless job.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?("CI_XCODE_VERSION")
+  # Run the step as a macOS run step does (bash -e), against a stand-in xcodebuild.
+  require "tmpdir"
+  Dir.mktmpdir do |dir|
+    xcode_cases.each do |line, pass|
+      File.write("#{dir}/xcodebuild", "#!/bin/sh\nprintf '%s\\nBuild version 1A1\\n' '#{line}'\n")
+      File.chmod(0o755, "#{dir}/xcodebuild")
+      ok = system({ "PATH" => "#{dir}:/usr/bin:/bin", "CI_XCODE_VERSION" => "27.1" }, "/bin/bash", "-e", "-c", xcode_check, out: File::NULL, err: File::NULL)
+      raise "#{label}'s Xcode check #{pass ? 'refuses' : 'accepts'} #{line.inspect} against 27.1" unless ok == pass
+    end
+  end
+end
+warm_up = studio.fetch("steps").select { |s| s.fetch("run", "").include?("simctl bootstatus") }
+raise "studio's warm-up must stop at 10 min, before a sick simulator holds the slot to the job cap" unless warm_up.size == 1 && warm_up.first["timeout-minutes"] == 10
+raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
+# Between jobs the Studio runs install.sh's copies of the runner scripts, so
+# every job compares them right after the first cleanup: a push to main with
+# its checkout, a pull request with main's copies, which the runners hold.
+drift = studio.fetch("steps")[3]
+drift_run = drift.fetch("run", "")
+raise "studio must check its installed runner scripts after the first cleanup" unless drift["name"] == "Installed runner scripts match the checkout" &&
+  drift_run.include?('dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED"') && drift_run.include?("cmp -s - ") &&
+  drift_run.include?("git fetch --depth 1 origin +refs/heads/main:refs/remotes/origin/main") && drift_run.include?('git show "origin/main:scripts/ci-runner/$script"') &&
+  drift_run.include?('if [ "$EVENT" = push ]; then') && drift_run.include?('cat "scripts/ci-runner/$script"') &&
+  drift.dig("env", "EVENT") == "${{ github.event_name }}" &&
+  drift_run.include?("sh scripts/ci-runner/install.sh") && drift_run.include?('[ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]') &&
+  %w[hook-job-started.sh cleanup-slot.sh reregister.sh].all? { |script| drift_run.include?(script) }
+# build.if and studio.if must stay exact complements, or a run takes both
+# paths or neither. An unquoted `true` compares a string output to a boolean
+# and is never equal, so it would silently route every run hosted.
+raise "studio must run exactly when route picks it" unless studio.fetch("if") == "needs.route.outputs.studio == 'true'"
+raise "the hosted build must yield to the Studio" unless jobs.fetch("build").fetch("if") == "needs.changes.outputs.app == 'true' && needs.route.outputs.studio != 'true'"
+# The route's trust rule must match scripts/ci-runner/hook-job-started.sh.
+trusted = jobs.fetch("route").fetch("steps").first.fetch("env").fetch("TRUSTED")
+raise "route must trust a push to main or a person's same-repository, non-Dependabot pull request" unless trusted == "${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.type == 'User' && !startsWith(github.event.pull_request.head.ref, 'dependabot/')) }}"
+raise "Required checks must wait for both paths" unless (%w[route studio build app] - jobs.fetch("required").fetch("needs")).empty?
+
+%w[build app studio].each do |job|
   raise "cancel only obsolete PR validation" unless workflow.fetch("jobs").fetch(job).dig("concurrency", "cancel-in-progress") == "${{ github.event_name == 'pull_request' }}"
 end
 # Main attempts must not share pending slots; PR attempts must share them.
 run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
-%w[build app].each do |job|
+%w[build app studio].each do |job|
   template = workflow.fetch("jobs").fetch(job).dig("concurrency", "group")
-  expected = "ci-#{job}-#{run_or_ref}"
+  # The Studio's iPhone job shares the hosted build's group. A PR push that
+  # switches to hosted cancels the old Studio job; one that switches to the
+  # Studio cancels the old hosted build only while it is pending or running,
+  # since its shards then sit in ci-app-* groups and run to the end.
+  expected = "ci-#{job == 'studio' ? 'build' : job}-#{run_or_ref}"
   expected += "-${{ matrix.shard.name }}-${{ matrix.device }}" if job == "app"
+  expected += "${{ matrix.device == 'iPad' && '-ipad' || '' }}" if job == "studio"
   raise "main #{job} groups must be unique per run" unless template == expected
   group = ->(event, run, ref) { template.sub(run_or_ref, event == "push" ? run.to_s : ref) }
   raise "main attempts share a pending slot" if group.call("push", 1, "refs/heads/main") == group.call("push", 2, "refs/heads/main")

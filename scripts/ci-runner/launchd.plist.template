@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  One CI runner slot. install.sh renders @SLOT@, @RUNNER_DIR@ and @HOME@ and
+  loads it into the user's launchd domain. The runner is ephemeral and exits
+  after one job; KeepAlive starts reregister.sh again, which cleans the slot
+  and registers a fresh runner.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.openwaters.slackwater.ci-runner.@SLOT@</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>@RUNNER_DIR@/reregister.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SLOT</key>
+        <string>@SLOT@</string>
+        <key>HOME</key>
+        <string>@HOME@</string>
+        <key>PATH</key>
+        <string>@HOME@/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>@RUNNER_DIR@</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>@HOME@/Library/Logs/slackwater-ci-runner-@SLOT@.log</string>
+    <key>StandardErrorPath</key>
+    <string>@HOME@/Library/Logs/slackwater-ci-runner-@SLOT@.log</string>
+</dict>
+</plist>

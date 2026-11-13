@@ -33,6 +33,7 @@ Documentation here describes the current product, maintained operating procedure
 | [SSCOFS validation](../tools/sscofs-validation/README.md) | Reusable validation tools imported by the fill pipeline |
 | [Patch pipeline](../tools/patch-pipeline/README.md) | Bathymetry, bounded current patches, and certification evidence |
 | [Feedback intake](../services/testflight-feedback/README.md) | Private TestFlight feedback setup, storage, and recovery |
+| [Studio CI runners](../scripts/ci-runner/README.md) | Installing, checking, and taking away the Mac Studio's three ephemeral CI runner slots |
 
 ## Project structure
 

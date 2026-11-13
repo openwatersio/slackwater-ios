@@ -53,6 +53,15 @@ for status, conclusion in (("completed", "failure"), ("completed", "cancelled"),
     changed = copy.deepcopy(jobs)
     changed[-1].update(status=status, conclusion=conclusion)
     check([run], changed, False)
+# The Studio path produces two app jobs in place of the hosted set.
+studio = [dict(id=i, run_attempt=1, name=n, status="completed", conclusion="success")
+          for i, n in enumerate(("App tests · iPhone (Studio)", "App tests · iPad (Studio)"), start=50)]
+check([run], studio, True)
+check([run], studio[:1], False)
+check([run], studio[:1] + jobs, True)
+check([run], studio + jobs, True)
+check([run], studio[:1] + jobs[:7], False)
+check([run], [{**studio[1], "conclusion": "failure"}, studio[0]], False)
 print("nightly exact-commit validation checks passed")
 
 # A real history bounds selection to the trigger, even if main advances while queued.

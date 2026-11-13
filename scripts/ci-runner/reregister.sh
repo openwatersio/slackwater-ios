@@ -1,0 +1,80 @@
+#!/bin/sh
+# Start one ephemeral CI runner slot: clean the slot's simulators, register a
+# fresh runner with a new token, and become the runner. launchd runs this from
+# ~/actions-runner/studio-<slot>/ and starts it again each time the runner
+# exits after its one job.
+#
+# SLOT=<1-3> is required. The hook and cleanup scripts that run are the
+# copies install.sh put in the runner directory; nothing here rewrites them.
+# RUNNER_TOKEN_CMD=<command> replaces the token minting, which otherwise
+# reads a fine-grained token from the login Keychain; it gets the token kind,
+# registration-token or remove-token, as $1.
+# RUNNER_DRY_RUN=1 prints the commands instead of running them, and the .env
+# it would write on stderr.
+set -eu
+case "${SLOT:-}" in
+    1|2|3) ;;
+    *) printf 'reregister.sh: SLOT must be 1, 2 or 3, got "%s"\n' "${SLOT:-}" >&2; exit 64 ;;
+esac
+repo=openwatersio/slackwater-ios
+runner_dir=$HOME/actions-runner/studio-$SLOT
+cd "$runner_dir"
+
+run() {
+    if [ -n "${RUNNER_DRY_RUN:-}" ]; then printf '%s\n' "$*"; else "$@"; fi
+}
+
+# Prints a short-lived registration or removal token for this repository.
+mint() {
+    if [ -n "${RUNNER_TOKEN_CMD:-}" ]; then
+        sh -c "$RUNNER_TOKEN_CMD" sh "$1"
+    elif [ -n "${RUNNER_DRY_RUN:-}" ]; then
+        printf 'DRY_RUN_TOKEN\n'
+    else
+        # Separate, so a missing Keychain item fails here instead of letting
+        # gh fall back to whatever account it is logged in as.
+        gh_token=$(security find-generic-password -s slackwater-ci-runner -w) || return 1
+        GH_TOKEN=$gh_token gh api -X POST "repos/$repo/actions/runners/$1" --jq .token
+    fi
+}
+
+# The runner loads .env into every job's environment. The workflow reads the
+# slot from it, and it pins the PATH the jobs see, whatever PATH config.sh
+# captured into .path when it ran. Jobs check out under _work, a path mise
+# has never been told to trust, so without MISE_TRUSTED_CONFIG_PATHS the
+# node shim can refuse the checkout's mise.toml.
+env_file=$(printf '%s\n' \
+    "SLACKWATER_CI_SLOT=$SLOT" \
+    "ACTIONS_RUNNER_HOOK_JOB_STARTED=$runner_dir/hook-job-started.sh" \
+    "PATH=$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    "MISE_TRUSTED_CONFIG_PATHS=$runner_dir/_work")
+if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+    printf 'would write %s/.env:\n%s\n' "$runner_dir" "$env_file" >&2
+else
+    printf '%s\n' "$env_file" >"$runner_dir/.env"
+fi
+
+# A failed cleanup must not stop the registration: launchd would restart
+# this every few seconds and the slot would never come up, with nothing on
+# GitHub to say why. The job's own "Clean the slot" step fails visibly.
+run zsh ./cleanup-slot.sh "$SLOT" ||
+    printf 'reregister.sh: cleanup of slot %s failed; registering anyway\n' "$SLOT" >&2
+
+# An ephemeral runner removes its local registration when its job ends. One
+# killed mid-job (a reboot, a crash) leaves it, and config.sh refuses to
+# configure over it.
+# Tokens are assigned before use so a failed mint stops the script here.
+if [ -e .runner ]; then
+    token=$(mint remove-token)
+    run ./config.sh remove --token "$token"
+fi
+
+token=$(mint registration-token)
+run ./config.sh --unattended --ephemeral --replace --url "https://github.com/$repo" \
+    --token "$token" --name "studio-$SLOT" --labels studio --work _work
+
+if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+    printf '%s\n' './run.sh'
+else
+    exec ./run.sh
+fi

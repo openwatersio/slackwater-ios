@@ -1,6 +1,6 @@
 # TestFlight — headless signing & upload
 
-Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) runs `scripts/nightly.sh` on a GitHub-hosted macOS runner: it numbers the build one past the highest on App Store Connect (or `CURRENT_PROJECT_VERSION`, if that is higher), archives and uploads it with `scripts/testflight.sh`, and tags the commit `nightly-<version>-<build>`. Nightly sets `TESTFLIGHT_DEFER_NOTES=1` so it owns the post-upload wait: up to 15 minutes for listing, up to 30 minutes total for processing, then a separate five minutes for automatic group assignment. Build-list polling allows three API-error retries across the wait, with a separate error if listing keeps failing. The release job has a 90-minute cap for setup, archive/upload, polling, and release creation. It attaches What to Test notes as soon as the build is valid, before checking its groups. Manual `testflight.sh` uploads attach their own notes. It commits nothing and runs no tests; CI runs `--full` on both simulators for every push to `main`. Everything below is the one-time state that relies on, and how to rebuild it.
+Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) runs `scripts/nightly.sh` on a GitHub-hosted macOS runner: it numbers the build one past the highest on App Store Connect (or `CURRENT_PROJECT_VERSION`, if that is higher), archives and uploads it with `scripts/testflight.sh`, and tags the commit `nightly-<version>-<build>`. Nightly sets `TESTFLIGHT_DEFER_NOTES=1` so it owns the post-upload wait: up to 15 minutes for listing, up to 30 minutes total for processing, then a separate five minutes for automatic group assignment. Build-list polling allows three API-error retries across the wait, with a separate error if listing keeps failing. The release job has a 90-minute cap for setup, archive/upload, polling, and release creation. It attaches What to Test notes as soon as the build is valid, before checking its groups. Manual `testflight.sh` uploads attach their own notes. It commits nothing and runs no tests; CI runs `--full` on both simulators for every push to `main`, on the Studio or on hosted runners. Everything below is the one-time state that relies on, and how to rebuild it.
 
 ## The pieces
 
@@ -232,8 +232,9 @@ its screen recording and UI hierarchy, which are XCTest attachments.
 Two smaller pieces of the same story:
 
 - `SLACKWATER_SIMS` names the devices to run on, overriding the fast/full list
-  outright. CI passes the runner image's stock `iPhone 17` to keep the hosted lane
-  iPhone-only; locally it is how you run on a clean device instead of the base one.
+  outright. CI's hosted path passes the runner image's stock `iPhone 17` to keep
+  that lane iPhone-only, and the Studio path passes the slot's own
+  `SlackwaterCI-<slot>-<device>`; locally it is how you run on a clean device instead of the base one.
 - Every run writes screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
   otherwise, so two local runs overwrite each other's images.
 

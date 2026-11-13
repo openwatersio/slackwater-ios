@@ -6,6 +6,14 @@ import subprocess
 import sys
 
 
+HOSTED_JOBS = frozenset({"Build for testing"} | {
+    f"App tests · {shard}{suffix}"
+    for shard in ("offline", "list", "transition", "detail", "premium", "rest")
+    for suffix in ("", " · iPad")
+})
+STUDIO_JOBS = frozenset({"App tests · iPhone (Studio)", "App tests · iPad (Studio)"})
+
+
 def api(path):
     return json.loads(subprocess.check_output(
         ["gh", "api", "--paginate", "--slurp", path], text=True))
@@ -51,11 +59,6 @@ def validate_jobs(run, repository):
     # Retain earlier successful jobs when only failed jobs were rerun.
     pages = api(f"repos/{repository}/actions/runs/{run['id']}/jobs?filter=all&per_page=100")
     jobs = [job for page in pages for job in page["jobs"]]
-    required = {"Build for testing"} | {
-        f"App tests · {shard}{suffix}"
-        for shard in ("offline", "list", "transition", "detail", "premium", "rest")
-        for suffix in ("", " · iPad")
-    }
     latest = {}
     for job in jobs:
         previous = latest.get(job["name"])
@@ -63,9 +66,12 @@ def validate_jobs(run, repository):
             latest[job["name"]] = job
     successful = {job["name"] for job in latest.values()
                   if job["status"] == "completed" and job["conclusion"] == "success"}
-    missing = required - successful
-    if missing:
-        raise ValueError("missing successful app validation: " + ", ".join(sorted(missing)))
+    # Either set in full validates the run, whatever else succeeded beside it.
+    # Two partial sets never add up to one.
+    if HOSTED_JOBS <= successful or STUDIO_JOBS <= successful:
+        return
+    missing = min((HOSTED_JOBS - successful, STUDIO_JOBS - successful), key=len)
+    raise ValueError("missing successful app validation: " + ", ".join(sorted(missing)))
 
 
 BLOCKED = 3
