@@ -9,10 +9,19 @@
 # ephemeral runner then exits and launchd brings up a fresh one. With no
 # Runner.Worker above it, as when run by hand, it only exits 1.
 #
-# The CI jobs run this script's test inside a real job, under a Runner.Worker
-# of their own, so the test puts a stand-in ps first on PATH for every case:
-# no refusal there can find a real Runner.Worker.
+# Every tool is called by absolute path. The PATH reregister.sh writes into
+# .env starts with directories the Studio's user can write, so a name looked
+# up there could be anything a trusted job left behind. kill stays the shell
+# builtin; sleep is not one in macOS's sh, so it is /bin/sleep.
+#
+# HOOK_PS and HOOK_JQ replace ps and jq for this script's test only. The CI
+# jobs run that test inside a real job, under a Runner.Worker of their own,
+# so it points HOOK_PS at a stand-in for every case and no refusal there can
+# find a real Runner.Worker. They widen nothing: a same-user attacker who can
+# set the runner's environment can also rewrite this file.
 set -eu
+ps=${HOOK_PS:-/bin/ps}
+jq=${HOOK_JQ:-/usr/bin/jq}
 refused=0
 
 # Says why once, then walks up to this job's Runner.Worker and kills it.
@@ -22,9 +31,11 @@ refuse() {
         "${GITHUB_EVENT_NAME:-an unnamed event}" "${GITHUB_ACTOR:-an unknown actor}" >&2
     pid=$$
     while [ "$pid" -gt 1 ]; do
-        pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ') || break
+        pid=$("$ps" -o ppid= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' ') || break
         [ -n "$pid" ] || break
-        if [ "$(ps -o comm= -p "$pid" 2>/dev/null | sed 's|.*/||')" = Runner.Worker ]; then
+        if [ "$("$ps" -o comm= -p "$pid" 2>/dev/null | /usr/bin/sed 's|.*/||')" = Runner.Worker ]; then
+            # Gives the worker a moment to flush the line above to the job log.
+            /bin/sleep 1
             kill -9 "$pid" || true
             break
         fi
@@ -51,9 +62,9 @@ case "$GITHUB_EVENT_NAME" in
         [ "$GITHUB_REF" = refs/heads/main ] && trusted=1
         ;;
     pull_request)
-        head=$(jq -r '.pull_request.head.repo.full_name // empty' "$GITHUB_EVENT_PATH")
-        author=$(jq -r '.pull_request.user.type // empty' "$GITHUB_EVENT_PATH")
-        branch=$(jq -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH")
+        head=$("$jq" -r '.pull_request.head.repo.full_name // empty' "$GITHUB_EVENT_PATH")
+        author=$("$jq" -r '.pull_request.user.type // empty' "$GITHUB_EVENT_PATH")
+        branch=$("$jq" -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH")
         # A bot's pull request is refused, and so is anything on a dependabot/
         # branch, whoever pushed to it last: nobody wrote the bumped packages.
         # Any field missing reads empty and is refused.
