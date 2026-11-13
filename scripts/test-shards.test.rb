@@ -64,6 +64,14 @@ raise "the workflow must pin STUDIO_XCODE_VERSION" unless workflow.dig("env", "S
 xcode_check = studio.fetch("steps")[1].fetch("run", "")
 raise "studio must check xcodebuild -version right after checkout" unless studio.fetch("steps")[0].fetch("uses", "").start_with?("actions/checkout@") && xcode_check.include?("xcodebuild -version") && xcode_check.include?('"Xcode $STUDIO_XCODE_VERSION"')
 raise "studio must clean its slot first and last" unless [studio.fetch("steps")[2], studio.fetch("steps").last].all? { |s| s.fetch("run", "").include?("cleanup-slot.sh") } && studio.fetch("steps").last["if"] == "always()"
+# Between jobs the Studio runs install.sh's copies of the runner scripts, so
+# every job compares them with the checkout, right after the first cleanup.
+drift = studio.fetch("steps")[3]
+drift_run = drift.fetch("run", "")
+raise "studio must check its installed runner scripts after the first cleanup" unless drift["name"] == "Installed runner scripts match the checkout" &&
+  drift_run.include?('dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED"') && drift_run.include?("cmp -s") &&
+  drift_run.include?("sh scripts/ci-runner/install.sh") && drift_run.include?('[ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]') &&
+  %w[hook-job-started.sh cleanup-slot.sh reregister.sh].all? { |script| drift_run.include?(script) }
 # build.if and studio.if must stay exact complements, or a run takes both
 # paths or neither. An unquoted `true` compares a string output to a boolean
 # and is never equal, so it would silently route every run hosted.

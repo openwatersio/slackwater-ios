@@ -56,6 +56,10 @@ A failing job-started hook alone does not stop a job: the runner marks it failed
 
 Every step checks before it acts, so a second run changes nothing that is in place. It does not download a runner into a directory that has one, recreate a simulator that exists, or reload a job that is loaded with the current plist. It does recopy the scripts when the checkout's copies differ, so run it after changing any of them. A plist that differs from the template is rewritten and its job reloaded, which stops that slot's runner, mid-job if it has one. In dry-run mode nothing is changed, so two dry runs print the same commands.
 
+### After changing the scripts
+
+Run `sh scripts/ci-runner/install.sh` on the Studio from a checkout of `main` once the change has merged. Every Studio job's "Installed runner scripts match the checkout" step compares the hook, `cleanup-slot.sh` and `reregister.sh` in the runner directory with the checkout's and fails, naming the stale file, until the copies match. A pull request that changes one of them fails that step on the Studio too, since the runners still hold `main`'s copies.
+
 ### Only while someone is logged in
 
 The jobs are LaunchAgents in the user's GUI session, and they read the token from the login Keychain. Both exist only while the user is logged in and the Keychain is unlocked. After a reboot without automatic login the Studio serves no slots until someone logs in, and Studio runs queue until then.

@@ -597,6 +597,27 @@ jobs:
       - name: Clean the slot
         run: zsh scripts/ci-runner/cleanup-slot.sh "$SLACKWATER_CI_SLOT"
 
+      # Between jobs the Studio runs the copies install.sh placed in the
+      # runner directory, and nothing re-syncs them. A copy that differs from
+      # the checkout is stale, or was rewritten by an earlier job. The hook's
+      # path in the runner's .env names that directory; with no path there,
+      # the runner was not installed the way the README says.
+      - name: Installed runner scripts match the checkout
+        run: |
+          if [ -z "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" ]; then
+            echo "::error::ACTIONS_RUNNER_HOOK_JOB_STARTED is not set: this runner was not installed as scripts/ci-runner/README.md says. Run sh scripts/ci-runner/install.sh on the Studio"
+            exit 1
+          fi
+          dir=$(dirname "$ACTIONS_RUNNER_HOOK_JOB_STARTED")
+          stale=0
+          for script in hook-job-started.sh cleanup-slot.sh reregister.sh; do
+            cmp -s "scripts/ci-runner/$script" "$dir/$script" || {
+              echo "::error::$dir/$script does not match scripts/ci-runner/$script. Run sh scripts/ci-runner/install.sh on the Studio"
+              stale=1
+            }
+          done
+          exit "$stale"
+
       # The checks that ride on the hosted build job. The iPhone job runs on
       # every trusted event, so they still gate every PR and every push; the
       # iPad job would only run them twice.
