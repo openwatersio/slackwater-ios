@@ -147,6 +147,19 @@ for slot in 1 2 3; do
     for device in iPhone iPad; do
         name=SlackwaterCI-$slot-$device
         if [ "$device" = iPhone ]; then type=$iphone_type; else type=$ipad_type; fi
+        # A device of this name off the pinned runtime, or unavailable, is
+        # not the slot's, but cleanup-slot.sh picks devices by name and
+        # would erase it too. Delete it before creating the real one.
+        for udid in $(printf '%s\n' "$devices" | jq -r --arg n "$name" --arg r "${runtime##*.}" \
+            '.devices | to_entries[] | .key as $k | .value[]
+             | select(.name == $n and (($k | endswith($r) | not) or .isAvailable != true)) | .udid'); do
+            if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+                run xcrun simctl shutdown "$udid"
+            else
+                xcrun simctl shutdown "$udid" 2>/dev/null || true
+            fi
+            run xcrun simctl delete "$udid"
+        done
         has_device "$name" || run xcrun simctl create "$name" "$type" "$runtime"
     done
 

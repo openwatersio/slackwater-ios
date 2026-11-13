@@ -161,7 +161,7 @@ out=$(install)
 same 'install when installed' '' "$out"
 
 # A device left on another runtime, or one whose runtime is gone, is not
-# there: install.sh creates it on the pinned one.
+# there: install.sh deletes it, then creates the slot's on the pinned one.
 cp "$scratch/devices.json" "$scratch/installed.json"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {
@@ -177,7 +177,11 @@ cat >"$scratch/devices.json" <<'JSON'
 JSON
 out=$(install)
 same 'install with devices off the pinned runtime' "$(printf '%s\n' \
+    'xcrun simctl shutdown 3' \
+    'xcrun simctl delete 3' \
     "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime" \
+    'xcrun simctl shutdown 6' \
+    'xcrun simctl delete 6' \
     "xcrun simctl create SlackwaterCI-3-iPad $ipad $runtime")" "$out"
 mv "$scratch/installed.json" "$scratch/devices.json"
 
