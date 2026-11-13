@@ -46,11 +46,6 @@ out=$(rereg SLOT=2 RUNNER_TOKEN_CMD='[ "$1" = remove-token ] && echo rm || echo 
 same 'reregister with a stale registration' "$(printf '%s\n' 'zsh ./cleanup-slot.sh 2' './config.sh remove --token rm' "$config" './run.sh')" "$out"
 rm "$runner/.runner"
 
-out=$(rereg SLOT=2 SLACKWATER_CI_SCRIPTS=/checkout/scripts/ci-runner 2>/dev/null)
-same 'reregister with a scripts refresh' "$(printf '%s\n' \
-    "cp /checkout/scripts/ci-runner/hook-job-started.sh /checkout/scripts/ci-runner/cleanup-slot.sh $runner/" \
-    'zsh ./cleanup-slot.sh 2' "$config" './run.sh')" "$out"
-
 # The plist template renders to a valid property list.
 sed -e 's|@SLOT@|1|g' -e "s|@RUNNER_DIR@|$home/actions-runner/studio-1|g" -e "s|@HOME@|$home|g" \
     "$dir/launchd.plist.template" >"$scratch/rendered.plist"

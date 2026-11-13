@@ -4,11 +4,11 @@
 # ~/actions-runner/studio-<slot>/ and starts it again each time the runner
 # exits after its one job.
 #
-# SLOT=<1-3> is required. SLACKWATER_CI_SCRIPTS=<dir> refreshes the hook and
-# cleanup scripts from a checkout first; without it the copies already in the
-# runner directory run. RUNNER_TOKEN_CMD=<command> replaces the token minting,
-# which otherwise reads a fine-grained token from the login Keychain; it gets
-# the token kind, registration-token or remove-token, as $1.
+# SLOT=<1-3> is required. The hook and cleanup scripts that run are the
+# copies install.sh put in the runner directory; nothing here rewrites them.
+# RUNNER_TOKEN_CMD=<command> replaces the token minting, which otherwise
+# reads a fine-grained token from the login Keychain; it gets the token kind,
+# registration-token or remove-token, as $1.
 # RUNNER_DRY_RUN=1 prints the commands instead of running them, and the .env
 # it would write on stderr.
 set -eu
@@ -37,12 +37,6 @@ mint() {
         GH_TOKEN=$gh_token gh api -X POST "repos/$repo/actions/runners/$1" --jq .token
     fi
 }
-
-# Never this script itself: sh reads it as it runs, and cp rewrites the same
-# file in place. install.sh replaces it.
-if [ -n "${SLACKWATER_CI_SCRIPTS:-}" ]; then
-    run cp "$SLACKWATER_CI_SCRIPTS/hook-job-started.sh" "$SLACKWATER_CI_SCRIPTS/cleanup-slot.sh" "$runner_dir/"
-fi
 
 # The runner loads .env into every job's environment. The workflow reads the
 # slot from it, and it pins the PATH the jobs see, whatever PATH config.sh

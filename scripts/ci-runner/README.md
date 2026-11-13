@@ -10,7 +10,7 @@ The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slot
 | `hook-job-started.sh` | Refuses any job that is not a push to main or a pull request a person opened from a branch in this repository other than `dependabot/*`. |
 | `cleanup-slot.sh` | Deletes the slot's simulator clones and erases its two devices. |
 
-`install.sh` copies `reregister.sh`, the hook and the cleanup script into each runner directory, and those copies are what run. Between jobs there is no checkout to run them from.
+`install.sh` copies `reregister.sh`, the hook and the cleanup script into each runner directory, and those copies are what run. Between jobs there is no checkout to run them from. `install.sh` is the only thing that writes them.
 
 A failing job-started hook alone does not stop a job: the runner marks it failed, but its steps still start, and a step under `if: always()` runs. So the hook, on a refusal, kills the job's `Runner.Worker` before any step runs. The ephemeral runner exits and launchd brings up a fresh one. The hook is the second fence. The first is the repository setting "Require approval for all outside collaborators" (Settings, Actions, General, Fork pull request workflows), which must stay on, so a fork's edited workflow never even starts without a maintainer's click.
 
