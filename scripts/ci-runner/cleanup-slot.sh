@@ -44,10 +44,28 @@ simctl() {
         print -r -- "simctl $label$*"
     elif [[ $1 == shutdown ]]; then
         xcrun simctl $set_args "$@" 2>/dev/null || true
+    elif xcrun simctl $set_args "$@"; then
+        :
+    elif [[ $1 == delete ]] && ! device_exists $set_args "$2"; then
+        # The same race as a process that exits before its kill: a killed
+        # xcodebuild tears its clones down on its own, so a clone listed a
+        # moment ago can be gone by the time the delete runs. "Invalid
+        # device" then is the outcome the delete wanted (a cancelled run on
+        # the Studio, #923), not a device that is stuck.
+        print -u2 -r -- "cleanup-slot: $2 was already gone"
     else
         # Best-effort: one stuck device must not stop the rest of the cleanup.
-        xcrun simctl $set_args "$@" || { print -u2 -r -- "cleanup-slot: simctl $label$* failed"; failed=1; }
+        print -u2 -r -- "cleanup-slot: simctl $label$* failed"; failed=1
     fi
+}
+
+# True when the device set (the --set arguments, if any, then the UDID) still
+# lists the device.
+device_exists() {
+    local -a set_args=()
+    if [[ $1 == --set ]]; then set_args=(--set "$2"); shift 2; fi
+    xcrun simctl $set_args list devices -j 2>/dev/null \
+        | jq -e --arg u "$1" '.devices[][] | select(.udid == $u)' >/dev/null 2>&1
 }
 
 clones=(${(f)"$(print -r -- "$devices" | jq -r --arg p "SlackwaterCI-$slot-" --arg a "$phone" --arg b "$pad" \
