@@ -773,6 +773,23 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertEqual(q.deferred(at: t0.addingTimeInterval(61)), 0)
     }
 
+    /// The retry timer slept until a job's `retryAfter`; its firing is what says
+    /// the job is due, since a pinned `appNow()` never reaches that instant.
+    func testAFiredRetryTimerReleasesTheJobsItSleptFor() {
+        var q = queue()
+        q.prioritize(lat: 48.4235, lon: -123.3705)
+        q.set("near", .downloading)
+        q.deferRetry("near", error: "HTTP 503", at: t0)
+        q.set("far", .downloading)
+        q.deferRetry("far", error: "HTTP 503", at: t0.addingTimeInterval(30))
+
+        q.releaseRetries(dueBy: t0.addingTimeInterval(60))
+
+        XCTAssertEqual(q.nextPending(at: t0)?.id, "near", "the job the timer slept for runs on a clock that never moved")
+        XCTAssertEqual(q.deferred(at: t0), 1, "a job due later keeps its backoff")
+        XCTAssertEqual(q.earliestRetry(after: t0), t0.addingTimeInterval(90))
+    }
+
     func testBackoffDoublesToAFifteenMinuteCeiling() {
         XCTAssertEqual(ChsQueue.backoff(attempts: 1), 60)
         XCTAssertEqual(ChsQueue.backoff(attempts: 2), 120)

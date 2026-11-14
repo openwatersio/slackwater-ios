@@ -82,7 +82,7 @@ enum ShortcutPlaceQuery {
     }
 
     static func record(id: String, kind: LocalStationKind, on date: Date? = nil,
-                       at now: Date = .now) throws -> WidgetRecord {
+                       at now: Date = appNow()) throws -> WidgetRecord {
         guard let item = StationItem.widgetItem(id: id), accepts(item, kind: kind), usable(item),
               let record = WidgetStationLoader.loadRecord(id: id,
                 at: date.flatMap { shortcutDateInterval($0, in: timeZone(item))?.start } ?? now) else {

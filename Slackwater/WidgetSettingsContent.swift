@@ -52,7 +52,9 @@ struct WidgetSettingsContent: View {
                 let id = WidgetStationLoader.resolvedStationID(WidgetStationLoader.defaultStationID())
                 // The default is Current Location, so the prefix (and
                 // its location mark) is the provider's for that entry.
-                return WidgetStationLoader.loadRecord(id: id).map {
+                // The real clock for the record and the card alike, not `appNow()`: the
+                // card's countdown chip (DayCurveContentView) runs on the real clock.
+                return WidgetStationLoader.loadRecord(id: id, at: .now).map {
                     WidgetCard.build($0, now: .now, stationNamePrefix: "Current Location")
                 }
             }.value

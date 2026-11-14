@@ -41,7 +41,7 @@ struct RangeDetailSheet: View {
     var imperial = false
     var unit = "m"
     var tz: TimeZone = .current
-    var now: Date = .now
+    var now: Date = appNow()
     /// Moves the scrubber to a tapped fact, the way the Moon sheet's facts
     /// already do. A superlative you cannot go and look at is trivia.
     var onJump: ((Date) -> Void)? = nil

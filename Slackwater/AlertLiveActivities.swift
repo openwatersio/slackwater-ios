@@ -51,14 +51,19 @@ enum AlertLiveActivities {
     /// outlives the event on the open face.
     nonisolated static func apply(_ entries: [AlertEntry], water: @Sendable (String) -> AlertLiveActivityAttributes.Water,
                       curve: @Sendable (AlertEntry) -> AlertLiveActivityCurve?,
-                      liveRuleIDs: Set<UUID>, imperial: Bool, now: Date) async -> Set<String> {
+                      liveRuleIDs: Set<UUID>, imperial: Bool) async -> Set<String> {
+        // The real clock, not `appNow()`, for the whole writer: the event, end, start and stale
+        // dates ActivityKit holds are absolute and read on the real clock, so a pinned Debug
+        // clock would keep activities that have ended and request ones that start at once.
+        // Read at each step, not the pass start: the resolve before this can run long, and so
+        // can the ends awaited below.
         let ours = Activity<AlertLiveActivityAttributes>.activities
         let records = ours.map { a in
             LiveActivityRecord(key: a.attributes.key, ruleID: a.attributes.ruleID,
                                pending: a.activityState == .pending,
                                event: a.attributes.event, end: a.attributes.end)
         }
-        let ending = Set(liveActivitiesToEnd(records, liveRuleIDs: liveRuleIDs, now: now))
+        let ending = Set(liveActivitiesToEnd(records, liveRuleIDs: liveRuleIDs, now: Date()))
         for a in ours where ending.contains(a.attributes.key) {
             await a.end(nil, dismissalPolicy: .immediate)
         }

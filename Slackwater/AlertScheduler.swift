@@ -43,7 +43,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
     let until = now.addingTimeInterval(AlertHorizon.calendar)
 
     for rule in rules where rule.enabled {
-        guard let record = WidgetStationLoader.loadRecord(id: rule.stationID) else {
+        guard let record = WidgetStationLoader.loadRecord(id: rule.stationID, at: now) else {
             resolved.unresolved.insert(rule.id)
             continue
         }
@@ -57,7 +57,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
     }
 
     for stationID in subscriptions {
-        guard let record = WidgetStationLoader.loadRecord(id: stationID) else {
+        guard let record = WidgetStationLoader.loadRecord(id: stationID, at: now) else {
             resolved.unresolvedStations.insert(stationID)
             continue
         }
@@ -179,7 +179,7 @@ struct AlertStatusSnapshot: Equatable {
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
             curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
-            liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial, now: now)
+            liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial)
         await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))
 
