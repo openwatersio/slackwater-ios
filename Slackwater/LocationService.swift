@@ -44,8 +44,13 @@ let locationAskedKey = "slackwater.seenGate"
 
     override private init() {
         status = manager.authorizationStatus
+        // A test fix is precise unless `-locApproximate` says otherwise: with a fix the
+        // delegate is never set, so whatever locationd reports at launch would stand for
+        // the whole run, and on a pristine clone under load it has reported reduced
+        // accuracy for an app that never asked (#923).
         accuracyAuthorization = CommandLine.arguments.contains("-locApproximate")
-            ? .reducedAccuracy : manager.accuracyAuthorization
+            ? .reducedAccuracy
+            : Self.testFix != nil ? .fullAccuracy : manager.accuracyAuthorization
         super.init()
         locating = Self.testAuthorizedNoFix
         // Test locations must not be overwritten by the simulator's cached fix
