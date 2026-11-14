@@ -9,7 +9,7 @@ import SwiftUI
 /// is the Now pill's (`scrubbedAway`), so the button and the pill never
 /// disagree about whether the strip has moved.
 func detailShareURL(stationID: String, scrubTime: Date?,
-                    now: Date = Date(), tz: TimeZone) -> URL? {
+                    now: Date = appNow(), tz: TimeZone) -> URL? {
     shareURL(forStationID: stationID,
              at: scrubTime.flatMap { scrubbedAway($0, from: now) ? $0 : nil },
              tz: tz)

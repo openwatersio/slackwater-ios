@@ -338,7 +338,7 @@ func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOc
 ```
 
 `deliveryPlan` is pure. A reschedule loads rules and subscriptions, resolves stations through
-`WidgetStationLoader.loadRecord(id:)`, builds rule and subscription occurrences from now out to the
+`WidgetStationLoader.loadRecord(id:at:)` at the pass's `now`, builds rule and subscription occurrences from now out to the
 90-day calendar horizon off the main thread (`resolveAlerts`), plans — the 14-day notification cut
 happens inside `deliveryPlan` — and hands the plan to thin writers. Besides its own triggers, a
 reschedule also rides the widget-reload hook: the comfort speed slider settling, a CHS fit
@@ -358,8 +358,11 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
   from the last run counts as placed and is never re-requested. The notification writer then gets
   `plannedNotifications`: the eligible list with the placed occurrences removed and cut to 64
   again, so an activity never costs a notification slot — the 65th-eligible occurrence moves up
-  from `overflow`. One the writer cannot place stays a notification. The writer filters by the
-  clock, not the pass start, so a slow resolve never requests an activity whose event has passed.
+  from `overflow`. One the writer cannot place stays a notification. Both writers filter by the
+  clock at write time, not the pass start, so a slow resolve never requests an activity whose
+  event has passed or a notification whose fire time has. The notification writer measures each
+  interval on the app clock, which a test launch can pin or shift; the Live Activity writer uses
+  the real clock, because the dates it hands ActivityKit are absolute and read on that one.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.

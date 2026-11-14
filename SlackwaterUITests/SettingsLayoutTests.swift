@@ -314,7 +314,9 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String, previewTitle: String? = nil, calendarSummary: String? = nil) {
-        let app = launch("-locDenied", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
+        // -resetCalendars: the calendar row's summary names a subscribed station, and a
+        // subscription an earlier test seeded on this simulator survives its relaunch.
+        let app = launch("-locDenied", "-resetCalendars", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
         // Use the gear's identifier-independent location in translated runs.
         if language == "en" {
             openSettings(app)

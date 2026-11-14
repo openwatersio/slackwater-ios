@@ -28,11 +28,11 @@ struct MaxDetailSheet: View {
     var seasons: [SeasonEvent] = []
     /// The loaded timeline's slack runs, for what this maximum costs.
     var slackRuns: [(slack: Date, start: Date, end: Date)] = []
-    var maximumAt: Date = .now
+    var maximumAt: Date = appNow()
     /// The reader's speed unit, for the lit bar's label.
     var speedUnit = "kn"
     var tz: TimeZone = .current
-    var now: Date = .now
+    var now: Date = appNow()
     var onJump: ((Date) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss

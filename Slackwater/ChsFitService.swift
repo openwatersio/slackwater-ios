@@ -138,6 +138,10 @@ final class ChsFitService: ObservableObject {
     private var downloadsActive = true
 #endif
     private var retryTimer: Task<Void, Never>?
+    /// The due time `retryTimer` is sleeping for. A pump that finds the same
+    /// earliest retry keeps the timer: re-arming would restart the whole backoff
+    /// under a pinned Debug clock, which never shows time remaining.
+    private var retryTimerDue: Date?
     private var connectivity: AnyCancellable?
     private var dataMode: AnyCancellable?
     private var onlinePending: [ChsCurrentGateInfo] = []
@@ -810,7 +814,7 @@ final class ChsFitService: ObservableObject {
         onlineStates[id] = .deferred(due)
         guard let gate = onlineDesired[id] else { return }
         onlineRetryTimers[id] = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(max(due.timeIntervalSinceNow, 1)))
+            try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
             guard !Task.isCancelled else { return }
             self?.onlineStates[id] = .idle
             self?.prefetchOnlineGates([gate])
@@ -1037,23 +1041,38 @@ final class ChsFitService: ObservableObject {
         } else {
             fitTask?.cancel()
             retryTimer?.cancel()
+            retryTimerDue = nil
         }
     }
 
-    private func pump() {
-        guard downloadsActive, !running, !networkKillSwitch, Connectivity.shared.online else { return }
+    /// `releasing` is the due time a fired retry timer slept until. Its jobs
+    /// become eligible only when downloads can run, so a timer that wakes
+    /// offline or under the kill switch leaves their backoff in place. A run
+    /// still claiming jobs takes them on its next pass; one already winding
+    /// down leaves them eligible for the next pump.
+    private func pump(releasing due: Date? = nil) {
+        guard downloadsActive, !networkKillSwitch, Connectivity.shared.online else { return }
+        if let due { queue.releaseRetries(dueBy: due) }
+        guard !running else { return }
         guard queue.nextPending() != nil else { return scheduleRetryPump() }
         running = true
         fitTask = Task.detached(priority: .utility) { [self] in await run() }
     }
 
     private func scheduleRetryPump() {
+        guard downloadsActive, let due = queue.earliestRetry() else {
+            retryTimer?.cancel()
+            retryTimerDue = nil
+            return
+        }
+        if retryTimerDue == due, let timer = retryTimer, !timer.isCancelled { return }
         retryTimer?.cancel()
-        guard downloadsActive, let due = queue.earliestRetry() else { return }
+        retryTimerDue = due
         retryTimer = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(max(due.timeIntervalSinceNow, 1)))
+            try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
             guard !Task.isCancelled else { return }
-            self?.pump()
+            self?.retryTimerDue = nil
+            self?.pump(releasing: due)
         }
     }
 

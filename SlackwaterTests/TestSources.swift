@@ -1,7 +1,7 @@
 import XCTest
 
 /// Shared plumbing for the source-text linter tests (TypeScaleTests,
-/// ColourAndFormTests, HeroChromeTests): `#filePath` of this file sits in
+/// ColourAndFormTests, HeroChromeTests, AppClockTests): `#filePath` of this file sits in
 /// SlackwaterTests/, so the repo root is one level up and the app sources
 /// live under Slackwater/. One walk, one file set — the per-test copies this
 /// replaces had identical semantics (FileManager.enumerator over Slackwater/,

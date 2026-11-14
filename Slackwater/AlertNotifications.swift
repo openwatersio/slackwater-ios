@@ -1,6 +1,15 @@
 // Slackwater — GPL v3. Schedules Premium alert notifications and routes a tap to the station at the event (docs/alerts.md §5.2).
 import UserNotifications
 
+/// How long from `now` until `entry` fires, or nil once its fire time is behind.
+/// A reminder already behind is dropped, not sent at once: nothing records what
+/// iOS has delivered, and the plan moves a reminder inside its lead to now on
+/// every pass, so requesting it would buzz again on each one.
+func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
+    let wait = entry.occurrence.fire.timeIntervalSince(now)
+    return wait > 0 ? wait : nil
+}
+
 @MainActor enum AlertNotifications {
     /// Every request this writer owns. Nothing else in the app schedules notifications, but
     /// the prefix keeps a replace from ever touching one that isn't ours.
@@ -22,10 +31,11 @@ import UserNotifications
         center.removePendingNotificationRequests(withIdentifiers: ours)
         guard await authorized() else { return }
         for entry in entries {
-            // An interval, not calendar components: the occurrence is an absolute instant,
-            // and this stays right when the phone changes time zone.
-            let wait = entry.occurrence.fire.timeIntervalSinceNow
-            guard wait > 0 else { continue }
+            // Measured as each request is added, since an interval trigger counts from `add`,
+            // and on the app clock, which a Debug launch can pin. An interval, not calendar
+            // components: the occurrence is an absolute instant, and this stays right when the
+            // phone changes time zone.
+            guard let wait = notificationWait(for: entry, from: appNow()) else { continue }
             let content = UNMutableNotificationContent()
             content.title = entry.copy.title
             content.body = entry.copy.body

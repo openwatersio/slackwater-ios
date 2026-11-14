@@ -67,7 +67,7 @@ func reportMoment(_ date: Date, _ tz: TimeZone,
 /// IS the prediction — whoever reads the mail opens the link and sees the exact
 /// curve the reporter was looking at, with none of it to keep in sync here.
 func reportBody(kind: ReportKind, stationID: String, scrubTime: Date?,
-                now: Date = Date(), tz: TimeZone) -> String {
+                now: Date = appNow(), tz: TimeZone) -> String {
     // `UnavailableStation` second: an unavailable station's id is one
     // `StationItem.byId` misses by construction, and without this the mail
     // reads "Station: ticon/gijontg-gij-esp-cmems" instead of naming Gijon.
@@ -102,7 +102,7 @@ private let mailtoAllowed: CharacterSet = {
 }()
 
 func reportMailURL(kind: ReportKind, stationID: String, scrubTime: Date?,
-                   now: Date = Date(), tz: TimeZone) -> URL? {
+                   now: Date = appNow(), tz: TimeZone) -> URL? {
     let body = reportBody(kind: kind, stationID: stationID, scrubTime: scrubTime, now: now, tz: tz)
     guard let subject = kind.subject.addingPercentEncoding(withAllowedCharacters: mailtoAllowed),
           let encoded = body.addingPercentEncoding(withAllowedCharacters: mailtoAllowed)
