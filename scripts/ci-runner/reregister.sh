@@ -4,7 +4,7 @@
 # ~/actions-runner/studio-<slot>/ and starts it again each time the runner
 # exits after its one job.
 #
-# SLOT=<1-3> is required. The hook and cleanup scripts that run are the
+# SLOT=<1-9> is required; install.sh's SLOTS sets how many there are. The hook and cleanup scripts that run are the
 # copies install.sh put in the runner directory; nothing here rewrites them.
 # RUNNER_TOKEN_CMD=<command> replaces the token minting, which otherwise
 # reads a fine-grained token from the login Keychain; it gets the token kind,
@@ -13,8 +13,8 @@
 # it would write on stderr.
 set -eu
 case "${SLOT:-}" in
-    1|2|3) ;;
-    *) printf 'reregister.sh: SLOT must be 1, 2 or 3, got "%s"\n' "${SLOT:-}" >&2; exit 64 ;;
+    [1-9]) ;;
+    *) printf 'reregister.sh: SLOT must be a whole number from 1 to 9, got "%s"\n' "${SLOT:-}" >&2; exit 64 ;;
 esac
 repo=openwatersio/slackwater-ios
 runner_dir=$HOME/actions-runner/studio-$SLOT

@@ -755,9 +755,16 @@ jobs:
           xcrun simctl shutdown "$udid"
 
       # As the hosted app job, minus its hosted-runner settings: test.sh sizes
-      # its own workers, clones the slot's device for them, and applies its
-      # own PERF_SCALE default of 2, which it chose for overlapped runs on
-      # this machine. SLACKWATER_SIMS comes from the step above.
+      # its own workers and clones the slot's device for them. SLACKWATER_SIMS
+      # comes from the step above.
+      #
+      # PERF_SCALE is the hosted path's 4, not test.sh's default of 2. The
+      # default was measured with two overlapped runs; a Studio job runs four
+      # clones, beside up to two more jobs and local work, and the first full
+      # iPad run lost one test to a 10-second wait that the hosted path gives
+      # 20 (PremiumSheetTests.testCalendarOpensOnCalendarsCard, main run
+      # 43509103099). The same scale on both paths also keeps a wait that
+      # passes on one from failing on the other.
       #
       # SLACKWATER_SIM_OS is pinned here as on the hosted path, and for a
       # sharper reason: a `name=` destination with no OS means OS:latest,
@@ -778,6 +785,7 @@ jobs:
         env:
           MODE: ${{ github.event_name == 'push' && '--full' || '' }}
           SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
+          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
 
       # The hosted app job's failure messages, rerun and verdict; the comments
       # there say why each exists.
@@ -813,6 +821,7 @@ jobs:
         env:
           SLACKWATER_ONLY: ${{ steps.failures.outputs.failed }}
           SLACKWATER_SIM_OS: ${{ env.CI_SIM_OS }}
+          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
 
       - name: Test result
         if: always()

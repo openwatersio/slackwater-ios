@@ -1,10 +1,10 @@
 # Studio CI runners
 
-The Mac Studio runs the CI app lane as three ephemeral self-hosted runners, slots 1 to 3. Each slot has its own runner directory, `~/actions-runner/studio-<slot>/`, its own two simulators, `SlackwaterCI-<slot>-iPhone` and `SlackwaterCI-<slot>-iPad`, and its own launchd job, `io.openwaters.slackwater.ci-runner.<slot>`. A runner takes one job and exits. launchd starts `reregister.sh` again, which cleans the slot's simulators, registers a fresh runner with a new token, and waits for the next job. The design is in [#923](https://github.com/openwatersio/slackwater-ios/issues/923).
+The Mac Studio runs the CI app lane as ephemeral self-hosted runners, one per slot, numbered from 1. How many is `install.sh`'s `SLOTS`, two by default. With three, a push to `main` (two jobs) and one pull request put twelve simulator clones on the Studio at once, and runs that pass alone failed Settings UI tests under that load. With two, a push to `main` takes both slots and pull requests queue behind it. Each slot has its own runner directory, `~/actions-runner/studio-<slot>/`, its own two simulators, `SlackwaterCI-<slot>-iPhone` and `SlackwaterCI-<slot>-iPad`, and its own launchd job, `io.openwaters.slackwater.ci-runner.<slot>`. A runner takes one job and exits. launchd starts `reregister.sh` again, which cleans the slot's simulators, registers a fresh runner with a new token, and waits for the next job. The design is in [#923](https://github.com/openwatersio/slackwater-ios/issues/923).
 
 | File | What it does |
 | --- | --- |
-| `install.sh` | Sets up the three slots and retires the old organisation runner. |
+| `install.sh` | Sets up `SLOTS` slots, two by default, retires any installed slot above that, and retires the old organisation runner. |
 | `reregister.sh` | What each launchd job runs: clean, register, run one job. |
 | `launchd.plist.template` | The launchd job, rendered once per slot. |
 | `hook-job-started.sh` | Refuses any job that is not a push to main or a pull request a person opened from a branch in this repository other than `dependabot/*`. |
@@ -37,11 +37,13 @@ Neither fence stops a trusted job. It runs as the Studio's user, who owns the ru
    sh scripts/ci-runner/install.sh
    ```
 
+   That installs two slots. To run three, `SLOTS=3 sh scripts/ci-runner/install.sh`; any number from 1 to 9 works. To drop back to two, run `sh scripts/ci-runner/install.sh` again without `SLOTS`: each installed slot above `SLOTS` is retired on that run. Its launchd job is unloaded, which stops a job it is running, its plist deleted, its runner deregistered from GitHub with a removal token minted from the Keychain token, its simulators and their clones deleted, and its directory removed.
+
    It needs `gh`, `jq`, `curl` and Xcode's `xcrun` on PATH, and the iOS runtime that the `runtime=` line in `install.sh` names installed; the shard test, `scripts/test-shards.test.rb`, checks that line against `CI_SIM_OS` in `.github/workflows/ci.yml`, the runtime the hosted app job tests on. Every Studio job fails before its tests if the slot's device is on another runtime; rerun `install.sh` after changing either. The selected Xcode must be the one the hosted `xcode-27` image carries, `CI_XCODE_VERSION` in `.github/workflows/ci.yml`: `xcode-select -p` shows which is selected and `xcodebuild -version` its version. Every Studio job checks it first and fails on any other, and the hosted build job checks the image against the same value. Jobs get `node` from mise, at the version in `mise.toml`, and `xcodegen` and `jq` from Homebrew, so `mise install` must have been run on the Studio. Each runner checks out into `~/actions-runner/studio-<n>/_work/`, a path mise has never trusted, so `reregister.sh` sets `MISE_TRUSTED_CONFIG_PATHS` to that directory in the runner's `.env`, and the `node` shim reads the checkout's `mise.toml` without asking. For each slot it downloads the current `actions/runner` release for `osx-arm64` if the directory has none, copies the scripts, creates the two simulators on that runtime if they are missing there, first deleting any device of the same name that is on another runtime or unavailable, writes the launchd plist into `~/Library/LaunchAgents/`, and loads it. If a slot's name has two available devices on that runtime, it changes nothing and prints their UDIDs: keep one, delete the rest with `xcrun simctl delete <udid>`, and run it again.
 
    Before that it retires the old runner: it unloads and deletes the `actions.runner.openwatersio.studio` agent and deletes the old `SlackwaterCI-iPhone` and `SlackwaterCI-iPad` simulators and their clones, including xcodebuild's in `~/Library/Developer/XCTestDevices`. The old runner was registered with the organisation, and its removal token can only be minted with an organisation admin token, so `install.sh` prints two commands, marked `operator:`, for you to run with one: the `config.sh remove` for `~/actions-runner/slackwater-ios`, and the `gh api` call that deletes the `slackwater-nightly` runner group. It keeps printing them while the old runner's `.runner` file is still there.
 
-4. Resolve each slot's packages once from a Terminal. A slot's first build downloads MapLibre through SwiftPM, which reads github.com credentials from the login Keychain and raises a permission dialog that a launchd job cannot show, so the job hangs. CONTRIBUTING.md, "The first `xcodebuild` in a new worktree can hang silently", has the detail. From a checkout where `xcodegen generate` has run, for each slot `<n>` from 1 to 3, run this and choose Always Allow:
+4. Resolve each slot's packages once from a Terminal. A slot's first build downloads MapLibre through SwiftPM, which reads github.com credentials from the login Keychain and raises a permission dialog that a launchd job cannot show, so the job hangs. CONTRIBUTING.md, "The first `xcodebuild` in a new worktree can hang silently", has the detail. From a checkout where `xcodegen generate` has run, for each slot `<n>` from 1 to `SLOTS`, run this and choose Always Allow:
 
    ```sh
    xcodebuild -resolvePackageDependencies -project Slackwater.xcodeproj -scheme Slackwater \
@@ -70,15 +72,14 @@ The jobs are LaunchAgents in the user's GUI session, and they read the token fro
 
 ## Check it
 
-`launchctl list | grep slackwater`, in a Terminal on the Studio (over ssh it reads another launchd domain and shows nothing), shows the three jobs. The first column is the process ID while `reregister.sh` or the runner is up; the second is the last exit status, which should be 0:
+`launchctl list | grep slackwater`, in a Terminal on the Studio (over ssh it reads another launchd domain and shows nothing), shows one job per slot, two by default. The first column is the process ID while `reregister.sh` or the runner is up; the second is the last exit status, which should be 0:
 
 ```
 41211	0	io.openwaters.slackwater.ci-runner.1
 41215	0	io.openwaters.slackwater.ci-runner.2
-41219	0	io.openwaters.slackwater.ci-runner.3
 ```
 
-GitHub sees three runners, `studio-1` to `studio-3`, online and ephemeral, with labels `self-hosted`, `macOS`, `ARM64`, which `config.sh` adds, and `studio`:
+GitHub sees one runner per slot, `studio-1` and `studio-2` by default, online and ephemeral, with labels `self-hosted`, `macOS`, `ARM64`, which `config.sh` adds, and `studio`:
 
 ```sh
 gh api repos/openwatersio/slackwater-ios/actions/runners \
@@ -88,7 +89,6 @@ gh api repos/openwatersio/slackwater-ios/actions/runners \
 ```
 studio-1	online	false	true	self-hosted,macOS,ARM64,studio
 studio-2	online	true	true	self-hosted,macOS,ARM64,studio
-studio-3	online	false	true	self-hosted,macOS,ARM64,studio
 ```
 
 A busy runner is running a job. When it finishes, it disappears from the list for a few seconds and comes back under the same name.

@@ -27,7 +27,14 @@ if (cd "$runner" && env -u SLOT HOME="$home" RUNNER_DRY_RUN=1 RUNNER_TOKEN_CMD='
     fail 'reregister.sh ran without SLOT'
 fi
 grep -q SLOT "$scratch/out" || fail "reregister.sh without SLOT said: $(cat "$scratch/out")"
-if rereg SLOT=4 >/dev/null 2>&1; then fail 'reregister.sh accepted slot 4'; fi
+for bad in 0 10 x; do
+    if rereg SLOT="$bad" >/dev/null 2>&1; then fail "reregister.sh accepted slot $bad"; fi
+done
+# Slot 4 is valid now that the count is install.sh's SLOTS.
+mkdir -p "$home/actions-runner/studio-4"
+(cd "$home/actions-runner/studio-4" && env HOME="$home" RUNNER_DRY_RUN=1 RUNNER_TOKEN_CMD='echo tok' SLOT=4 sh "$dir/reregister.sh") >"$scratch/out" 2>/dev/null ||
+    fail 'reregister.sh refused slot 4'
+grep -qxF 'zsh ./cleanup-slot.sh 4' "$scratch/out" || fail "reregister.sh slot 4 printed: $(cat "$scratch/out")"
 
 config="./config.sh --unattended --ephemeral --replace --url https://github.com/openwatersio/slackwater-ios --token tok --name studio-2 --labels studio --work _work"
 out=$(rereg SLOT=2 2>"$scratch/err")
@@ -84,14 +91,15 @@ install() {
     env HOME="$home" RUNNER_DRY_RUN=1 RUNNER_VERSION=v2.330.0 \
         RUNNER_LOADED_LABELS="$scratch/loaded" SIMCTL_DEVICES_JSON="$scratch/devices.json" \
         SIMCTL_XCTEST_DEVICES_JSON="$scratch/xctest.json" \
-        sh "$dir/install.sh"
+        "$@" sh "$dir/install.sh"
 }
 uid=$(id -u)
 url=https://github.com/actions/runner/releases/download/v2.330.0/actions-runner-osx-arm64-2.330.0.tar.gz
 iphone=com.apple.CoreSimulator.SimDeviceType.iPhone-17
 ipad=com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB
 runtime=com.apple.CoreSimulator.SimRuntime.iOS-27-0
-expected=$(
+# What a first install prints for the slots it is given.
+first_install() {
     printf '%s\n' \
         "launchctl bootout gui/$uid/actions.runner.openwatersio.studio" \
         "rm -f $home/Library/LaunchAgents/actions.runner.openwatersio.studio.plist" \
@@ -107,7 +115,7 @@ expected=$(
         "xcrun simctl --set $home/Library/Developer/XCTestDevices shutdown DDDDDDDD-0000-0000-0000-000000000001" \
         "xcrun simctl --set $home/Library/Developer/XCTestDevices delete DDDDDDDD-0000-0000-0000-000000000001" \
         "mkdir -p $home/Library/LaunchAgents $home/Library/Logs"
-    for n in 1 2 3; do
+    for n in "$@"; do
         r=$home/actions-runner/studio-$n
         plist=$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.$n.plist
         printf '%s\n' \
@@ -124,15 +132,24 @@ expected=$(
             "write $plist" \
             "launchctl bootstrap gui/$uid $plist"
     done
-)
+}
+# Two slots unless SLOTS says otherwise.
+expected=$(first_install 1 2)
 out=$(install)
 same 'install, first run' "$expected" "$out"
 # Dry-run changes nothing, so a second run must decide the same way.
 out=$(install)
 same 'install, second run' "$expected" "$out"
+out=$(install SLOTS=3)
+same 'install, first run with SLOTS=3' "$(first_install 1 2 3)" "$out"
+for bad in 0 10 x -1; do
+    if install SLOTS="$bad" >"$scratch/out" 2>"$scratch/err"; then fail "install.sh accepted SLOTS=\"$bad\""; fi
+    [ -s "$scratch/out" ] && fail "install.sh with SLOTS=\"$bad\" printed: $(cat "$scratch/out")"
+    grep -q 'SLOTS must be a whole number from 1 to 9' "$scratch/err" || fail "install.sh with SLOTS=\"$bad\" said: $(cat "$scratch/err")"
+done
 
 # Once everything is in place, a run does nothing.
-for n in 1 2 3; do
+for n in 1 2; do
     r=$home/actions-runner/studio-$n
     mkdir -p "$r"
     : >"$r/config.sh"
@@ -148,8 +165,7 @@ mv "$scratch/loaded.new" "$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
-  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true}
 ]}}
 JSON
 printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
@@ -162,23 +178,22 @@ cp "$scratch/devices.json" "$scratch/installed.json"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {
   "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-    {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
-    {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": false}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-    {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}
+    {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true},
+    {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": false}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true}
   ],
   "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
-    {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+    {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true}
   ]
 }}
 JSON
 out=$(install)
 same 'install with devices off the pinned runtime' "$(printf '%s\n' \
+    'xcrun simctl shutdown 2' \
+    'xcrun simctl delete 2' \
+    "xcrun simctl create SlackwaterCI-1-iPad $ipad $runtime" \
     'xcrun simctl shutdown 3' \
     'xcrun simctl delete 3' \
-    "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime" \
-    'xcrun simctl shutdown 6' \
-    'xcrun simctl delete 6' \
-    "xcrun simctl create SlackwaterCI-3-iPad $ipad $runtime")" "$out"
+    "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime")" "$out"
 mv "$scratch/installed.json" "$scratch/devices.json"
 
 # A listing that is not a device list stops the install before any simulator
@@ -202,8 +217,7 @@ cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
   {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-  {"name": "SlackwaterCI-2-iPhone", "udid": "7", "isAvailable": true},
-  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+  {"name": "SlackwaterCI-2-iPhone", "udid": "7", "isAvailable": true}
 ]}}
 JSON
 if install >"$scratch/out" 2>"$scratch/err"; then fail 'install.sh accepted two SlackwaterCI-2-iPhone devices'; fi
@@ -220,5 +234,55 @@ same 'install with a changed plist' "$(printf '%s\n' \
     "launchctl bootout gui/$uid/io.openwaters.slackwater.ci-runner.2" \
     "write $plist" \
     "launchctl bootstrap gui/$uid $plist")" "$out"
+
+# A machine with three slots installed and SLOTS=2: slot 3 is retired, its
+# runner deregistered with a removal token, and slots 1 and 2 left alone.
+home=$scratch/retire-home
+: >"$scratch/loaded"
+for n in 1 2 3; do
+    r=$home/actions-runner/studio-$n
+    mkdir -p "$r" "$home/Library/LaunchAgents"
+    : >"$r/config.sh"
+    : >"$r/.runner"
+    cp "$dir/hook-job-started.sh" "$dir/cleanup-slot.sh" "$dir/reregister.sh" "$r/"
+    sed -e "s|@SLOT@|$n|g" -e "s|@RUNNER_DIR@|$r|g" -e "s|@HOME@|$home|g" "$dir/launchd.plist.template" \
+        >"$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.$n.plist"
+    printf '%s\n' "io.openwaters.slackwater.ci-runner.$n" >>"$scratch/loaded"
+done
+mkdir -p "$home/Library/Logs"
+cat >"$scratch/devices.json" <<'JSON'
+{"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
+  {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
+  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
+  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true},
+  {"name": "SlackwaterCI-3-iPhone-old", "udid": "7", "isAvailable": false}
+]}}
+JSON
+cat >"$scratch/xctest.json" <<'JSON'
+{"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
+  {"name": "Clone 1 of SlackwaterCI-3-iPad", "udid": "8", "isAvailable": true},
+  {"name": "Clone 1 of SlackwaterCI-2-iPhone", "udid": "9", "isAvailable": true}
+]}}
+JSON
+r3=$home/actions-runner/studio-3
+plist3=$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.3.plist
+xctest=$home/Library/Developer/XCTestDevices
+retired=$(printf '%s\n' \
+    "launchctl bootout gui/$uid/io.openwaters.slackwater.ci-runner.3" \
+    "rm -f $plist3" \
+    "cd $r3 && ./config.sh remove --token rm" \
+    'xcrun simctl shutdown 5' 'xcrun simctl delete 5' \
+    'xcrun simctl shutdown 6' 'xcrun simctl delete 6' \
+    'xcrun simctl shutdown 7' 'xcrun simctl delete 7' \
+    "xcrun simctl --set $xctest shutdown 8" "xcrun simctl --set $xctest delete 8" \
+    "rm -rf $r3")
+out=$(install SLOTS=2 RUNNER_TOKEN_CMD='[ "$1" = remove-token ] && echo rm || echo tok')
+same 'install retiring slot 3' "$retired" "$out"
+# A slot that is retired, its plist and directory gone, gets nothing.
+rm -rf "$r3" "$plist3"
+grep -vxF io.openwaters.slackwater.ci-runner.3 "$scratch/loaded" >"$scratch/loaded.new"
+mv "$scratch/loaded.new" "$scratch/loaded"
+out=$(install SLOTS=2)
+same 'install after slot 3 is retired' '' "$out"
 
 printf 'runner install checks passed\n'
