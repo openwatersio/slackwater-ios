@@ -1,6 +1,8 @@
 #!/bin/sh
-# Install the Studio's three ephemeral CI runner slots, and retire the old
-# organisation runner and its simulators. See README.md in this directory.
+# Install the Studio's ephemeral CI runner slots, SLOTS of them, 2 unless the
+# environment says otherwise, and retire the old organisation runner and its
+# simulators. A slot numbered above SLOTS that is still installed is retired on
+# the same run. See README.md in this directory.
 #
 # Each step checks before it acts, so running this again changes nothing that
 # is already in place; a plist that no longer matches the template is
@@ -11,8 +13,20 @@
 # (one label per line) stands in for asking launchd which jobs are loaded, and
 # SIMCTL_DEVICES_JSON=<file> for `xcrun simctl list devices -j`, and
 # SIMCTL_XCTEST_DEVICES_JSON=<file> for the same listing of XCTestDevices.
+# RUNNER_TOKEN_CMD=<command> replaces the removal-token minting for a retired
+# slot, as in reregister.sh.
 set -eu
+# Two by default: with three, a push to main (two jobs) and one pull request put
+# twelve simulator clones on the Studio at once, and runs that pass alone failed
+# Settings UI tests under that load. With two, a push to main takes both slots
+# and pull requests queue behind it.
+SLOTS=${SLOTS:-2}
+case $SLOTS in
+    [1-9]) ;;
+    *) printf 'install.sh: SLOTS must be a whole number from 1 to 9, got "%s"\n' "$SLOTS" >&2; exit 64 ;;
+esac
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo=openwatersio/slackwater-ios
 uid=$(id -u)
 agents=$HOME/Library/LaunchAgents
 old_label=actions.runner.openwatersio.studio
@@ -24,6 +38,32 @@ runtime=com.apple.CoreSimulator.SimRuntime.iOS-27-0
 
 run() {
     if [ -n "${RUNNER_DRY_RUN:-}" ]; then printf '%s\n' "$*"; else "$@"; fi
+}
+
+# Deletes one simulator, shutting it down first. A device that is not booted
+# fails the shutdown, which is fine. delete_device <udid> [<device set dir>]
+delete_device() {
+    udid=$1
+    if [ $# -gt 1 ]; then set -- --set "$2"; else set --; fi
+    if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+        run xcrun simctl "$@" shutdown "$udid"
+    else
+        xcrun simctl "$@" shutdown "$udid" 2>/dev/null || true
+    fi
+    run xcrun simctl "$@" delete "$udid"
+}
+
+# Prints a short-lived token of the kind $1 names for this repository, the way
+# reregister.sh mints them.
+mint() {
+    if [ -n "${RUNNER_TOKEN_CMD:-}" ]; then
+        sh -c "$RUNNER_TOKEN_CMD" sh "$1"
+    elif [ -n "${RUNNER_DRY_RUN:-}" ]; then
+        printf 'DRY_RUN_TOKEN\n'
+    else
+        gh_token=$(security find-generic-password -s slackwater-ci-runner -w) || return 1
+        GH_TOKEN=$gh_token gh api -X POST "repos/$repo/actions/runners/$1" --jq .token
+    fi
 }
 
 tools=jq
@@ -72,8 +112,9 @@ has_device() {
 # Two available devices of one slot name on the pinned runtime are both the
 # slot's as far as cleanup-slot.sh and the jobs can tell. Which one to keep is
 # the operator's call, so stop before changing anything.
+slots=$(seq 1 "$SLOTS")
 duplicates=0
-for slot in 1 2 3; do
+for slot in $slots; do
     for device in iPhone iPad; do
         name=SlackwaterCI-$slot-$device
         udids=$(printf '%s\n' "$devices" | jq -r --arg n "$name" --arg r "${runtime##*.}" \
@@ -108,12 +149,7 @@ fi
 # The old simulators carry no slot number: SlackwaterCI-iPhone, SlackwaterCI-iPad
 # and clones named after them. A new name has a digit after the first hyphen.
 for udid in $(printf '%s\n' "$devices" | jq -r '.devices[][] | select(.name | test("SlackwaterCI-[A-Za-z]")) | .udid'); do
-    if [ -n "${RUNNER_DRY_RUN:-}" ]; then
-        run xcrun simctl shutdown "$udid"
-    else
-        xcrun simctl shutdown "$udid" 2>/dev/null || true
-    fi
-    run xcrun simctl delete "$udid"
+    delete_device "$udid"
 done
 # xcodebuild's parallel-test clones of them live in a set of their own, which
 # a plain `simctl list` never shows ("Clone 1 of SlackwaterCI-iPhone").
@@ -134,14 +170,47 @@ if [ -n "$xctest_devices" ] && ! is_device_list "$xctest_devices"; then
 fi
 if [ -n "$xctest_devices" ]; then
     for udid in $(printf '%s\n' "$xctest_devices" | jq -r '.devices[][] | select(.name | test("SlackwaterCI-[A-Za-z]")) | .udid'); do
-        if [ -n "${RUNNER_DRY_RUN:-}" ]; then
-            run xcrun simctl --set "$xctest_set" shutdown "$udid"
-        else
-            xcrun simctl --set "$xctest_set" shutdown "$udid" 2>/dev/null || true
-        fi
-        run xcrun simctl --set "$xctest_set" delete "$udid"
+        delete_device "$udid" "$xctest_set"
     done
 fi
+
+# Slots above SLOTS that are still installed: stop the job, deregister the
+# runner, and delete its simulators, xcodebuild's clones of them, and its
+# directory. One with neither a plist nor a directory is already gone.
+n=$((SLOTS + 1))
+while [ "$n" -le 9 ]; do
+    dir=$HOME/actions-runner/studio-$n
+    label=io.openwaters.slackwater.ci-runner.$n
+    plist=$agents/$label.plist
+    if [ -e "$plist" ] || [ -d "$dir" ]; then
+        if is_loaded "$label"; then run launchctl bootout "gui/$uid/$label"; fi
+        if [ -e "$plist" ]; then run rm -f "$plist"; fi
+        if [ -e "$dir/.runner" ]; then
+            # Assigned before use so a failed mint stops the script here.
+            token=$(mint remove-token)
+            if [ -n "${RUNNER_DRY_RUN:-}" ]; then
+                printf 'cd %s && ./config.sh remove --token %s\n' "$dir" "$token"
+            else
+                (cd "$dir" && ./config.sh remove --token "$token")
+            fi
+        fi
+        # The same names cleanup-slot.sh treats as the slot's: in the default
+        # set, the ones that start with the slot's prefix; in xcodebuild's,
+        # the clones whose names contain it ("Clone 1 of SlackwaterCI-3-iPad").
+        for udid in $(printf '%s\n' "$devices" | jq -r --arg p "SlackwaterCI-$n-" \
+            '.devices[][] | select(.name | startswith($p)) | .udid'); do
+            delete_device "$udid"
+        done
+        if [ -n "$xctest_devices" ]; then
+            for udid in $(printf '%s\n' "$xctest_devices" | jq -r --arg p "SlackwaterCI-$n-" \
+                '.devices[][] | select(.name | contains($p)) | .udid'); do
+                delete_device "$udid" "$xctest_set"
+            done
+        fi
+        run rm -rf "$dir"
+    fi
+    n=$((n + 1))
+done
 
 if [ ! -d "$agents" ] || [ ! -d "$HOME/Library/Logs" ]; then
     run mkdir -p "$agents" "$HOME/Library/Logs"
@@ -151,7 +220,7 @@ version=${RUNNER_VERSION:-}
 rendered=$(mktemp)
 trap 'rm -f "$rendered"' EXIT
 
-for slot in 1 2 3; do
+for slot in $slots; do
     dir=$HOME/actions-runner/studio-$slot
     label=io.openwaters.slackwater.ci-runner.$slot
     plist=$agents/$label.plist
@@ -185,12 +254,7 @@ for slot in 1 2 3; do
         for udid in $(printf '%s\n' "$devices" | jq -r --arg n "$name" --arg r "${runtime##*.}" \
             '.devices | to_entries[] | .key as $k | .value[]
              | select(.name == $n and (($k | endswith($r) | not) or .isAvailable != true)) | .udid'); do
-            if [ -n "${RUNNER_DRY_RUN:-}" ]; then
-                run xcrun simctl shutdown "$udid"
-            else
-                xcrun simctl shutdown "$udid" 2>/dev/null || true
-            fi
-            run xcrun simctl delete "$udid"
+            delete_device "$udid"
         done
         has_device "$name" || run xcrun simctl create "$name" "$type" "$runtime"
     done

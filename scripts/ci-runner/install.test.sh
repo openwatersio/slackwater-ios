@@ -91,7 +91,8 @@ url=https://github.com/actions/runner/releases/download/v2.330.0/actions-runner-
 iphone=com.apple.CoreSimulator.SimDeviceType.iPhone-17
 ipad=com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB
 runtime=com.apple.CoreSimulator.SimRuntime.iOS-27-0
-expected=$(
+# What a first install prints for the slots it is given.
+first_install() {
     printf '%s\n' \
         "launchctl bootout gui/$uid/actions.runner.openwatersio.studio" \
         "rm -f $home/Library/LaunchAgents/actions.runner.openwatersio.studio.plist" \
@@ -107,7 +108,7 @@ expected=$(
         "xcrun simctl --set $home/Library/Developer/XCTestDevices shutdown DDDDDDDD-0000-0000-0000-000000000001" \
         "xcrun simctl --set $home/Library/Developer/XCTestDevices delete DDDDDDDD-0000-0000-0000-000000000001" \
         "mkdir -p $home/Library/LaunchAgents $home/Library/Logs"
-    for n in 1 2 3; do
+    for n in "$@"; do
         r=$home/actions-runner/studio-$n
         plist=$home/Library/LaunchAgents/io.openwaters.slackwater.ci-runner.$n.plist
         printf '%s\n' \
@@ -124,7 +125,9 @@ expected=$(
             "write $plist" \
             "launchctl bootstrap gui/$uid $plist"
     done
-)
+}
+# Two slots unless SLOTS says otherwise.
+expected=$(first_install 1 2)
 out=$(install)
 same 'install, first run' "$expected" "$out"
 # Dry-run changes nothing, so a second run must decide the same way.
@@ -132,7 +135,7 @@ out=$(install)
 same 'install, second run' "$expected" "$out"
 
 # Once everything is in place, a run does nothing.
-for n in 1 2 3; do
+for n in 1 2; do
     r=$home/actions-runner/studio-$n
     mkdir -p "$r"
     : >"$r/config.sh"
@@ -148,8 +151,7 @@ mv "$scratch/loaded.new" "$scratch/loaded"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
-  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+  {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true}
 ]}}
 JSON
 printf '%s\n' '{"devices": {}}' >"$scratch/xctest.json"
@@ -162,23 +164,22 @@ cp "$scratch/devices.json" "$scratch/installed.json"
 cat >"$scratch/devices.json" <<'JSON'
 {"devices": {
   "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-    {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
-    {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": false}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-    {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}
+    {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true},
+    {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": false}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true}
   ],
   "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
-    {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+    {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true}
   ]
 }}
 JSON
 out=$(install)
 same 'install with devices off the pinned runtime' "$(printf '%s\n' \
+    'xcrun simctl shutdown 2' \
+    'xcrun simctl delete 2' \
+    "xcrun simctl create SlackwaterCI-1-iPad $ipad $runtime" \
     'xcrun simctl shutdown 3' \
     'xcrun simctl delete 3' \
-    "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime" \
-    'xcrun simctl shutdown 6' \
-    'xcrun simctl delete 6' \
-    "xcrun simctl create SlackwaterCI-3-iPad $ipad $runtime")" "$out"
+    "xcrun simctl create SlackwaterCI-2-iPhone $iphone $runtime")" "$out"
 mv "$scratch/installed.json" "$scratch/devices.json"
 
 # A listing that is not a device list stops the install before any simulator
@@ -202,8 +203,7 @@ cat >"$scratch/devices.json" <<'JSON'
 {"devices": {"com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
   {"name": "SlackwaterCI-1-iPhone", "udid": "1", "isAvailable": true}, {"name": "SlackwaterCI-1-iPad", "udid": "2", "isAvailable": true},
   {"name": "SlackwaterCI-2-iPhone", "udid": "3", "isAvailable": true}, {"name": "SlackwaterCI-2-iPad", "udid": "4", "isAvailable": true},
-  {"name": "SlackwaterCI-2-iPhone", "udid": "7", "isAvailable": true},
-  {"name": "SlackwaterCI-3-iPhone", "udid": "5", "isAvailable": true}, {"name": "SlackwaterCI-3-iPad", "udid": "6", "isAvailable": true}
+  {"name": "SlackwaterCI-2-iPhone", "udid": "7", "isAvailable": true}
 ]}}
 JSON
 if install >"$scratch/out" 2>"$scratch/err"; then fail 'install.sh accepted two SlackwaterCI-2-iPhone devices'; fi
