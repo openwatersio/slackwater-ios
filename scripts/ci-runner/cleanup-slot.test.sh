@@ -69,3 +69,43 @@ fi
 actual=$(print -r -- "$out" | grep '^simctl' | sort || true)
 expected_xctest=$(print -r -- "$expected" | grep -- '--set XCTestDevices')
 [[ "$actual" == "$expected_xctest" ]] || { printf 'unlistable default set mismatch:\n%s\n' "$actual" >&2; exit 1; }
+
+# A clone that xcodebuild's own teardown deleted between the listing and the
+# delete is done, not stuck: the stand-in xcrun refuses the delete with
+# "Invalid device" and then lists the set without it, and the cleanup exits 0.
+# Shutdowns and erases succeed; the default-set listing comes from the fixture.
+mkdir -p "$scratch/bin"
+cat > "$scratch/bin/xcrun" <<'STUB'
+#!/bin/sh
+shift                                   # simctl
+[ "$1" = --set ] && shift 2
+case "$1" in
+    list) printf '{"devices":{}}\n' ;;
+    delete) printf 'Invalid device: %s\n' "$2" >&2; exit 149 ;;
+    *) exit 0 ;;
+esac
+STUB
+chmod +x "$scratch/bin/xcrun"
+if ! out=$(HOME=$scratch/home PATH="$scratch/bin:$PATH" SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$xctest_fixture \
+    zsh "$root/scripts/ci-runner/cleanup-slot.sh" 1 2>"$scratch/err"); then
+    printf 'cleanup-slot.sh failed on clones that were already gone:\n%s\n' "$(<"$scratch/err")" >&2; exit 1
+fi
+[[ $(grep -c 'was already gone' "$scratch/err") -eq 4 ]] || { printf 'expected four already-gone lines:\n%s\n' "$(<"$scratch/err")" >&2; exit 1; }
+grep -q 'failed' "$scratch/err" && { printf 'a vanished clone was counted as a failure:\n%s\n' "$(<"$scratch/err")" >&2; exit 1; }
+
+# A delete that fails while the device is still listed is still a failure.
+cat > "$scratch/bin/xcrun" <<STUB
+#!/bin/sh
+shift
+[ "\$1" = --set ] && shift 2
+case "\$1" in
+    list) cat "$fixture" ;;
+    delete) printf 'Unable to delete: %s\n' "\$2" >&2; exit 1 ;;
+    *) exit 0 ;;
+esac
+STUB
+if HOME=$scratch/home PATH="$scratch/bin:$PATH" SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$xctest_fixture \
+    zsh "$root/scripts/ci-runner/cleanup-slot.sh" 1 >/dev/null 2>"$scratch/err"; then
+    printf 'cleanup-slot.sh exited 0 with a clone that would not delete\n' >&2; exit 1
+fi
+grep -q 'simctl delete .* failed' "$scratch/err" || { printf 'no failed line for a stuck clone:\n%s\n' "$(<"$scratch/err")" >&2; exit 1; }
