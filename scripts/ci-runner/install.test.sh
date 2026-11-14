@@ -27,7 +27,14 @@ if (cd "$runner" && env -u SLOT HOME="$home" RUNNER_DRY_RUN=1 RUNNER_TOKEN_CMD='
     fail 'reregister.sh ran without SLOT'
 fi
 grep -q SLOT "$scratch/out" || fail "reregister.sh without SLOT said: $(cat "$scratch/out")"
-if rereg SLOT=4 >/dev/null 2>&1; then fail 'reregister.sh accepted slot 4'; fi
+for bad in 0 10 x; do
+    if rereg SLOT="$bad" >/dev/null 2>&1; then fail "reregister.sh accepted slot $bad"; fi
+done
+# Slot 4 is valid now that the count is install.sh's SLOTS.
+mkdir -p "$home/actions-runner/studio-4"
+(cd "$home/actions-runner/studio-4" && env HOME="$home" RUNNER_DRY_RUN=1 RUNNER_TOKEN_CMD='echo tok' SLOT=4 sh "$dir/reregister.sh") >"$scratch/out" 2>/dev/null ||
+    fail 'reregister.sh refused slot 4'
+grep -qxF 'zsh ./cleanup-slot.sh 4' "$scratch/out" || fail "reregister.sh slot 4 printed: $(cat "$scratch/out")"
 
 config="./config.sh --unattended --ephemeral --replace --url https://github.com/openwatersio/slackwater-ios --token tok --name studio-2 --labels studio --work _work"
 out=$(rereg SLOT=2 2>"$scratch/err")
