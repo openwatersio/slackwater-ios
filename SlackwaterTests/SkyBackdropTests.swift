@@ -356,22 +356,19 @@ final class SkyBackdropTests: XCTestCase {
                 XCTAssertEqual(faced["sun"], site.sides, "\(site.name): the sun's sides")
             }
             XCTAssertEqual(faced["moon"], site.sides, "\(site.name): the moon's sides")
-            // Facing north the frame is the sky as seen, so the limb is not mirrored there.
+            // The limb matches the sky whichever way the chart frame faces.
             for (facesSouth, limb) in limbs {
                 let sky = SkyState(time: limb.time, latitude: site.lat, longitude: site.lon, days: limb.days)
                 XCTAssertEqual(sky.moonSpan?.facesSouth, facesSouth)
-                assertBackdropLimbFacesTheDrawnSun(sky, sun: try sunAltAz(limb.time, observer: observer),
+                assertBackdropLimbMatchesTheSky(sky, sun: try sunAltAz(limb.time, observer: observer),
                                                    moon: try moonAltAz(limb.time, observer: observer),
                                                    "\(site.name) \(f.string(from: limb.time))")
             }
         }
     }
 
-    /// Honolulu, 27 January 2026 at 00:00 UTC: the sun culminates south and
-    /// the moon north, so their frames face apart. The limb turns to the side
-    /// the sun is drawn on and keeps its lean, and as the drawn sun passes
-    /// over the moon it turns through vertical instead of snapping across.
-    func testMoonLimbFacesTheDrawnSunWhenTheirFramesFaceApart() throws {
+    /// Opposing chart frames must not change the observer's lunar orientation.
+    func testMoonLimbMatchesTheSkyWhenTheirFramesFaceApart() throws {
         let honolulu = (lat: 21.3067, lon: -157.8670)
         let observer = try Observer(latitudeDeg: honolulu.lat, longitudeDeg: honolulu.lon)
         let at = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-27T00:00:00Z"))
@@ -379,24 +376,11 @@ final class SkyBackdropTests: XCTestCase {
         let sky = SkyState(time: at, latitude: honolulu.lat, longitude: honolulu.lon, days: days)
         XCTAssertEqual(sky.sunSpan?.facesSouth, true)
         XCTAssertEqual(sky.moonSpan?.facesSouth, false)
-        assertBackdropLimbFacesTheDrawnSun(sky, sun: try sunAltAz(at, observer: observer),
+        assertBackdropLimbMatchesTheSky(sky, sun: try sunAltAz(at, observer: observer),
                                            moon: try moonAltAz(at, observer: observer), "Honolulu")
-        var last = sky.backdropMoonLightAngle(sunDrawnOffset: -100)
-        for offset in stride(from: -99, through: 100, by: 1) {
-            let limb = sky.backdropMoonLightAngle(sunDrawnOffset: CGFloat(offset))
-            XCTAssertLessThan(abs(atan2(sin(limb - last), cos(limb - last))), 5 * .pi / 180, "at \(offset)pt")
-            last = limb
-        }
-        XCTAssertEqual(cos(sky.backdropMoonLightAngle(sunDrawnOffset: 0)), 0, accuracy: 1e-9)
     }
 
-    /// Through moon passes whose frame faces away from the sun's, the
-    /// backdrop limb never jumps: not at sunset, where the rule changes from
-    /// the drawn sun to the moon's own frame, and not at solar midnight, where
-    /// a set sun's off-screen x wraps round. Honolulu: the waxing fortnight in
-    /// June, the sun's frame facing north, for sunsets; and a January night,
-    /// the sun's frame facing south, for a wrap. (A north-facing sun frame
-    /// never wraps: the sun's lower culmination is due north too.)
+    /// The true orientation stays continuous through sunset and the chart's wrap.
     func testMoonLimbTurnsSmoothlyWhileItsFrameFacesAwayFromTheSun() throws {
         let honolulu = (lat: 21.3067, lon: -157.8670)
         let observer = try Observer(latitudeDeg: honolulu.lat, longitudeDeg: honolulu.lon)
@@ -417,9 +401,7 @@ final class SkyBackdropTests: XCTestCase {
                     && sky.sunSpan?.facesSouth != sky.moonSpan?.facesSouth
                 let sunX = skyBodyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: honolulu.lat,
                                         span: sky.sunSpan, pad: sunDiscRadius, size: size).x
-                let moonX = skyBodyPoint(azimuth: moon.azDeg, altitude: moon.altDeg, latitude: honolulu.lat,
-                                         span: sky.moonSpan, pad: moonGlyphSize / 2, size: size).x
-                let limb = sky.backdropMoonLightAngle(sunDrawnOffset: sunX - moonX)
+                let limb = sky.moonLightAngle
                 if let last {
                     XCTAssertLessThan(abs(atan2(sin(limb - last.limb), cos(limb - last.limb))), 20 * .pi / 180,
                                       ISO8601DateFormatter().string(from: time))
@@ -575,51 +557,19 @@ final class SkyBackdropTests: XCTestCase {
             // The tiles and the Moon sheet draw the moon as seen.
             let sky = SkyState(time: at, latitude: site.lat, longitude: site.lon)
             XCTAssertLessThan(gap(sky.moonLightAngle, toSun), 2 * .pi / 180, time)
-            assertBackdropLimbFacesTheDrawnSun(sky, sun: sun, moon: moon, time)
+            assertBackdropLimbMatchesTheSky(sky, sun: sun, moon: moon, time)
         }
     }
 
-    /// The backdrop's limb faces the sun as drawn. Where both frames face
-    /// the same way, or the sun is down, it faces it as `skyPoint` draws it
-    /// in the moon's own frame: a step from the moon toward the sun lands on
-    /// the side the limb points. The frame stretches azimuth and altitude
-    /// unequally, so only the signs carry over. Where they face apart with
-    /// the sun up, the limb points across to the side the sun is drawn on,
-    /// leaning up or down as it is seen.
-    private func assertBackdropLimbFacesTheDrawnSun(_ sky: SkyState, sun: AltAz, moon: AltAz, _ label: String,
-                                                    line: UInt = #line) {
-        let size = CGSize(width: 400, height: 160)
-        let sunDrawn = skyBodyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: sky.latitude,
-                                    span: sky.sunSpan, pad: sunDiscRadius, size: size)
-        let moonDrawn = skyBodyPoint(azimuth: moon.azDeg, altitude: moon.altDeg, latitude: sky.latitude,
-                                     span: sky.moonSpan, pad: moonGlyphSize / 2, size: size)
-        let limb = sky.backdropMoonLightAngle(sunDrawnOffset: sunDrawn.x - moonDrawn.x)
-        let north = sky.latitude >= 0
-        guard (sky.sunSpan?.facesSouth ?? north) == (sky.moonSpan?.facesSouth ?? north) || sun.altDeg <= 0 else {
-            XCTAssertEqual(cos(limb) > 0, sunDrawn.x > moonDrawn.x, "\(label): limb faces the drawn sun across",
-                           line: line)
-            XCTAssertEqual(sin(limb) > 0, sin(sky.moonLightAngle) > 0, "\(label): limb keeps its lean",
-                           line: line)
-            return
-        }
+    private func assertBackdropLimbMatchesTheSky(_ sky: SkyState, sun: AltAz, moon: AltAz, _ label: String,
+                                                line: UInt = #line) {
         let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
         let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
         let right = cos(sunAlt) * sin(deltaAz)
         let up = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
-        let step = 0.5
-        let norm = hypot(right, up)
-        let here = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg, latitude: sky.latitude,
-                            span: sky.moonSpan, size: size)
-        let there = skyPoint(azimuth: moon.azDeg + step * right / norm / cos(moonAlt),
-                             altitude: moon.altDeg + step * up / norm, latitude: sky.latitude,
-                             span: sky.moonSpan, size: size)
-        if abs(right) > 0.1 * norm {
-            XCTAssertEqual(cos(limb) > 0, there.x > here.x, "\(label): limb faces the drawn sun across", line: line)
-        }
-        if abs(up) > 0.1 * norm {
-            XCTAssertEqual(sin(limb) > 0, there.y > here.y, "\(label): limb faces the drawn sun vertically",
-                           line: line)
-        }
+        let toSun = atan2(-up, right)
+        let gap = sky.moonLightAngle - toSun
+        XCTAssertLessThan(abs(atan2(sin(gap), cos(gap))), 2 * .pi / 180, label, line: line)
     }
 
     /// Phase names are presentation, kept app-side when the astronomy moved to
