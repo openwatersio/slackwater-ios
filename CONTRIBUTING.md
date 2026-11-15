@@ -4,13 +4,19 @@ Slackwater is a tide and current app that runs its predictions on the device. Bu
 
 ## Getting started
 
-You need **Xcode 26** or later (the app targets iOS 26) and **XcodeGen** (`brew install xcodegen`). The `.xcodeproj` and `Info.plist` are generated rather than committed, so generate them first:
+You need **Xcode 27** or later (the app targets iOS 26). Open the committed project:
 
 ```sh
-git config core.hooksPath .githooks   # regenerates the project after every pull
-xcodegen generate
 open Slackwater.xcodeproj
 ```
+
+`Slackwater.xcodeproj/project.xcproj` is the source of truth for targets, package requirements, localizations, and build settings. Shared schemes and each app or extension's `Info.plist` are committed too. Xcode 27 reads the JSON format; Xcode 27.2 or later can edit its format through the project inspector. No project generator is required.
+
+Add and remove files through Xcode, or update the JSON file's `files` tree and `target-membership` entries. A file on disk alone is not compiled or bundled. Shared portable sources and station resources need membership in the phone, phone widget, watch, and watch widget targets; keep the widget resource lists narrow rather than bundling the entire Resources directory. The watch additionally needs the station index and its own phone-shared UI sources. Preserve resource folder references and their copy behavior when adding generated bundles.
+
+The JSON format permits trailing commas. On macOS, use `plutil -convert json -o - Slackwater.xcodeproj/project.xcproj` when a tool needs strict JSON. Commit `project.xcworkspace/xcshareddata/swiftpm/Package.resolved` with dependency changes; keep the fitting validator's engine revision aligned. User state under `xcuserdata` stays ignored.
+
+Project-level `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` apply to all four shipping bundles. Each committed Info.plist substitutes those settings for its bundle version fields. Keep `MARKETING_VERSION` above 1.0 until the accidental 1.0 TestFlight train is retired, and keep `manageAppVersionAndBuildNumber` set to NO when exporting (see [TestFlight](docs/testflight.md)). Every shipping target has its own manual Release signing profile; Debug signing is automatic. The iOS and watchOS deployment floors are 26.0, and `PREMIUM_ENABLED` must be present in both Debug and Release compilation conditions.
 
 Build and run the `Slackwater` scheme. There is no other setup — the app ships its station data, so it works offline from first launch.
 
@@ -35,7 +41,7 @@ For quick iteration on the first launch itself, the `Slackwater First Run` schem
 
 Run the `SlackwaterWatch` scheme on a watch simulator; the phone schemes cannot deploy to a watch. Its UI tests run the same way, `xcodebuild test -scheme SlackwaterWatch -destination 'platform=watchOS Simulator,name=<watch>'`, under the [worktree test lock](#local-test-runs). `-locDenied` skips the location prompt, as on the phone.
 
-The watch targets do not extract strings (`SWIFT_EMIT_LOC_STRINGS: NO` in `project.yml`), because extracting from the watch alone would drop the translator comments that only the phone's code supplies for shared keys. Building the watch scheme therefore leaves `Slackwater/Localizable.xcstrings` untouched, and a new watch string goes into the catalog by hand.
+The watch targets do not extract strings (`SWIFT_EMIT_LOC_STRINGS: NO` in `Slackwater.xcodeproj/project.xcproj`), because extracting from the watch alone would drop the translator comments that only the phone's code supplies for shared keys. Building the watch scheme therefore leaves `Slackwater/Localizable.xcstrings` untouched, and a new watch string goes into the catalog by hand.
 
 ## Running on the iPhone Duo
 
@@ -51,7 +57,7 @@ The `iPhone Duo` simulator (iOS 27.1 and later) boots folded, on its cover scree
 
 `xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens the Premium sheet) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
 
-Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-locDenied"])`, open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the [worktree test lock](#local-test-runs). Delete the file and run `xcodegen generate` again before committing.
+Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-locDenied"])`, open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the [worktree test lock](#local-test-runs). Delete the file and its project membership before committing.
 
 ## User-facing copy
 
@@ -71,7 +77,7 @@ Building a phone scheme in Xcode extracts strings into the catalog, which is how
 
 Builds also rewrite the catalogs when no copy changed. Xcode reorders fields and plural variants within an entry, drops the final newline, marks keys `"extractionState" : "stale"` when the branch is behind `main`, and a watch build sets `CFBundleName` in `InfoPlist.xcstrings` to `SlackwaterWatch`. None of that is a content change, so `scripts/localization.py` passes it and only review catches it. Before committing, run `git diff --stat -- '*.xcstrings'`. If your change adds, edits, or removes no copy, revert the catalogs with `git checkout -- '*.xcstrings'`. If it does, stage only your own entries with `git add -p`. The revert takes your hand-added entries with it, so a script that runs a build and then reverts the catalogs to clean up after it throws your own work away; stage the entries first, or add them after the last build of the run.
 
-The macOS build lane runs `python3 scripts/localization.py` after generating the project. It exports current source keys with empty temporary catalogs and extraction enabled for the phone, widgets, and watch, then restores each catalog byte for byte. Missing or stale keys, missing or unfinished translations (including plural variants), and changed format arguments or Siri app-name tokens fail the check. Only `shouldTranslate: false` exempts an entry. Translation locales come from `knownRegions` in `project.yml`, excluding `Base` and the source language. Export diagnostics are saved to `build/localization-export.log`. The small fixture check runs with `python3 scripts/localization.test.py`.
+The macOS build lane runs `python3 scripts/localization.py` before compiling the app. It exports current source keys with empty temporary catalogs and extraction enabled for the phone, widgets, and watch, then restores each catalog byte for byte. Missing or stale keys, missing or unfinished translations (including plural variants), and changed format arguments or Siri app-name tokens fail the check. Only `shouldTranslate: false` exempts an entry. Translation locales come from `localizations.supported` in `Slackwater.xcodeproj/project.xcproj`, excluding `Base` and the development language. Export diagnostics are saved to `build/localization-export.log`. The small fixture check runs with `python3 scripts/localization.test.py`.
 
 ## Running the tests
 
@@ -124,7 +130,7 @@ Local test runs share this Mac with other worktrees and sessions, and, when CI t
 
 Several unit tests walk every app source through `appSources()` (`SlackwaterTests/TestSources.swift`) and fail on banned text, so a brand-new file under `Slackwater/` trips them while changing nothing that exists: `TimelineTests.testNoSourceFileSpellsATwentyFourHourPattern` (no `HH:mm` — one clock, use `chartTime`), `TypeScaleTests` (retired fonts; `formatHeight(`, `formatSpeed(`, `formatNm(` and `cardTime(` must sit near `monospacedDigit()`), `ColourAndFormTests` (no `Color(hex:)` outside Theme), `HeroChromeTests` (no material imitation of glass), `AppClockTests` (no `timeIntervalSinceNow`, and a default spelled `: Date = .now` or `: Date = Date()` is `appNow()` instead — one clock, which a test launch can pin; a line naming `CLLocation` is exempt, since the system stamps those on the real clock). Run those five classes alongside your own when you add a file; they are unit tests and take seconds.
 
-Never baseline a suspected-flaky failure by stashing your changes. A scan whose offender is your new file passes the moment the file is gone, which reads as "pre-existing" and is the exact opposite of the truth. Baseline by checking out the parent commit, and run `xcodegen generate` afterwards or the build fails on a project file still naming the removed source.
+Never baseline a suspected-flaky failure by stashing your changes. A scan whose offender is your new file passes the moment the file is gone, which reads as "pre-existing" and is the exact opposite of the truth. Baseline by checking out the parent commit together with its committed project configuration.
 
 ### UI test state
 
@@ -266,7 +272,7 @@ xcrun xcresulttool export attachments --path <bundle> --output-path <dir>    # U
 
 A check that only a person can make goes in an issue labelled `manual testing`: anything that needs a device or a watch, or a simulator state no UI test can reach, such as a folded iPhone Duo. A pull request's checklist stops being tracked once it merges, so move any device check still open at merge into an issue, the way #610 collects the phone's. `gh issue list --label "manual testing"` is the queue.
 
-Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit source, and version numbering. Signing and provisioning traps are documented where they live (`project.yml` comments, `docs/testflight.md`, the `releasing-to-testflight` skill). Also check these constraints:
+Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit source, and version numbering. Signing and provisioning traps are documented where they live (the project settings, `docs/testflight.md`, the `releasing-to-testflight` skill). Also check these constraints:
 
 - The `.storekit` file is wired to the scheme's `run:` action, so StoreKit works in the simulator and silently does not in an archive, where `Product.products(for:)` goes to real App Store Connect. Check `inAppPurchasesV2` and `subscriptionGroups` on the app before writing a word about a purchase.
 - App Groups are not in the App Store Connect API (`/v1/appGroups` is a 404). Creating one is developer.apple.com UI work; budget a human for it.

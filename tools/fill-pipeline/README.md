@@ -198,10 +198,7 @@ cd tools/fill-pipeline
 ./pack.py                        # ../../Slackwater/Resources/fill-salish.{bin,json}
 ```
 
-Then from the repo root: `xcodegen generate` (folder-based resource
-inclusion picks the new bundle up automatically — no `project.yml` edit
-needed, same as `chs-bundle.js`/`fill-fixture.bin` already in
-`Slackwater/Resources/`), then run the test suite; `FillFieldTests.swift`'s
+Add the generated bundle to the app's resources in `Slackwater.xcodeproj/project.xcproj`, preserving folder references for directory bundles, then run the test suite from the repo root; `FillFieldTests.swift`'s
 `testRealBundleGoldenElement` activates automatically once
 `fill-salish.bin` exists at that path.
 

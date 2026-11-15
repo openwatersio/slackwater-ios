@@ -275,8 +275,6 @@ jobs:
         with:
           node-version-file: mise.toml
 
-      - run: brew install xcodegen
-
       - name: Test runner modes
         run: |
           zsh scripts/test-modes.test.sh
@@ -291,12 +289,11 @@ jobs:
         run: swift build -c release --package-path tools/FitValidation
 
       # MapLibre is a binary download, not a compile — the cache saves the
-      # fetch, not a build. The generated xcodeproj and its Package.resolved
-      # are not committed, so key on project.yml, where the package pins live.
+      # fetch, not a build. Package.resolved pins the downloaded versions.
       - uses: actions/cache@v6
         with:
           path: build/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       # The IWLS fixture is compiled into the unit-test bundle, so it is staged
@@ -304,7 +301,6 @@ jobs:
       - name: Prepare project
         run: |
           node scripts/iwls-fixtures.mjs prepare
-          xcodegen generate
 
       - name: Localization completeness
         run: python3 scripts/localization.py
@@ -674,11 +670,10 @@ jobs:
         run: swift build -c release --package-path tools/FitValidation
 
       # The IWLS fixture is compiled into the unit-test bundle, so it is staged
-      # before the build. xcodegen and node come from the machine.
+      # before the build. Node comes from the machine.
       - name: Prepare project
         run: |
           node scripts/iwls-fixtures.mjs prepare
-          xcodegen generate
 
       - name: Localization completeness
         if: matrix.device == 'iPhone'

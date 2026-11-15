@@ -25,10 +25,10 @@ final class ChsGridTests: XCTestCase {
     }
 
     func testFitValidationUsesTheAppPackageRevision() throws {
-        let revisions = try repoSource("project.yml").components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.hasPrefix("revision: ") }
+        let revisions = try repoSource("Slackwater.xcodeproj/project.xcproj").components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.hasPrefix("\"revision\": ") }
         XCTAssertEqual(revisions.count, 1)
-        let revision = String(try XCTUnwrap(revisions.first).dropFirst("revision: ".count))
+        let revision = try XCTUnwrap(revisions.first).components(separatedBy: "\"")[3]
         XCTAssertTrue(try repoSource("tools/FitValidation/Package.swift").contains("revision: \"\(revision)\""))
         let resolved = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(repoSource("tools/FitValidation/Package.resolved").utf8)) as? [String: Any])
         let pins = try XCTUnwrap(resolved["pins"] as? [[String: Any]])

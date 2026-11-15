@@ -6,12 +6,6 @@ xcuserdata/
 *.xcuserstate
 .DS_Store
 
-# XcodeGen output (regenerate with `xcodegen generate`)
-Slackwater.xcodeproj/
-Slackwater/Info.plist
-SlackwaterWidgets/Info.plist
-SlackwaterWatch/Info.plist
-
 # tools/ npm deps (npm install in tools/ to regenerate)
 tools/node_modules/
 services/testflight-feedback/node_modules/

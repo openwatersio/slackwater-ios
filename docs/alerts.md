@@ -642,7 +642,7 @@ Online gates predict only from a network fetch ([chs-data-model](chs-data-model.
 Occurrences run in the app, which already links Almanac; the widget extension draws the activity
 from its attributes and gains no dependency.
 
-**`project.yml`**, app target `info.properties`: `NSCalendarsFullAccessUsageDescription`, plus
+**`Slackwater/Info.plist`**: `NSCalendarsFullAccessUsageDescription`, plus
 `NSSupportsLiveActivities`. Neither is an entitlement, so the Manual-signed Release
 provisioning profiles stay as they are.
 

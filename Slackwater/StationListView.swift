@@ -681,7 +681,7 @@ struct StationListView: View {
         path.append(station)
     }
 
-    /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
+    /// The app's URL scheme (Info.plist CFBundleURLTypes). Widgets emit
     /// both routes: locked accessory widgets → premium (the Premium sheet), home widgets
     /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
     /// rather than inline because user activities and alert taps route

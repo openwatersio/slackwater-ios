@@ -31,7 +31,7 @@ Website changes wait as draft PRs. App changes are opened only after the milesto
 
 Approval closes the version's train. App Store Connect then rejects every upload to it with errors 90186 and 90062, and Nightly fails until `MARKETING_VERSION` moves.
 
-1. Set `MARKETING_VERSION` in `project.yml` to the next minor version, run `xcodegen generate` and `zsh scripts/nightly.test.sh`, and merge. #713 is the pattern.
+1. Set the project-level `MARKETING_VERSION` in `Slackwater.xcodeproj/project.xcproj` to the next minor version and run `zsh scripts/nightly.test.sh`, and merge. #713 is the pattern.
 2. Once main CI passes on that commit, dispatch a fresh Nightly. Rerunning a failed Nightly job rebuilds its old commit on the closed train.
 3. File the issue for the following train ("Open the 1.N+1.0 train when App Review approves 1.N.0") and add it to the project as Approval for the new version.
 

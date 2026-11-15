@@ -5,7 +5,7 @@ description: Use when cutting a Slackwater iOS release, bumping MARKETING_VERSIO
 
 # Releasing Slackwater to TestFlight
 
-`project.yml` is the source of truth for both version numbers. It has not always
+`Slackwater.xcodeproj/project.xcproj` is the source of truth for both version numbers. It has not always
 been — read The rule that bites before touching either one.
 
 One-time infrastructure (ASC key, keychain, signing identity, profile) lives in

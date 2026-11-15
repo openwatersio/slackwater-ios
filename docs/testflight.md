@@ -15,7 +15,7 @@ Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly wor
 | In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime.v2` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. The ID without `.v2` belongs to a one-year subscription and is not requested by the app. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |
 | Distribution identity | `testflight` environment secrets `SIGNING_P12` (base64 `.p12`) and `SIGNING_P12_PASSWORD` | "Apple Distribution" certificate, minted through `asc.mjs create-cert`. `testflight.sh` imports it into a throwaway keychain per run |
 | Provisioning profiles | "Slackwater App Store", "Slackwater Widgets App Store", "Slackwater Watch App Store", and "Slackwater Watch Widgets App Store" | `testflight.sh` downloads all four by name (`asc.mjs install-profiles`), so a re-mint needs no secret change. Each must post-date every capability on its bundle ID |
-| Signing config | `project.yml`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
+| Signing config | `Slackwater.xcodeproj/project.xcproj`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
 
 ## One-time setup
 
@@ -103,8 +103,8 @@ The order that works, when a target gains an entitlement:
 3. **Re-mint every affected profile.** Profiles are snapshots: "Slackwater App Store"
    was minted 2026-07-30, long before the entitlement existed, and adding the
    capability does not retroactively update it.
-4. **Give the appex a `Release` block in `project.yml`.** Without one it stays on
-   `CODE_SIGN_STYLE: Automatic` and Release falls back to
+4. **Set the appex's `CODE_SIGN_STYLE[config=Release]` to `Manual` and its Release identity and profile in `Slackwater.xcodeproj/project.xcproj`.** Without these it stays on
+   automatic signing and Release falls back to
    `"iOS Team Provisioning Profile: *"` — which needs a GUI session to mint, so a
    headless archive simply fails.
 5. **Add the appex to `exportOptions`' `provisioningProfiles` dict** in
@@ -112,7 +112,7 @@ The order that works, when a target gains an entitlement:
 
 The watch app and its complications went through the same order (#525): each is
 a bundle ID with App Groups assigned in the developer.apple.com UI, its own
-profile, a Release block, and an `exportOptions` entry. Watch bundle IDs register
+profile, Release signing settings, and an `exportOptions` entry. Watch bundle IDs register
 as iOS bundle IDs, so their profiles are `IOS_APP_STORE` like the phone's, and the
 watch app ships inside the phone's archive rather than as a separate upload.
 
@@ -159,7 +159,7 @@ repeated name in that output is the bug.
 Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/skills/`).
 
 - **A release goes to every checked-in external group.** Dispatch `Promote Nightly to Beta` with the nightly build number. It uses collected notes from `docs/release-notes/<version>-<build>.md` when present; otherwise it collects PR titles since the previous Beta build in App Store Connect (or the last version tag when that build has no Nightly tag), falling back to commit titles for direct commits. It updates TestFlight notes, attaches the existing build to Beta, and submits it for Apple beta review. Notes appear in the workflow summary; App Store Connect holds the Beta build history. No release PR, archive, upload, or app CI run is involved. Check the result with `node scripts/asc.mjs builds`.
-- Bump `CURRENT_PROJECT_VERSION` in `project.yml` per upload (App Store Connect rejects reused
+- Bump `CURRENT_PROJECT_VERSION` in `Slackwater.xcodeproj/project.xcproj` per upload (App Store Connect rejects reused
   build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
   because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and
   the export sets `manageAppVersionAndBuildNumber` `<false/>`** — through build 21 neither was
@@ -182,7 +182,7 @@ Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/ski
 ## Test runs — offline by default, full before an upload (2026-09-08)
 
 One XCTestPlan (`TestPlans/Slackwater.xctestplan`), checked in and wired into the
-scheme by `project.yml`. `scripts/test.sh` selects targets from that plan and
+scheme in `Slackwater.xcodeproj/xcshareddata/xcschemes/Slackwater.xcscheme`. `scripts/test.sh` selects targets from that plan and
 prints a per-simulator wall clock. Default, full, and unit modes use only local
 recordings and seeded state. Only `--live` opts into real IWLS access, with
 `TEST_RUNNER_SLACKWATER_LIVE=1` reaching the UI-test runner.
