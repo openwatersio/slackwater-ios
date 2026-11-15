@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 // File-input reference harness for the fill and patch pipelines. The frozen
 // JavaScript oracle remains their fitter; SlackwaterKit predicts the holdout.
-// Pinned to the same slackwater revision as project.yml.
+// Pinned to the same slackwater revision as Slackwater.xcodeproj/project.xcproj.
 import PackageDescription
 
 let package = Package(

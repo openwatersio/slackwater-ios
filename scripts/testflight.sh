@@ -37,12 +37,11 @@ security list-keychains -d user -s $KC "${OLD_KCS[@]}"
 node scripts/asc.mjs install-profiles "Slackwater App Store" "Slackwater Widgets App Store" \
   "Slackwater Watch App Store" "Slackwater Watch Widgets App Store"
 
-xcodegen generate
 # -clonedSourcePackagesDirPath: repo-local SPM cache so CLI builds never share
 # ~/Library/Caches/org.swift.swiftpm with the Xcode GUI — two resolvers racing
 # on the MapLibre binary artifact corrupts the shared cache ("already exists
 # in file system", 2026-07-31). Agent-run builds should pass the same flag.
-# BUILD_NUMBER overrides project.yml's CURRENT_PROJECT_VERSION for every
+# BUILD_NUMBER overrides Slackwater.xcodeproj/project.xcproj's CURRENT_PROJECT_VERSION for every
 # target, the widget included (nightly.sh numbers builds from ASC this way).
 xcodebuild archive -project Slackwater.xcodeproj -scheme Slackwater \
   -destination 'generic/platform=iOS' -archivePath build/Slackwater.xcarchive \
@@ -59,7 +58,7 @@ cat > build/exportUpload.plist <<'EOF'
   <!-- Defaults to YES, and that default is why builds 1-21 numbered themselves:
        Xcode rewrites CFBundleVersion to the next number free on App Store
        Connect at upload time, so the archive's own build number never mattered
-       and the ASC number was an upload counter. NO makes project.yml's
+       and the ASC number was an upload counter. NO makes Slackwater.xcodeproj/project.xcproj's
        CURRENT_PROJECT_VERSION the build number. It must exceed the highest
        already uploaded or the upload is rejected as a duplicate. -->
   <key>manageAppVersionAndBuildNumber</key><false/>

@@ -5,7 +5,8 @@ root=${0:A:h:h}
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/repo/scripts" "$scratch/repo/Slackwater" "$scratch/repo/SlackwaterTests" "$scratch/repo/SlackwaterUITests" "$scratch/bin"
-touch "$scratch/repo/project.yml"  # the source-changed sweep at the end walks these
+mkdir -p "$scratch/repo/Slackwater.xcodeproj" "$scratch/repo/SlackwaterWidgets" "$scratch/repo/SlackwaterWatch" "$scratch/repo/SlackwaterWatchWidgets" "$scratch/repo/SlackwaterWatchUITests" "$scratch/repo/TestPlans"
+touch "$scratch/repo/Slackwater.xcodeproj/project.xcproj"  # the source-changed sweep at the end walks these
 cp "$root/scripts/test.sh" "$scratch/repo/scripts/test.sh"
 cp "$root/scripts/first-run.sh" "$scratch/repo/scripts/first-run.sh"
 touch "$scratch/repo/scripts/iwls-fixtures.mjs"
@@ -80,6 +81,7 @@ assert_count() { [[ $(grep -c -- "$1" "$log") == "$2" ]] || { print -u2 -- "wron
 
 run_mode
 assert_has "node scripts/iwls-fixtures.mjs prepare"
+assert_lacks "xcodegen"
 assert_has "xcrun simctl create Slackwater iPhone 17 · repo iPhone 17"
 assert_has "xcrun simctl erase SIM-Slackwater_iPhone_17_·_repo"
 assert_has "id=SIM-Slackwater_iPhone_17_·_repo"
@@ -89,8 +91,8 @@ assert_has "-collect-test-diagnostics never"
 assert_has "-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600"
 assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
-[[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
-  print -u2 -- "fixture preparation did not precede XcodeGen"
+[[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodebuild /=' "$log") ]] || {
+  print -u2 -- "fixture preparation did not precede the build"
   exit 1
 }
 

@@ -85,13 +85,15 @@ jobs:
         with:
           node-version-file: mise.toml
 
-      - run: brew install xcodegen
+      # A selected green commit may predate the committed native project.
+      - if: hashFiles('project.yml') != ''
+        run: brew install xcodegen
 
       # Same MapLibre download cache as ci.yml, shared with its keys.
       - uses: actions/cache@v6
         with:
           path: build/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       - name: Release the validated commit to Nightly

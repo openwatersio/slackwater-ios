@@ -90,7 +90,6 @@ export TEST_RUNNER_SLACKWATER_PERF_SCALE="${TEST_RUNNER_SLACKWATER_PERF_SCALE:-2
 # into the unit-test bundle, so that build already staged it.
 if [[ -z "${SLACKWATER_XCTESTRUN:-}" ]]; then
   [[ $MODE == live ]] || node scripts/iwls-fixtures.mjs prepare
-  xcodegen generate
 fi
 
 # SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
@@ -312,8 +311,9 @@ done
 # Not fatal: the run may well be clean, and the person editing is entitled to.
 # But the result stops being evidence, and that has to be said out loud rather
 # than discovered later from a confusing failure.
-changed=$(find Slackwater SlackwaterTests SlackwaterUITests project.yml \
-  -newer "$srcmark" \( -name '*.swift' -o -name 'project.yml' \) 2>/dev/null)
+changed=$(find Slackwater SlackwaterWidgets SlackwaterWatch SlackwaterWatchWidgets \
+  SlackwaterTests SlackwaterUITests SlackwaterWatchUITests Slackwater.xcodeproj TestPlans \
+  -newer "$srcmark" \( -name '*.swift' -o -name 'project.xcproj' -o -name '*.xcscheme' -o -name 'Info.plist' -o -name 'Package.resolved' -o -name '*.xctestplan' \) 2>/dev/null)
 if [[ -n "$changed" ]]; then
   echo "warning: source changed while the suite ran — this result is not evidence for any commit:"
   printf '  %s\n' ${(f)changed}

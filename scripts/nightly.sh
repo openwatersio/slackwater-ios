@@ -3,7 +3,7 @@
 # gate; require the full CI suite for this exact checkout before archiving.
 #
 # Nothing is committed. The build number comes from App Store Connect and is
-# passed to the archive, so project.yml's CURRENT_PROJECT_VERSION only floors it.
+# passed to the archive, so Slackwater.xcodeproj/project.xcproj's CURRENT_PROJECT_VERSION only floors it.
 # The nightly-<version>-<build> tag on the built commit is the record.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,17 +18,17 @@ fi
 # Exit 3 is the gate refusing an unvalidated commit: nothing to release, not a failure.
 python3 scripts/nightly-validation.py "$SHA" || exit $(( $? == 3 ? 0 : 1 ))
 
-VERSION=$(awk '$1 == "MARKETING_VERSION:" { print $2; exit }' project.yml)
-CURRENT_BUILD=$(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml)
+VERSION=$(plutil -extract build-settings.MARKETING_VERSION raw -o - Slackwater.xcodeproj/project.xcproj)
+CURRENT_BUILD=$(plutil -extract build-settings.CURRENT_PROJECT_VERSION raw -o - Slackwater.xcodeproj/project.xcproj)
 ASC_BUILDS=$(node scripts/asc.mjs builds)
 ASC_ROW=${ASC_BUILDS%%$'\n'*}
-# An app with no uploads yet lists no builds; count from project.yml alone.
+# An app with no uploads yet lists no builds; count from Slackwater.xcodeproj/project.xcproj alone.
 ASC_BUILD=0
 if [[ -n $ASC_ROW ]]; then
   [[ $ASC_ROW =~ '\(([0-9]+)\)' ]] && ASC_BUILD=$match[1] || ASC_BUILD=
 fi
 if [[ -z $VERSION || $CURRENT_BUILD != <-> || $ASC_BUILD != <-> ]]; then
-  echo "Could not determine the current version/build from project.yml and App Store Connect." >&2
+  echo "Could not determine the current version/build from Slackwater.xcodeproj/project.xcproj and App Store Connect." >&2
   exit 1
 fi
 NEXT_BUILD=$(( CURRENT_BUILD > ASC_BUILD ? CURRENT_BUILD + 1 : ASC_BUILD + 1 ))

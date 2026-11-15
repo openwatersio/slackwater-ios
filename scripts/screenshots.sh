@@ -76,7 +76,6 @@ shot_time=$(date -u -r 1790440860 +%Y-%m-%dT%H:%M:%S.000Z)
 
 export TEST_RUNNER_M1_SHOT_DIR="${SHOT_DIR:-/tmp/slackwater-shots}" TEST_RUNNER_SLACKWATER_SHOTS=1
 mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
-xcodegen generate
 rm -rf build/results-shots.xcresult
 mkdir -p build
 lockf build/xcodebuild.lock xcodebuild test \

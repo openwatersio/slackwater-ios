@@ -90,12 +90,12 @@ def main():
     paths = sorted(Path("Slackwater").glob("*.xcstrings"))
     saved = {path: path.read_bytes() for path in paths}
     catalogs = {path: json.loads(value) for path, value in saved.items()}
-    source_language = "en"
-    regions = re.search(r"^\s*knownRegions:\s*\[([^\]]+)\]", Path("project.yml").read_text(), re.M)
-    if not regions:
-        raise ValueError("Cannot read configured knownRegions from project.yml")
-    locales = [region.strip().strip("\"'") for region in regions[1].split(",")]
-    locales = [locale for locale in locales if locale not in ("Base", source_language)]
+    project = json.loads(subprocess.check_output([
+        "plutil", "-convert", "json", "-o", "-", "Slackwater.xcodeproj/project.xcproj",
+    ]))
+    source_language = project["localizations"]["development"]
+    locales = [locale for locale in project["localizations"]["supported"]
+               if locale not in ("Base", source_language)]
     if not locales:
         raise ValueError("No translation locales configured")
     Path("build").mkdir(exist_ok=True)

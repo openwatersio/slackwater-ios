@@ -23,8 +23,9 @@ test("a recipe mismatch fails generation", () => {
   assert.throws(() => currentGate("gate", entry, [], "deadbeef"), /differs from engine recipe/);
 });
 test("the recipe fixture belongs to the engine the app pins", () => {
-  const project = readFileSync(new URL("../project.yml", import.meta.url), "utf8");
-  assert.ok(project.includes(`revision: ${recipe.engineRevision}`), "refresh the measured recipe fixture when changing the engine pin");
+  const resolved = JSON.parse(readFileSync(new URL("../Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved", import.meta.url), "utf8"));
+  const engine = resolved.pins.find(pin => pin.identity === "slackwater");
+  assert.equal(engine?.state.revision, recipe.engineRevision, "refresh the measured recipe fixture when changing the engine pin");
 });
 test("every curated fit's evidence matches the pinned recipe", async () => {
   for (const [id, e] of Object.entries(await curatedRecords())) {

@@ -1,0 +1,50 @@
+{
+  "originHash" : "baeae3866e9715caadcef25f64c0318d649bbc9334548f2679f0910dc191d1a0",
+  "pins" : [
+    {
+      "identity" : "almanac",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/openwatersio/almanac",
+      "state" : {
+        "revision" : "29222122763cc1cd58633388f66979bd698485be",
+        "version" : "0.13.0"
+      }
+    },
+    {
+      "identity" : "flatbuffers",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/flatbuffers.git",
+      "state" : {
+        "revision" : "187240970746d00bbd26b0f5873ed54d2477f9f3",
+        "version" : "25.9.23"
+      }
+    },
+    {
+      "identity" : "maplibre-gl-native-distribution",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/maplibre/maplibre-gl-native-distribution",
+      "state" : {
+        "revision" : "13e41ab3d77ff5113e7e5d4ee87803b1f81f5683",
+        "version" : "6.31.0"
+      }
+    },
+    {
+      "identity" : "slackwater",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/openwatersio/slackwater",
+      "state" : {
+        "revision" : "5b3478d24a31136429867918bcfd163e59c53372"
+      }
+    },
+    {
+      "identity" : "slackwater-database",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/openwatersio/slackwater-database",
+      "state" : {
+        "revision" : "f9c3d42c066efe87e606f8c09673fb70cff2b2cf",
+        "version" : "1.0.1-beta.20261107"
+      }
+    }
+  ],
+  "version" : 3
+}

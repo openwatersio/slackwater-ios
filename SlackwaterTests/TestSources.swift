@@ -44,7 +44,13 @@ func codeOnly(_ line: String) -> String {
 }
 
 /// One repo file by path relative to the repo root (e.g.
-/// "Slackwater/MapScreen.swift", "project.yml").
+/// "Slackwater/MapScreen.swift", "Slackwater.xcodeproj/project.xcproj").
 func repoSource(_ path: String) throws -> String {
     try String(contentsOf: repoRoot.appendingPathComponent(path), encoding: .utf8)
+}
+
+func repoProject() throws -> [String: Any] {
+    try XCTUnwrap(JSONSerialization.jsonObject(
+        with: Data(repoSource("Slackwater.xcodeproj/project.xcproj").utf8),
+        options: [.json5Allowed]) as? [String: Any])
 }

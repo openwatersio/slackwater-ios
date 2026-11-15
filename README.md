@@ -48,8 +48,8 @@ or visit [Slackwater support](https://slackwater.xyz/support/).
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
-tests and pull-request guidance. You will need Xcode 26 or later and XcodeGen;
-then run `xcodegen generate` and open `Slackwater.xcodeproj`.
+tests and pull-request guidance. You will need Xcode 27 or later;
+open the committed `Slackwater.xcodeproj`.
 
 ## License
 

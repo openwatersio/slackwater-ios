@@ -138,7 +138,7 @@ Apple's [criteria](https://developer.apple.com/help/app-store-connect/manage-app
 
 | Label                        | iPhone and iPad | Apple Watch    | Evidence |
 | ---------------------------- | --------------- | -------------- | -------- |
-| Dark Interface               | Yes             | Yes            | The phone is dark-only (`UIUserInterfaceStyle: Dark` in `project.yml`, `.preferredColorScheme(.dark)` on the root and sheets). Every watch surface draws on the dark canvas. |
+| Dark Interface               | Yes             | Yes            | The phone is dark-only (`UIUserInterfaceStyle: Dark` in `Slackwater/Info.plist`, `.preferredColorScheme(.dark)` on the root and sheets). Every watch surface draws on the dark canvas. |
 | Captions, Audio Descriptions | Not applicable  | Not applicable | No audio or video. |
 | Larger Text                  | Not yet         | Not yet        | The lead, its pad and the pills scale, and chart labels stay fixed by contract (`docs/scrubber.md` § 5). Station names, Downloads rows and the eyebrows clip, the pills stop at the first accessibility size, and the iPad sidebar is a fixed 320 points; #500. On the watch, list rows are a fixed height, the reading card shrinks its text, and the detail never scrolls. |
 | VoiceOver                    | Yes             | Not yet        | The scrubber is one adjustable control with a dated spoken value and Next event, Previous event and Set an alert actions; icon buttons are named and section labels are headings, and the list and search reach every station the map shows. The audit covers three screens (#674), so the rest is a hand check on a device before publishing (#610). Known gaps: #498, #671, #673. The watch's complications and reading card are unlabelled; #672. |

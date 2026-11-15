@@ -30,7 +30,7 @@ enum StationSuccessors {
         guard let url = Bundle.main.url(forResource: "station-successors", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let map = try? JSONDecoder().decode([String: StationSuccessor].self, from: data) else {
-            // Every target bundles the file (project.yml, PortableSources). An
+            // Every target bundles the file (project target membership). An
             // empty map moves nothing, which is today's behavior, so a release
             // build degrades rather than crashing.
             assertionFailure("station-successors.json is missing or unreadable")

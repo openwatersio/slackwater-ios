@@ -126,7 +126,7 @@ struct ChsModel: Codable {
 /// for the next half-hourly tick (H1). A closure, not a direct
 /// `WidgetCenter.shared.reloadAllTimelines()` call, because this file also
 /// compiles into the widget extension (see the appex source list in
-/// project.yml) — the appex has no reason to reload itself mid-fit, so it
+/// the project configuration) — the appex has no reason to reload itself mid-fit, so it
 /// keeps the default no-op and only `SlackwaterApp.init()` assigns the real
 /// trigger.
 enum WidgetReload {

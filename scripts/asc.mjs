@@ -374,7 +374,7 @@ if (cmd === 'create-cert') {
   console.log('cert:', r.data.id, r.data.attributes.serialNumber, '->', args[1]);
 } else if (cmd === 'builds') {
   // What TestFlight actually holds, which is the only place the version story
-  // can be checked: project.yml states an intent, this is the outcome.
+  // can be checked: Slackwater.xcodeproj/project.xcproj states an intent, this is the outcome.
   const r = await api('GET', `/v1/builds?filter[app]=${await appId()}&limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups`);
   const inc = (id) => r.included?.find((i) => i.id === id);
   for (const b of r.data) {

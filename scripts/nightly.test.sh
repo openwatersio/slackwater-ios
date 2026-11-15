@@ -14,17 +14,19 @@ git init --bare -q "$ORIGIN"
 git init -q -b main "$REPO"
 git -C "$REPO" config user.name 'Nightly Test'
 git -C "$REPO" config user.email nightly@example.test
-mkdir -p "$REPO/scripts"
+mkdir -p "$REPO/scripts" "$REPO/Slackwater.xcodeproj"
 # Older eligible commits can have release scripts with no CI gate.
 sed '/^python3 scripts\/nightly-validation.py /d' "$ROOT/scripts/nightly.sh" > "$REPO/scripts/nightly.sh"
 cp "$ROOT/scripts/nightly-validation.py" "$REPO/scripts/nightly-validation.py"
 cp "$ROOT/scripts/nightly-validation.py" "$TMP/nightly-validation.py"
 
-cat > "$REPO/project.yml" <<'EOF'
-settings:
-  base:
-    MARKETING_VERSION: 1.13.0
-    CURRENT_PROJECT_VERSION: 38
+cat > "$REPO/Slackwater.xcodeproj/project.xcproj" <<'EOF'
+{
+  "build-settings": {
+    "MARKETING_VERSION": "1.13.0",
+    "CURRENT_PROJECT_VERSION": "38",
+  },
+}
 EOF
 print 'base' > "$REPO/app.txt"
 git -C "$REPO" add .
@@ -153,7 +155,7 @@ RELEASE_COMMAND=$(ruby -ryaml -e 'puts YAML.safe_load(File.read(ARGV[0]), aliase
 nightly() { (cd "$REPO" && bash -e -c "$RELEASE_COMMAND") }
 new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
 
-# A new app with no uploads yet numbers from project.yml, commits nothing, and
+# A new app with no uploads yet numbers from Slackwater.xcodeproj/project.xcproj, commits nothing, and
 # tags the commit it built.
 : > "$STATE/asc-build"
 head=$(git -C "$REPO" rev-parse HEAD)
@@ -192,7 +194,7 @@ before=$(wc -l < "$STATE/events")
 nightly
 [[ $(wc -l < "$STATE/events") == $before ]]
 
-# ASC is ahead of project.yml now, so it sets the number.
+# ASC is ahead of Slackwater.xcodeproj/project.xcproj now, so it sets the number.
 new_commit 'Another feature'
 nightly
 tail -2 "$STATE/events" | diff -u - <(printf 'upload:40\nrelease:nightly-1.13.0-40\n')

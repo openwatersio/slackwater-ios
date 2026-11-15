@@ -5,7 +5,7 @@ description: Use when cutting a Slackwater iOS release, bumping MARKETING_VERSIO
 
 # Releasing Slackwater to TestFlight
 
-`project.yml` is the source of truth for both version numbers. It has not always
+`Slackwater.xcodeproj/project.xcproj` is the source of truth for both version numbers. It has not always
 been — read The rule that bites before touching either one.
 
 One-time infrastructure (ASC key, keychain, signing identity, profile) lives in
@@ -27,7 +27,7 @@ carried XcodeGen's literal `1.0` / `1` on every one of those uploads, so:
 - `MARKETING_VERSION` reached nothing at all. Builds 1–21 all read `1.0` to
   testers; 0.3.0, 0.5.0 and 0.6.0 existed only in git
 
-Fixed 2026-08-11 (PR #48). `info.properties` now maps both plist keys to the
+Fixed 2026-08-11 (PR #48). Each committed Info.plist maps both version keys to the
 build settings, and the export sets `manageAppVersionAndBuildNumber` to `<false/>`.
 **Both halves are load-bearing** — the plist keys alone are still overwritten at
 upload, and the flag alone uploads build `1` and is rejected as a duplicate.
@@ -70,4 +70,4 @@ Settled, so they don't get re-litigated:
 - **Treating a green CI run as a released build.** CI never uploads. An upload is
   `scripts/testflight.sh` on `main` and nothing else.
 - **Assuming a version bump shipped.** Until it appears in `asc.mjs builds`, the
-  bump is a line in a YAML file. Build 22 sat merged and unuploaded for a day.
+  bump is a project setting. Build 22 sat merged and unuploaded for a day.
