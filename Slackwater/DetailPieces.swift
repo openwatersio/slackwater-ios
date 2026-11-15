@@ -204,29 +204,8 @@ struct SkyState {
     let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
     /// The glyph's rotation toward the sun as the moon is seen (`moonTilt`),
-    /// for the summary tile.
+    /// for the backdrop, summary tile and Moon sheet.
     let moonLightAngle: Double
-    /// The same rotation in the backdrop's frame, given how far right of the
-    /// moon the sun is drawn (`sunDrawnOffset`, negative to its left). `skyPoint` puts east on the right whichever
-    /// way the frame faces, which facing south is the sky's mirror image; the
-    /// limb is mirrored with it so it still faces the sun drawn beside it.
-    /// In the tropics the sun's frame can face the other way, and then the
-    /// two are not one picture: while the sun is up, the limb keeps its
-    /// upward or downward lean and turns to the side the sun is drawn on,
-    /// through vertical as the drawn sun passes over or under the moon (the
-    /// lean across is scaled down within 40pt) so it never snaps to its mirror
-    /// image. Once the sun has set there is no drawn sun to face, and its
-    /// off-screen x wraps round at midnight. On the horizon the two rules
-    /// agree, since both frames put the sun's rising side on the right.
-    func backdropMoonLightAngle(sunDrawnOffset: CGFloat?) -> Double {
-        let moonFacesSouth = moonSpan?.facesSouth ?? (latitude >= 0)
-        let sunFacesSouth = sunSpan?.facesSouth ?? (latitude >= 0)
-        if moonFacesSouth != sunFacesSouth, let sunDrawnOffset, let sun, sun.altDeg > 0 {
-            let across = abs(cos(moonLightAngle)) * Double(min(max(sunDrawnOffset / 40, -1), 1))
-            return atan2(sin(moonLightAngle), across)
-        }
-        return moonFacesSouth ? .pi - moonLightAngle : moonLightAngle
-    }
     /// The stars' frame: the sun's span, always facing the equator. Facing
     /// the sun's own way, the whole field would flip to its mirror image at
     /// midnight on the nights the sun's crossing changes sides; stars are
@@ -415,7 +394,7 @@ struct SkyBackdrop: View {
                         return len > 0 ? CGPoint(x: sun.x + dx / len * d, y: sun.y + dy / len * d)
                                        : CGPoint(x: sun.x + d, y: sun.y)
                     } ?? truePoint
-                    let toSun = sky.backdropMoonLightAngle(sunDrawnOffset: sunPoint.map { $0.x - point.x })
+                    let toSun = sky.moonLightAngle
                     let glare = moonGlareOpacity(
                         distance: sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity,
                         obscuration: sky.obscuration)
