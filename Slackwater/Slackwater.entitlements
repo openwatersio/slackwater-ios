@@ -13,7 +13,7 @@
 	     other. Apex only: the Worker owns the apex and www as custom domains,
 	     and a shared link is written against the apex.
 
-	     Release signs manually (Slackwater.xcodeproj/project.xcproj sets CODE_SIGN_STYLE: Manual with
+	     Release signs manually (Slackwater.xcodeproj/project.xcproj sets CODE_SIGN_STYLE[config=Release] to Manual with
 	     PROVISIONING_PROFILE_SPECIFIER "Slackwater App Store"), so this key
 	     does not take effect until Associated Domains is enabled on the App ID
 	     and that profile is regenerated. Until then a Release build fails to

@@ -12,4 +12,13 @@ raise "no candidate must skip release" unless release.fetch("if").include?("need
 raise "nightly requires Actions read permission" unless release.dig("permissions", "actions") == "read"
 raise "nightly requires release write permission" unless release.dig("permissions", "contents") == "write"
 raise "release needs time for archive/upload plus processing, group waits and retries" unless release.fetch("timeout-minutes") >= 90
+
+ci = YAML.safe_load(File.read(File.expand_path("../.github/workflows/ci.yml", __dir__)), aliases: true)
+nightly_jobs = ci.fetch("jobs").select do |_, job|
+  job.fetch("steps", []).any? { |step| step.fetch("run", "").include?("zsh scripts/nightly.test.sh") }
+end
+raise "nightly fixture must run on both macOS build paths" unless nightly_jobs.keys.sort == %w[build studio]
+nightly_jobs.each do |name, job|
+  raise "nightly fixture requires macOS plutil in #{name}" if job.fetch("runs-on").to_s.include?("ubuntu")
+end
 puts "nightly workflow checks passed"

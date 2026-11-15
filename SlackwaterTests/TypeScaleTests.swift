@@ -34,9 +34,10 @@ final class TypeScaleTests: XCTestCase {
     /// The bundled families must not come back via Info.plist either.
     func testNoBundledFontsDeclared() throws {
         let project = try repoSource("Slackwater.xcodeproj/project.xcproj")
-        let plist = try repoSource("Slackwater/Info.plist")
-        XCTAssertFalse(plist.contains("UIAppFonts"),
-                       "UIAppFonts must be gone — bundled fonts are retired")
+        for target in ["Slackwater", "SlackwaterWidgets", "SlackwaterWatch", "SlackwaterWatchWidgets"] {
+            XCTAssertFalse(try repoSource("\(target)/Info.plist").contains("UIAppFonts"),
+                           "\(target): bundled fonts are retired")
+        }
         XCTAssertFalse(project.contains(".ttf"),
                        "no .ttf should be referenced from the project")
     }

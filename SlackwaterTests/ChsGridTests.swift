@@ -25,15 +25,23 @@ final class ChsGridTests: XCTestCase {
     }
 
     func testFitValidationUsesTheAppPackageRevision() throws {
-        let revisions = try repoSource("Slackwater.xcodeproj/project.xcproj").components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.hasPrefix("\"revision\": ") }
-        XCTAssertEqual(revisions.count, 1)
-        let revision = try XCTUnwrap(revisions.first).components(separatedBy: "\"")[3]
+        let packages = try XCTUnwrap(repoProject()["packages"] as? [[String: Any]])
+        let package = try XCTUnwrap(packages.first {
+            $0["repository"] as? String == "https://github.com/openwatersio/slackwater"
+        })
+        let version = try XCTUnwrap(package["version"] as? [String: Any])
+        let revision = try XCTUnwrap(version["revision"] as? String)
         XCTAssertTrue(try repoSource("tools/FitValidation/Package.swift").contains("revision: \"\(revision)\""))
-        let resolved = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(repoSource("tools/FitValidation/Package.resolved").utf8)) as? [String: Any])
-        let pins = try XCTUnwrap(resolved["pins"] as? [[String: Any]])
-        let slackwater = try XCTUnwrap(pins.first { $0["identity"] as? String == "slackwater" })
-        XCTAssertEqual((slackwater["state"] as? [String: Any])?["revision"] as? String, revision)
+        let recipe = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: Data(repoSource("tools/chs-current-recipe.json").utf8)) as? [String: Any])
+        XCTAssertEqual(recipe["engineRevision"] as? String, revision)
+        for path in ["tools/FitValidation/Package.resolved",
+                     "Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"] {
+            let resolved = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(repoSource(path).utf8)) as? [String: Any])
+            let pins = try XCTUnwrap(resolved["pins"] as? [[String: Any]])
+            let slackwater = try XCTUnwrap(pins.first { $0["identity"] as? String == "slackwater" })
+            XCTAssertEqual((slackwater["state"] as? [String: Any])?["revision"] as? String, revision, path)
+        }
     }
 
 }

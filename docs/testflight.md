@@ -161,7 +161,7 @@ Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/ski
 - **A release goes to every checked-in external group.** Dispatch `Promote Nightly to Beta` with the nightly build number. It uses collected notes from `docs/release-notes/<version>-<build>.md` when present; otherwise it collects PR titles since the previous Beta build in App Store Connect (or the last version tag when that build has no Nightly tag), falling back to commit titles for direct commits. It updates TestFlight notes, attaches the existing build to Beta, and submits it for Apple beta review. Notes appear in the workflow summary; App Store Connect holds the Beta build history. No release PR, archive, upload, or app CI run is involved. Check the result with `node scripts/asc.mjs builds`.
 - Bump `CURRENT_PROJECT_VERSION` in `Slackwater.xcodeproj/project.xcproj` per upload (App Store Connect rejects reused
   build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
-  because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and
+  because each committed Info.plist maps them to `CFBundleVersion` / `CFBundleShortVersionString` and
   the export sets `manageAppVersionAndBuildNumber` `<false/>`** — through build 21 neither was
   wired, Xcode renumbered every upload itself, and every build shipped as `1.0`. Check the
   result with `node scripts/asc.mjs builds`.

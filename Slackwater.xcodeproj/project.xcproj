@@ -765,6 +765,7 @@
         { "path": "PrintableHTMLTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
         { "path": "PrintableSheetTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
         { "path": "PrintableTablesTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
+        { "path": "ProjectTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
         { "path": "ReduceMotionTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
         { "path": "RenderedStripTests.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },
         { "path": "RenderProbes.swift", "target-membership": [ "SlackwaterTests/compile-sources" ] },

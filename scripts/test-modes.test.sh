@@ -5,7 +5,7 @@ root=${0:A:h:h}
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/repo/scripts" "$scratch/repo/Slackwater" "$scratch/repo/SlackwaterTests" "$scratch/repo/SlackwaterUITests" "$scratch/bin"
-mkdir -p "$scratch/repo/Slackwater.xcodeproj"
+mkdir -p "$scratch/repo/Slackwater.xcodeproj" "$scratch/repo/SlackwaterWidgets" "$scratch/repo/SlackwaterWatch" "$scratch/repo/SlackwaterWatchWidgets" "$scratch/repo/SlackwaterWatchUITests" "$scratch/repo/TestPlans"
 touch "$scratch/repo/Slackwater.xcodeproj/project.xcproj"  # the source-changed sweep at the end walks these
 cp "$root/scripts/test.sh" "$scratch/repo/scripts/test.sh"
 cp "$root/scripts/first-run.sh" "$scratch/repo/scripts/first-run.sh"

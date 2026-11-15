@@ -48,3 +48,9 @@ func codeOnly(_ line: String) -> String {
 func repoSource(_ path: String) throws -> String {
     try String(contentsOf: repoRoot.appendingPathComponent(path), encoding: .utf8)
 }
+
+func repoProject() throws -> [String: Any] {
+    try XCTUnwrap(JSONSerialization.jsonObject(
+        with: Data(repoSource("Slackwater.xcodeproj/project.xcproj").utf8),
+        options: [.json5Allowed]) as? [String: Any])
+}

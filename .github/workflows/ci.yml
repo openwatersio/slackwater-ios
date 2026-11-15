@@ -170,7 +170,6 @@ jobs:
           python3 scripts/cancel-closed-ci.test.py
           ruby scripts/nightly-workflow.test.rb
           sudo apt-get update && sudo apt-get install -y zsh
-          zsh scripts/nightly.test.sh
           zsh scripts/promote-nightly.test.sh
           ruby scripts/promote-workflow.test.rb
           node --test scripts/asc.test.mjs
@@ -278,6 +277,7 @@ jobs:
       - name: Test runner modes
         run: |
           zsh scripts/test-modes.test.sh
+          zsh scripts/nightly.test.sh
           sh scripts/test-retryable.test.sh
           sh scripts/test-failed-selectors.test.sh
           sh scripts/ci-runner/hook-job-started.test.sh
@@ -658,6 +658,7 @@ jobs:
         if: matrix.device == 'iPhone'
         run: |
           zsh scripts/test-modes.test.sh
+          zsh scripts/nightly.test.sh
           sh scripts/test-retryable.test.sh
           sh scripts/test-failed-selectors.test.sh
           sh scripts/ci-runner/hook-job-started.test.sh
