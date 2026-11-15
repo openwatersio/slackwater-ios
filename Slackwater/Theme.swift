@@ -23,6 +23,11 @@ private struct DetailTopHeightKey: PreferenceKey {
 /// `anchor` as well as the scrub, and only the detail view holds that. The
 /// strip takes it directly.
 struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: View {
+    @Environment(\.reviewForecastLoaded) private var reviewForecastLoaded
+    @Environment(\.reviewVisitID) private var reviewVisitID
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var appearedReviewVisitID: UUID?
+    @State private var reviewVisible = false
     let name: String
     let region: String
     let favoriteId: String
@@ -219,6 +224,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // link lands while this detail is already up — a second link to the
             // open station re-pushes the same value, so nothing else re-appears.
             .onAppear {
+                appearedReviewVisitID = reviewVisitID
+                reviewVisible = true
                 if !restoredFold {
                     restoredFold = true
                     if let fold = FoldHandoff.takePage(favoriteId), let page = fold.page {
@@ -243,7 +250,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     starsAvailable: tourStarsTime(days: timeline.days, after: appNow(), within: coverage) != nil,
                     moonAvailable: tourMoonTime(days: timeline.days, after: appNow(), within: coverage) != nil)
             }
+            .task(id: reviewVisible && scenePhase == .active && timeline != nil) {
+                guard reviewVisible, scenePhase == .active, timeline != nil,
+                      !reviewRequestsDisabled, let visitID = appearedReviewVisitID else { return }
+                // A disappearing page's data can finish after its navigation visit was replaced.
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                reviewForecastLoaded(visitID)
+            }
             .onDisappear {
+                reviewVisible = false
                 if TourCoach.shared.station == favoriteId { TourCoach.shared.finish() }
             }
             .sheet(isPresented: $showPicker) {
@@ -1217,5 +1233,27 @@ enum RankedStations {
             groups = StationGroups(ranked: ranked, chosen: picks)
         }
         return (ranked, groups)
+    }
+}
+
+private struct ReviewForecastLoadedKey: EnvironmentKey {
+    static let defaultValue: @MainActor (UUID) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var reviewForecastLoaded: @MainActor (UUID) -> Void {
+        get { self[ReviewForecastLoadedKey.self] }
+        set { self[ReviewForecastLoadedKey.self] = newValue }
+    }
+}
+
+private struct ReviewVisitIDKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
+extension EnvironmentValues {
+    var reviewVisitID: UUID? {
+        get { self[ReviewVisitIDKey.self] }
+        set { self[ReviewVisitIDKey.self] = newValue }
     }
 }

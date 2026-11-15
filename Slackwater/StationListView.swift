@@ -2,6 +2,7 @@
 // distance), its search overlay, map pane, and floating toolbar.
 import CoreLocation
 import SwiftUI
+import StoreKit
 
 // MARK: - Station list
 
@@ -28,6 +29,9 @@ enum MapPreview: Equatable {
 }
 
 struct StationListView: View {
+    @Environment(\.requestReview) private var requestReview
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var reviewVisit = ReviewRequestVisit()
     @State private var path = NavigationPath()
     @State private var query = ""
     @State private var showSettings = false
@@ -153,6 +157,14 @@ struct StationListView: View {
         }
     }
 
+    private var reviewAvailable: Bool {
+        scenePhase == .active && linkedRemovedStationID == nil &&
+        !showMap && !searching && !showSettings && !showDownloads &&
+        !showPremium && chooser == nil && !TourCoach.shared.armed
+    }
+
+    private var reviewOpportunity: Bool { reviewVisit.pending && path.isEmpty && reviewAvailable }
+
     var body: some View {
         Group {
             if regular {
@@ -168,6 +180,12 @@ struct StationListView: View {
         // iPad, tap included, in a live-logged repro. Attached here instead,
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
+        .environment(\.reviewVisitID, reviewVisit.id)
+        .environment(\.reviewForecastLoaded) { visitID in
+            guard reviewVisit.forecastDidLoad(visitID: visitID, isNavigating: !path.isEmpty,
+                                             isActive: scenePhase == .active) else { return }
+            ReviewRequestPolicy.shared.recordForecastUse(at: appNow())
+        }
         .environment(\.openTideDetail) { path.append($0) }
         // The nearby-station link's push — appends (a step deeper), never the
         // path reset `open` does: the station being left stays on the back
@@ -213,6 +231,24 @@ struct StationListView: View {
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, { openChsRoute($0) }) }
         .sheet(isPresented: $showPremium, onDismiss: { premiumOpening = nil }) {
             PremiumView(opening: premiumOpening)
+        }
+        .onChange(of: path.count) { old, new in
+            reviewVisit.navigationChanged(from: old, to: new, available: reviewAvailable)
+        }
+        .onChange(of: reviewAvailable) { _, available in
+            reviewVisit.availabilityChanged(available)
+        }
+        .task(id: reviewOpportunity) {
+            guard reviewOpportunity, !reviewRequestsDisabled else { return }
+            // Let the back transition finish; a new destination or sheet cancels this task.
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            // TestFlight cannot display reviews; preserve its history for an App Store install.
+            guard case .verified(let transaction) = try? await AppTransaction.shared,
+                  !Task.isCancelled, reviewOpportunity else { return }
+            guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                  ReviewRequestPolicy.shared.consumeRequest(version: version, at: appNow(), environment: transaction.environment) else { return }
+            requestReview()
+            reviewVisit.pending = false
         }
         .onOpenURL(perform: handleDeepLink)
         .onContinueUserActivity(stationActivityType) { activity in
@@ -722,6 +758,7 @@ struct StationListView: View {
         case .chsGate(let gate): next.append(ChsRoute.derivedGate(gate))
         case .chsCurrent(let gate): next.append(ChsRoute.currentGate(gate))
         }
+        if path != next { reviewVisit.beginVisit() }
         path = next
     }
 

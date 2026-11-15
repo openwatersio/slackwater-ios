@@ -312,6 +312,12 @@ A favorite or deep-linked station with no successor stays in place as a removed-
 
 The trailing swipe on a removed favorite is "Remove", which deletes it outright without adding it to Recents.
 
+### 9.4 App Store review requests
+
+The iOS app records visible, active loaded forecast use on three distinct local calendar days. Returning from a visit that displayed a loaded forecast may request an App Store review after a one-second settling delay. Waiting and unavailable pages do not qualify. Opening a map, search, a sheet, a removed-station notice, another destination, or leaving the active scene cancels the opportunity rather than deferring it until that surface closes.
+
+Requests are limited to one attempt per marketing version and at least 120 elapsed 24-hour periods between attempts, persisted in local app settings, which can carry forward through device backup or migration. StoreKit controls whether a prompt appears; an attempted request consumes the allowance even if Apple suppresses it. Only verified App Store production builds consume attempts; TestFlight, Xcode and automated tests do not. TestFlight forecast days can carry forward to an App Store installation. Clock rollback keeps the cooldown closed until the stored request is at least 120 days old.
+
 ## 10. Map handoff
 
 There are no tabs. Two floating 56-unit glass buttons sit at the bottom of the list, 16 units from the sides and 24 from the bottom:
@@ -409,6 +415,8 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 24. **Heading navigation:** With a fix, a favorite, and a recent, the headings rotor steps through My Location, Favorites, Near Me, and Recents, and stops on nothing inside a card.
 25. **Resume and live readings:** Leave the app overnight, then reopen it with the list and a selected detail visible. Mounted cards refresh immediately, keep updating every 60 seconds while active, and preserve the selection and scroll position. A map preview keeps its eager first frame until the next tick. After midnight, online current cards select the current day’s cached window without a network request.
 
+26. **Review request timing on iOS:** After loaded forecasts on three distinct local dates, returning from a loaded forecast can request a review after one second. A waiting or unavailable visit does not qualify. Switching to another surface or backgrounding during the delay cancels rather than defers the request. TestFlight does not consume the production allowance.
+
 ## 15. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy to another platform:
@@ -430,6 +438,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Card refresh lifecycle | `Slackwater/CardRefresh.swift`, `SlackwaterTests/CardRefreshTests.swift` |
 | Mini curve | `Slackwater/StationCardGraph.swift` |
 | Download status and strip | `Slackwater/CardStatus.swift`, `Slackwater/DownloadStrip.swift`, `Slackwater/DownloadTier.swift` |
+| App Store review eligibility and visit lifecycle | `Slackwater/ReviewRequestPolicy.swift`, `SlackwaterTests/ReviewRequestPolicyTests.swift`, `Slackwater/StationListView.swift`, `Slackwater/Theme.swift` |
 | Deep links | `Slackwater/DeepLink.swift` |
 | Distance formatting | `Slackwater/Units.swift` |
 | Pure behavior checks | `SlackwaterTests/UnitsAndGroupsTests.swift`, `SlackwaterTests/NationalScaleTests.swift`, `SlackwaterTests/WorldDefaultsTests.swift`, `SlackwaterTests/StationCardLoadingTests.swift`, `SlackwaterTests/StaleStationTests.swift`, `SlackwaterTests/FavoritesCloudTests.swift` |
