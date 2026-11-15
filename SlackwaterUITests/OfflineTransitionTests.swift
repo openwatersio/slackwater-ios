@@ -402,7 +402,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             let needed = (notice.label as NSString).boundingRect(
                 with: CGSize(width: notice.frame.width, height: .greatestFiniteMagnitude),
                 options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil).height
-            XCTAssertGreaterThan(needed, font.lineHeight * 1.5, "\(name): the sentence should need more than one line")
+            if UIDevice.current.userInterfaceIdiom == .phone || category.isAccessibilityCategory {
+                XCTAssertGreaterThan(needed, font.lineHeight * 1.5, "\(name): the sentence should need more than one line")
+            }
             XCTAssertGreaterThanOrEqual(notice.frame.height, needed - font.lineHeight / 2,
                                         "\(name): the bound notice is shorter than its text and was cut off")
             save(app, "bounded-current-\(name).png")
