@@ -4,7 +4,18 @@ root=${0:A:h:h:h}
 fixture=$root/scripts/ci-runner/fixtures/simctl-devices.json
 xctest_fixture=$root/scripts/ci-runner/fixtures/simctl-xctest-devices.json
 
-# kill lines come from scanning real processes, so only simctl lines are compared.
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+mkdir -p "$scratch/bin"
+# These tests exercise simulator cleanup, so no real process may be selected
+# for termination, even when cleanup runs without CLEANUP_DRY_RUN.
+cat > "$scratch/bin/pgrep" <<'STUB'
+#!/bin/sh
+exit 1
+STUB
+chmod +x "$scratch/bin/pgrep"
+export PATH="$scratch/bin:$PATH"
+
 run() {
     local out
     out=$(CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$xctest_fixture zsh "$root/scripts/ci-runner/cleanup-slot.sh" "$1") || {
@@ -35,12 +46,12 @@ actual=$(run 3)
 # device is still erased. Slot 1 above also has an unavailable iPhone, on
 # iOS 25, beside its available one: that one is skipped without a failure.
 if out=$(CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$xctest_fixture \
-    zsh "$root/scripts/ci-runner/cleanup-slot.sh" 4 2>"${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"); then
-    rm -f "${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"
+    zsh "$root/scripts/ci-runner/cleanup-slot.sh" 4 2>"$scratch/err"); then
+    rm -f "$scratch/err"
     printf 'cleanup-slot.sh exited 0 with an unavailable fixed device\n' >&2; exit 1
 fi
-err=$(<"${TMPDIR:-/tmp}/cleanup-slot-test-err.$$")
-rm -f "${TMPDIR:-/tmp}/cleanup-slot-test-err.$$"
+err=$(<"$scratch/err")
+rm -f "$scratch/err"
 actual=$(print -r -- "$out" | grep '^simctl' | sort || true)
 [[ "$actual" == 'simctl erase 44444444-0000-0000-0000-000000000002' ]] || { printf 'unavailable fixed device mismatch:\n%s\n' "$actual" >&2; exit 1; }
 [[ "$err" == 'fixed device SlackwaterCI-4-iPhone is not available on any runtime; rerun scripts/ci-runner/install.sh' ]] || {
@@ -49,8 +60,6 @@ actual=$(print -r -- "$out" | grep '^simctl' | sort || true)
 
 # An XCTestDevices set that is there but cannot be listed fails the cleanup
 # and is skipped, while the default set is still cleaned.
-scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/home/Library/Developer/XCTestDevices"
 if out=$(HOME=$scratch/home CLEANUP_DRY_RUN=1 SIMCTL_DEVICES_JSON=$fixture SIMCTL_XCTEST_DEVICES_JSON=$scratch/missing.json \
     zsh "$root/scripts/ci-runner/cleanup-slot.sh" 1 2>"$scratch/err"); then
@@ -74,7 +83,6 @@ expected_xctest=$(print -r -- "$expected" | grep -- '--set XCTestDevices')
 # delete is done, not stuck: the stand-in xcrun refuses the delete with
 # "Invalid device" and then lists the set without it, and the cleanup exits 0.
 # Shutdowns and erases succeed; the default-set listing comes from the fixture.
-mkdir -p "$scratch/bin"
 cat > "$scratch/bin/xcrun" <<'STUB'
 #!/bin/sh
 shift                                   # simctl
