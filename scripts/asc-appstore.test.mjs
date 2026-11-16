@@ -39,6 +39,51 @@ async function run(args, respond) {
 
 const version = (state = 'PREPARE_FOR_SUBMISSION') => ({ id: 'version', attributes: { versionString: '1.15.0', appVersionState: state } });
 
+test('appstore-releases follows pagination and reads only shipped versions and their attached builds', async () => {
+  const { calls, output } = await run(['appstore-releases'], (c) => {
+    if (c.path.endsWith('/appStoreVersions')) {
+      if (c.query.has('cursor')) return { data: [version('READY_FOR_DISTRIBUTION')] };
+      return {
+        data: [
+          { ...version('REPLACED_WITH_NEW_VERSION'), id: 'old', attributes: { versionString: '1.14.0', appVersionState: 'REPLACED_WITH_NEW_VERSION' } },
+          ...['PENDING_DEVELOPER_RELEASE', 'PROCESSING_FOR_DISTRIBUTION', 'IN_REVIEW'].map(version),
+        ],
+        links: { next: 'https://api.appstoreconnect.apple.com/v1/apps/app/appStoreVersions?cursor=next' },
+      };
+    }
+    if (c.path === '/v1/appStoreVersions/old/build') return { data: { attributes: { version: '61' } } };
+    if (c.path === '/v1/appStoreVersions/version/build') return { data: { attributes: { version: '74' } } };
+  });
+  assert.deepEqual(JSON.parse(output.join('\n')), [
+    { version: '1.14.0', build: '61', state: 'REPLACED_WITH_NEW_VERSION' },
+    { version: '1.15.0', build: '74', state: 'READY_FOR_DISTRIBUTION' },
+  ]);
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('appstore-releases refuses a shipped version without an attached build', async () => {
+  await assert.rejects(run(['appstore-releases'], (c) => {
+    if (c.path.endsWith('/appStoreVersions')) return { data: [version('READY_FOR_DISTRIBUTION')] };
+    if (c.path.endsWith('/build')) return { data: null };
+  }), /1.15.0.*attached build/);
+});
+
+test('appstore-releases applies the sync floor before reading legacy build relationships', async () => {
+  const { output } = await run(['appstore-releases', '1.15.0'], (c) => {
+    if (c.path.endsWith('/appStoreVersions')) return { data: [
+      { ...version('REPLACED_WITH_NEW_VERSION'), id: 'legacy', attributes: { versionString: '1.0', appVersionState: 'REPLACED_WITH_NEW_VERSION' } },
+      version('READY_FOR_DISTRIBUTION'),
+    ] };
+    assert.notEqual(c.path, '/v1/appStoreVersions/legacy/build', 'legacy build relationship was read');
+    if (c.path.endsWith('/build')) return { data: { attributes: { version: '74' } } };
+  });
+  assert.deepEqual(JSON.parse(output.join('\n')), [{ version: '1.15.0', build: '74', state: 'READY_FOR_DISTRIBUTION' }]);
+});
+
+test('appstore-releases rejects a foreign pagination origin', async () => {
+  await assert.rejects(run(['appstore-releases'], () => ({ data: [], links: { next: 'https://example.com/steal' } })), /pagination origin/);
+});
+
 test('a keyed prepare dry run plans app info for the version it would create', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asc-dry-'));
   try {

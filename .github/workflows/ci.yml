@@ -172,6 +172,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y zsh
           zsh scripts/promote-nightly.test.sh
           ruby scripts/promote-workflow.test.rb
+          ruby scripts/release-sync-workflow.test.rb
+          node --test scripts/release-sync.test.mjs
           node --test scripts/asc.test.mjs
 
       - name: Fixture tooling

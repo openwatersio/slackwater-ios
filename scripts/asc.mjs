@@ -372,6 +372,29 @@ if (cmd === 'create-cert') {
   });
   fs.writeFileSync(args[1], Buffer.from(r.data.attributes.certificateContent, 'base64'));
   console.log('cert:', r.data.id, r.data.attributes.serialNumber, '->', args[1]);
+} else if (cmd === 'appstore-releases') {
+  const minimum = args[0];
+  if (minimum && !/^\d+\.\d+(?:\.\d+)?$/.test(minimum)) fail('appstore-releases minimum version must be numeric');
+  const released = [];
+  let next = `/v1/apps/${await appId()}/appStoreVersions?filter[platform]=IOS&limit=200`;
+  while (next) {
+    const page = await api('GET', next);
+    for (const v of page.data) {
+      const state = versionState(v);
+      if (!['READY_FOR_DISTRIBUTION', 'READY_FOR_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(state)) continue;
+      if (minimum && v.attributes.versionString.localeCompare(minimum, 'en', { numeric: true }) < 0) continue;
+      const build = (await api('GET', `/v1/appStoreVersions/${v.id}/build`)).data?.attributes?.version;
+      if (!/^\d+$/.test(build ?? '')) fail(`version ${v.attributes.versionString} has no attached build`);
+      released.push({ version: v.attributes.versionString, build, state });
+    }
+    const link = page.links?.next;
+    if (link) {
+      const url = new URL(link, 'https://api.appstoreconnect.apple.com');
+      if (url.origin !== 'https://api.appstoreconnect.apple.com') fail('unexpected App Store Connect pagination origin');
+      next = url.pathname + url.search;
+    } else next = null;
+  }
+  console.log(JSON.stringify(released));
 } else if (cmd === 'builds') {
   // What TestFlight actually holds, which is the only place the version story
   // can be checked: Slackwater.xcodeproj/project.xcproj states an intent, this is the outcome.
@@ -548,6 +571,6 @@ if (cmd === 'create-cert') {
   confirm('accessibility publishes the labels to the product page');
   await pushAccessibility(loadListing());
 } else {
-  console.log('usage: asc.mjs builds | previous-beta <buildNumber> | verify <version> <buildNumber> <groupFile> | promote <version> <buildNumber> <groupFile> | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName] | install-profiles <name>...');
+  console.log('usage: asc.mjs appstore-releases [minimumVersion] | builds | previous-beta <buildNumber> | verify <version> <buildNumber> <groupFile> | promote <version> <buildNumber> <groupFile> | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName] | install-profiles <name>...');
   console.log('App Store (docs/appstore.md), each with --dry-run: prepare <version> <build> [screenshotDir] | version <version> | app-info | localization <version> | review-details <version> | attach-build <version> <build> | screenshots <version> [screenshotDir] | submit <version> --yes | release <version> --yes | accessibility --yes');
 }
