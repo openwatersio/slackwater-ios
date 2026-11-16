@@ -31,6 +31,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = launch("-locDenied")
         openFridayHarbor(app)
         let row = app.buttons["sun-card-details"].firstMatch
+        func openSunDetails() {
+            scrollTo(row, in: app)
+            let title = app.navigationBars["Sun activity"]
+            for _ in 0..<3 {
+                if !title.exists, row.exists, row.isHittable { row.tap() }
+                if title.appears(within: 5) { return }
+            }
+            XCTFail("the Sun card did not open its sheet")
+        }
         scrollTo(row, in: app)
         XCTAssertTrue(row.appears(within: 5))
         XCTAssertFalse(row.label.contains("Solar noon"))
@@ -50,7 +59,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertFalse(app.buttons["sun-card-previous"].exists)
         XCTAssertFalse(app.buttons["sun-card-next"].exists)
         save(app, "sun-card.png")
-        row.tap()
+        openSunDetails()
         let next = app.buttons["sun-next-event"]
         XCTAssertTrue(next.appears(within: 5))
         let initialPrevious = app.buttons["sun-previous-event"]
@@ -69,7 +78,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         next.tap()
         XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10))
         XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(destination)'"))
-        row.tap()
+        openSunDetails()
         let previous = app.buttons["sun-previous-event"]
         XCTAssertTrue(previous.appears(within: 5))
         XCTAssertTrue(previous.label.contains("Yesterday"), previous.label)
@@ -78,7 +87,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         previous.tap()
         XCTAssertTrue(app.navigationBars["Sun activity"].disappears(within: 10))
         XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(earlier)'"))
-        row.tap()
+        openSunDetails()
         XCTAssertTrue(app.descendants(matching: .any)["sun-event-astroDawn"].firstMatch.appears(within: 5))
         XCTAssertFalse(app.descendants(matching: .any)["sun-eye-height"].firstMatch.exists)
         XCTAssertFalse(app.descendants(matching: .any)["sun-horizon-dip"].firstMatch.exists)
@@ -112,7 +121,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertTrue(waitFor(leadReading(app), "value ENDSWITH '\(clock)'"),
                       "the timeline did not land on \(clock): \(scrubClock(app))")
         XCTAssertTrue(row.appears(within: 5))
-        row.tap()
+        let detailScroll = app.scrollViews.containing(.button, identifier: "sun-card-details").firstMatch
+        detailScroll.swipeUp()
+        detailScroll.swipeUp()
+        XCTAssertFalse(row.exists && row.isHittable, "the card should be offscreen before reopening")
+        openSunDetails()
         let perihelion = app.buttons["sun-perihelion"]
         XCTAssertTrue(perihelion.appears(within: 5))
         let apsisClock = try XCTUnwrap(perihelion.value as? String)
