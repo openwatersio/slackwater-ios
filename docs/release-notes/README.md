@@ -4,7 +4,7 @@ One file per version, named for its `MARKETING_VERSION`. Nightly posts the versi
 
 ## Format
 
-1. The version line, which gains its build number when a build is picked.
+1. The version line, optionally followed by the selected build in parentheses. The release sync checks any supplied build against the App Store's attached build.
 2. A blank line.
 3. What the version is about — one sentence and highlight bullets opening with `·` for an update, an introduction for a first release.
 4. A closing paragraph starting `Worth testing:`.
@@ -18,5 +18,7 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 ```
 
 So `Worth testing:` starts its own line and stays last, and anything a beta tester needs but an App Store reader does not belongs inside it — build numbers, simulator caveats, what to watch for in a specific lane.
+
+The hourly [App Store release sync](../appstore.md#automatic-github-releases) publishes missing stable releases from these reviewed notes. Its headline is the one-line summary without closing punctuation. Merge the notes before the App Store release; an existing GitHub release's wording is preserved on subsequent runs.
 
 The listing reads What's New from this file rather than holding a second copy, so the listing and the build's notes cannot drift apart.

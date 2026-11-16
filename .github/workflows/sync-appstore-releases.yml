@@ -1,0 +1,63 @@
+name: Sync App Store releases
+
+on:
+  schedule:
+    - cron: '43 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate and preview without publishing
+        type: boolean
+        default: true
+
+concurrency:
+  group: appstore-release-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.repository == 'openwatersio/slackwater-ios' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: testflight
+    permissions:
+      contents: write
+    steps:
+      - name: Require an owner for manual dispatch or rerun
+        if: github.event_name == 'workflow_dispatch' || github.run_attempt > 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          admin=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$GITHUB_TRIGGERING_ACTOR/permission" --jq '.user.permissions.admin')
+          [[ "$admin" == true ]] || { echo "$GITHUB_TRIGGERING_ACTOR is not a repository owner." >&2; exit 1; }
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+          sparse-checkout: |
+            scripts
+            docs/release-notes
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mise.toml
+
+      - name: Publish missing stable releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          args=()
+          if [[ "$DRY_RUN" == true ]]; then args+=(--dry-run); fi
+          node scripts/release-sync.mjs "${args[@]}"
+
+      - name: Report failed reconciliation
+        if: failure()
+        run: echo 'App Store release sync failed. Check the failed step for missing notes, missing Nightly tags, conflicting stable tags, or API errors. The next hourly run retries automatically.' >> "$GITHUB_STEP_SUMMARY"

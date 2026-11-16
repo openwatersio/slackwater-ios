@@ -6,7 +6,7 @@ Credentials are the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY` TestFlight
 
 ## Per release
 
-1. **Pick the build.** It is a nightly that was promoted to Beta and checked on a device. `node scripts/asc.mjs builds` shows it as `<version> (<build>)`, `VALID`. Its number goes on the first line of `docs/release-notes/<version>.md`.
+1. **Pick the build.** It is a nightly that was promoted to Beta and checked on a device. `node scripts/asc.mjs builds` shows it as `<version> (<build>)`, `VALID`. The first line of `docs/release-notes/<version>.md` can contain just the version. If you add the build in parentheses, keep it aligned with any replacement selected during review; the GitHub sync checks it against Apple's attached build.
 2. **Shoot and caption the screenshots** on the current UI. The medium iPhone, iPad and Watch sets are required; the large iPhone set is optional. Keep raw captures separate from the upload directories:
 
    ```sh
@@ -43,7 +43,19 @@ Credentials are the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY` TestFlight
 6. **Release.** Approval parks the version in Pending Developer Release. On release day, `node scripts/asc.mjs release 1.15.0 --yes` requests distribution. Confirm the public listing resolves in the intended storefronts. The website already links to the App Store. A successful request starts distribution; it does not establish that the version is available yet. Rerunning `release` after distribution starts sends no second request.
 
 7. **Publish accessibility labels** only after the device checks in #610 support every claimed label. Review `node scripts/asc.mjs accessibility --dry-run`, then publish with `--yes`. Apple Watch labels stay in the UI.
-8. **Record the shipped build.** Confirm the App Store version and its attached build in App Store Connect before creating or annotating a GitHub release. Do not infer them from the newest nightly or a public marketing version.
+8. **Check the GitHub record.** The [Sync App Store releases](../.github/workflows/sync-appstore-releases.yml) workflow publishes missing stable releases hourly. Confirm its summary names the App Store version, attached build, and exact Nightly commit. It can also be dispatched on `main`; manual runs default to a dry run. See [Automatic GitHub releases](#automatic-github-releases).
+
+## Automatic GitHub releases
+
+`node scripts/asc.mjs appstore-releases 1.15.0` reads shipped iOS versions at or above 1.15.0 and each version's attached build as JSON, including versions replaced by a newer release. The optional minimum is applied before fetching build relationships, so older records cannot block the sync. Pending approval, pending developer release, and processing do not qualify. This reads the App Store record, not the latest TestFlight upload.
+
+`node scripts/release-sync.mjs --dry-run` checks those records against Nightly tags, remote stable tags, and GitHub releases. The workflow publishes missing stable `v<version>` releases at `nightly-<version>-<build>`, using the current main branch's reviewed `docs/release-notes/<version>.md`. It creates new tags with a non-forced push before publishing with `--verify-tag`, refusing a conflicting tag created since validation. The notes' first summary line, without closing punctuation, becomes the headline; the body omits the version line and `Worth testing:`. Review and merge those notes before releasing on the App Store. If their version line names a build, it must match Apple's attached build; leaving the build off lets Apple supply it. Existing release titles and bodies stay as published.
+
+The hourly Ubuntu workflow uses the existing `testflight` environment secrets and runs only on this repository's `main`; manual dispatch and reruns require an owner. It checks out current main's release scripts and notes without the app's resource blobs, including on reruns. It does not build, upload, submit, or release an app. It validates every applicable version before writing, serializes its runs, and retries on the next schedule after an API or publication failure. The job summary records each version, build, and commit. Failed runs appear in Actions; scheduled-run email notifications go to the schedule's actor according to that user's notification settings.
+
+Sync starts at **1.15.0**. The initial App Store version is `1.0`, recorded manually in GitHub as `v1.14.0`; that historical mapping remains outside automatic reconciliation. Nightly prereleases stay prereleases. The newest shipped version becomes Latest; backfilling older versions never downgrades a newer Latest.
+
+A missing notes file, missing Nightly tag, build mismatch, or stable tag pointing elsewhere fails the run. Fix the notes or restore the verified Nightly record through review, then rerun. The sync never moves an existing tag or converts a draft or prerelease into a stable release. A tag with no release can be completed when its commit matches. Publishing is restricted to the serialized workflow, and Latest is re-read after publication. Local runs must use `--dry-run`; they need full, current Nightly tags and `origin/main` (`git fetch origin main --tags`) as well as App Store credentials and a GitHub token.
 
 ## Commands
 

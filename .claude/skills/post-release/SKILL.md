@@ -37,16 +37,10 @@ Approval closes the version's train. App Store Connect then rejects every upload
 
 ## When the version is live
 
-1. **Find the released build.** The submitted build can change during review: 1.14.0 went in as 47 and shipped as 61. Read it from the version's page in App Store Connect or the release issue's latest comment, not from `docs/release-notes/`. Its commit is `git rev-parse nightly-<version>-<build>^{commit}`.
-2. **Update `docs/release-notes/<version>.md`** so its version line names the released build and its highlights describe what that build ships. Merge that before publishing.
-3. **Publish the GitHub release** at that commit, as the latest full release, titled with a headline that says what changed for people using the app, with no version (see [GitHub release title and notes](../../../CONTRIBUTING.md#github-release-title-and-notes)). The body is the notes file without its version line or its `Worth testing:` paragraph, which is for beta testers, so it opens with the one-line summary:
-
-   ```sh
-   sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/<version>.md > /tmp/notes.md
-   gh release create v<version> --target <commit> --title "<headline>" --notes-file /tmp/notes.md --latest
-   ```
-
-4. **Confirm:** `gh release list` shows `v<version>` as Latest.
+1. **Check the released build.** `node scripts/asc.mjs appstore-releases 1.15.0` reads the App Store versions from 1.15.0 onward and their attached builds. Do not use the newest TestFlight upload or the first submission. Its commit is `git rev-parse nightly-<version>-<build>^{commit}`.
+2. **Check the automatic GitHub release.** The hourly `Sync App Store releases` workflow publishes missing stable releases from 1.15.0 onward using Apple's attached build and the reviewed notes on main. The first summary becomes the headline, with no closing punctuation, and `Worth testing:` is excluded. Merge those notes before the App Store release. Their version line can omit the build; if supplied, it must match Apple's build. Existing release copy stays as published. See [Automatic GitHub releases](../../../docs/appstore.md#automatic-github-releases).
+3. **Recover a failed sync.** Read its Actions summary. Fix missing notes, a mismatched notes build, or a missing verified Nightly tag, then dispatch the workflow on main. Manual dispatch defaults to a dry run; disable it to publish. Conflicting stable tags require investigation; never move one to make the sync pass. The initial App Store 1.0 / GitHub v1.14.0 record remains manual.
+4. **Confirm:** `gh release list` shows the newest shipped `v<version>` as Latest and each stable tag points to its attached build's Nightly commit.
 5. **Clear the App Store release column** for the version in the project. Merge a waiting website PR only when the released build contains the app change it announces: `git merge-base --is-ancestor <app-change-commit> <released-commit>`. If it doesn't, move the item to the next Release.
 
 ## Common mistakes
