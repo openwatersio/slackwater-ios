@@ -370,9 +370,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         }
         XCTAssert(map.frame.maxY <= window.maxY - 40, "the Nearby map stayed below the screen")
         save(app, "nearby-map.png")
-        // Clear of the iPad scroll bar and the iPhone's top-right station pin.
-        let tapX = UIDevice.current.userInterfaceIdiom == .pad ? 0.8 : 0.97
-        map.coordinate(withNormalizedOffset: CGVector(dx: tapX, dy: 0.05)).tap()
+        let empty = try XCTUnwrap(pinFreePoint(on: map), "no pin-free spot on the Nearby map")
+        empty.tap()
         XCTAssert(app.descendants(matching: .any)["map-canvas"].firstMatch.appears(within: 10),
                   "a tap on the Nearby map did not open the full map")
     }

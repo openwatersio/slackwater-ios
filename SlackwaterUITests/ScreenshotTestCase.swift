@@ -27,9 +27,11 @@ import notify
     /// One miss is the whole report. Left to continue, a test that lost one
     /// race walks on into four more waits, each scaled 4× on CI, and buries
     /// the first cause under a ten-minute cascade (#474).
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         continueAfterFailure = false
+        // Orientation outlives a test on its simulator clone, so the next class there inherits it.
+        XCUIDevice.shared.orientation = .portrait
     }
 
     override func tearDown() async throws {
@@ -472,6 +474,112 @@ import notify
             ink += 1
         }
         return Double(ink) / Double(w * h)
+    }
+
+    /// The luminance band the app's dark basemap (`BASEMAP_STYLE_URL`) draws
+    /// in, land and water alike. Every pin carries a plate darker than it and a
+    /// face brighter than it; roads and labels fall outside it too, which only costs room.
+    static let basemapLuminance = 56...94
+
+    /// Points from the tap to the nearest pin ink that `pinFreePoint` needs:
+    /// half the hit box in `MapScreen`'s `handleTap`, plus room for icon bounds beyond the ink.
+    static let pinClearance = 32
+
+    /// The luminance of the `station-selected` disc: white at
+    /// `PIN_SELECTED_DISC_OPACITY` (MapStyleBuilder) over any ground in `basemapLuminance`.
+    static let selectionDiscLuminance: ClosedRange<Int> = {
+        func disc(_ ground: Int) -> Double { Double(ground) + 0.18 * Double(255 - ground) }
+        return Int(disc(basemapLuminance.lowerBound).rounded(.down))...Int(disc(basemapLuminance.upperBound).rounded(.up))
+    }()
+
+    /// A point on `map` far enough from every pin that a tap there misses them
+    /// all. Which pins a map draws depends on the catalog and on the map's
+    /// size, so no fixed offset stays empty. `map` must be centred on its
+    /// selected station, as the Nearby map is on its page's own: that pin's
+    /// disc drawing is how the read knows the pins have landed. Nil when no
+    /// point has the room.
+    func pinFreePoint(on map: XCUIElement) -> XCUICoordinate? {
+        // Before the pins land, an empty-looking map reads the same twice and offers its centre.
+        XCTAssert(eventually(within: 10) { pinInk(map).centreDisc },
+                  "the map never drew the selection disc of the station it is centred on")
+        let read = settled { pinInk(map) }
+        let ink = read.cells, cols = read.cols, rows = read.rows
+        guard cols > 0, rows > 0 else { return nil }
+        // Chebyshev distance to the nearest ink cell, in points, by a two-pass
+        // chamfer with unit weights on all eight neighbours (exact for this metric).
+        var dist = ink.map { $0 ? 0 : Int.max / 2 }
+        func relax(_ x: Int, _ y: Int, _ neighbours: [(Int, Int)]) {
+            for (dx, dy) in neighbours {
+                let nx = x + dx, ny = y + dy
+                guard nx >= 0, nx < cols, ny >= 0, ny < rows else { continue }
+                dist[y * cols + x] = min(dist[y * cols + x], dist[ny * cols + nx] + 1)
+            }
+        }
+        for y in 0..<rows { for x in 0..<cols { relax(x, y, [(-1, 0), (-1, -1), (0, -1), (1, -1)]) } }
+        for y in (0..<rows).reversed() {
+            for x in (0..<cols).reversed() { relax(x, y, [(1, 0), (1, 1), (0, 1), (-1, 1)]) }
+        }
+        var best = (x: 0, y: 0, room: -1)
+        for y in 0..<rows {
+            for x in 0..<cols {
+                let room = min(dist[y * cols + x], x, y, cols - 1 - x, rows - 1 - y)
+                if room > best.room { best = (x, y, room) }
+            }
+        }
+        guard best.room >= Self.pinClearance else { return nil }
+        return map.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: Double(best.x) + 0.5, dy: Double(best.y) + 0.5))
+    }
+
+    private struct PinInk: Equatable {
+        let cells: [Bool], cols: Int, rows: Int
+        /// The selection disc ringing the centre: a run of disc-bright pixels
+        /// on all four sides. A label or road there brightens one or two sides at most.
+        let centreDisc: Bool
+    }
+
+    /// One flag per point of `map`: whether any pixel under it falls outside
+    /// `basemapLuminance`.
+    private func pinInk(_ map: XCUIElement) -> PinInk {
+        let frame = map.frame
+        guard let cg = map.screenshot().image.cgImage, frame.width > 0, frame.height > 0
+        else { return PinInk(cells: [], cols: 0, rows: 0, centreDisc: false) }
+        let w = cg.width, h = cg.height
+        let scale = Double(w) / frame.width
+        // In landscape an element's screenshot comes back in the portrait framebuffer's orientation.
+        XCTAssertEqual(Double(h) / frame.height, scale, accuracy: 0.05,
+                       "the map's screenshot is \(w)×\(h) for a \(frame.size) frame")
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return PinInk(cells: [], cols: 0, rows: 0, centreDisc: false) }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let cols = Int(frame.width), rows = Int(frame.height)
+        var ink = [Bool](repeating: false, count: cols * rows)
+        func luminance(_ x: Int, _ y: Int) -> Int {
+            let i = (y * w + x) * 4
+            return (Int(px[i]) + Int(px[i + 1]) + Int(px[i + 2])) / 3
+        }
+        // Far enough to pass the tallest pin, a tide gauge, and reach its disc at any zoom the Nearby map frames.
+        let reach = Int(32 * scale), run = Int(3 * scale)
+        let centreDisc = [(1, 0), (-1, 0), (0, 1), (0, -1)].allSatisfy { dx, dy in
+            var streak = 0
+            for step in 0...reach {
+                let x = w / 2 + dx * step, y = h / 2 + dy * step
+                guard x >= 0, x < w, y >= 0, y < h else { return false }
+                streak = Self.selectionDiscLuminance.contains(luminance(x, y)) ? streak + 1 : 0
+                if streak >= run { return true }
+            }
+            return false
+        }
+        for y in 0..<h {
+            let row = min(Int(Double(y) / scale), rows - 1)
+            for x in 0..<w where !Self.basemapLuminance.contains(luminance(x, y)) {
+                ink[row * cols + min(Int(Double(x) / scale), cols - 1)] = true
+            }
+        }
+        return PinInk(cells: ink, cols: cols, rows: rows, centreDisc: centreDisc)
     }
 
     /// Tap the pin at (lat, lon) on the fixed Salish camera, by mercator math.
