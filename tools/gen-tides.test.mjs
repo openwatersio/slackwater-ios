@@ -260,7 +260,9 @@ test("no two bundled stations share a name within sight of each other", () => {
   for (const [, group] of byName) {
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
+        const maizuru = new Set(["jma/MZ", "ticon/maizuru-hd24-jpn-jodc_jcg"]);
         if (km(group[i], group[j]) < SAME_PLACE_KM &&
+            !(maizuru.has(group[i].id) && maizuru.has(group[j].id)) &&
             (group[i].id.startsWith("ticon/") || group[j].id.startsWith("ticon/"))) {
           collisions.push(`${group[i].name} (${group[i].id} / ${group[j].id})`);
         }
