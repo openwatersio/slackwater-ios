@@ -281,7 +281,7 @@ const collides = (s) => {
 // and untrail() have run. Matching on the raw name missed those pairs
 // entirely; this is why the dedupe below runs AFTER naming, not before.
 const byName = new Map();
-// These same-named stations are separate gauges, 6.8 km apart.
+// These same-named stations are separate gauges, about 6.9 km apart.
 const maizuruGauges = new Set(["jma/MZ", "ticon/maizuru-hd24-jpn-jodc_jcg"]);
 const samePlace = (s) =>
   (byName.get(s.name.toLowerCase()) ?? []).some((k) =>
@@ -498,7 +498,7 @@ function buildStation(s) {
       // `trailingCode` already extracted, or a derived "Town, XX" that never
       // matches a bare name ending).
       name: untrail(s.name, code, trailingCode(region), region),
-      region,
+      region: s.id === "ticon/maizuru-hd24-jpn-jodc_jcg" ? "Kyoto · Japan Coast Guard" : region,
       aliases: s.aliases ?? [],
       latitude: s.latitude,
       longitude: s.longitude,

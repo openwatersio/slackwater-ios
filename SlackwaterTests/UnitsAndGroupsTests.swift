@@ -288,6 +288,8 @@ import XCTest
     func testKindLabelsDistinguishSeriesAndProvider() {
         let byId = Dictionary(StationItem.all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         XCTAssertEqual(byId[TideStationRecord.fridayHarborID]?.kindLabel, "Tide · NOAA")
+        XCTAssertEqual(byId["jma/MZ"]?.kindLabel, "Tide · JMA")
+        XCTAssertEqual(byId["ticon/maizuru-hd24-jpn-jodc_jcg"]?.kindLabel, "Tide · TICON-4")
         XCTAssertEqual(byId["current:noaa/PUG1744"]?.kindLabel, "Current · NOAA")
         XCTAssertEqual(byId["chs-victoria"]?.kindLabel, "Tide · CHS")
         XCTAssertEqual(byId["chs-active-pass"]?.kindLabel, "Current · CHS")

@@ -125,7 +125,7 @@ terms are worse than "no" — silence is not permission.
 
 - **NOAA** — public domain. 3,263 tide stations and 2,572 current stations (harmonic or
   subordinate-offset) ship with full constituents, offline from first launch.
-- **TICON-4** — the CC BY 4.0 half ships, 1,381 stations; the ones in Canadian water CHS does
+- **TICON-4** — the CC BY 4.0 half ships, 1,382 stations; the ones in Canadian water CHS does
   not gauge are the gap-fills `tools/gen-tides.mjs` counts in its census line. Attribution is in
   Settings. **This is the precedent for bundling third-party harmonic constants** — see
   `tools/gen-tides.mjs`.
@@ -235,7 +235,7 @@ The practical list. Each of these has cost someone time.
 | Identity for stations that may NEVER ship (109) | `Slackwater/Resources/unavailable-stations.json` |
 | CHS current gates (23: 7 fitted, 16 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
-| Bundled tide stations (5,028: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.tcdb` (reviewable copy `stations.json`) |
+| Bundled tide stations (5,029: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.tcdb` (reviewable copy `stations.json`) |
 | NOAA current stations (2,572) | `Slackwater/Resources/currents.tcdb` (reviewable copy `currents.json`) |
 | Fitted models, online blocks and tide previews | App Group container, `ChsModels/{id}.json`, `-current.json`, `-online.json`, `-tide-preview.json` (moved once from Application Support) |
 | Chunk cache and the 7-day IWLS station list cache | Application Support, `ChsChunks/` and `IwlsStations.json` (backup-excluded) |
