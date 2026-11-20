@@ -382,10 +382,16 @@ enum StationItem: Identifiable, Hashable {
     /// name, series and provider are the difference that isn't distance.
     var kindLabel: String {
         switch self {
-        case .tide: String(localized: "Tide · NOAA", comment: "Station type and provider. Keep NOAA exact.")
-        case .current: String(localized: "Current · NOAA", comment: "Station type and provider. Keep NOAA exact.")
-        case .chs: String(localized: "Tide · CHS", comment: "Station type and provider. Keep CHS exact.")
-        case .chsGate, .chsCurrent: String(localized: "Current · CHS", comment: "Station type and provider. Keep CHS exact.")
+        case .tide(let station):
+            let sources = ["noaa": "NOAA", "ticon": "TICON-4", "jma": "JMA", "dmi": "DMI",
+                           "linz": "LINZ", "kartverket": "Kartverket", "jhod": "Japan Coast Guard"]
+            let prefix = String(station.id.prefix(while: { $0 != "/" }))
+            if prefix == "noaa" { return String(localized: "Tide · NOAA", comment: "Station type and provider. Keep NOAA exact.") }
+            let source = sources[prefix] ?? prefix
+            return String(localized: "Tide · \(source)", comment: "Download row station type and region. The value is catalog data.")
+        case .current: return String(localized: "Current · NOAA", comment: "Station type and provider. Keep NOAA exact.")
+        case .chs: return String(localized: "Tide · CHS", comment: "Station type and provider. Keep CHS exact.")
+        case .chsGate, .chsCurrent: return String(localized: "Current · CHS", comment: "Station type and provider. Keep CHS exact.")
         }
     }
     /// "1.1 nm ENE of Sierra Point": NOAA regions are often a bare offset from

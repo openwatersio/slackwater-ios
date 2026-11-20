@@ -281,8 +281,11 @@ const collides = (s) => {
 // and untrail() have run. Matching on the raw name missed those pairs
 // entirely; this is why the dedupe below runs AFTER naming, not before.
 const byName = new Map();
+// These same-named stations are separate gauges, about 6.9 km apart.
+const maizuruGauges = new Set(["jma/MZ", "ticon/maizuru-hd24-jpn-jodc_jcg"]);
 const samePlace = (s) =>
-  (byName.get(s.name.toLowerCase()) ?? []).some((k) => km(s, k) < SAME_PLACE_KM);
+  (byName.get(s.name.toLowerCase()) ?? []).some((k) =>
+    km(s, k) < SAME_PLACE_KM && !(maizuruGauges.has(s.id) && maizuruGauges.has(k.id)));
 // IDENTITY, not proximity — the one duplicate class neither rule above can
 // see. UHSLC publishes each gauge through two feeds, fast-delivery and
 // research-quality, and they disagree on POSITION by more than SAME_PLACE_KM:
@@ -495,7 +498,7 @@ function buildStation(s) {
       // `trailingCode` already extracted, or a derived "Town, XX" that never
       // matches a bare name ending).
       name: untrail(s.name, code, trailingCode(region), region),
-      region,
+      region: s.id === "ticon/maizuru-hd24-jpn-jodc_jcg" ? "Kyoto · Japan Coast Guard" : region,
       aliases: s.aliases ?? [],
       latitude: s.latitude,
       longitude: s.longitude,
