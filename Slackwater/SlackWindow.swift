@@ -49,6 +49,15 @@ func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
     0
 }
 
+/// Keep sampled rotary axis crossings from being presented as true zero-current events.
+func currentEventsMatchingWater(_ points: [CurrentPoint], events: [CurrentEvent]) -> [CurrentEvent] {
+    guard let first = points.first?.time, let last = points.last?.time else { return events }
+    return events.filter { event in
+        guard event.kind == .slack, event.time >= first, event.time <= last else { return true }
+        return readCurrent(at: event.time, timeline: points, events: [event], flood: nil, ebb: nil)?.state == .slack
+    }
+}
+
 /// Full-speed comfort windows from SlackwaterKit, with true slack instants kept separate.
 func measureSlacks(_ points: [CurrentPoint], events: [CurrentEvent], threshold: Double)
     -> (windows: [(slack: Date, start: Date, end: Date)], cores: [(slack: Date, start: Date, end: Date)]) {

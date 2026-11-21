@@ -58,18 +58,15 @@ Three things that must never be conflated, in prose, labels, or names:
 
 | Term | Is | Duration |
 |---|---|---|
-| **slack** | the zero crossing (`v = 0`) | an instant |
-| **slack window** | the run where `\|v\| ≤ threshold` **and the sign reverses inside it** | minutes to hours |
-| **weak water** | `\|v\| ≤ threshold`, no reversal | any |
+| **slack** | the full current vector reaches zero | an instant |
+| **slack window** | the run where full current speed is at or below the comfort threshold | minutes to hours |
 
-Weak water is not slack. A lull that dips under the threshold and builds back
-the way it came is the flood pausing, not the pass opening. Marking it as a
-window promises a transit that never happens.
+A same-direction lull can be a window without containing a slack event. A rotating current with cross-flow is not slack when only its flood/ebb component crosses zero.
 
 A slack window is not slack either. The threshold is the reader's boat, and
 at a weak station a 0.5 kn window can hold a whole flood, maximum included.
 Inside the window the water is still flooding or ebbing, and the chart says
-so. Slack is the zero crossing, independent of the comfort-current setting.
+so. Slack is the zero-current instant, independent of the comfort-current setting.
 There is no positive slack-speed cutoff.
 
 **This distinction is a predicate, not a rendering choice.** See §6.1: it holds
@@ -134,9 +131,7 @@ The countdown questions below are the narrows reading's. At a reach the question
 1. **Endpoints are the interpolated ±threshold crossings**, never the nearest
    sample. At a fast gate a 10-minute sample lands a long way from the edge, and
    the error is always in the dangerous direction.
-2. **A run counts only if the sign reverses inside it** (§2). Test this on the
-   entry and exit steps too, not only steps wholly inside: at a violent gate the
-   reversal and the band edge land in the same sample.
+2. **Measure full current speed against the comfort threshold.** A run may contain zero, one, or several true zero-current events.
 3. **Touching or overlapping windows are one run.** A run containing one slack labels its opening; a continuous run containing several slacks labels each exact slack instead.
 4. **A window narrower than the sample step is not a window.** Draw the slack
    instant instead (§5.3).
@@ -238,7 +233,7 @@ The make-way anchor picks the order (§1). A mark that inverts the narrows order
 - **The inked run** — when it is actually happening: the curve itself,
   overdrawn in blue between the crossings, and in the go colour across the
   slack inside it. Outside every window the line is the ramp's yellow floor,
-  including weak water that eases under the limit without turning (§6.1).
+  including water above the comfort limit (§6.1).
 
 Drawing the run **on** the water rather than behind it is what stops it
 over-claiming. A peak rising past the threshold breaks the run, and two windows
@@ -254,13 +249,7 @@ value, marking the instant adds a competing focal point that carries no
 decision — an "interesting moment," like a peak, but without the peak's
 justification.
 
-**Every reversal has a window.** When the sampling steps over the band, the
-line between the two samples either side of the crossing still crosses it,
-and the window is measured on that line (§8.3). A window too narrow to
-draw as a run is not drawn. Slack has no duration: a short go-colour stroke
-centred on the zero instant marks it, with or without a window. The stroke's
-width is a rendering minimum, not a span of slack water. A current that never
-reaches zero has no slack. (Derived-gate presentation is specified in §9.)
+A true zero inside the sampled series is retained even when its window cannot be measured. A major-axis reversal with nonzero cross-flow need not enter the comfort window. A window too narrow to draw as a run is not drawn. Slack has no duration: a short go-colour stroke centred on the zero instant marks it, with or without a window. The stroke's width is a rendering minimum, not a span of slack water. A current that never reaches zero has no slack. (Derived-gate presentation is specified in §9.)
 
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
@@ -311,18 +300,7 @@ provider.
 ### 6.1 Green is one predicate everywhere
 
 The go colour means **slack**: the zero instant, shown with a short stroke.
-Blue, the curve's own colour, means **slack window**:
-`|v| ≤ effective threshold`, and the sign reverses inside this run. Both are
-the definitions from §2, and they are the same on the chart, the card,
-widget and the watch.
-
-Instantaneous speed under the threshold is **not** the window predicate. A
-surface that marks weak water as a window invites a transit through a pass
-that is not opening — the exact failure §2 exists to prevent, arriving
-through a surface that reimplemented the test. Any surface that shows either
-colour computes it from the shared window definition, never from a fresh
-comparison against the threshold. The map pin is the one instantaneous
-surface: it is green only at exactly zero and wears the ramp otherwise.
+Blue, the curve's own colour, means **slack window**: full current speed is at or below the effective threshold. The run can contain no true slack. Each surface uses SlackwaterKit's shared window calculation, while the map pin is green only at a true zero.
 
 Green is the only reserved meaning on the whole chart. Not "good", not "tide
 station", not "rising", and not the slack window.
@@ -583,7 +561,7 @@ reading.
 it" does not.* Until this is answered, a rotary station is better shown as a
 table than as a chart that implies an axis it does not have.
 
-What ships today: the strip stays rectilinear on the major axis, and the readings carry the vector. Speed and set come from the kit's minor-axis prediction on the bundled NOAA harmonic records that carry minor-axis constants. At a major-axis slack the lead reads `Slack` with the crossing flow beside it. The chart form stays open.
+What ships today: the strip stays rectilinear on the major axis, and the readings carry the vector. Speed and set come from the kit's minor-axis prediction on the bundled NOAA harmonic records that carry minor-axis constants. At a major-axis crossing with nonzero cross-flow the lead keeps the water's speed and direction without calling it slack. The chart form stays open.
 
 ---
 
