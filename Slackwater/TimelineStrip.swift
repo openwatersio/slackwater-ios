@@ -562,7 +562,7 @@ struct TimelineData {
         let start = chrome.start, end = chrome.end
 
         let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
-        let currentEvents = sampleEvents(onlinePoints).filter {
+        let currentEvents = currentEventsMatchingWater(onlinePoints, events: sampleEvents(onlinePoints)).filter {
             $0.time >= start.addingTimeInterval(-eventPad) && $0.time <= end.addingTimeInterval(eventPad)
         }
 
@@ -644,8 +644,8 @@ struct TimelineData {
         if let current {
             let s = current.engineStation
             currentPoints = s.speeds(from: start, to: end, step: 600)
-            currentEvents = s.events(from: start.addingTimeInterval(-pad),
-                                     to: end.addingTimeInterval(pad))
+            currentEvents = currentEventsMatchingWater(currentPoints, events: s.events(from: start.addingTimeInterval(-pad),
+                                     to: end.addingTimeInterval(pad)))
             (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
         }
         if let gate {

@@ -408,8 +408,7 @@ extension DerivedGateRecord {
     }
 }
 
-/// The card's runs: one window per slack from the SHARED `slackWindow`
-/// predicate against the effective threshold, merged where they touch.
+/// The card's full-speed comfort windows from SlackwaterKit.
 func cardWindows(points: [CurrentPoint], slacks: [Date], events: [CurrentEvent]? = nil, threshold: Double = slackThresholdKn) -> [WindowRun] {
     guard threshold > 0 else { return [] }
     let actual = events ?? slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
@@ -465,7 +464,7 @@ extension CurrentStationRecord {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = max(now.addingTimeInterval(StationCardGraph.forwardWindow), requestedEnd ?? now)
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
-        let events = s.events(from: start, to: end)
+        let events = currentEventsMatchingWater(raw, events: s.events(from: start, to: end))
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
@@ -499,7 +498,7 @@ extension ChsOnlineWindow {
         let tz = TimeZone(identifier: timezone) ?? .current
         let samples = points
         let raw = samples.filter { $0.time >= start && $0.time <= end }
-        let events = sampleEvents(samples).filter { $0.time >= start && $0.time <= end }
+        let events = currentEventsMatchingWater(raw, events: sampleEvents(samples).filter { $0.time >= start && $0.time <= end })
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },

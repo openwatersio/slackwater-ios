@@ -186,14 +186,18 @@ struct SlackWindowShortcutResult {
                      after now: Date = appNow()) -> SlackWindowShortcutResult? {
         guard let selected, case .current(let record, let engine) = selected,
               !slackWindowIsOff(slackThresholdKn) else { return nil }
-        let requestedEnd = now.addingTimeInterval(172_800 + 21_600)
+        let searchEnd = now.addingTimeInterval(172_800)
+        let requestedEnd = searchEnd.addingTimeInterval(21_600)
         let end = (engine as? ChsOnlineWindow).map { min(requestedEnd, $0.end) } ?? requestedEnd
-        var card = WidgetCard.build(selected, now: now, through: end)
-        guard let graph = card.graph, let first = graph.points.first, let last = graph.points.last else { return nil }
-        let points = engine.speeds(from: first.time, to: last.time, step: StationCardGraph.sampleStep)
-        let events = engine.events(from: first.time, to: last.time)
-        guard let window = currentWindows(points, events: events, threshold: slackThresholdKn).first(where: { $0.end > now }) else { return nil }
+        let start = now.addingTimeInterval(-StationCardGraph.backWindow)
+        guard end > start else { return nil }
+        let points = engine.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
+        let events = currentEventsMatchingWater(points, events: engine.events(from: start, to: end))
+        guard let window = currentWindows(points, events: events, threshold: slackThresholdKn)
+            .first(where: { $0.end > now && $0.start < searchEnd }), !points.isEmpty else { return nil }
         let slack = events.first { $0.kind == .slack && window.slackTimes.contains($0.time) }
+        let cardEnd = min(end, window.end.addingTimeInterval(21_600))
+        var card = WidgetCard.build(selected, now: now, through: cardEnd)
         let hasOpening = window.start > points[0].time
         let hasClosing = window.end < points[points.count - 1].time
         let focus = window.start > now ? window.start : now
@@ -268,7 +272,7 @@ extension SlackWindowShortcutQuery {
         guard let graph = card.graph else { return nil }
         guard let firstPoint = graph.points.first, let lastPoint = graph.points.last else { return nil }
         let points = engine.speeds(from: firstPoint.time, to: lastPoint.time, step: StationCardGraph.sampleStep)
-        let events = engine.events(from: firstPoint.time, to: lastPoint.time)
+        let events = currentEventsMatchingWater(points, events: engine.events(from: firstPoint.time, to: lastPoint.time))
         let windows: [SlackWindowShortcutResult] = currentWindows(points, events: events, threshold: slackThresholdKn)
             .filter { $0.start < day.end && $0.end > day.start }
             .map { window in
@@ -286,7 +290,7 @@ extension SlackWindowShortcutQuery {
         let name = record.name
         let answer = String(localized: "Slack windows at \(name) on \(date): \(times).", comment: "Siri answer listing current windows on a day. Values are place, localized date and a localized list of local time ranges.")
         card.graph?.highlight = first.hasOpeningBoundary && first.hasClosingBoundary
-            ? first.start...first.end : first.start...first.start
+            ? first.start...first.end : day.start...day.start
         return .init(windows: windows, spoken: answer, detail: nil, card: card)
     }
 }

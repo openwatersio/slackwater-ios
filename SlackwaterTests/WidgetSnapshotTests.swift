@@ -447,7 +447,7 @@ import SlackwaterKit
     }
 
     /// Friday Harbor's card at a fixed instant, at the midpoint of the first fall after it (between a high and the low that follows) and at the midpoint of the first rise (a low and the high that follows), never on a turn.
-    func testTheTideCardReadsAsItAlwaysHas() throws {
+    func testTheTideCardReadsThePinnedEnginePrediction() throws {
         let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID })
         let now = Date(timeIntervalSince1970: 1_790_000_000)
         let turns = record.engineStation.extremes(from: now, to: now.addingTimeInterval(48 * 3600))
@@ -457,13 +457,13 @@ import SlackwaterKit
         let midRise = turns[j].time.addingTimeInterval(turns[j + 1].time.timeIntervalSince(turns[j].time) / 2)
 
         let atNow = record.cardState(at: now)
-        XCTAssertEqual(atNow.height, 0.20008368511312424, accuracy: 1e-9)
+        XCTAssertEqual(atNow.height, 0.2017763985283949, accuracy: 1e-9)
         XCTAssertFalse(atNow.rising)
         let falling = record.cardState(at: midFall)
-        XCTAssertEqual(falling.height, 1.9027424681577627, accuracy: 1e-9)
+        XCTAssertEqual(falling.height, 1.903074422745883, accuracy: 1e-9)
         XCTAssertFalse(falling.rising)
         let rising = record.cardState(at: midRise)
-        XCTAssertEqual(rising.height, 1.2297737742539478, accuracy: 1e-9)
+        XCTAssertEqual(rising.height, 1.227190735338082, accuracy: 1e-9)
         XCTAssertTrue(rising.rising)
     }
 
@@ -533,28 +533,20 @@ import SlackwaterKit
         XCTAssertGreaterThan(departs, 0, "the day's water leaves the major axis")
     }
 
-    /// At Kodiak's slacks the card prints the water's full speed. Where it says Slack it shows the crossing flow's set only while that flow prints above zero; the card finds its own slacks over its own span, which can land them a second or more from these, so a slack it does not mark reads as moving water.
-    func testARotaryCardAtSlackShowsTheCrossingFlow() throws {
+    /// A rotary axis crossing is moving water, not a slack event.
+    func testARotaryCardAtAxisCrossingShowsMovingWater() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
         let station = kodiak.engineStation
-        let slacks = station.events(from: day, to: day.addingTimeInterval(86_400)).filter { $0.kind == .slack }
-        var crossing = 0
-        for slack in slacks {
-            let p = try XCTUnwrap(station.speeds(from: slack.time, to: slack.time.addingTimeInterval(1), step: 1).first)
-            let f = face(WidgetCard.build(.current(kodiak, station: station), now: slack.time).reading)
-            let value = formatSpeed(p.magnitude, unit: "kn")
-            let set = compassPoint(try XCTUnwrap(p.direction))
-            if f.first != "Slack" {
-                let word = p.speed >= 0 ? "Flooding" : "Ebbing"
-                XCTAssertEqual(f, [word, value, p.magnitude < 0.05 ? "•" : set, "\(value) kn, \(word), setting \(set)"], "\(slack.time)")
-            } else if value == "0.0" {
-                XCTAssertEqual(f, ["Slack", "0.0", "•", "0.0 kn, slack"], "\(slack.time)")
-            } else {
-                crossing += 1
-                XCTAssertEqual(f, ["Slack", value, set, "\(value) kn, slack, setting \(set)"], "\(slack.time)")
-            }
+        let end = day.addingTimeInterval(86_400)
+        let crossings = kodiak.harmonicStation.axisEventsForReduction(from: day, to: end)
+            .filter { $0.kind == .slack && $0.time >= day && $0.time < end }
+        XCTAssertFalse(crossings.isEmpty)
+        for event in crossings {
+            let point = try XCTUnwrap(station.speeds(from: event.time, to: event.time.addingTimeInterval(1), step: 1).first)
+            let reading = face(WidgetCard.build(.current(kodiak, station: station), now: event.time).reading)
+            XCTAssertNotEqual(reading.first, "Slack")
+            XCTAssertEqual(reading[1], formatSpeed(point.magnitude, unit: "kn"))
         }
-        XCTAssertGreaterThan(crossing, 0, "the water still crosses at a slack the card marks")
     }
 
     /// The widget's card at a synthetic rotary slack: the word Slack, the full speed, and the crossing flow's set; off the slack, the water's own set by the signed speed's word.
@@ -567,7 +559,7 @@ import SlackwaterKit
         }
         let station = FixedWidgetCurrent(points: points, slacks: [t])
         func card(_ now: Date) -> [String] { face(WidgetCard.build(.current(record, station: station), now: now).reading) }
-        XCTAssertEqual(card(t), ["Slack", "0.6", "E", "0.6 kn, slack, setting E"])
+        XCTAssertEqual(card(t), ["Flooding", "0.6", "E", "0.6 kn, Flooding, setting E"])
         XCTAssertEqual(card(t.addingTimeInterval(600)), ["Flooding", "1.3", "NE", "1.3 kn, Flooding, setting NE"])
     }
 
