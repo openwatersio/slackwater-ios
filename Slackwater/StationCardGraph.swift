@@ -410,8 +410,10 @@ extension DerivedGateRecord {
 
 /// The card's runs: one window per slack from the SHARED `slackWindow`
 /// predicate against the effective threshold, merged where they touch.
-func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [WindowRun] {
-    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
+func cardWindows(points: [CurrentPoint], slacks: [Date], events: [CurrentEvent]? = nil, threshold: Double = slackThresholdKn) -> [WindowRun] {
+    guard threshold > 0 else { return [] }
+    let actual = events ?? slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
+    return currentWindows(points, events: actual, threshold: threshold).map { WindowRun(start: $0.start, end: $0.end) }
 }
 
 /// The slack inside the card's windows at `threshold`, measured the same way.
@@ -484,7 +486,7 @@ extension CurrentStationRecord {
             includesZero: true,
             uncertain: tilde,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
+            windows: cardWindows(points: raw, slacks: slackTimes, events: events, threshold: threshold),
             cores: cardCores(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
@@ -515,7 +517,7 @@ extension ChsOnlineWindow {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
+            windows: cardWindows(points: raw, slacks: slackTimes, events: events, threshold: threshold),
             cores: cardCores(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
