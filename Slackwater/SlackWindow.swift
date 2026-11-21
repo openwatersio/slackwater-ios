@@ -49,16 +49,14 @@ func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
     0
 }
 
-/// Each slack's window at `threshold` and its slack core, measured on the same
-/// samples with SlackwaterKit's `slackWindow`. A core lies inside its window; a
-/// slack outside the samples has neither.
-func measureSlacks(_ points: [CurrentPoint], slacks: [Date], threshold: Double)
+/// Full-speed comfort windows from SlackwaterKit, with true slack instants kept separate.
+func measureSlacks(_ points: [CurrentPoint], events: [CurrentEvent], threshold: Double)
     -> (windows: [(slack: Date, start: Date, end: Date)], cores: [(slack: Date, start: Date, end: Date)]) {
-    let core = slackCoreThresholdKn(threshold)
-    func measure(_ at: Double) -> [(slack: Date, start: Date, end: Date)] {
-        slacks.compactMap { t in slackWindow(points, around: t, threshold: at).map { (slack: t, start: $0.start, end: $0.end) } }
+    guard threshold > 0 else { return ([], []) }
+    let windows = currentWindows(points, events: events, threshold: threshold).map { window in
+        (slack: window.slackTimes.first ?? window.start, start: window.start, end: window.end)
     }
-    return (measure(threshold), measure(core))
+    return (windows, [])
 }
 
 /// Touching windows share a drawn run; a run spanning several slacks names their exact times (current-charts §4).

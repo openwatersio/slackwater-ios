@@ -142,10 +142,11 @@ struct TimelineChunk {
             let padded = s.speeds(from: start.addingTimeInterval(-pad),
                                   to: end.addingTimeInterval(pad), step: 600)
             currentPoints = padded.filter { inSpan($0.time) }
-            currentEvents = s.events(from: start.addingTimeInterval(-pad),
-                                     to: end.addingTimeInterval(pad)).filter { inSpan($0.time) }
-            (windows, cores) = measureSlacks(padded, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
-                                             threshold: threshold)
+            let paddedEvents = s.events(from: start.addingTimeInterval(-pad), to: end.addingTimeInterval(pad))
+            currentEvents = paddedEvents.filter { inSpan($0.time) }
+            let measured = measureSlacks(padded, events: paddedEvents, threshold: threshold)
+            windows = measured.windows.filter { $0.end >= start && $0.start < end }
+            cores = measured.cores.filter { $0.end >= start && $0.start < end }
         case .gate(let record):
             let g = record.engineGate
             let slacks = g.slacks(from: start.addingTimeInterval(-Self.gateSlackPad),
@@ -223,8 +224,9 @@ extension TimelineData {
         let currentEvents = dedupeEvents(chunks.flatMap(\.currentEvents))
         // A boundary slack caught by both neighbouring chunks is measured twice.
         func dedupeWindows(_ all: [(slack: Date, start: Date, end: Date)]) -> [(slack: Date, start: Date, end: Date)] {
-            all.enumerated().filter { i, w in
-                i == 0 || w.slack.timeIntervalSince(all[i - 1].slack) >= 2
+            let sorted = all.sorted { $0.slack < $1.slack }
+            return sorted.enumerated().filter { i, w in
+                i == 0 || w.slack.timeIntervalSince(sorted[i - 1].slack) >= 2
             }.map(\.element)
         }
         let windows = dedupeWindows(chunks.flatMap(\.slackWindows))

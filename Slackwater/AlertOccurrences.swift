@@ -41,13 +41,11 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
-    let slacks = station.events(from: start, to: stop).filter { $0.kind == .slack }.map(\.time)
-    let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
-    let opened: [(event: Date, end: Date?)] = runs.map { ($0.start, $0.end) }
-    let uncovered: [(event: Date, end: Date?)] = slacks
-        .filter { t in !runs.contains { $0.contains(t) } }
-        .map { ($0, nil) }
-    return (opened + uncovered).sorted { $0.event < $1.event }
+    let events = station.events(from: start, to: stop)
+    return currentWindows(points, events: events, threshold: threshold).map { window in
+        (event: window.start, end: window.start == window.end ? nil : window.end)
+    }
+
 }
 
 /// One dated event a rule found (docs/alerts.md §4).
