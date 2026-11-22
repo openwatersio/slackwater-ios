@@ -4,6 +4,7 @@
 // failed station re-queues it.
 import XCTest
 import Combine
+import SlackwaterKit
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
@@ -893,6 +894,14 @@ final class ChsQueueTests: XCTestCase {
 
         XCTAssertEqual(downloads.jobIDs, [port.id, derived.reference])
         XCTAssertEqual(downloads.online.map(\.id), [online.id])
+    }
+
+    @MainActor
+    func testAutoFitNeverQueuesCurrentWithAnUnvalidatedRecipe() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { !$0.isOnline })
+        let jobs = ChsFitService.autoFitSet(lat: gate.latitude, lon: gate.longitude)
+        let gates = Dictionary(uniqueKeysWithValues: ChsCurrentGateInfo.all.map { ($0.id, $0) })
+        XCTAssertTrue(jobs.filter(\.isCurrent).allSatisfy { gates[$0.id]?.recipe == ChsCurrentFit.stamp })
     }
 
     @MainActor

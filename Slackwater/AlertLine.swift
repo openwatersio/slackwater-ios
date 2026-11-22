@@ -69,11 +69,9 @@ let alertOnceReach: TimeInterval = 6 * 3_600
 /// Where the strip marks an alert: the event of each occurrence of the station's enabled rules
 /// inside the query, one per minute however many rules share it. Resolved against the bundled
 /// record, the way the Rest tap resolves (`alertNextOccurrence`). A `once` rule is resolved
-/// over the reach either side of its own minute, whatever the query: `alertOccurrences`
-/// filters to its range before it picks the occurrence nearest the minute, so a range cut
-/// short of the one meant would hand the rule to a neighbour inside the range, where a press
-/// sat well off its event (a current strip parks on the slack while the occurrence is the
-/// window's opening). The moment it finds may lie outside the query; the strip clips.
+/// over the reach either side of its own minute, whatever the query. The occurrence is selected
+/// before the range filter, so rescheduling cannot retarget it to a later event. The moment it
+/// finds may lie outside the strip's query; the strip clips.
 func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
     let mine = rules.filter { $0.stationID == stationID && $0.enabled }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }

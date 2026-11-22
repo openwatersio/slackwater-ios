@@ -49,7 +49,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var id = UUID()
     var stationID: String        // a concrete catalog id, never a location sentinel
     var trigger: AlertTrigger
-    /// Set: only the occurrence at this instant, and the rule expires once it passes.
+    /// Set: one occurrence near this instant; the rule expires after both have passed.
     var once: Date?
     /// Seconds before the event that the notification fires. Zero by default: the calendar's
     /// throwaway rules (§5.1) are rules with no lead, and the alert sheet starts a new rule at
@@ -77,7 +77,7 @@ enum AlertTrigger: Codable, Equatable {
   no window contains it. A press on a current strip can be later than the window opening, and a
   press on the curve can name a minute the rounded height crosses a little before or after. If the
   selected opening has already passed, rescheduling does not retarget a later window. The
-  reschedule drops the rule once the instant is past. Unset, the rule watches every occurrence of
+  reschedule drops the rule once the instant and its resolved event are past. Unset, the rule watches every occurrence of
   its trigger. Copy comes from `trigger` either way, so nothing stores a rendered string.
 - A sentence makes the same two kinds of rule. "The next low tide" is a `once` rule on the first
   occurrence the sentence describes; "every low tide" is the rule without `once`. The sentence is
@@ -366,7 +366,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
-- Rules whose `once` is in the past are removed.
+- Once rules are removed when their stored instant is past and no resolved event remains ahead.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
 calendar turned on or off; the slack threshold changing; `PremiumStore.isPremium` changing; a CHS
@@ -661,8 +661,8 @@ No engine or Almanac version change.
   the first upcoming opening agrees with `SlackWindowShortcutQuery.next` when Siri is not reporting an already-open window; crossings interpolate and respect
   direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.
-- `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
-  drops the rule then; clearing `once` makes the same rule repeat.
+- `once` — one occurrence selected from the pressed minute; the reschedule removes the rule after
+  the minute and resolved event have passed. Clearing `once` makes the same rule repeat.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
   free plan keeps every subscribed calendar and no notifications. The activity candidates are
   the notification list's short-lead subset in fire order, none without Premium; the sweep ends

@@ -210,7 +210,7 @@ final class ChsFitService: ObservableObject {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: false,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: tideFitDays)
         }
-        jobs += ChsCurrentGateInfo.all.filter { !$0.isOnline }.map {
+        jobs += ChsCurrentGateInfo.all.filter { !$0.isOnline && $0.recipe == ChsCurrentFit.stamp }.map {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: true,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: $0.fitDays)
         }
@@ -1132,7 +1132,7 @@ final class ChsFitService: ObservableObject {
 
     /// The fast answer landed: publish it, keep the job queued (it is not done).
     private func publishProvisional(_ gate: ChsCurrentGateInfo, _ model: ChsModel) {
-        guard (try? ChsModelStore.saveCurrent(model)) != nil else { return }
+        guard gate.usableModel(model) != nil, (try? ChsModelStore.saveCurrent(model)) != nil else { return }
         currentRecords[gate.id] = gate.record(with: model)
         provisional.insert(gate.id)
         modelRevision += 1
@@ -1255,8 +1255,15 @@ final class ChsFitService: ObservableObject {
 
     private nonisolated func land(_ model: ChsModel, for job: ChsJob) async throws {
         try Task.checkCancellation()
-        if job.isCurrent { try ChsModelStore.saveCurrent(model) }
-        else { try ChsModelStore.save(model) }
+        if job.isCurrent {
+            let valid = await MainActor.run {
+                ChsCurrentGateInfo.all.first { $0.id == job.id }?.usableModel(model) != nil
+            }
+            guard valid else { throw ChsError.permanent("Current model does not match the validated recipe") }
+            try ChsModelStore.saveCurrent(model)
+        } else {
+            try ChsModelStore.save(model)
+        }
         await MainActor.run {
             if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
                 self.currentRecords[job.id] = gate.record(with: model)
