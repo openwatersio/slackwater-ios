@@ -1999,6 +1999,21 @@ private struct FoldPageTestHarness: View {
             .allSatisfy { e in d.snapTimes.contains { abs($0.timeIntervalSince(e.time)) < 1 } })
     }
 
+    func testOnlineWindowUsesSamplesBeyondTheVisibleEdge() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let tz = TimeZone(secondsFromGMT: 0)!
+        let end = Timeline.window(anchor: now).end
+        let points = (-12...12).map { index in
+            CurrentPoint(time: end.addingTimeInterval(Double(index) * 600),
+                         speed: abs(index) < 6 ? 0.1 : 1)
+        }
+        let timeline = TimelineData.build(onlinePoints: points, tz: tz, lat: 48.5, lon: -123,
+                                          now: now, anchor: now, threshold: 0.5)
+        let window = try XCTUnwrap(timeline.slackWindows.first)
+        XCTAssertGreaterThan(window.end, timeline.end)
+        XCTAssertFalse(timeline.snapTimes.contains(timeline.end))
+    }
+
     /// A window ending exactly on a slack sample must not trap (the post-loop
     /// run close sees an empty run) — and the zero still reads as the slack.
     func testSampleEventsTrailingZero() {

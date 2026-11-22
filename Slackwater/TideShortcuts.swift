@@ -289,8 +289,9 @@ extension SlackWindowShortcutQuery {
         let date = shortcutDate(day.start, in: record.tz)
         let name = record.name
         let answer = String(localized: "Slack windows at \(name) on \(date): \(times).", comment: "Siri answer listing current windows on a day. Values are place, localized date and a localized list of local time ranges.")
+        let focus = first.hasOpeningBoundary ? first.start : day.start
         card.graph?.highlight = first.hasOpeningBoundary && first.hasClosingBoundary
-            ? first.start...first.end : day.start...day.start
+            ? first.start...first.end : focus...focus
         return .init(windows: windows, spoken: answer, detail: nil, card: card)
     }
 }

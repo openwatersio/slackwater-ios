@@ -571,9 +571,9 @@ struct TimelineData {
         // so a sub-threshold window measured off it would be fiction (gutter
         // spec §3). These are fetched OFFICIAL samples — real velocities, just
         // downloaded rather than computed — so the window means exactly what it
-        // means at a harmonic station. Same computation, same series the strip
-        // draws.
-        let (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
+        // means at a harmonic station. Use the fetched coverage so a window
+        // crossing the visible edge keeps its observed boundary.
+        let (windows, cores) = measureSlacks(onlinePoints, events: currentEvents, threshold: threshold)
 
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
@@ -647,7 +647,7 @@ struct TimelineData {
             currentPoints = padded.filter { $0.time >= start && $0.time <= end }
             currentEvents = currentEventsMatchingWater(padded, events: s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad)))
-            (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
+            (windows, cores) = measureSlacks(padded, events: currentEvents, threshold: threshold)
         }
         if let gate {
             let g = gate.engineGate
