@@ -192,7 +192,10 @@ final class FillField: Sendable {
                 let amplitude = r.f16()
                 let phase = r.f16()
                 if let name = idToName[Int(id)] {
-                    out.append(HarmonicConstituent(name: name, amplitude: amplitude, phase: phase))
+                    // Format 1 was fitted with the engine's former M3/S3/M7 arguments.
+                    let shift = ["M3", "S3", "M7"].contains(name) ? 180.0 : 0.0
+                    out.append(HarmonicConstituent(name: name, amplitude: amplitude,
+                                                   phase: (phase + shift).truncatingRemainder(dividingBy: 360)))
                 }
             }
             return out

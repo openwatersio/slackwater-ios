@@ -1332,7 +1332,7 @@ final class ChsFitService: ObservableObject {
             stationID: info.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
             fitEndMs: end.timeIntervalSince1970 * 1000,
-            offset: fit.offset, rms: fit.rms, constituents: fit.constituents)
+            offset: fit.offset, rms: fit.rms, constituents: translatedLegacyTidePhases(fit.constituents))
     }
 
     /// wcsp1+wcdp1 over the gate's OWN validated window, projected onto the CHS

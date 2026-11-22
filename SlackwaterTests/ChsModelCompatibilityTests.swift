@@ -17,6 +17,17 @@ final class ChsModelCompatibilityTests: XCTestCase {
                  constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
     }
 
+    func testTideModelPhaseConventionRoundTripsAcrossVersions() throws {
+        let old = [Con(name: "M3", amplitude: 1, phase: 350), Con(name: "M2", amplitude: 2, phase: 12)]
+        let translated = translatedLegacyTidePhases(old)
+        XCTAssertEqual(translated.map(\.phase), [170, 12])
+        XCTAssertEqual(translatedLegacyTidePhases(translated).map(\.phase), [350, 12])
+        let info = try XCTUnwrap(ChsStationInfo.all.first)
+        let model = ChsModel(stationID: info.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                             fitStartMs: 0, fitEndMs: 1, offset: 0, rms: 0, constituents: old)
+        XCTAssertEqual(info.record(with: model).constituents.map(\.phase), [170, 12])
+    }
+
     func testOnlyMeasuredWindowsAreUsable() {
         XCTAssertNotNil(gate().usableModel(model()))
         XCTAssertNotNil(gate().usableModel(model(days: 60)))
