@@ -193,7 +193,7 @@ struct AlertSheet: View {
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .waitingForStation {
-                        Text("Waiting for station data")
+                        Text("Waiting for station data", comment: "Alert sheet status when the selected station's predictions are not available yet.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .unavailable {

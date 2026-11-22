@@ -1,6 +1,11 @@
 // Slackwater — GPL v3. Runs the alert pipeline — rules → occurrences → plan → writers — on launch and on every change (docs/alerts.md §6).
 import Foundation
 
+/// A detached resolution is valid only for rules that still match its snapshot.
+func unchangedResolvedRules(_ snapshot: [AlertRule], current: [AlertRule]) -> [AlertRule] {
+    snapshot.filter { current.contains($0) }
+}
+
 /// One planned delivery with everything a writer needs.
 struct AlertEntry {
     /// Which station's calendar this belongs in.
@@ -147,7 +152,8 @@ struct AlertStatusSnapshot: Equatable {
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved))
         for id in expired { AlertRuleStore.shared.remove(id) }
-        let rules = storedRules.filter { !expired.contains($0.id) }
+        let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
+            .filter { !expired.contains($0.id) }
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
                                 calendarOccurrences: resolved.calendarOccurrences,
                                 now: now, premium: premium, premiumEnds: premiumEnds)

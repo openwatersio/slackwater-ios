@@ -5,6 +5,16 @@ import XCTest
 final class AlertResolveTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_755_800_000)
 
+    func testDeliveryUsesOnlyRulesUnchangedDuringResolution() {
+        let kept = AlertRule(stationID: "kept", trigger: .slack)
+        let deleted = AlertRule(stationID: "deleted", trigger: .slack)
+        let edited = AlertRule(stationID: "edited", trigger: .slack)
+        var disabled = edited
+        disabled.enabled = false
+        let added = AlertRule(stationID: "added", trigger: .slack)
+        XCTAssertEqual(unchangedResolvedRules([kept, deleted, edited], current: [kept, disabled, added]), [kept])
+    }
+
     func testResolveNamesPlacesAndReportsUnknownStations() {
         let good = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: true))
         let unknown = AlertRule(stationID: "noaa/does-not-exist", trigger: .tideExtreme(high: true))
