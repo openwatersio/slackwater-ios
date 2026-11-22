@@ -10,3 +10,5 @@ node tools/chs-reference/capture.mjs /path/to/engine/packages/engine/dist/index.
 ```
 
 The first command captures the frozen bundle in `chs-fit-golden.json`. The second captures the built `@slackwater/engine` package in `chs-fit-parity.json`; build the engine from openwatersio/slackwater#341 first. Both files live in `SlackwaterTests/Fixtures`. The tests compare native coefficients tightly with the per-sample TS reference and compare held-out prediction error with the frozen CHS baseline. Do not regenerate the baseline from the new fitter.
+
+The committed JavaScript fitter uses the pre-Schureman M3, S3 and M7 phase convention. FitValidation translates those constituents before evaluating them with the current engine; newly captured fixtures must record their source convention.

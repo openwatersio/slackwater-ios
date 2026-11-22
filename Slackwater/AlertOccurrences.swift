@@ -38,17 +38,21 @@ func tideCrossings(_ samples: [(time: Date, height: Double)], level: Double, ris
 /// covers (`end == nil`). Series and events are padded 6 h beyond the range so a window
 /// straddling either end is whole; the caller clips to the range.
 func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
-                         threshold: Double) -> [(event: Date, end: Date?)] {
+                         threshold: Double) -> [(event: Date, end: Date?, noWindow: Bool, observedThrough: Date?)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
     let events = currentEventsMatchingWater(points, events: station.events(from: start, to: stop))
     let windows = currentWindows(points, events: events, threshold: threshold)
-    let openings: [(event: Date, end: Date?)] = windows.map { window in
-        (event: window.start, end: window.start == window.end ? nil : window.end)
+    let openings: [(event: Date, end: Date?, noWindow: Bool, observedThrough: Date?)] = windows.compactMap { window in
+        if window.start == window.end {
+            return window.slackTimes.isEmpty ? nil : (window.start, nil, true, nil)
+        }
+        let closing = window.end == points.last?.time ? nil : window.end
+        return (window.start, closing, false, closing == nil ? points.last?.time : nil)
     }
-    let uncovered: [(event: Date, end: Date?)] = events.filter { event in
+    let uncovered: [(event: Date, end: Date?, noWindow: Bool, observedThrough: Date?)] = events.filter { event in
         event.kind == .slack && !windows.contains { $0.start <= event.time && event.time <= $0.end }
-    }.map { (event: $0.time, end: nil) }
+    }.map { (event: $0.time, end: nil, noWindow: true, observedThrough: nil) }
     return (openings + uncovered).sorted { $0.event < $1.event }
 }
 
@@ -104,25 +108,31 @@ extension WidgetRecord {
 func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
                       from: Date, to: Date, threshold: Double) -> [AlertOccurrence] {
     var found: [(event: Date, end: Date?, noWindow: Bool, heightM: Double?)]
+    var observedThrough: [Date: Date] = [:]
+    let searchFrom = rule.once.map { min(from, $0.addingTimeInterval(-21_600)) } ?? from
+    let searchTo = rule.once.map { max(to, $0.addingTimeInterval(21_600)) } ?? to
 
     switch (rule.trigger, station) {
     case (.slackWindowOpens, .current(let s, _, _)):
-        found = slackWindowOpenings(s, from: from, to: to, threshold: threshold)
-            .map { (event: $0.event, end: $0.end, noWindow: $0.end == nil, heightM: nil) }
+        let openings = slackWindowOpenings(s, from: searchFrom, to: searchTo, threshold: threshold)
+        observedThrough = Dictionary(openings.compactMap { opening in
+            opening.observedThrough.map { (alertMinute(opening.event), $0) }
+        }, uniquingKeysWith: max)
+        found = openings.map { (event: $0.event, end: $0.end, noWindow: $0.noWindow, heightM: nil) }
     case (.currentPeak(let flood), .current(let s, _, _)):
-        found = s.events(from: from, to: to)
+        found = s.events(from: searchFrom, to: searchTo)
             .filter { $0.kind == (flood ? .maxFlood : .maxEbb) }
             .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
     case (.slack, .derived(let g, _, _)):
-        found = g.slacks(from: from, to: to)
+        found = g.slacks(from: searchFrom, to: searchTo)
             .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
     case (.tideExtreme(let high, let ofDay), .tide(let s, let tz, _)):
         var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
         // A day's rank needs the whole station day, 23 to 25 hours long, so that query runs
         // midnight to midnight. The plain query stays as asked.
         let span = ofDay == true
-            ? cal.startOfDay(for: from)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: to)) ?? to)
-            : from...to
+            ? cal.startOfDay(for: searchFrom)...(cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: searchTo)) ?? to)
+            : searchFrom...searchTo
         var extremes = s.extremes(from: span.lowerBound, to: span.upperBound)
             .filter { $0.kind == (high ? .high : .low) }
         if ofDay == true {
@@ -132,12 +142,12 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         }
         found = extremes.map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
     case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
-        let samples = s.heights(from: alertSampleGrid(from), to: to, step: 600).map { (time: $0.time, height: $0.height) }
+        let samples = s.heights(from: alertSampleGrid(searchFrom), to: searchTo, step: 600).map { (time: $0.time, height: $0.height) }
         found = tideCrossings(samples, level: level, rising: rising)
             .map { (event: $0, end: nil, noWindow: false, heightM: level) }
     case (.eclipse, _):
         guard let observer = try? Observer(latitudeDeg: position.lat, longitudeDeg: position.lon) else { return [] }
-        found = visibleEclipses(from: from, to: to, observer: observer)
+        found = visibleEclipses(from: searchFrom, to: searchTo, observer: observer)
             .map { (event: $0.start, end: nil, noWindow: false, heightM: nil) }
     default:
         // The trigger doesn't apply to this kind of station (spec §8).
@@ -153,7 +163,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
             abs(o.event.timeIntervalSince(minute))
         }
         let containing = rule.trigger == .slackWindowOpens
-            ? found.first { $0.event <= minute && $0.end.map { minute < $0 } == true } : nil
+            ? found.first { $0.event <= minute && ($0.end ?? observedThrough[$0.event]).map { minute < $0 } == true } : nil
         if let selected = containing ?? found.min(by: { distance($0) < distance($1) }),
            containing != nil || distance(selected) <= 6 * 3600 {
             found = [selected]
@@ -172,8 +182,8 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     }
 }
 
-/// `once` rules whose moment has passed. Their notification, if it had one, fired at
-/// `event − lead` and is long gone; the rule is what is left to clear (spec §6).
-func expiredRules(_ rules: [AlertRule], now: Date) -> [UUID] {
-    rules.filter { ($0.once ?? .distantFuture) < now }.map(\.id)
+/// Once rules expire after both the selected moment and its resolved event have passed.
+func expiredRules(_ rules: [AlertRule], now: Date, occurrences: [AlertOccurrence] = []) -> [UUID] {
+    let upcoming = Set(occurrences.filter { $0.event >= now }.map(\.ruleID))
+    return rules.filter { ($0.once ?? .distantFuture) < now && !upcoming.contains($0.id) }.map(\.id)
 }

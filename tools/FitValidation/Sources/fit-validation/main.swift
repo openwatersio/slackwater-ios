@@ -60,6 +60,15 @@ struct FitOut: Decodable {
     let constituents: [Con]
     let unseparable: [String]
 }
+// TODO(#943): Remove when the frozen fitter emits the current phase convention.
+func engineConstituents(_ constituents: [FitOut.Con]) -> [HarmonicConstituent] {
+    constituents.map { constituent in
+        let shift = ["M3", "S3", "M7"].contains(constituent.name) ? 180.0 : 0.0
+        return HarmonicConstituent(name: constituent.name, amplitude: constituent.amplitude,
+                                   phase: (constituent.phase + shift).truncatingRemainder(dividingBy: 360))
+    }
+}
+
 struct Obs { let time: Date; let kind: CurrentEventKind; let speed: Double }
 
 /// IwlsEvent -> Obs, shared by live IWLS fetch and file-input mode (both
@@ -166,7 +175,7 @@ func runFit(name: String, flood: Double, ebb: Double,
                                   atomically: true, encoding: .utf8)
 
         let engine = CurrentStation(
-            constituents: fit.constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
+            constituents: engineConstituents(fit.constituents),
             floodDirection: flood, ebbDirection: ebb, offset: fit.offset)
         let predicted = engine.events(from: valStart.addingTimeInterval(-dayS / 2),
                                       to: valEnd.addingTimeInterval(dayS / 2))

@@ -373,6 +373,15 @@ import SlackwaterKit
                                         from: now, to: week, threshold: 0.5), [])
     }
 
+    func testOnceRuleDoesNotExpireBeforeItsResolvedEvent() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        let future = AlertOccurrence(ruleID: rule.id, event: now.addingTimeInterval(3600),
+                                     fire: now.addingTimeInterval(1800))
+        XCTAssertTrue(expiredRules([rule], now: now, occurrences: [future]).isEmpty)
+        XCTAssertEqual(expiredRules([rule], now: now.addingTimeInterval(7200), occurrences: [future]), [rule.id])
+    }
+
     func testExpiryTakesOnlyOnceRulesWhoseMomentHasPassed() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let repeating = AlertRule(stationID: "a", trigger: .slack)

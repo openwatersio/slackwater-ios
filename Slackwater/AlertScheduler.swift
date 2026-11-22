@@ -131,10 +131,7 @@ struct AlertStatusSnapshot: Equatable {
 
     private func runPass(now: Date) async {
         _ = ChsFitService.shared
-        for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
-            AlertRuleStore.shared.remove(id)
-        }
-        let rules = AlertRuleStore.shared.rules
+        let storedRules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium
         let premiumEnds = PremiumStore.shared.hasPurchased ? nil : FreeDayStore.shared.current?.end
@@ -145,8 +142,11 @@ struct AlertStatusSnapshot: Equatable {
         let stopped = Set(stored.map(\.stationID)).subtracting(subscriptions)
 
         let resolved = await Task.detached(priority: .utility) {
-            resolveAlerts(rules, subscriptions: subscriptions, now: now, threshold: threshold)
+            resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
+        let expired = Set(expiredRules(storedRules, now: now, occurrences: resolved.occurrences))
+        for id in expired { AlertRuleStore.shared.remove(id) }
+        let rules = storedRules.filter { !expired.contains($0.id) }
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
                                 calendarOccurrences: resolved.calendarOccurrences,
                                 now: now, premium: premium, premiumEnds: premiumEnds)

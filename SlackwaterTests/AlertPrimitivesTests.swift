@@ -46,6 +46,22 @@ final class AlertPrimitivesTests: XCTestCase {
         }
     }
 
+    private struct FakePeaks: CurrentPredicting {
+        let peaks: [Date]
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] { [] }
+        func events(from: Date, to: Date) -> [CurrentEvent] {
+            peaks.filter { from <= $0 && $0 <= to }.map { CurrentEvent(time: $0, speed: 1, kind: .maxFlood) }
+        }
+    }
+
+    func testOncePeakDoesNotRetargetAfterItsEventPassed() {
+        let station = FakePeaks(peaks: [at(3600), at(5 * 3600)])
+        let rule = AlertRule(stationID: "current:test", trigger: .currentPeak(flood: true), once: at(2 * 3600))
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(3 * 3600), to: at(6 * 3600), threshold: 0.5)
+        XCTAssertTrue(found.isEmpty)
+    }
+
     func testOnceInsideLongWindowSelectsItsOpening() {
         let speeds: [Double] = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 0.1, 0.1]
         let points = speeds.enumerated().map {
@@ -81,6 +97,41 @@ final class AlertPrimitivesTests: XCTestCase {
         let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
                                      position: (0, 0), from: at(2 * 3600), to: at(7 * 3600), threshold: 0.5)
         XCTAssertTrue(found.isEmpty)
+    }
+
+    func testOnceInsideLongWindowWithUnknownCloseFindsOpening() {
+        let speeds: [Double] = [1] + Array(repeating: 0.1, count: 11)
+        let points = speeds.enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: at(9 * 3600))
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(0), to: at(10 * 3600), threshold: 0.5)
+        XCTAssertEqual(found.count, 1)
+        XCTAssertNil(found.first?.end)
+    }
+
+    func testThresholdTouchWithoutSlackDoesNotCreateSlackAlert() {
+        let points = [1.0, 0.5, 1.0].enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let found = slackWindowOpenings(station, from: at(0), to: at(1200), threshold: 0.5)
+        XCTAssertTrue(found.isEmpty)
+    }
+
+    func testWindowBeyondPredictionCoverageHasNoInventedClosing() throws {
+        let points = [1.0, 0.1, 0.1].enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(0), to: at(3600), threshold: 0.5)
+        let window = try XCTUnwrap(found.first)
+        XCTAssertNil(window.end)
+        XCTAssertFalse(window.noWindow)
     }
 
     func testMergedWindowsOpenOnceAndAFastReversalOpensItsOwn() {
