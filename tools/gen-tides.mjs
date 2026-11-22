@@ -707,7 +707,7 @@ const tcdb = buildDatabase(stations.map((b) => ({
   quality: rawById.get(b.id).quality?.seasonal_dominant ? { seasonal_dominant: true } : undefined,
   harmonic_constituents: b.constituents,
   datums: b.reference ? {} : rawById.get(b.id).datums,
-})), { version: databaseVersion, credits: await sourceCredits(db.all) });
+})), { version: databaseVersion, credits: await sourceCredits(db.all), constituents: db.constituents });
 writeFileSync(join(here, "..", "Slackwater", "Resources", "stations.tcdb"), tcdb);
 
 const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
