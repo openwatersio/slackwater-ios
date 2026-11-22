@@ -174,7 +174,12 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         }
         let containing = rule.trigger == .slackWindowOpens
             ? found.first { $0.event <= minute && ($0.end ?? observedThrough[$0.event]).map { minute < $0 } == true } : nil
-        if let selected = containing ?? found.min(by: { distance($0) < distance($1) }),
+        let nextWindow = rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
+            ? found.filter { $0.event >= minute }.min(by: { $0.event < $1.event }) : nil
+        let nearest = found.min(by: { distance($0) < distance($1) })
+        let candidate = rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
+            ? containing ?? nextWindow : nearest
+        if let selected = candidate,
            containing != nil || distance(selected) <= 6 * 3600 {
             found = [selected]
         } else {

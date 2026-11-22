@@ -73,8 +73,8 @@ enum AlertTrigger: Codable, Equatable {
 - A rule names a place the user chose. Rules are created from a detail view, whose station id is
   always concrete, so a rule never follows Current Location.
 - **`once` is the whole difference between the sheet's repeat choices (§7.2).** Set, the rule
-  watches for the window containing that instant, or the nearest occurrence within six hours when
-  no window contains it. A press on a current strip can be later than the window opening, and a
+  watches for the window containing that instant, or the next opening within six hours when
+  no window contains it. Other triggers use the nearest occurrence within six hours. A press on a current strip can be later than the window opening, and a
   press on the curve can name a minute the rounded height crosses a little before or after. If the
   selected opening has already passed, rescheduling does not retarget a later window. The
   reschedule drops the rule once the instant and its resolved event are past. Unset, the rule watches every occurrence of

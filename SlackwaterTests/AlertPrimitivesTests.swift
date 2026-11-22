@@ -97,7 +97,7 @@ final class AlertPrimitivesTests: XCTestCase {
         XCTAssertTrue(found.isEmpty)
     }
 
-    func testOnceBetweenWindowsDoesNotRetargetAfterNearestOpening() {
+    func testOnceBetweenWindowsSelectsTheNextOpeningAndKeepsIt() {
         let speeds: [Double] = [1, 0.1, 1, 1, 1, 1, 0.1, 1]
         let points = speeds.enumerated().map {
             CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
@@ -106,7 +106,10 @@ final class AlertPrimitivesTests: XCTestCase {
         let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: at(2.5 * 3600))
         let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
                                      position: (0, 0), from: at(2 * 3600), to: at(7 * 3600), threshold: 0.5)
-        XCTAssertTrue(found.isEmpty)
+        XCTAssertEqual(found.map(\.event), [alertMinute(at(5 * 3600 + 2000))])
+        let after = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(6 * 3600), to: at(7 * 3600), threshold: 0.5)
+        XCTAssertTrue(after.isEmpty)
     }
 
     func testOnceInsideLongWindowWithUnknownCloseFindsOpening() {
