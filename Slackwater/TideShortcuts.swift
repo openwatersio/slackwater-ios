@@ -194,7 +194,7 @@ struct SlackWindowShortcutResult {
         let points = engine.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
         let events = currentEventsMatchingWater(points, events: engine.events(from: start, to: end))
         guard let window = currentWindows(points, events: events, threshold: slackThresholdKn)
-            .first(where: { $0.end > now && $0.start < searchEnd }), !points.isEmpty else { return nil }
+            .first(where: { $0.start < $0.end && $0.end > now && $0.start < searchEnd }), !points.isEmpty else { return nil }
         let slack = events.first { $0.kind == .slack && window.slackTimes.contains($0.time) }
         let cardEnd = min(end, window.end.addingTimeInterval(21_600))
         var card = WidgetCard.build(selected, now: now, through: cardEnd)
@@ -274,7 +274,7 @@ extension SlackWindowShortcutQuery {
         let points = engine.speeds(from: firstPoint.time, to: lastPoint.time, step: StationCardGraph.sampleStep)
         let events = currentEventsMatchingWater(points, events: engine.events(from: firstPoint.time, to: lastPoint.time))
         let windows: [SlackWindowShortcutResult] = currentWindows(points, events: events, threshold: slackThresholdKn)
-            .filter { $0.start < day.end && $0.end > day.start }
+            .filter { $0.start < $0.end && $0.start < day.end && $0.end > day.start }
             .map { window in
                 let slack = events.first { $0.kind == .slack && window.slackTimes.contains($0.time) }
                 return .init(slack: slack, start: window.start, end: window.end,

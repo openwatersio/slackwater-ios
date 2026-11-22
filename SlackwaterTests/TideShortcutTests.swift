@@ -176,6 +176,33 @@ import CoreLocation
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(result.card.graph?.points.last).time, expected.last!.time)
     }
 
+    private struct WindowlessSlack: CurrentPredicting {
+        let slack: Date
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            guard to >= from else { return [] }
+            return stride(from: 0.0, through: to.timeIntervalSince(from), by: step).map {
+                CurrentPoint(time: from.addingTimeInterval($0), speed: 1)
+            }
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] {
+            from <= slack && slack <= to ? [CurrentEvent(time: slack, speed: 0, kind: .slack)] : []
+        }
+    }
+
+    func testWindowlessSlackIsNotSpokenAsAComfortWindow() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        guard case .current(let record, _) = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701", at: now)) else {
+            return XCTFail("expected current")
+        }
+        let selected = WidgetRecord.current(record, station: WindowlessSlack(slack: now.addingTimeInterval(3600)))
+        XCTAssertNil(SlackWindowShortcutQuery.next(at: selected, after: now))
+        let day = DateInterval(start: now, duration: 86_400)
+        XCTAssertNil(SlackWindowShortcutQuery.on(day, at: selected))
+    }
+
     func testDatedSlackWindowsStayOnTheRequestedDayAndSpeakLocalTimes() throws {
         let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
         defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }

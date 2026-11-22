@@ -199,7 +199,10 @@ func expiredRules(_ rules: [AlertRule], now: Date, occurrences: [AlertOccurrence
 }
 
 func expiredUnchangedRules(_ snapshot: [AlertRule], current: [AlertRule], now: Date,
-                           occurrences: [AlertOccurrence]) -> [UUID] {
-    let unchanged = snapshot.filter { current.contains($0) }
+                           occurrences: [AlertOccurrence], unresolved: Set<UUID> = []) -> [UUID] {
+    let unchanged = snapshot.filter { rule in
+        current.contains(rule) && !(unresolved.contains(rule.id)
+            && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
+    }
     return expiredRules(unchanged, now: now, occurrences: occurrences)
 }

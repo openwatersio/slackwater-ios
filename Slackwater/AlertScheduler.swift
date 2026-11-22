@@ -145,7 +145,7 @@ struct AlertStatusSnapshot: Equatable {
             resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
-                                                now: now, occurrences: resolved.occurrences))
+                                                now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved))
         for id in expired { AlertRuleStore.shared.remove(id) }
         let rules = storedRules.filter { !expired.contains($0.id) }
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
