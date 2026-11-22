@@ -24,7 +24,15 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
 }
 
 enum AlertOpeningAvailability: Equatable, Sendable {
-    case checking, available(Date), alreadyOpen, unavailable
+    case checking, available(Date), alreadyOpen, unavailable, waitingForStation
+}
+
+func alertSheetOpeningCanSave(_ availability: AlertOpeningAvailability, now: Date) -> Bool {
+    switch availability {
+    case .available(let opening): return opening >= now
+    case .waitingForStation: return true
+    case .checking, .alreadyOpen, .unavailable: return false
+    }
 }
 
 func alertSheetOpeningAvailability(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
@@ -120,8 +128,7 @@ struct AlertSheet: View {
     private var canSave: Bool {
         guard alertSheetCanSave(rule, now: appNow()) else { return false }
         guard checksOpening else { return true }
-        if case .available = openingAvailability { return checkedOpeningRule == rule && !openingHasPassed }
-        return false
+        return checkedOpeningRule == rule && alertSheetOpeningCanSave(openingAvailability, now: appNow())
     }
 
     var body: some View {
@@ -183,6 +190,10 @@ struct AlertSheet: View {
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if checksOpening && checkedOpeningRule == rule && openingHasPassed {
                         Text("The reminder time has passed", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .waitingForStation {
+                        Text("Waiting for station data")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .unavailable {
@@ -248,7 +259,7 @@ struct AlertSheet: View {
             let now = appNow(), threshold = slackThresholdKn
             let availability = await Task.detached(priority: .utility) {
                 guard let record = WidgetStationLoader.loadRecord(id: snapshot.stationID, at: now) else {
-                    return AlertOpeningAvailability.unavailable
+                    return AlertOpeningAvailability.waitingForStation
                 }
                 return alertSheetOpeningAvailability(snapshot, station: WidgetStationLoader.station(from: record),
                                                      position: record.alertPosition, now: now, threshold: threshold)

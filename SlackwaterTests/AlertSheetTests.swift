@@ -80,6 +80,15 @@ final class AlertSheetTests: XCTestCase {
                                                      now: before, threshold: 0.5), .available(alertMinute(moment.addingTimeInterval(-1600))))
     }
 
+    func testOpeningAlertCanWaitForMissingStationData() {
+        XCTAssertTrue(alertSheetOpeningCanSave(.waitingForStation, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.checking, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.unavailable, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.alreadyOpen, now: moment))
+        XCTAssertTrue(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(60)), now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(-60)), now: moment))
+    }
+
     func testReminderUsesTheResolvedWindowOpening() {
         let press = moment.addingTimeInterval(3600)
         let opening = moment.addingTimeInterval(600)

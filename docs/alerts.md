@@ -505,7 +505,7 @@ with "Does not repeat", and is asked to support the app only when they ask to be
 there; a `once` rule bound there would be dropped by the reschedule its save triggers (§6). The
 sheet says "This moment has passed" under When and disables Save. The Rest tap never meets this:
 it binds to the offer's next occurrence after now, or opens a repeating draft when the
-notification horizon holds none. A one-time current-window alert also requires its selected opening to be in the future. The sheet resolves it off the main thread, disables Save while checking, and says when the opening has passed or cannot be resolved. Repeating rules remain available.
+notification horizon holds none. A one-time current-window alert also requires its selected opening to be in the future. The sheet resolves it off the main thread, disables Save while checking, and says when the opening has passed or cannot be resolved. If station data is missing, the sheet allows Save and says it is waiting for station data; the scheduler retains the rule while it waits. Repeating rules remain available.
 
 ### 7.3 The sentence
 
