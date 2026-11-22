@@ -643,8 +643,9 @@ struct TimelineData {
         var cores: [(slack: Date, start: Date, end: Date)] = []
         if let current {
             let s = current.engineStation
-            currentPoints = s.speeds(from: start, to: end, step: 600)
-            currentEvents = currentEventsMatchingWater(currentPoints, events: s.events(from: start.addingTimeInterval(-pad),
+            let padded = s.speeds(from: start.addingTimeInterval(-pad), to: end.addingTimeInterval(pad), step: 600)
+            currentPoints = padded.filter { $0.time >= start && $0.time <= end }
+            currentEvents = currentEventsMatchingWater(padded, events: s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad)))
             (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
         }

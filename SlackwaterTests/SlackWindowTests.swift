@@ -70,6 +70,18 @@ final class SlackWindowTests: XCTestCase {
         XCTAssertEqual(currentEventsMatchingWater(points, events: [verified]).count, 1)
     }
 
+    func testUnobservedAxisCrossingsAreNotClaimedAsSlack() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [CurrentPoint(time: start, speed: 1),
+                      CurrentPoint(time: start.addingTimeInterval(600), speed: 1)]
+        let outside = start.addingTimeInterval(-60)
+        let crossing = CurrentEvent(time: outside, speed: 0, kind: .slack)
+        let verified = CurrentEvent(time: outside, speed: 0, kind: .slack, verifiedZero: true)
+        XCTAssertTrue(currentEventsMatchingWater(points, events: [crossing]).isEmpty)
+        XCTAssertEqual(currentEventsMatchingWater(points, events: [verified]).count, 1)
+        XCTAssertTrue(currentEventsMatchingWater([], events: [crossing]).isEmpty)
+    }
+
     func testContinuousWindowPreservesEverySlackMark() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let points = (0...4).map { index in
