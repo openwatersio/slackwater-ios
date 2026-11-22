@@ -1527,7 +1527,7 @@ private struct FoldPageTestHarness: View {
         let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
         defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
         AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
-        let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
+        let victoria = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         let d = TimelineData.build(tide: nil, current: victoria, now: Date(), anchor: todayLocal(victoria.tz))
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
@@ -1563,7 +1563,7 @@ private struct FoldPageTestHarness: View {
     }
 
     func testComfortCurrentChangesOnlyTheWindowAroundZero() throws {
-        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+        let station = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         let now = Date(), anchor = todayLocal(station.tz)
         for threshold in [0.0, 0.1, 1] {
             let d = TimelineData.build(tide: nil, current: station, now: now,
@@ -1792,17 +1792,14 @@ private struct FoldPageTestHarness: View {
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.
-    func testSlackWindowsBracketTheirSlacks() throws {
-        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+    func testSlackWindowsContainTheirTrueSlacks() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         let d = TimelineData.build(tide: nil, current: station, now: Date(), anchor: todayLocal(station.tz))
-        let slacks = d.currentEvents.filter { $0.kind == .slack }
-        XCTAssertGreaterThan(slacks.count, 10, "a week of slacks must exist to window")
-        XCTAssertFalse(d.slackWindows.isEmpty)
-        for w in d.slackWindows {
-            XCTAssert(w.start <= w.slack && w.slack <= w.end,
-                      "a window must bracket its own slack: \(w)")
-            XCTAssert(slacks.contains { $0.time == w.slack },
-                      "every window belongs to a drawn slack event")
+        let slacks = d.currentEvents.filter { $0.kind == .slack && d.contains($0.time) }
+        XCTAssertGreaterThan(slacks.count, 10, "a week of true slacks must exist")
+        XCTAssertFalse(d.windowRuns.isEmpty)
+        for slack in slacks {
+            XCTAssertTrue(d.windowRuns.contains { $0.contains(slack.time) }, "a true slack belongs to a measured window")
         }
     }
 
