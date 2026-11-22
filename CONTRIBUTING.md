@@ -298,6 +298,10 @@ Verify claims against this repo's tests and code; sibling repos can have differe
 
 Review every scrubber presentation change in `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView`, `OnlineGateDetailView`, and the watch's `PlaceDetail` (`SlackwaterWatch/`), which draws the same canvas under the Digital Crown. `ChsDetailView` is a routing wrapper, not a sixth presentation.
 
+## Compatibility transforms
+
+Track every temporary compatibility transform in an issue and link it with a TODO at the transform. Record the first app release containing it when that release ships. Review removal once customers and paired devices have updated to that release or later; verify saved data, offline devices, backups and supported rollback paths before removing it.
+
 ## AI agents
 
 This is a public, open-source repository. Source code and changes intended for public pull requests may be sent to the contributor’s configured external code reviewers as part of routine review. Verify repository visibility and the review payload before raising a private-data transfer concern; credentials and other nonpublic local data are outside that permission.

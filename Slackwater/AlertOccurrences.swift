@@ -154,8 +154,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         }
         let containing = rule.trigger == .slackWindowOpens
             ? found.first { $0.event <= minute && $0.end.map { minute < $0 } == true } : nil
-        let inRange = found.filter { $0.event >= from && $0.event <= to }
-        if let selected = containing ?? inRange.min(by: { distance($0) < distance($1) }),
+        if let selected = containing ?? found.min(by: { distance($0) < distance($1) }),
            containing != nil || distance(selected) <= 6 * 3600 {
             found = [selected]
         } else {
