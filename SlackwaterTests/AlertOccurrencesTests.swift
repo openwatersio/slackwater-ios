@@ -373,6 +373,15 @@ import SlackwaterKit
                                         from: now, to: week, threshold: 0.5), [])
     }
 
+    func testExpiredSnapshotDoesNotDeleteAnEditedRule() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let old = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        var edited = old
+        edited.once = nil
+        XCTAssertTrue(expiredUnchangedRules([old], current: [edited], now: now, occurrences: []).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([old], current: [old], now: now, occurrences: []), [old.id])
+    }
+
     func testOnceRuleDoesNotExpireBeforeItsResolvedEvent() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let rule = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))

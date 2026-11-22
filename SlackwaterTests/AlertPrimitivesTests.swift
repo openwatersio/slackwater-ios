@@ -54,6 +54,16 @@ final class AlertPrimitivesTests: XCTestCase {
         }
     }
 
+    func testOnceSearchDoesNotExpandAcrossMonthsOfStaleRules() {
+        let from = at(0), to = at(86_400)
+        let old = alertSearchSpan(once: at(-365 * 86_400), from: from, to: to)
+        XCTAssertEqual(old.lowerBound, at(-21_600))
+        XCTAssertEqual(old.upperBound, to)
+        let distant = alertSearchSpan(once: at(365 * 86_400), from: from, to: to)
+        XCTAssertEqual(distant.lowerBound, from)
+        XCTAssertEqual(distant.upperBound, to.addingTimeInterval(21_600))
+    }
+
     func testOncePeakDoesNotRetargetAfterItsEventPassed() {
         let station = FakePeaks(peaks: [at(3600), at(5 * 3600)])
         let rule = AlertRule(stationID: "current:test", trigger: .currentPeak(flood: true), once: at(2 * 3600))
@@ -63,16 +73,16 @@ final class AlertPrimitivesTests: XCTestCase {
     }
 
     func testOnceInsideLongWindowSelectsItsOpening() {
-        let speeds: [Double] = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 0.1, 0.1]
+        let speeds: [Double] = [1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 0.1, 0.1]
         let points = speeds.enumerated().map {
-            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+            CurrentPoint(time: at(Double($0.offset - 1) * 3600), speed: $0.element)
         }
         let station = FakeCurrent(points: points, slacks: [])
         let press = at(5.5 * 3600)
         let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: press)
         let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
-                                     position: (0, 0), from: at(-60), to: at(9 * 3600), threshold: 0.5)
-        XCTAssertEqual(found.map(\.event), [alertMinute(at(0))])
+                                     position: (0, 0), from: at(-3600), to: at(9 * 3600), threshold: 0.5)
+        XCTAssertEqual(found.map(\.event), [alertMinute(at(-1600))])
     }
 
     func testOnceDoesNotRetargetAfterItsWindowOpened() {
@@ -110,6 +120,17 @@ final class AlertPrimitivesTests: XCTestCase {
                                      position: (0, 0), from: at(0), to: at(10 * 3600), threshold: 0.5)
         XCTAssertEqual(found.count, 1)
         XCTAssertNil(found.first?.end)
+    }
+
+    func testWindowAlreadyOpenAtCoverageStartHasNoInventedOpening() {
+        let points = [0.1, 0.1, 1.0].enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(-60), to: at(7200), threshold: 0.5)
+        XCTAssertTrue(found.isEmpty)
     }
 
     func testThresholdTouchWithoutSlackDoesNotCreateSlackAlert() {
