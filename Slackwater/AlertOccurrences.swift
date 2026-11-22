@@ -145,7 +145,6 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     }
 
     found = found.map { (event: alertMinute($0.event), end: $0.end.map(alertMinute), noWindow: $0.noWindow, heightM: $0.heightM) }
-    found = found.filter { $0.event >= from && $0.event <= to }
     if let once = rule.once {
         // Prefer the window containing the pressed instant; another opening can be closer
         // than the start of a long window. Other triggers use the nearest event.
@@ -155,13 +154,15 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         }
         let containing = rule.trigger == .slackWindowOpens
             ? found.first { $0.event <= minute && $0.end.map { minute < $0 } == true } : nil
-        if let selected = containing ?? found.min(by: { distance($0) < distance($1) }),
+        let inRange = found.filter { $0.event >= from && $0.event <= to }
+        if let selected = containing ?? inRange.min(by: { distance($0) < distance($1) }),
            containing != nil || distance(selected) <= 6 * 3600 {
             found = [selected]
         } else {
             found = []
         }
     }
+    found = found.filter { $0.event >= from && $0.event <= to }
     if let sun = rule.sun {
         let spans = sunWindowSpans(sun, from: from, to: to, lat: position.lat, lon: position.lon)
         found = found.filter { f in spans.contains { $0.contains(f.event) } }

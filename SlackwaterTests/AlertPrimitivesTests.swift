@@ -59,6 +59,18 @@ final class AlertPrimitivesTests: XCTestCase {
         XCTAssertEqual(found.map(\.event), [alertMinute(at(0))])
     }
 
+    func testOnceDoesNotRetargetAfterItsWindowOpened() {
+        let speeds: [Double] = [1, 0.1, 0.1, 0.1, 1, 1, 0.1, 0.1, 1]
+        let points = speeds.enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: at(3 * 3600))
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(2 * 3600), to: at(8 * 3600), threshold: 0.5)
+        XCTAssertTrue(found.isEmpty)
+    }
+
     func testMergedWindowsOpenOnceAndAFastReversalOpensItsOwn() {
         let speeds: [Double] = [2, 1.5, 1, 0.6, 0.3, 0.1, 0,   // 0…3600: slack A at 3600
                                 0.1, 0.3, 0,                   // 4200…5400: slack B at 5400

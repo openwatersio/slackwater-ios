@@ -73,10 +73,10 @@ enum AlertTrigger: Codable, Equatable {
 - A rule names a place the user chose. Rules are created from a detail view, whose station id is
   always concrete, so a rule never follows Current Location.
 - **`once` is the whole difference between the sheet's repeat choices (§7.2).** Set, the rule
-  watches for the single occurrence nearest that instant — within six hours, under the gap
-  between two of any trigger — because the pressed minute is not always the event's own: a press
-  on a current strip parks on the slack instant while the occurrence is the window's opening, and
-  a press on the curve names a minute the rounded height crosses a little before or after. The
+  watches for the window containing that instant, or the nearest occurrence within six hours when
+  no window contains it. A press on a current strip can be later than the window opening, and a
+  press on the curve can name a minute the rounded height crosses a little before or after. If the
+  selected opening has already passed, rescheduling does not retarget a later window. The
   reschedule drops the rule once the instant is past. Unset, the rule watches every occurrence of
   its trigger. Copy comes from `trigger` either way, so nothing stores a rendered string.
 - A sentence makes the same two kinds of rule. "The next low tide" is a `once` rule on the first
