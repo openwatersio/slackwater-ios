@@ -104,7 +104,7 @@ struct ComplicationReading: Equatable {
                 samples: samples,
                 slackRuns: runs.filter { $0.overlaps(span) },
                 runsAreSlack: off,
-                gauge: Self.currentGauge(windows, now: now, tz: tz))
+                gauge: Self.currentGauge(windows, now: now, tz: tz, observedUntil: points.last.map { hours($0.time) }))
 
         case .derived:
             // Derived gates are Canadian; the watch shows them nothing until #523.
@@ -114,8 +114,10 @@ struct ComplicationReading: Equatable {
 
     /// One swing of arc ending where the next slack window ends: now's dot
     /// approaches the window from the left, and sits inside it during slack.
-    private static func currentGauge(_ windows: [ClosedRange<Double>], now: Date, tz: TimeZone) -> Gauge? {
-        guard let window = windows.first(where: { $0.upperBound >= 0 }) else { return nil }
+    private static func currentGauge(_ windows: [ClosedRange<Double>], now: Date, tz: TimeZone,
+                                     observedUntil: Double?) -> Gauge? {
+        guard let window = windows.first(where: { $0.upperBound >= 0 }),
+              let observedUntil, window.upperBound < observedUntil else { return nil }
         let swing = StationCardGraph.swing / 3600
         let span = max(swing, window.upperBound - window.lowerBound)
         let arcStart = window.upperBound - span

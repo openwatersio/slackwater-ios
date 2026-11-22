@@ -177,6 +177,24 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertEqual(ComplicationReading.build(station, now: now)?.word, "Ebbing")
     }
 
+    private struct ConstantCurrent: CurrentPredicting {
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            guard to >= from else { return [] }
+            return stride(from: 0.0, through: to.timeIntervalSince(from), by: step).map {
+                CurrentPoint(time: from.addingTimeInterval($0), speed: 0.2)
+            }
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    func testContinuousComfortableCurrentHasNoInventedClosingTime() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        let reading = try XCTUnwrap(ComplicationReading.build(.current(ConstantCurrent(), tz: utc, name: "Constant"), now: now))
+        XCTAssertNil(reading.gauge?.endText)
+    }
+
     func testInsideAWindowTheDotSitsInTheWindow() throws {
         guard case .current(let s, let tz, _) = current else { return XCTFail() }
         let ahead = try XCTUnwrap(try cardRuns(at: now).first { $0.start > now })
