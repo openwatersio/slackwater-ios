@@ -267,7 +267,7 @@ const tcdb = buildDatabase(stations.map((s) => ({
       },
     }),
   },
-})), { version: databaseVersion, credits: await sourceCredits(db.all) });
+})), { version: databaseVersion, credits: await sourceCredits(db.all), constituents: db.constituents });
 writeFileSync(join(res, "currents.tcdb"), tcdb);
 const subordinateCount = stations.filter((s) => s.reference).length;
 const referenceOnlyCount = stations.filter((s) => s.referenceOnly).length;
