@@ -173,7 +173,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
             abs(o.event.timeIntervalSince(minute))
         }
         let containing = rule.trigger == .slackWindowOpens
-            ? found.first { $0.event <= minute && ($0.end ?? observedThrough[$0.event]).map { minute < $0 } == true } : nil
+            ? found.first { $0.event <= minute && ($0.end ?? observedThrough[$0.event]).map { minute <= $0 } == true } : nil
         let nextWindow = rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
             ? found.filter { $0.event >= minute }.min(by: { $0.event < $1.event }) : nil
         let nearest = found.min(by: { distance($0) < distance($1) })

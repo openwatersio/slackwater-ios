@@ -112,6 +112,19 @@ final class AlertPrimitivesTests: XCTestCase {
         XCTAssertTrue(after.isEmpty)
     }
 
+    func testOnceOnWindowClosingSelectsThatWindow() {
+        let speeds: [Double] = [1, 0.1, 1, 1, 1, 1, 0.1, 1]
+        let points = speeds.enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: alertMinute(at(3600 + 1600)))
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(0), to: at(7 * 3600), threshold: 0.5)
+        XCTAssertEqual(found.map(\.event), [alertMinute(at(2000))])
+    }
+
     func testOnceInsideLongWindowWithUnknownCloseFindsOpening() {
         let speeds: [Double] = [1] + Array(repeating: 0.1, count: 11)
         let points = speeds.enumerated().map {
