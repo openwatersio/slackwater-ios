@@ -788,7 +788,7 @@ final class RenderedStripTests: XCTestCase {
             speeds.append(2.0 * sin(2 * .pi * t.timeIntervalSince(span.start) / period))
             t = t.addingTimeInterval(900)
         }
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
             fetchedAt: now, start: span.start, end: span.end,
             floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)

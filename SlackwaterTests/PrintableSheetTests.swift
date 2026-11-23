@@ -49,7 +49,7 @@ final class PrintableSheetTests: XCTestCase {
     func testAnOnlineGatePrintsEveryStoredBlockOnce() throws {
         func block(_ start: Double, _ count: Int) -> ChsOnlineWindow {
             let times = (0..<count).map { start + Double($0) * 900 }
-            return ChsOnlineWindow(stationID: "chs-x", iwlsName: "x", timezone: "America/Vancouver",
+            return ChsOnlineWindow(axisOnly: true, stationID: "chs-x", iwlsName: "x", timezone: "America/Vancouver",
                                    fetchedAt: Date(timeIntervalSince1970: start),
                                    start: Date(timeIntervalSince1970: times.first!),
                                    end: Date(timeIntervalSince1970: times.last!),

@@ -113,7 +113,7 @@ final class CardRefreshTests: XCTestCase {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline })
         let start = first.addingTimeInterval(-86_400)
         let offsets = stride(from: 0.0, through: 3 * 86_400, by: 900).map { $0 }
-        let online = ChsOnlineWindow(
+        let online = ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: "UTC", fetchedAt: first,
             start: start, end: start.addingTimeInterval(3 * 86_400),
             floodDirection: 90, ebbDirection: 270,
@@ -177,7 +177,7 @@ final class CardRefreshTests: XCTestCase {
         let day = dayLocal(appNow().addingTimeInterval(7 * 86_400), gate.tz)
         let span = Timeline.window(anchor: day)
         let offsets = stride(from: 0.0, through: span.end.timeIntervalSince(span.start), by: 900).map { $0 }
-        let cached = ChsOnlineWindow(
+        let cached = ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: "UTC", fetchedAt: day,
             start: span.start, end: span.end, floodDirection: 90, ebbDirection: 270,
             times: offsets.map { span.start.timeIntervalSince1970 + $0 },

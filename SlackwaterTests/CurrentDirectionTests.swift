@@ -83,7 +83,7 @@ final class CurrentDirectionTests: XCTestCase {
             else { try? FileManager.default.removeItem(at: url) }
         }
         let now = appNow(), t = now.timeIntervalSince1970
-        let window = ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
+        let window = ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
                                      fetchedAt: now, start: now, end: now.addingTimeInterval(900),
                                      // Dodd's IWLS metadata: the ebb is 20° off the flood's reciprocal.
                                      floodDirection: 355, ebbDirection: 155,
@@ -98,7 +98,7 @@ final class CurrentDirectionTests: XCTestCase {
 
     func testOnlineMapReadingDoesNotBridgeAMissingSample() {
         let now = appNow(), t = now.timeIntervalSince1970
-        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC",
+        let window = ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC",
                                      fetchedAt: now, start: now, end: now.addingTimeInterval(1800),
                                      floodDirection: 0, ebbDirection: 180,
                                      times: [t, t + 1800], speeds: [2, -2])

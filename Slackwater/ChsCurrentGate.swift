@@ -102,8 +102,11 @@ extension ChsModelStore {
         } else {
             store = nil
         }
-        onlineCache[stationID] = (mtime, size, store)
-        return store
+        // Axis-only online caches cannot establish true slack; refetch them.
+        let vectorStore = store.map { ChsOnlineStore(stationID: $0.stationID, blocks: $0.blocks.filter(\.hasVectors)) }
+        let usable = vectorStore.flatMap { $0.blocks.isEmpty ? nil : $0 }
+        onlineCache[stationID] = (mtime, size, usable)
+        return usable
     }
 
     // Every access holds onlineCacheLock, including decoding and replacement.
@@ -143,9 +146,34 @@ struct ChsOnlineWindow: Codable, Sendable {
     let ebbDirection: Double
     let times: [Double]        // epoch seconds, official samples on `ChsGrid`
     let speeds: [Double]       // signed kn along the flood axis (project())
+    // Optional for decoding older files; production readers refetch axis-only blocks.
+    var magnitudes: [Double]? = nil
+    var directions: [Double]? = nil
+
+    init(axisOnly: Bool = false, stationID: String, iwlsName: String, timezone: String, fetchedAt: Date,
+         start: Date, end: Date, floodDirection: Double, ebbDirection: Double,
+         times: [Double], speeds: [Double], magnitudes: [Double]? = nil, directions: [Double]? = nil) {
+        self.stationID = stationID; self.iwlsName = iwlsName; self.timezone = timezone
+        self.fetchedAt = fetchedAt; self.start = start; self.end = end
+        self.floodDirection = floodDirection; self.ebbDirection = ebbDirection
+        self.times = times; self.speeds = speeds
+        self.magnitudes = magnitudes ?? (axisOnly ? speeds.map { abs($0) } : nil)
+        self.directions = directions ?? (axisOnly ? speeds.map { $0 >= 0 ? floodDirection : ebbDirection } : nil)
+    }
+
+    var hasVectors: Bool {
+        guard let magnitudes, let directions, magnitudes.count == times.count,
+              directions.count == times.count, speeds.count == times.count else { return false }
+        return magnitudes.allSatisfy { $0.isFinite && $0 >= 0 } && directions.allSatisfy(\.isFinite)
+    }
 
     var points: [CurrentPoint] {
-        zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
+        let vector = hasVectors
+        return zip(times.indices, zip(times, speeds)).map { index, pair in
+            CurrentPoint(time: Date(timeIntervalSince1970: pair.0), speed: pair.1,
+                         magnitude: vector ? magnitudes?[index] : nil,
+                         direction: vector ? directions?[index] : nil)
+        }
     }
 
     /// Stored online bounds are clamped to the last returned sample, so two
@@ -188,8 +216,10 @@ struct ChsOnlineWindow: Codable, Sendable {
         guard start <= other.end.addingTimeInterval(slack),
               other.start <= end.addingTimeInterval(slack) else { return other }
         let cut = prunedBefore.timeIntervalSince1970
-        var byTime = Dictionary(zip(times, speeds), uniquingKeysWith: { _, b in b })
-        for (t, v) in zip(other.times, other.speeds) { byTime[t] = v }
+        guard hasVectors == other.hasVectors else { return other }
+        var byTime: [Double: (Double, Double?, Double?)] = [:]
+        for point in points { byTime[point.time.timeIntervalSince1970] = (point.speed, hasVectors ? point.magnitude : nil, point.direction) }
+        for point in other.points { byTime[point.time.timeIntervalSince1970] = (point.speed, other.hasVectors ? point.magnitude : nil, point.direction) }
         let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
         return ChsOnlineWindow(
             stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,
@@ -197,7 +227,9 @@ struct ChsOnlineWindow: Codable, Sendable {
             start: max(min(start, other.start), prunedBefore),
             end: max(end, other.end),
             floodDirection: other.floodDirection, ebbDirection: other.ebbDirection,
-            times: kept.map(\.key), speeds: kept.map(\.value))
+            times: kept.map(\.key), speeds: kept.map { $0.value.0 },
+            magnitudes: hasVectors ? kept.map { $0.value.1! } : nil,
+            directions: hasVectors ? kept.map { $0.value.2! } : nil)
     }
 
     /// This window with everything before `cut` dropped — nil when nothing
@@ -207,11 +239,13 @@ struct ChsOnlineWindow: Codable, Sendable {
         guard start < cut else { return self }
         guard end > cut else { return nil }
         let c = cut.timeIntervalSince1970
-        let kept = zip(times, speeds).filter { $0.0 >= c }
+        let indices = times.indices.filter { times[$0] >= c }
         return ChsOnlineWindow(stationID: stationID, iwlsName: iwlsName, timezone: timezone,
                                fetchedAt: fetchedAt, start: cut, end: end,
                                floodDirection: floodDirection, ebbDirection: ebbDirection,
-                               times: kept.map { $0.0 }, speeds: kept.map { $0.1 })
+                               times: indices.map { times[$0] }, speeds: indices.map { speeds[$0] },
+                               magnitudes: hasVectors ? indices.map { magnitudes![$0] } : nil,
+                               directions: hasVectors ? indices.map { directions![$0] } : nil)
     }
 }
 

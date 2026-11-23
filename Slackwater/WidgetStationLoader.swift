@@ -195,7 +195,17 @@ extension ChsOnlineWindow: CurrentPredicting {
                 // CHS samples are `ChsGrid` apart; widget readings also land between them.
                 let fraction = (time - times[index - 1]) / span
                 let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
-                result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
+                if hasVectors, let magnitudes, let directions {
+                    let a = directions[index - 1] * .pi / 180, b = directions[index] * .pi / 180
+                    let east = magnitudes[index - 1] * sin(a) * (1 - fraction) + magnitudes[index] * sin(b) * fraction
+                    let north = magnitudes[index - 1] * cos(a) * (1 - fraction) + magnitudes[index] * cos(b) * fraction
+                    let magnitude = hypot(east, north)
+                    let direction = magnitude > 0 ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
+                    result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value,
+                                               magnitude: magnitude, direction: direction))
+                } else {
+                    result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
+                }
             }
             time += step
         }
@@ -203,6 +213,6 @@ extension ChsOnlineWindow: CurrentPredicting {
     }
 
     func events(from start: Date, to end: Date) -> [CurrentEvent] {
-        sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        currentEventsMatchingWater(points, events: sampleEvents(points)).filter { $0.time >= start && $0.time <= end }
     }
 }

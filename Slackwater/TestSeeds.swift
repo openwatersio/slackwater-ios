@@ -242,7 +242,7 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
         t = t.addingTimeInterval(ChsGrid.seconds)  // the official-sample cadence
     }
     let window = ChsOnlineWindow(
-        stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
+        axisOnly: true, stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
         fetchedAt: appNow(), start: start, end: end,
         floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
     // `_ =` because `try?` re-wraps the merged window `saveOnline` returns,

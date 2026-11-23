@@ -104,7 +104,7 @@ final class PatchFieldTests: XCTestCase {
         let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
         XCTAssertTrue(field.cells(at: now).isEmpty)
         let t = now.timeIntervalSince1970
-        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
             fetchedAt: now, start: now, end: now.addingTimeInterval(900),
             floodDirection: 21, ebbDirection: 201, times: [t, t + 900], speeds: [-2, -2]))
         let cells = field.cells(at: now.addingTimeInterval(450))

@@ -19,6 +19,21 @@ extension ChsFitService {
                 from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
     }
 
+    /// Pair the original IWLS vectors with the signed projection at each timestamp.
+    nonisolated static func onlineVectors(speeds: [ChsSample], dirs: [ChsSample], flood: Double)
+        -> (projected: [ChsSample], magnitudes: [Double], directions: [Double])? {
+        guard (speeds + dirs).allSatisfy({ $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite }) else { return nil }
+        let projected = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        guard !projected.isEmpty else { return nil }
+        let speedByTime = Dictionary(speeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { _, b in b })
+        let directionByTime = Dictionary(dirs.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { _, b in b })
+        let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
+        let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
+        guard magnitudes.count == projected.count, directions.count == projected.count,
+              magnitudes.allSatisfy({ $0.isFinite && $0 >= 0 }), directions.allSatisfy(\.isFinite) else { return nil }
+        return (projected, magnitudes, directions)
+    }
+
     /// The fit-reject gates (`ChsCurrentGateInfo.isOnline`) get no on-device fit
     /// — only official wcsp1/wcdp1 predictions, `Timeline.onlineFetchDays` forward
     /// of `anchor` (today unless a caller says otherwise) and back-padded like
@@ -157,13 +172,11 @@ extension ChsFitService {
             await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 3, total: total) }
         }
         try Task.checkCancellation()
-        let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
-        // IWLS can 200 with an empty series (a quiet chunk boundary, no error
-        // to catch). Saving anyway would fall through to the requested
-        // start/end below and stick forever — a zero-sample window that
-        // still reads as "covers the strip". Fail the fetch instead: the
-        // caller already turns any thrown error into the honesty card + retry.
-        guard !projected.isEmpty else { throw ChsError.permanent("\(gate.name): IWLS returned an empty series") }
+        // Empty or unmatched IWLS series cannot establish coverage or a current vector.
+        guard let vectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
+            throw ChsError.permanent("\(gate.name): IWLS returned incomplete current vectors")
+        }
+        let projected = vectors.projected
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
         // would make `covers` pass on a window with a hole in it and
@@ -175,7 +188,8 @@ extension ChsFitService {
             stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
             fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
             floodDirection: flood, ebbDirection: ebb,
-            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
+            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v },
+            magnitudes: vectors.magnitudes, directions: vectors.directions)
         do {
             // The MERGED window goes back to the caller, not `window`: the
             // fetched block is only the part that was missing, and a caller
@@ -238,7 +252,7 @@ extension ChsOnlineWindow {
     func cardState(at now: Date) -> CurrentCardState {
         let point = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }
             ?? CurrentPoint(time: now, speed: 0)
-        let next = sampleEvents(points).first { $0.time > now }
+        let next = currentEventsMatchingWater(points, events: sampleEvents(points)).first { $0.time > now }
         return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }

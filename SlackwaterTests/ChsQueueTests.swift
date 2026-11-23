@@ -52,7 +52,7 @@ final class ChsQueueTests: XCTestCase {
         }
         XCTAssertTrue(service.prepareOnlineUpdate(gate))
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -321,7 +321,7 @@ final class ChsQueueTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = stale.tz
         let span = Timeline.window(anchor: calendar.date(byAdding: .day, value: -60, to: todayLocal(stale.tz))!)
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: stale.id, iwlsName: stale.name, timezone: stale.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -498,7 +498,7 @@ final class ChsQueueTests: XCTestCase {
         let url = ChsModelStore.onlineUrl(gate.id)
         defer { try? FileManager.default.removeItem(at: url) }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -530,7 +530,7 @@ final class ChsQueueTests: XCTestCase {
             try? fm.removeItem(at: url)
         }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -557,7 +557,7 @@ final class ChsQueueTests: XCTestCase {
             try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
         }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -584,7 +584,7 @@ final class ChsQueueTests: XCTestCase {
         }
         XCTAssertTrue(service.onlineRefreshDue(gate), "a station with nothing stored downloads")
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -752,7 +752,7 @@ final class ChsQueueTests: XCTestCase {
     /// The span a fetch for `anchor` would store, with two samples.
     private func onlineWindow(_ gate: ChsCurrentGateInfo, anchor: Date) -> ChsOnlineWindow {
         let span = Timeline.window(anchor: anchor)
-        return ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+        return ChsOnlineWindow(axisOnly: true, stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
                                fetchedAt: appNow(), start: span.start, end: span.end,
                                floodDirection: 45, ebbDirection: 225,
                                times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970],

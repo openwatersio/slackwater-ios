@@ -51,7 +51,7 @@ final class StationCardGraphTests: XCTestCase {
         for speeds in [[0.0, 1, 2, 1, 0, -1, -2, -1, 0],
                        [2.0, 2, 2, 2, 0, -2, -2, -2, 0]] {
             let times = speeds.indices.map { now.addingTimeInterval(Double($0) * 600).timeIntervalSince1970 }
-            let model = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: now,
+            let model = ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: now,
                                         start: now, end: Date(timeIntervalSince1970: times.last!),
                                         floodDirection: 90, ebbDirection: 270, times: times, speeds: speeds)
             let graph = model.cardGraph(at: now, unit: "kn")

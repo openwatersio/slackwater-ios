@@ -195,8 +195,79 @@ final class ChsCurrentGateTests: XCTestCase {
 
     // MARK: - The fetched window (online gates: official CHS predictions, no fit)
 
+    func testOnlineVectorPairsDownloadedSpeedAndDirection() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 900_000, v: 90), ChsSample(t: 1_800_000, v: 120)]
+        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        XCTAssertEqual(result.projected.count, 3)
+        XCTAssertEqual(result.projected[1].v, 0, accuracy: 1e-9)
+        XCTAssertEqual(result.magnitudes, [2, 2, 2])
+        XCTAssertEqual(result.directions, [60, 90, 120])
+    }
+
+    func testOnlineVectorSurvivesCacheAndDoesNotInventSlack() throws {
+        let id = "chs-vector-regression"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1800),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800], speeds: [1, 0, -1],
+                                     magnitudes: [2, 2, 2], directions: [60, 90, 120])
+        try ChsModelStore.saveOnline(window)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline(id)?.blocks.first)
+        let middle = try XCTUnwrap(loaded.speeds(from: Date(timeIntervalSince1970: 900),
+                                                 to: Date(timeIntervalSince1970: 900), step: 1).first)
+        XCTAssertEqual(middle.speed, 0, accuracy: 1e-9)
+        XCTAssertEqual(middle.magnitude, 2, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(middle.direction), 90, accuracy: 1e-9)
+        XCTAssertTrue(currentWindows(loaded.points, events: loaded.events(from: window.start, to: window.end),
+                                     threshold: 0.5).isEmpty)
+        XCTAssertFalse(loaded.events(from: window.start, to: window.end).contains { $0.kind == .slack })
+    }
+
+    func testOnlineVectorInterpolationCrossesNorthWithoutReversing() throws {
+        let window = ChsOnlineWindow(stationID: "vector", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, 1],
+                                     magnitudes: [1, 1], directions: [350, 10])
+        let point = try XCTUnwrap(window.speeds(from: Date(timeIntervalSince1970: 450),
+                                                 to: Date(timeIntervalSince1970: 450), step: 1).first)
+        let direction = try XCTUnwrap(point.direction)
+        XCTAssertLessThan(min(direction, 360 - direction), 0.001)
+        XCTAssertGreaterThan(point.magnitude, 0.98)
+    }
+
+    func testOnlineVectorSurvivesMergeAndPrune() throws {
+        func window(_ start: Double, _ speeds: [Double], _ magnitudes: [Double], _ directions: [Double]) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: "vector", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                            start: Date(timeIntervalSince1970: start), end: Date(timeIntervalSince1970: start + 900),
+                            floodDirection: 0, ebbDirection: 180, times: [start, start + 900], speeds: speeds,
+                            magnitudes: magnitudes, directions: directions)
+        }
+        let a = window(0, [1, 0], [2, 2], [60, 90])
+        let b = window(900, [0, -1], [3, 2], [90, 120])
+        let merged = a.merging(b, prunedBefore: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(merged.magnitudes, [2, 3, 2])
+        XCTAssertEqual(merged.directions, [60, 90, 120])
+        let pruned = try XCTUnwrap(merged.pruned(before: Date(timeIntervalSince1970: 900)))
+        XCTAssertEqual(pruned.magnitudes, [3, 2])
+        XCTAssertEqual(pruned.directions, [90, 120])
+    }
+
+    func testAxisOnlyOnlineCacheIsNotUsedAsAFullVector() throws {
+        let id = "chs-axis-only-regression"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1])
+        let url = ChsModelStore.onlineUrl(id)
+        try ChsModelStore.saveOnline(window)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertNil(ChsModelStore.loadOnline(id))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "keep the old file for rollback")
+    }
+
     func testOnlineWindowStoreRoundTrip() throws {
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-online", iwlsName: "Test Online Station",
             timezone: "America/Vancouver", fetchedAt: .now,
             start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
@@ -215,7 +286,7 @@ final class ChsCurrentGateTests: XCTestCase {
     }
 
     func testLoadOnlineCachesDecodedStore() throws {
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-cache", iwlsName: "Test Cache Station",
             timezone: "America/Vancouver", fetchedAt: .now,
             start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
@@ -261,7 +332,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let need = Timeline.window(anchor: today0)
 
         func window(start: Date, end: Date) -> ChsOnlineWindow {
-            ChsOnlineWindow(stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
+            ChsOnlineWindow(axisOnly: true, stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
                             fetchedAt: .now, start: start, end: end,
                             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         }
@@ -288,7 +359,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let today = cal.startOfDay(for: Date())
         let w = Timeline.window(anchor: today)
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "test", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: Date(), start: w.start,
             end: today.addingTimeInterval(30 * 86_400),
@@ -345,7 +416,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let span = Timeline.window(anchor: today)
         let month = Timeline.onlineFetchDays * 86_400
         func block(_ start: Date, _ end: Date, fetchedAt: Date = appNow()) -> ChsOnlineWindow {
-            ChsOnlineWindow(stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
+            ChsOnlineWindow(axisOnly: true, stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
                             fetchedAt: fetchedAt, start: start, end: end,
                             floodDirection: 0, ebbDirection: 180,
                             times: [start.timeIntervalSince1970, end.timeIntervalSince1970],
@@ -380,7 +451,7 @@ final class ChsCurrentGateTests: XCTestCase {
     /// clamps itself to, and the only shape these merge tests need.
     private func onlineWindow(_ times: [Double], _ speeds: [Double],
                               id: String = "chs-test-merge") -> ChsOnlineWindow {
-        ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "America/Vancouver",
+        ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Test", timezone: "America/Vancouver",
                         fetchedAt: .now,
                         start: Date(timeIntervalSince1970: times.first ?? 0),
                         end: Date(timeIntervalSince1970: times.last ?? 0),
@@ -520,9 +591,8 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(store.blocks[0].times, [t0, t0 + 900])
     }
 
-    /// A device that fetched under the single-window shape keeps its data: the
-    /// legacy file decodes as one block.
-    func testLoadOnlineMigratesALegacySingleWindowFile() throws {
+    /// A single-window file carrying vectors still decodes as one block.
+    func testLoadOnlineMigratesSingleWindowWithVectors() throws {
         let legacy = onlineWindow([0, 900], [1, 2], id: "chs-test-legacy")
         try ChsModelStore.save(legacy, id: "chs-test-legacy", suffix: "-online")  // v1 bytes, straight to disk
         defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl("chs-test-legacy")) }
@@ -561,7 +631,7 @@ final class ChsCurrentGateTests: XCTestCase {
                                     "the newest chunk must reach the window end")
 
         // And the window that span produces covers the strip its own anchor draws.
-        let fetched = ChsOnlineWindow(
+        let fetched = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-online", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: .now, start: paged.start, end: paged.end,
             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
@@ -578,7 +648,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let today = cal.startOfDay(for: Date())
         let end = today.addingTimeInterval(30 * 86_400)
-        let w = ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+        let w = ChsOnlineWindow(axisOnly: true, stationID: "g", iwlsName: "G", timezone: tz.identifier,
                                 fetchedAt: Date(), start: today, end: end,
                                 floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         XCTAssertEqual(prefetchAnchor(after: w, tz: tz), cal.startOfDay(for: end))
@@ -621,7 +691,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let today = cal.startOfDay(for: Date())
         func span(_ anchor: Date) -> ChsOnlineWindow {
             let w = Timeline.window(anchor: anchor)
-            return ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+            return ChsOnlineWindow(axisOnly: true, stationID: "g", iwlsName: "G", timezone: tz.identifier,
                                    fetchedAt: .now, start: w.start, end: w.end,
                                    floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         }
