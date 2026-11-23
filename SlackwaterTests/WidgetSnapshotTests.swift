@@ -574,6 +574,20 @@ import SlackwaterKit
         XCTAssertNil(WidgetSnapshot.build(.current(station, tz: .gmt, name: record.name), now: t).next)
     }
 
+    func testNextEventKeepsFractionalEngineSlack() throws {
+        let record = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
+        let station = record.engineStation
+        let slack = try XCTUnwrap(station.events(from: day, to: day.addingTimeInterval(3 * 86_400))
+            .first { $0.kind == .slack && !$0.verifiedZero && $0.time.timeIntervalSince1970.rounded(.down) != $0.time.timeIntervalSince1970 })
+        let now = slack.time.addingTimeInterval(-1)
+        let cardNext = try XCTUnwrap(record.cardState(at: now, station: station).next)
+        XCTAssertEqual(cardNext.kind, .slack)
+        XCTAssertEqual(cardNext.time.timeIntervalSince(slack.time), 0, accuracy: 1)
+        let widgetNext = try XCTUnwrap(WidgetSnapshot.build(.current(station, tz: .gmt, name: record.name), now: now).next)
+        XCTAssertEqual(widgetNext.label, "Slack")
+        XCTAssertEqual(widgetNext.time.timeIntervalSince(slack.time), 0, accuracy: 1)
+    }
+
     func testNextEventKeepsARealUnverifiedSlack() throws {
         let record = try XCTUnwrap(CurrentStationRecord.all.first)
         let t = day
