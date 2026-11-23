@@ -44,6 +44,7 @@ struct ResolvedAlerts: Sendable {
     var legacyReview: Set<UUID> = []
     /// Subscribed current stations with predictions but no true slack in Off mode.
     var calendarNoSlack: Set<String> = []
+    var calendarEmpty: Set<String> = []
     /// Subscribed stations that can't be loaded. Their calendars are left exactly as they
     /// are: an empty plan is "nothing known yet", not "delete the next 90 days".
     var unresolvedStations: Set<String> = []
@@ -138,6 +139,8 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             }
         }
     }
+    let withEvents = Set(resolved.calendarOccurrences.compactMap { resolved.calendarStations[$0.ruleID] })
+    resolved.calendarEmpty = Set(subscriptions).subtracting(resolved.unresolvedStations).subtracting(withEvents)
     return resolved
 }
 
@@ -148,6 +151,7 @@ struct AlertStatusSnapshot: Equatable {
     var heldWindows: Set<UUID> = []
     var reviewPending: Set<UUID> = []
     var calendarNoSlack: Set<String> = []
+    var calendarEmpty: Set<String> = []
     var notificationsAuthorized = false
 }
 
@@ -190,13 +194,13 @@ struct AlertStatusSnapshot: Equatable {
         let previous = pass
         let mine = Task { @MainActor in
             await previous?.value
-            await self.runPass(now: now)
+            while !(await self.runPass(now: now)) {}
         }
         pass = mine
         await mine.value
     }
 
-    private func runPass(now: Date) async {
+    private func runPass(now: Date) async -> Bool {
         _ = ChsFitService.shared
         let storedRules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
@@ -213,10 +217,7 @@ struct AlertStatusSnapshot: Equatable {
         }.value
         // A preference change can land while the prediction scan is off the main actor.
         // Discard its old result before changing alerts, then resolve the new setting.
-        guard threshold == slackThresholdKn else {
-            Self.requestReschedule()
-            return
-        }
+        guard threshold == slackThresholdKn else { return false }
         let reviewIDs = resolved.legacyReview
         AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
@@ -268,6 +269,8 @@ struct AlertStatusSnapshot: Equatable {
                                      reviewPending: Set(rules.filter { $0.once != nil && !$0.currentWindowRule
                                          && resolved.noSlack.contains($0.id) }.map(\.id)),
                                      calendarNoSlack: resolved.calendarNoSlack.intersection(Set(StationCalendarStore.shared.subscriptions.map(\.stationID))),
+                                     calendarEmpty: resolved.calendarEmpty.intersection(Set(StationCalendarStore.shared.subscriptions.map(\.stationID))),
                                      notificationsAuthorized: await AlertNotifications.authorized())
+        return true
     }
 }

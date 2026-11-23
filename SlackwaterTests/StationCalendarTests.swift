@@ -51,11 +51,12 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
     }
 
-    func testEmptyValidForecastCanCreateCalendar() {
+    func testEmptyValidForecastWaitsForAnEventBeforeCreatingCalendar() {
         let id = "current:noaa/weak"
         XCTAssertTrue(calendarWriteGroups([], subscribed: [id], live: [id], skipping: [])[id]?.isEmpty == true)
-        XCTAssertTrue(calendarShouldCreate(stationID: id, stopped: []))
-        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [id]))
+        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [], hasEvents: false))
+        XCTAssertTrue(calendarShouldCreate(stationID: id, stopped: [], hasEvents: true))
+        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [id], hasEvents: true))
     }
 
     func testATideStationPublishesBothExtremesAndEclipses() {
@@ -119,10 +120,11 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(calendarSubscriptionChange(on, stationID: "a", premium: true), .remove)
     }
 
-    func testCalendarSubscriptionRequiresCreatedCalendar() {
-        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil))
-        XCTAssertTrue(calendarSubscriptionReady(calendarID: "calendar"))
-        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil))
+    func testCalendarSubscriptionRequiresCalendarOrAnEmptyForecast() {
+        XCTAssertTrue(calendarSubscriptionReady(calendarID: nil, noEvents: true))
+        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noEvents: false))
+        XCTAssertTrue(calendarSubscriptionReady(calendarID: "calendar", noEvents: false))
+        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noEvents: false))
     }
 
     // MARK: the store

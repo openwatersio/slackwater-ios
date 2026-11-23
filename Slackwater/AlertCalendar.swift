@@ -32,8 +32,8 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     return groups
 }
 
-func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
-    !stopped.contains(stationID)
+func calendarShouldCreate(stationID: String, stopped: Set<String>, hasEvents: Bool) -> Bool {
+    !stopped.contains(stationID) && hasEvents
 }
 
 @MainActor enum AlertCalendar {
@@ -187,10 +187,10 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
             }
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
-            // A valid forecast can have no opening within the horizon; keep its subscription
-            // with an empty calendar so it can be filled by a later pass.
+            // Wait for an event before creating a calendar: another device can only
+            // recognize a calendar as ours by its station-linked events.
             guard let calendar = calendarFor(stationID: stationID, title: title,
-                                             create: calendarShouldCreate(stationID: stationID, stopped: stopped), now: now) else { continue }
+                                             create: calendarShouldCreate(stationID: stationID, stopped: stopped, hasEvents: !planned.isEmpty), now: now) else { continue }
             sync(calendar, to: planned, now: now)
         }
     }

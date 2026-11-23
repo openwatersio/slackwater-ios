@@ -158,8 +158,8 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     return premium ? .add : .upsell
 }
 
-func calendarSubscriptionReady(calendarID: String?) -> Bool {
-    calendarID != nil
+func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
+    calendarID != nil || noEvents
 }
 
 @MainActor final class StationCalendarStore: ObservableObject {
