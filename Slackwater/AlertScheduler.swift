@@ -6,6 +6,10 @@ func unchangedResolvedRules(_ snapshot: [AlertRule], current: [AlertRule]) -> [A
     snapshot.filter { current.contains($0) }
 }
 
+func activeRuleIDs(_ rules: [AlertRule]) -> Set<UUID> {
+    Set(rules.filter(\.enabled).map(\.id))
+}
+
 /// One planned delivery with everything a writer needs.
 struct AlertEntry {
     /// Which station's calendar this belongs in.
@@ -186,7 +190,7 @@ struct AlertStatusSnapshot: Equatable {
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
             curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
-            liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial)
+            liveRuleIDs: activeRuleIDs(AlertRuleStore.shared.rules), imperial: imperial)
         await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))
 

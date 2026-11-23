@@ -59,6 +59,14 @@ final class SlackWindowTests: XCTestCase {
         XCTAssertTrue(cardWindows(points: points, slacks: [axisCrossing.time], events: [axisCrossing], threshold: 0.5).isEmpty)
     }
 
+    func testCardDoesNotTreatAnUnmeasuredSlackAsAWindow() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [CurrentPoint(time: start, speed: 1),
+                      CurrentPoint(time: start.addingTimeInterval(600), speed: 1)]
+        let slack = CurrentEvent(time: start.addingTimeInterval(300), speed: 0, kind: .slack, verifiedZero: true)
+        XCTAssertTrue(cardWindows(points: points, slacks: [slack.time], events: [slack], threshold: 0.5).isEmpty)
+    }
+
     func testRotaryEventRequiresAZeroVectorOrVerification() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let middle = start.addingTimeInterval(300)

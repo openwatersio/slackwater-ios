@@ -412,7 +412,9 @@ extension DerivedGateRecord {
 func cardWindows(points: [CurrentPoint], slacks: [Date], events: [CurrentEvent]? = nil, threshold: Double = slackThresholdKn) -> [WindowRun] {
     guard threshold > 0 else { return [] }
     let actual = events ?? slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
-    return currentWindows(points, events: actual, threshold: threshold).map { WindowRun(start: $0.start, end: $0.end) }
+    return currentWindows(points, events: actual, threshold: threshold)
+        .filter { $0.start < $0.end }
+        .map { WindowRun(start: $0.start, end: $0.end) }
 }
 
 /// The slack inside the card's windows at `threshold`, measured the same way.

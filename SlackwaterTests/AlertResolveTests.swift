@@ -15,6 +15,18 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertEqual(unchangedResolvedRules([kept, deleted, edited], current: [kept, disabled, added]), [kept])
     }
 
+    func testEditedEnabledRuleKeepsItsActiveCountdown() {
+        let snapshot = AlertRule(stationID: "current:test", trigger: .slack)
+        var edited = snapshot
+        edited.lead = 1800
+        let active = LiveActivityRecord(key: "open", ruleID: snapshot.id, pending: false,
+                                        event: now.addingTimeInterval(-600), end: now.addingTimeInterval(600))
+        XCTAssertTrue(unchangedResolvedRules([snapshot], current: [edited]).isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([active], liveRuleIDs: activeRuleIDs([edited]), now: now).isEmpty)
+        edited.enabled = false
+        XCTAssertEqual(liveActivitiesToEnd([active], liveRuleIDs: activeRuleIDs([edited]), now: now), ["open"])
+    }
+
     func testResolveNamesPlacesAndReportsUnknownStations() {
         let good = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: true))
         let unknown = AlertRule(stationID: "noaa/does-not-exist", trigger: .tideExtreme(high: true))
