@@ -118,7 +118,7 @@ struct ChsModel: Codable {
     let offset: Double
     /// Fit residual: metres for a tide port, knots for a gate.
     let rms: Double
-    let constituents: [Con]
+    var constituents: [Con]
 }
 
 /// The app-only side effect of a fitted model landing on disk: reload the

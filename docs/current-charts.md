@@ -130,7 +130,8 @@ The countdown questions below are the narrows reading's. At a reach the question
 
 1. **Endpoints are the interpolated ±threshold crossings**, never the nearest
    sample. At a fast gate a 10-minute sample lands a long way from the edge, and
-   the error is always in the dangerous direction.
+   the error is always in the dangerous direction. If the available series starts
+   inside a window, its first sample is not presented as the window's opening.
 2. **Measure full current speed against the comfort threshold.** A run may contain zero, one, or several true zero-current events.
 3. **Touching or overlapping windows are one run.** A run containing one slack labels its opening; a continuous run containing several slacks labels each exact slack instead.
 4. **A window narrower than the sample step is not a window.** Draw the slack

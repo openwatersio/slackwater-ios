@@ -133,11 +133,12 @@ func readsSlack(at t: Date, runs cores: [WindowRun], slacks: [Date]) -> Bool {
 
 /// A continuous window spanning several slacks names each zero, so its off-screen opening cannot hide all the times.
 func slackAxisMoments(windows: [WindowRun], cores: [WindowRun], slacks: [Date],
-                      pointsPerHour: CGFloat) -> [Date] {
+                      pointsPerHour: CGFloat, coverageStart: Date? = nil) -> [Date] {
     let drawn = windows.filter { !$0.drawsAsDot(pointsPerHour: pointsPerHour) }
     let marks = cores.map { $0.axisMoment(pointsPerHour: pointsPerHour) } + bareSlacks(slacks, runs: cores)
     let windowTimes = drawn.flatMap { run -> [Date] in
         let zeros = slacks.filter { run.contains($0) }
+        if let coverageStart, run.start <= coverageStart { return zeros }
         return zeros.count > 1 ? zeros : [run.start]
     }
     return (windowTimes + marks.filter { t in !drawn.contains { $0.contains(t) } }).sorted()

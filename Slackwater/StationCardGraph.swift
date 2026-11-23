@@ -151,8 +151,10 @@ nonisolated struct StationCardGraph: View {
     }
 
     /// The card uses the shared opening-or-slack rule at its own drawing scale.
-    static func axisMoments(_ windows: [WindowRun], cores: [WindowRun], slacks: [Date], pointsPerHour: CGFloat) -> [Date] {
-        slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour)
+    static func axisMoments(_ windows: [WindowRun], cores: [WindowRun], slacks: [Date], pointsPerHour: CGFloat,
+                            coverageStart: Date? = nil) -> [Date] {
+        slackAxisMoments(windows: windows, cores: cores, slacks: slacks, pointsPerHour: pointsPerHour,
+                         coverageStart: coverageStart)
     }
 
     /// Keep the reading on its preferred side unless it would land on the identity rows or axis times.
@@ -275,7 +277,8 @@ nonisolated struct StationCardGraph: View {
                 axisMoments += extremes.filter { $0.deg == nil && $0.flow == nil }.map { ($0.time, $0.timeText, $0.high) }
                 if includesZero {
                     axisMoments += Self.axisMoments(windows, cores: cores, slacks: slacks,
-                                                    pointsPerHour: xScale * 3600).map { ($0, nil, nil) }
+                                                    pointsPerHour: xScale * 3600,
+                                                    coverageStart: points.first?.time).map { ($0, nil, nil) }
                 }
             }
             let keptAxisTimes = Self.thinAxisMoments(axisMoments.map(\.time), x: x, width: size.width)

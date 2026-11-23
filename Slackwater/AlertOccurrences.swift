@@ -115,6 +115,7 @@ func alertSearchSpan(once: Date?, from: Date, to: Date) -> ClosedRange<Date> {
 /// scheduler and the tests are its only callers.
 func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
                       from: Date, to: Date, threshold: Double) -> [AlertOccurrence] {
+    if rule.currentWindowRule && !rule.currentWindowWasOff && slackWindowIsOff(threshold) { return [] }
     var found: [(event: Date, end: Date?, noWindow: Bool, heightM: Double?)]
     var observedThrough: [Date: Date] = [:]
     var unobservedOpenings: Set<Date> = []
@@ -205,10 +206,13 @@ func expiredRules(_ rules: [AlertRule], now: Date, occurrences: [AlertOccurrence
 
 func expiredUnchangedRules(_ snapshot: [AlertRule], current: [AlertRule], now: Date,
                            occurrences: [AlertOccurrence], unresolved: Set<UUID> = [],
-                           noSlack: Set<UUID> = []) -> [UUID] {
+                           noSlack: Set<UUID> = [], heldWindows: Set<UUID> = []) -> [UUID] {
     let unchanged = snapshot.filter { rule in
-        current.contains(rule) && rule.slackNeedsReview != true && !noSlack.contains(rule.id) && !(unresolved.contains(rule.id)
-            && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
+        current.contains(rule) && rule.slackNeedsReview != true && !noSlack.contains(rule.id)
+            && !(heldWindows.contains(rule.id) && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
+            && !(unresolved.contains(rule.id) && rule.once.map {
+                $0.addingTimeInterval(21_600) >= now
+            } == true)
     }
     return expiredRules(unchanged, now: now, occurrences: occurrences)
 }

@@ -298,6 +298,26 @@ import SlackwaterKit
         XCTAssertFalse(tl.isSlack(at: minimum.time))
     }
 
+    func testLeadDoesNotInventAnOpeningAtTheFirstAvailableSample() {
+        let tl = TimelineData(
+            tz: utc, anchor: t0, today: t0, start: at(-3600), end: at(7200), days: [],
+            tidePoints: [], tideRates: [], tideExtremes: [],
+            currentPoints: [CurrentPoint(time: t0, speed: 0.1), CurrentPoint(time: at(7200), speed: 0.1)],
+            currentEvents: [], snapTimes: [],
+            slackWindows: [(slack: t0, start: t0, end: at(7200))])
+        XCTAssertNotEqual(lead(scrub: at(-600), timeline: tl).nextSignificant?.time, t0)
+    }
+
+    func testBoundedWindowDoesNotLabelOrSnapToUnobservedEdges() {
+        let points = [CurrentPoint(time: t0, speed: 0.1), CurrentPoint(time: at(3600), speed: 0.4),
+                      CurrentPoint(time: at(7200), speed: 0.1)]
+        let tl = TimelineData.build(onlinePoints: points, tz: utc, lat: 0, lon: 0,
+                                    now: t0, anchor: t0, threshold: 0.5)
+        XCTAssertFalse(tl.slackAxisTimes.contains(t0))
+        XCTAssertFalse(tl.snapTimes.contains(t0))
+        XCTAssertFalse(tl.snapTimes.contains(at(7200)))
+    }
+
     func testTrialIslandLullIsExcludedFromNextMax() throws {
         let trial = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/PCT1391"))
         let start = Date(timeIntervalSince1970: 1_794_297_600) // 2026-11-10 08:00 UTC

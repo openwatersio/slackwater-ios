@@ -124,6 +124,21 @@ import SlackwaterKit
         XCTAssertEqual(found.map(\.event), slacks.map { alertMinute($0.time) })
     }
 
+    func testTemporarilyTurningOffAOnceWindowDoesNotRetargetItToSlack() throws {
+        let id = "current:noaa/ACT1616"
+        let (station, position) = try load(id)
+        let every = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let slack = try XCTUnwrap(alertOccurrences(every, station: station, position: position,
+                                                   from: now, to: week, threshold: 0).first)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: slack.event)
+        once.currentWindowRule = true
+        XCTAssertTrue(alertOccurrences(once, station: station, position: position,
+                                       from: now, to: week, threshold: 0).isEmpty)
+        once.currentWindowWasOff = true
+        XCTAssertEqual(alertOccurrences(once, station: station, position: position,
+                                        from: now, to: week, threshold: 0).map(\.event), [slack.event])
+    }
+
     // MARK: a once rule takes the occurrence nearest the pressed minute
 
     func testAOnceRuleInsideAWindowResolvesToItsOpening() throws {
@@ -371,6 +386,14 @@ import SlackwaterKit
 
         XCTAssertEqual(alertOccurrences(only, station: station, position: position,
                                         from: now, to: week, threshold: 0.5), [])
+    }
+
+    func testUnresolvedLegacyWindowExpiresAfterReach() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let rule = AlertRule(stationID: "current:missing", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-21_601))
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now,
+                                             occurrences: [], unresolved: [rule.id]), [rule.id])
     }
 
     func testUnresolvedOnceRuleIsKeptWhileItsEventCouldStillBeAhead() {

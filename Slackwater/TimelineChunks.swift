@@ -233,7 +233,8 @@ extension TimelineData {
         // The magnet's stops, assembled the way both monolithic builders do it.
         let sunTimes = days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let others = tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores,
+                               coverageStart: currentPoints.first?.time, coverageEnd: currentPoints.last?.time)
             + eclipses.map(\.peak) + solarEclipses.map(\.peak)
         let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 

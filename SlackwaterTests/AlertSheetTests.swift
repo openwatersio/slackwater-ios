@@ -6,6 +6,17 @@ import SlackwaterKit
 final class AlertSheetTests: XCTestCase {
     private let moment = Date(timeIntervalSince1970: 1_700_000_040)
 
+    func testEditingWindowSelectionUpdatesItsOffOrigin() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        var saved = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: date)
+        saved.currentWindowRule = true
+        saved.currentWindowWasOff = true
+        XCTAssertTrue(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5))
+        var edited = saved
+        edited.once = date.addingTimeInterval(3600)
+        XCTAssertFalse(alertSheetWindowWasOff(edited, saved: saved, threshold: 0.5))
+    }
+
     func testAMomentOffersBothChoicesAndNoMomentOffersOnlyEvery() {
         XCTAssertEqual(alertRepeatChoices(boundMoment: moment), [false, true])
         // Review Focus 4: a repeating rule from the Alerts screen has nothing to bind back to.
@@ -105,6 +116,18 @@ final class AlertSheetTests: XCTestCase {
         XCTAssertFalse(alertSheetOpeningCanSave(.alreadyOpen, now: moment))
         XCTAssertTrue(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(60)), now: moment))
         XCTAssertFalse(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(-60)), now: moment))
+    }
+
+    func testHeldWindowCanStillBeEditedWhileOff() {
+        let station = WidgetStation.current(WindowCurrent(points: []), tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let selected = moment.addingTimeInterval(3600)
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: selected)
+        rule.currentWindowRule = true
+        XCTAssertEqual(alertSheetOpeningAvailability(rule, station: station, position: (0, 0),
+                                                     now: moment, threshold: 0), .held)
+        XCTAssertTrue(alertSheetOpeningCanSave(.held, now: moment))
+        XCTAssertTrue(alertSheetCanSave(rule, now: selected.addingTimeInterval(60), holding: true))
+        XCTAssertFalse(alertSheetCanSave(rule, now: selected.addingTimeInterval(21_601), holding: true))
     }
 
     func testReminderUsesTheResolvedWindowOpening() {

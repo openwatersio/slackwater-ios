@@ -121,19 +121,26 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     /// Turning a station off takes its events with it — that is what the confirmation the user
     /// read said would happen.
     static func removeCalendar(for stationID: String) {
-        guard authorized, let id = StationCalendarStore.shared.calendarID(for: stationID),
-              let calendar = store.calendar(withIdentifier: id) else { return }
-        try? store.removeCalendar(calendar, commit: true)
+        guard authorized else { return }
+        let calendars = StationCalendarStore.shared
+        for id in calendars.calendarIDsForRemoval(stationID) {
+            guard let calendar = store.calendar(withIdentifier: id) else { continue }
+            if (try? store.removeCalendar(calendar, commit: true)) != nil,
+               id == calendars.calendarID(for: stationID) {
+                calendars.forgetWindowCalendar(for: stationID)
+            }
+        }
     }
 
     /// How many of this station's events are still to come — the number the swap and the
     /// turn-off confirmations name.
     static func futureEventCount(for stationID: String, now: Date) -> Int {
-        guard authorized, let id = StationCalendarStore.shared.calendarID(for: stationID),
-              let calendar = store.calendar(withIdentifier: id) else { return 0 }
+        guard authorized else { return 0 }
+        let calendars = StationCalendarStore.shared.calendarIDsForRemoval(stationID).compactMap { store.calendar(withIdentifier: $0) }
+        guard !calendars.isEmpty else { return 0 }
         return store.events(matching: store.predicateForEvents(
             withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),
-            calendars: [calendar])).count
+            calendars: calendars)).count
     }
 
     /// Makes each subscribed station's calendar match its plan — but only where the caller's
@@ -149,6 +156,12 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
         // invisible here, and `calendarFor`'s ownership check creates the duplicate it exists to
         // prevent.
         store.reset()
+        for (stationID, id) in StationCalendarStore.shared.orphanedWindowCalendars {
+            guard let calendar = store.calendar(withIdentifier: id) else { continue }
+            if (try? store.removeCalendar(calendar, commit: true)) != nil {
+                StationCalendarStore.shared.forgetWindowCalendar(for: stationID)
+            }
+        }
         CurrentCalendarInvalidations.retry { clearInvalidatedCurrent($0, now: now) }
         let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,

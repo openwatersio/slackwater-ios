@@ -46,10 +46,11 @@ struct CurrentLead: View {
         }
         slacks += timeline.bareSlackTimes
         var stops: [(time: Date, text: String)] = slacks.map { ($0, "Slack") }
+        let seriesStart = timeline.currentPoints.first?.time ?? .distantFuture
         let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
         for run in timeline.windowRuns where !run.isDot {
             // A window and its core opening together are one stop, the slack.
-            if !slacks.contains(run.start) {
+            if run.start > seriesStart && !slacks.contains(run.start) {
                 stops.append((run.start, "Slack window"))
             }
             // A run that reaches the series' end never closes.

@@ -98,8 +98,12 @@ func calendarTriggers(for kind: StationCalendarKind) -> [AlertTrigger] {
 func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
     switch kind {
     case .tide: "\(name) Tides"
-    case .current, .derived: "\(name) Currents"
+    case .current, .derived: "\(name) Currents · Slackwater"
     }
+}
+
+private func usesWindowCalendar(_ stationID: String) -> Bool {
+    stationID.hasPrefix("current:") || ChsCurrentGateInfo.all.contains { $0.id == stationID }
 }
 
 /// What turning a station's toggle does, given what is already on.
@@ -118,6 +122,10 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     return premium ? .add : .upsell
 }
 
+func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
+    calendarID != nil || noSlack
+}
+
 @MainActor final class StationCalendarStore: ObservableObject {
     static let shared = StationCalendarStore(defaults: AppGroup.defaults)
 
@@ -125,17 +133,31 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     /// Assigned once at launch (SlackwaterApp.init) to the scheduler, like AlertRuleStore's.
     var onChange: () -> Void = {}
     private let defaults: UserDefaults
+    // TODO(#944): Revisit separate calendars after older builds and rollback are no longer supported.
+    // Kept outside the subscription encoding so an older app cannot overwrite the new id.
+    private static let windowIDsKey = "slackwater.currentWindowCalendarIDs"
+    private var windowIDs: [String: String]
 
     /// `successors` moves a subscription whose station left the bundle to the
     /// station that replaced it (`StationSuccessors`), keeping its calendar.
     init(defaults: UserDefaults, successors: [String: String] = StationSuccessors.bundled) {
         self.defaults = defaults
+        let savedWindowIDs = defaults.dictionary(forKey: Self.windowIDsKey) as? [String: String] ?? [:]
+        var migratedWindowIDs: [String: String] = [:]
+        for (id, calendarID) in savedWindowIDs.sorted(by: { $0.key < $1.key }) {
+            let resolved = StationSuccessors.resolve(id, in: successors)
+            if migratedWindowIDs[resolved] == nil { migratedWindowIDs[resolved] = calendarID }
+        }
+        windowIDs = migratedWindowIDs
+        if migratedWindowIDs != savedWindowIDs { defaults.set(migratedWindowIDs, forKey: Self.windowIDsKey) }
         // UI-test hook, like FavoritesStore's `-resetFavorites`: this store and the
         // EventKit calendars it names both persist across a run's separate app launches
         // (same simulator, same App Group), so a test that toggles a calendar on needs its
         // own way back to a clean slate.
         if CommandLine.arguments.contains("-resetCalendars") {
             defaults.removeObject(forKey: AppGroup.stationCalendarsKey)
+            defaults.removeObject(forKey: Self.windowIDsKey)
+            windowIDs = [:]
         }
         let stored = defaults.data(forKey: AppGroup.stationCalendarsKey)
             .flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) } ?? []
@@ -149,8 +171,29 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     }
 
     func calendarID(for stationID: String) -> String? {
-        subscriptions.first { $0.stationID == stationID }
+        guard subscriptions.contains(where: { $0.stationID == stationID }) else { return nil }
+        if usesWindowCalendar(stationID) { return windowIDs[stationID].flatMap { $0.isEmpty ? nil : $0 } }
+        return subscriptions.first { $0.stationID == stationID }
             .map(\.calendarID).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    func calendarIDsForRemoval(_ stationID: String) -> [String] {
+        guard let subscription = subscriptions.first(where: { $0.stationID == stationID }) else { return [] }
+        var ids: [String] = []
+        for id in [calendarID(for: stationID), subscription.calendarID].compactMap({ $0 }) where !id.isEmpty && !ids.contains(id) {
+            ids.append(id)
+        }
+        return ids
+    }
+
+    var orphanedWindowCalendars: [String: String] {
+        let active = Set(subscriptions.map(\.stationID))
+        return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty }
+    }
+
+    func forgetWindowCalendar(for stationID: String) {
+        guard windowIDs.removeValue(forKey: stationID) != nil else { return }
+        defaults.set(windowIDs, forKey: Self.windowIDsKey)
     }
 
     /// Idempotent: subscribing to a station already on keeps the calendar it already has.
@@ -176,6 +219,12 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
 
     func setCalendarID(_ id: String, for stationID: String) {
         guard let i = subscriptions.firstIndex(where: { $0.stationID == stationID }) else { return }
+        if usesWindowCalendar(stationID) {
+            windowIDs[stationID] = id
+            defaults.set(windowIDs, forKey: Self.windowIDsKey)
+            onChange()
+            return
+        }
         subscriptions[i].calendarID = id
         persist()
     }

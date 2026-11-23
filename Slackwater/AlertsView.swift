@@ -14,6 +14,10 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
     if !premium { return "Notifications are Premium" }
     if !status.notificationsAuthorized { return "Notifications are off in Settings" }
+    if status.heldWindows.contains(rule.id) {
+        return String(localized: "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
+    }
+    if status.reviewPending.contains(rule.id) { return String(localized: "Review or delete this alert.") }
     if status.noSlack.contains(rule.id) {
         return String(localized: "No slack in available predictions", comment: "Alert status when the available current predictions contain no true slack for an alert.")
     }

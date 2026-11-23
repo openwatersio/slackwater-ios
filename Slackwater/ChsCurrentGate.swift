@@ -263,9 +263,17 @@ extension ChsCurrentGateInfo {
     func usableModel(_ model: ChsModel) -> ChsModel? {
         guard !isOnline, model.stationID == id,
               let recipe, recipe == ChsCurrentFit.stamp,
-              model.recipe == recipe, let days = model.fitDays else { return nil }
+              let days = model.fitDays else { return nil }
         guard days == fitDays || (offersProvisional && days == Self.provisionalDays) else { return nil }
-        return model
+        if model.recipe == recipe { return model }
+        // TODO(#943): Retire the legacy recipe conversion when saved models and rollback are no longer supported.
+        guard recipe == "bb3c78ac6991", model.schemaVersion == 1, model.recipe == "8f85912ce223",
+              model.constituents.count == ChsCurrentFit.basis.count,
+              Set(model.constituents.map(\.name)) == Set(ChsCurrentFit.basis) else { return nil }
+        var translated = model
+        translated.constituents = translatedLegacyTidePhases(model.constituents)
+        translated.recipe = recipe
+        return translated
     }
 
     func isProvisional(_ model: ChsModel) -> Bool {

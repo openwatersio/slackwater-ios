@@ -208,7 +208,8 @@ struct CalendarStationsView: View {
     private func subscribeAndVerify(_ stationID: String) async {
         calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()
-        guard calendars.calendarID(for: stationID) == nil else { return }
+        guard !calendarSubscriptionReady(calendarID: calendars.calendarID(for: stationID),
+                                         noSlack: AlertScheduler.shared.status.calendarNoSlack.contains(stationID)) else { return }
         calendars.unsubscribe(stationID)
         failedName = name(stationID)
         failed = true

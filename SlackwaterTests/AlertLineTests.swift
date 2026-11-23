@@ -200,7 +200,8 @@ final class AlertLineTests: XCTestCase {
             .first { $0.openingObserved && ($0.end?.timeIntervalSince($0.event) ?? 0) > 600 })
         let opening = alertMinute(window.event)
         let press = min(20 * 60.0, window.end!.timeIntervalSince(opening) / 2)
-        let once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: opening.addingTimeInterval(press), lead: 900)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: opening.addingTimeInterval(press), lead: 900)
+        once.currentWindowRule = true
         let request = AlertMomentRequest(stationID: id, rules: [once], start: opening.addingTimeInterval(press / 2),
                                          end: opening.addingTimeInterval(2 * 86_400), threshold: 0.5)
 

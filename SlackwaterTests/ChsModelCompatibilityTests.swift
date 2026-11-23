@@ -69,6 +69,48 @@ final class ChsModelCompatibilityTests: XCTestCase {
         XCTAssertNil(gate(recipe: "other").usableModel(model(recipe: nil)))
     }
 
+    func testLegacyCurrentModelRemainsUsableOfflineWithCorrectedM3Phase() throws {
+        let constituents = ChsCurrentFit.basis.map { Con(name: $0, amplitude: $0 == "M3" ? 1 : 0, phase: 10) }
+        let legacy = ChsModel(stationID: "chs-test", iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                              fitStartMs: 0, fitEndMs: 1, fitDays: 210, recipe: "8f85912ce223",
+                              floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0,
+                              constituents: constituents)
+        let converted = try XCTUnwrap(gate().usableModel(legacy))
+        XCTAssertEqual(converted.recipe, ChsCurrentFit.stamp)
+        XCTAssertEqual(converted.constituents.first { $0.name == "M3" }?.phase, 190)
+        XCTAssertEqual(converted.constituents.first { $0.name == "M2" }?.phase, 10)
+        XCTAssertEqual(legacy.constituents.first { $0.name == "M3" }?.phase, 10)
+        let station = CurrentStation(constituents: converted.constituents.map {
+            HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
+        }, floodDirection: 45, ebbDirection: 225, offset: 0)
+        let time = Date(timeIntervalSince1970: 1_767_225_600)
+        XCTAssertEqual(try XCTUnwrap(station.speeds(from: time, to: time.addingTimeInterval(1), step: 1).first).speed,
+                       -0.015125836587024157, accuracy: 1e-7)
+        var incomplete = legacy
+        incomplete.constituents.removeLast()
+        XCTAssertNil(gate().usableModel(incomplete))
+    }
+
+    @MainActor func testLegacyCurrentFileRemainsAvailableWithoutCalendarInvalidation() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { !$0.isOnline })
+        let model = ChsModel(stationID: gate.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                             fitStartMs: 0, fitEndMs: 1, fitDays: gate.fitDays, recipe: "8f85912ce223",
+                             floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0,
+                             constituents: ChsCurrentFit.basis.map { Con(name: $0, amplitude: 1, phase: 10) })
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let name = gate.id + "-current.json"
+        let bytes = try JSONEncoder().encode(model)
+        try bytes.write(to: directory.appendingPathComponent(name))
+        ChsFitService.invalidateCurrentCalendars(in: [name], directory: directory, defaults: defaults)
+        XCTAssertTrue(CurrentCalendarInvalidations.pending(in: defaults).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent(name)), bytes)
+        XCTAssertNotNil(gate.usableModel(try JSONDecoder().decode(ChsModel.self, from: bytes)))
+    }
+
     func testUnstampedOrUnknownWindowRefitsOnce() {
         XCTAssertNil(gate().usableModel(model(days: nil, recipe: nil)))
         XCTAssertNil(gate(days: 60).usableModel(model(days: nil, recipe: nil)))

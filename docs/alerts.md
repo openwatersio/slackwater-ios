@@ -57,6 +57,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var lead: TimeInterval = 0
     var sun: SunWindow?          // nil is any time; daylight, goldenHour, blueHour
     var enabled = true
+    var heightNeedsReview: Bool?
+    var slackNeedsReview: Bool?
+    var currentWindowRule = false
+    var currentWindowWasOff = false
 }
 
 enum AlertTrigger: Codable, Equatable {
@@ -198,9 +202,8 @@ of the sources it would create in is adopted only when it already holds one of t
 future events for that station (`owns`); a title match alone is never adopted, because station
 names collide. The title match matters because the calendar syncs: without it a second device
 turning the same station on creates a duplicate calendar with the same name and the user sees every
-event twice. The title carries the series, "*Name* Tides" or "*Name* Currents"
-(`stationCalendarTitle`), so a place that is both a tide and a current station gets two calendars. The comfort speed syncs through iCloud with the units, so devices on one account
-write the same slack windows when they use the same prediction rules. Devices on different app versions can calculate different windows and rewrite each other's synced calendar events until both are updated. Two devices that do not share settings, and are set to *different* comfort
+event twice. The title carries the series: "*Name* Tides", "*Name* Currents · Slackwater" for current windows, including a derived gate (`stationCalendarTitle`). Current windows use a separate calendar and a separately stored identifier from the older app's "*Name* Currents" calendar, so devices on different app versions do not rewrite each other's plans. Both calendars can be visible during the rollout; the older calendar is kept for older devices. Turning the subscription off on an updated device counts and removes both known calendars. If an older build removes the subscription, the updated build removes its orphaned window calendar when access and the calendar are available. The comfort speed syncs through iCloud with the units, so devices on one account
+write the same slack windows when they use the same prediction rules. Two devices that do not share settings, and are set to *different* comfort
 speeds, can likewise rewrite each other's slack windows on every foreground. That is a setting describing one
 boat, and the events are otherwise identical on both devices.
 
@@ -366,7 +369,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
-- Once rules are removed when their stored instant is past and no resolved event remains ahead. A one-time current rule with no predicted true slack is switched off and marked for review, and stays visible until edited or removed even if the comfort setting changes. Turning it back on requires reviewing and saving the rule. Older builds preserve a marked rule as an unreadable trigger rather than expiring or delivering it.
+- Once rules are removed when their stored instant is past and no resolved event remains ahead. An older one-time current rule is marked for review when a comfort window is on, because its original selected event cannot be reconstructed reliably. With the setting Off, it only fires if a true slack falls within two minutes of its saved minute; an ambiguous selection waits until six hours after that minute before it is switched off and marked for review. It then stays visible until edited or removed. A one-time alert saved for a comfort window waits while the setting is Off instead of moving to a different slack; it can resume if the setting is restored within six hours of its selected moment. An alert saved while the setting is Off follows true slacks while Off; if the setting is turned on, the alert is held for review instead of moving to a different window opening. Older builds preserve new one-time window rules and marked rules as unreadable triggers; they cannot deliver them until the app is updated again.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
 calendar turned on or off; the slack threshold changing; `PremiumStore.isPremium` changing; a CHS

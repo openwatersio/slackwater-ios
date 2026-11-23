@@ -405,7 +405,8 @@ struct TimelineData {
 
     /// Window openings, zeros in continuous windows, and uncovered slack marks.
     var slackAxisTimes: [Date] {
-        slackAxisMoments(windows: windowRuns, cores: coreRuns, slacks: slackTimes, pointsPerHour: Timeline.pph)
+        slackAxisMoments(windows: windowRuns, cores: coreRuns, slacks: slackTimes, pointsPerHour: Timeline.pph,
+                         coverageStart: currentPoints.first?.time)
     }
 
     /// A drawn window stops at its opening and closing. A core is one stop at
@@ -413,11 +414,17 @@ struct TimelineData {
     /// dot go with it. A window too short to draw has no stops of its own.
     static func currentSnapTimes(events: [CurrentEvent],
                                  windows: [(slack: Date, start: Date, end: Date)],
-                                 cores: [(slack: Date, start: Date, end: Date)]) -> [Date] {
+                                 cores: [(slack: Date, start: Date, end: Date)],
+                                 coverageStart: Date? = nil, coverageEnd: Date? = nil) -> [Date] {
         let coreRuns = mergedRuns(cores)
         let dots = coreRuns.filter(\.isDot)
         return events.map(\.time).filter { t in !dots.contains { $0.holdsSlack(at: t) } }
-            + mergedRuns(windows).filter { !$0.isDot }.flatMap(\.snapMoments)
+            + mergedRuns(windows).filter { !$0.isDot }.flatMap { run in
+                run.snapMoments.filter { time in
+                    !(time == run.start && coverageStart.map { run.start <= $0 } == true)
+                        && !(time == run.end && coverageEnd.map { run.end >= $0 } == true)
+                }
+            }
             + coreRuns.flatMap(\.snapMoments)
     }
 
@@ -579,7 +586,8 @@ struct TimelineData {
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
-        let others = currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+        let others = currentSnapTimes(events: currentEvents, windows: windows, cores: cores,
+                                      coverageStart: onlinePoints.first?.time, coverageEnd: onlinePoints.last?.time)
             + eclipses.map(\.peak) + solarEclipses.map(\.peak)
         let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 
@@ -670,7 +678,8 @@ struct TimelineData {
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let others = tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
-            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores)
+            + currentSnapTimes(events: currentEvents, windows: windows, cores: cores,
+                               coverageStart: currentPoints.first?.time, coverageEnd: currentPoints.last?.time)
             + eclipses.map(\.peak) + solarEclipses.map(\.peak)
         let snaps = Array(Set(others + sunTimes)).filter { $0 >= start && $0 <= end }.sorted()
 
