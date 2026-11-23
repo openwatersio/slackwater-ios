@@ -211,7 +211,8 @@ func calendarSubscriptionReady(calendarID: String?) -> Bool {
     var orphanedWindowCalendars: [String: String] {
         guard subscriptionsDecoded else { return [:] }
         let active = Set(subscriptions.map(\.stationID))
-        return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty }
+        let usedIDs = Set(subscriptions.flatMap { calendarIDsForRemoval($0.stationID) })
+        return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty && !usedIDs.contains($0.value) }
     }
 
     func rememberOrphanCalendar(_ id: String, for stationID: String) {

@@ -23,6 +23,15 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(Array(store.orphanedWindowCalendars.values), ["old-window"])
     }
 
+    @MainActor func testReusedCalendarIsNotDeletedByOrphanCleanup() {
+        let store = StationCalendarStore(defaults: defaults(), successors: [:])
+        let id = "current:noaa/test"
+        store.rememberOrphanCalendar("calendar", for: id)
+        store.subscribe(id)
+        store.setCalendarID("calendar", for: id)
+        XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+    }
+
     @MainActor func testUnavailableLegacyCalendarIsRetainedAfterUnsubscribe() {
         let d = defaults()
         let id = "current:noaa/test"
