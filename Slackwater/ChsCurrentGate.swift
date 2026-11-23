@@ -296,6 +296,11 @@ extension ChsCurrentGateInfo {
         return (signed, flood, ebb)
     }
 
+    /// Build an in-session record using the same conversion as a model loaded from disk.
+    func usableRecord(with model: ChsModel) -> CurrentStationRecord? {
+        usableModel(model).map { record(with: $0) }
+    }
+
     /// A fitted CHS gate renders through the exact same record/engine/view path
     /// as a bundled NOAA current station — provenance shows only in the footer.
     func record(with model: ChsModel) -> CurrentStationRecord {

@@ -124,7 +124,7 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
 }
 
 func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
-    calendarID != nil || noSlack
+    calendarID != nil
 }
 
 @MainActor final class StationCalendarStore: ObservableObject {

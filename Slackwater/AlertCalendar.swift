@@ -183,13 +183,21 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
 
     private static func clearInvalidatedCurrent(_ stationID: String, now: Date) -> Bool {
         guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return false }
-        let title = stationCalendarTitle(name: gate.name, kind: .current)
-        guard let calendar = calendarFor(stationID: stationID, title: title, create: false, now: now) else {
-            let subscribed = StationCalendarStore.shared.subscriptions.contains { $0.stationID == stationID }
-            return !subscribed && StationCalendarStore.shared.calendarID(for: stationID) == nil
+        let ids = StationCalendarStore.shared.calendarIDsForRemoval(stationID)
+        let calendars: [EKCalendar]
+        if ids.isEmpty {
+            let title = stationCalendarTitle(name: gate.name, kind: .current)
+            guard let calendar = calendarFor(stationID: stationID, title: title, create: false, now: now) else {
+                return !StationCalendarStore.shared.subscriptions.contains { $0.stationID == stationID }
+            }
+            calendars = [calendar]
+        } else {
+            calendars = ids.compactMap { store.calendar(withIdentifier: $0) }
+            // An iCloud calendar may not have appeared on this device yet. Retry later.
+            guard calendars.count == ids.count else { return false }
         }
         let existing = store.events(matching: store.predicateForEvents(
-            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: [calendar]))
+            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: calendars))
         let removals = calendarInvalidationRemovals(existing.map {
             (start: $0.startDate, url: $0.url)
         }, stationID: stationID, now: now)

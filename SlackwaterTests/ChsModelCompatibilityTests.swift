@@ -78,6 +78,7 @@ final class ChsModelCompatibilityTests: XCTestCase {
         let converted = try XCTUnwrap(gate().usableModel(legacy))
         XCTAssertEqual(converted.recipe, ChsCurrentFit.stamp)
         XCTAssertEqual(converted.constituents.first { $0.name == "M3" }?.phase, 190)
+        XCTAssertEqual(gate().usableRecord(with: legacy)?.constituents.first { $0.name == "M3" }?.phase, 190)
         XCTAssertEqual(converted.constituents.first { $0.name == "M2" }?.phase, 10)
         XCTAssertEqual(legacy.constituents.first { $0.name == "M3" }?.phase, 10)
         let station = CurrentStation(constituents: converted.constituents.map {

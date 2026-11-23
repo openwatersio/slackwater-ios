@@ -15,6 +15,8 @@ final class AlertSheetTests: XCTestCase {
         var edited = saved
         edited.once = date.addingTimeInterval(3600)
         XCTAssertFalse(alertSheetWindowWasOff(edited, saved: saved, threshold: 0.5))
+        saved.slackNeedsReview = true
+        XCTAssertFalse(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5))
     }
 
     func testAMomentOffersBothChoicesAndNoMomentOffersOnlyEvery() {

@@ -25,7 +25,8 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date, holding: Bool = false) -> B
 }
 
 func alertSheetWindowWasOff(_ rule: AlertRule, saved: AlertRule?, threshold: Double) -> Bool {
-    if let saved, saved.currentWindowRule, saved.once == rule.once, saved.trigger == rule.trigger {
+    if let saved, saved.slackNeedsReview != true, saved.currentWindowRule,
+       saved.once == rule.once, saved.trigger == rule.trigger {
         return saved.currentWindowWasOff
     }
     return slackWindowIsOff(threshold)

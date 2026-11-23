@@ -1265,8 +1265,9 @@ final class ChsFitService: ObservableObject {
             try ChsModelStore.save(model)
         }
         await MainActor.run {
-            if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
-                self.currentRecords[job.id] = gate.record(with: model)
+            if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }),
+               let record = gate.usableRecord(with: model) {
+                self.currentRecords[job.id] = record
                 self.provisional.remove(job.id)
             } else if let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
                 self.tideRecords[job.id] = info.record(with: model)

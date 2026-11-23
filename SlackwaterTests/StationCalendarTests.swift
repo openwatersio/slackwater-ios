@@ -99,8 +99,8 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(calendarSubscriptionChange(on, stationID: "a", premium: true), .remove)
     }
 
-    func testNoSlackIsAValidSubscriptionEvenWithoutACalendarYet() {
-        XCTAssertTrue(calendarSubscriptionReady(calendarID: nil, noSlack: true))
+    func testCalendarSubscriptionRequiresCreatedCalendar() {
+        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noSlack: true))
         XCTAssertTrue(calendarSubscriptionReady(calendarID: "calendar", noSlack: false))
         XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noSlack: false))
     }
