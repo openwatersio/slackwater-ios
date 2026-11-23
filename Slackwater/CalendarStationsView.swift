@@ -5,6 +5,7 @@ struct CalendarStationsView: View {
     @ObservedObject private var calendars = StationCalendarStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
     @ObservedObject private var premium = PremiumStore.shared
+    @ObservedObject private var scheduler = AlertScheduler.shared
     @State private var showPremium = false
     @State private var pending: PendingRemoval?
     @State private var denied = false
@@ -137,6 +138,11 @@ struct CalendarStationsView: View {
             }
             .disabled(record == nil)
             .accessibilityIdentifier("calendar-station-\(stationID)")
+            if on && !stopped && scheduler.status.calendarNoSlack.contains(stationID) {
+                Text("No slack in available predictions")
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+            }
             if stopped {
                 Button { showPremium = true } label: {
                     Label("Stopped — needs Premium", systemImage: "sparkles")

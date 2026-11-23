@@ -50,6 +50,13 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertFalse(resolved.unresolved.contains(rule.id))
     }
 
+    func testOffModeRotaryCalendarReportsNoPredictedSlack() {
+        let stationID = "current:noaa/KOD0901"
+        let resolved = resolveAlerts([], subscriptions: [stationID], now: now, threshold: 0)
+        XCTAssertTrue(resolved.calendarNoSlack.contains(stationID))
+        XCTAssertFalse(resolved.unresolvedStations.contains(stationID))
+    }
+
     func testASubscribedStationResolvesItsOwnTriggersAndNoRules() {
         let resolved = resolveAlerts([], subscriptions: [TideStationRecord.fridayHarborID],
                                      now: now, threshold: 0.5)

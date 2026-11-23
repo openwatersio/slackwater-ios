@@ -40,6 +40,8 @@ struct ResolvedAlerts: Sendable {
     var unresolved: Set<UUID> = []
     /// Repeating Off-mode current rules for which the available predictions contain no true slack.
     var noSlack: Set<UUID> = []
+    /// Subscribed current stations with predictions but no true slack in Off mode.
+    var calendarNoSlack: Set<String> = []
     /// Subscribed stations that can't be loaded. Their calendars are left exactly as they
     /// are: an empty plan is "nothing known yet", not "delete the next 90 days".
     var unresolvedStations: Set<String> = []
@@ -90,9 +92,14 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             let rule = AlertRule(stationID: stationID, trigger: trigger)
             resolved.calendarRules[rule.id] = rule
             resolved.calendarStations[rule.id] = stationID
-            resolved.calendarOccurrences += alertOccurrences(rule, station: station,
-                                                             position: record.alertPosition,
-                                                             from: now, to: until, threshold: threshold)
+            let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
+                                               from: now, to: until, threshold: threshold)
+            resolved.calendarOccurrences += occurrences
+            if trigger == .slackWindowOpens, slackWindowIsOff(threshold), occurrences.isEmpty,
+               case .current(let current, _, _) = station,
+               current.speeds(from: now, to: now.addingTimeInterval(600), step: 600).count >= 2 {
+                resolved.calendarNoSlack.insert(stationID)
+            }
         }
     }
     return resolved
@@ -102,6 +109,7 @@ struct AlertStatusSnapshot: Equatable {
     var scheduledThrough: [UUID: Date] = [:]
     var unresolved: Set<UUID> = []
     var noSlack: Set<UUID> = []
+    var calendarNoSlack: Set<String> = []
     var notificationsAuthorized = false
 }
 
@@ -209,6 +217,7 @@ struct AlertStatusSnapshot: Equatable {
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved.intersection(Set(rules.map(\.id))),
                                      noSlack: resolved.noSlack.intersection(Set(rules.map(\.id))),
+                                     calendarNoSlack: resolved.calendarNoSlack.intersection(Set(StationCalendarStore.shared.subscriptions.map(\.stationID))),
                                      notificationsAuthorized: await AlertNotifications.authorized())
     }
 }
