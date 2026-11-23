@@ -250,7 +250,7 @@ import SlackwaterDatabase
             var stations = database.map(StationInput.init)
             let i = try XCTUnwrap(stations.firstIndex { $0.current?.offsets == nil })
             clear(&stations[i])
-            try StationDatabase.build(stations, version: database.version).write(to: url)
+            try StationDatabase.build(stations, version: database.version, constituentDefinitions: database.constituentDefinitions).write(to: url)
             rejected("currents")
             try saved.write(to: url)
         }
