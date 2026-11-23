@@ -50,8 +50,8 @@ struct WidgetSnapshot: Equatable {
             let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             // The water's full speed, as the card prints it.
             let speed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.magnitude ?? 0
-            let ev = s.events(from: now, to: now.addingTimeInterval(172_800))
-                .first { $0.time > now }
+            let events = s.events(from: now, to: now.addingTimeInterval(172_800))
+            let ev = currentEventsMatchingWater(s, events: events).first { $0.time > now }
             let next = ev.map {
                 switch $0.kind {
                 case .slack: Event(time: $0.time, label: String(localized: "Slack", comment: "Widget slack-current event label."))

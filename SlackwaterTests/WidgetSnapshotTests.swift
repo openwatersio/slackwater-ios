@@ -563,6 +563,16 @@ import SlackwaterKit
         XCTAssertEqual(card(t.addingTimeInterval(600)), ["Flooding", "1.3", "NE", "1.3 kn, Flooding, setting NE"])
     }
 
+    func testNextEventDoesNotNameRotaryAxisCrossingAsSlack() throws {
+        let record = try XCTUnwrap(CurrentStationRecord.all.first)
+        let t = day
+        let points = [CurrentPoint(time: t, speed: 1, magnitude: 1.5, direction: 45),
+                      CurrentPoint(time: t.addingTimeInterval(600), speed: -1, magnitude: 1.5, direction: 135)]
+        let station = FixedWidgetCurrent(points: points, slacks: [t.addingTimeInterval(300)])
+        XCTAssertNil(record.cardState(at: t, station: station).next)
+        XCTAssertNil(WidgetSnapshot.build(.current(station, tz: .gmt, name: record.name), now: t).next)
+    }
+
     /// The card's state keeps the whole engine-exact point, and the lock-screen widget's value is the same full speed the card prints.
     func testTheCardStateAndTheAccessoryValueCarryTheWatersSpeed() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
