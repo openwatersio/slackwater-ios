@@ -661,11 +661,9 @@ import SlackwaterKit
                                floodDirection: 355, ebbDirection: 155, times: times, speeds: speeds)
     }
 
-    func testOnlineNextEventKeepsSampledSlack() throws {
+    func testOnlineNextEventRejectsCrossFlowAtAxisCrossing() throws {
         let window = doddWindow
-        let slack = try XCTUnwrap(window.events(from: day, to: window.end).first { $0.kind == .slack })
-        let events = currentEventsMatchingWater(window, events: [slack])
-        XCTAssertEqual(events.map(\.time), [slack.time])
+        XCTAssertFalse(window.events(from: day, to: window.end).contains { $0.kind == .slack })
     }
 
     /// The online card reads its nearest sample's speed, and an ebb sample sets along the published ebb bearing.
@@ -679,8 +677,7 @@ import SlackwaterKit
         XCTAssertEqual(face(state), ["Ebbing", "1.2", "SSE", "1.2 kn, Ebbing, setting SSE"])
     }
 
-    /// Within a second of a slack the samples derive, the online card says Slack over its nearest sample's 0.2 kn. That water runs along the axis, so no crossing flow prints and the card shows the slack dot and speaks no set.
-    func testTheOnlineCardAtADerivedSlackShowsTheDot() throws {
+    func testTheOnlineCardAtAnAxisCrossingKeepsTheDirection() throws {
         let window = doddWindow
         let slack = try XCTUnwrap(sampleEvents(window.points).first { $0.kind == .slack }).time
         XCTAssertEqual(slack, day.addingTimeInterval(2 * 600 + 150))
@@ -688,8 +685,7 @@ import SlackwaterKit
         let state = window.cardState(at: now)
         XCTAssertEqual(state.signed, 0.2, "the nearest sample")
         let graph = window.cardGraph(at: now, unit: "kn")
-        XCTAssertTrue(graph.isSlack(at: now))
-        XCTAssertEqual(face(state, inWindow: graph.isSlack(at: now)), ["Slack", "0.2", "•", "0.2 kn, slack"])
+        XCTAssertFalse(graph.isSlack(at: now))
     }
 }
 

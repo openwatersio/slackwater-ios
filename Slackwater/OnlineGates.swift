@@ -23,13 +23,15 @@ extension ChsFitService {
     nonisolated static func onlineVectors(speeds: [ChsSample], dirs: [ChsSample], flood: Double)
         -> (projected: [ChsSample], magnitudes: [Double], directions: [Double])? {
         guard (speeds + dirs).allSatisfy({ $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite }) else { return nil }
-        let projected = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        let speedByTime = Dictionary(speeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let uniqueSpeeds = speedByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
+        let projected = project(speeds: uniqueSpeeds, dirs: dirs, floodDirection: flood)
         guard !projected.isEmpty else { return nil }
-        let speedByTime = Dictionary(speeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { _, b in b })
-        let directionByTime = Dictionary(dirs.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { _, b in b })
+        let directionByTime = Dictionary(dirs.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
         let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
         let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
         guard magnitudes.count == projected.count, directions.count == projected.count,
+              zip(projected, projected.dropFirst()).allSatisfy({ $1.t > $0.t && $1.t - $0.t <= ChsOnlineWindow.sampleInterval * 1000 }),
               magnitudes.allSatisfy({ $0.isFinite && $0 >= 0 }), directions.allSatisfy(\.isFinite) else { return nil }
         return (projected, magnitudes, directions)
     }
@@ -174,7 +176,7 @@ extension ChsFitService {
         try Task.checkCancellation()
         // Empty or unmatched IWLS series cannot establish coverage or a current vector.
         guard let vectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
-            throw ChsError.permanent("\(gate.name): IWLS returned incomplete current vectors")
+            throw ChsError.transient("\(gate.name): IWLS returned incomplete current vectors")
         }
         let projected = vectors.projected
         // A chunk IWLS truncates mid-series (a short response, a gap at one
@@ -227,7 +229,11 @@ extension ChsModelStore {
         let store = (loadOnline(window.stationID)
                      ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
             .inserting(window, prunedBefore: cut)
-        try save(store, id: window.stationID, suffix: "-online")
+        try Task.checkCancellation()
+        let url = onlineUrl(window.stationID)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(store).write(to: url, options: .atomic)
+        WidgetReload.trigger()
         return store.block(spanning: window) ?? window
     }
 }
@@ -252,7 +258,7 @@ extension ChsOnlineWindow {
     func cardState(at now: Date) -> CurrentCardState {
         let point = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }
             ?? CurrentPoint(time: now, speed: 0)
-        let next = currentEventsMatchingWater(points, events: sampleEvents(points)).first { $0.time > now }
+        let next = events(from: now, to: end).first { $0.time > now }
         return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }

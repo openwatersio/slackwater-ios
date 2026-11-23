@@ -213,6 +213,6 @@ extension ChsOnlineWindow: CurrentPredicting {
     }
 
     func events(from start: Date, to end: Date) -> [CurrentEvent] {
-        currentEventsMatchingWater(points, events: sampleEvents(points)).filter { $0.time >= start && $0.time <= end }
+        currentEventsMatchingWater(self, events: sampleEvents(points)).filter { $0.time >= start && $0.time <= end }
     }
 }
