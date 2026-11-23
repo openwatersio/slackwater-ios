@@ -116,6 +116,7 @@ func alertLineLabel(_ state: AlertLineState, offer: AlertTrigger, tz: TimeZone, 
         return String(localized: "Set alert for \(event) · \(when(moment))",
                       comment: "The line under the timeline after a press and hold. First argument is an event such as 'low tide', second a weekday and time.")
     case .set(let rule):
+        if rule.slackNeedsReview == true { return String(localized: "Review or delete this alert.") }
         if let once = rule.once {
             return String(localized: "Alert set · \(event) · \(when(once))",
                           comment: "The line under the timeline when a one-time alert already exists. First argument is an event such as 'low tide', second a weekday and time.")
@@ -135,7 +136,7 @@ struct AlertLine: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
 
     var body: some View {
-        let on: Bool = { if case .set = state { return true } else { return false } }()
+        let on: Bool = { if case .set(let rule) = state { return rule.slackNeedsReview != true } else { return false } }()
         let label = alertLineLabel(state, offer: offer, tz: tz, imperial: units == "imperial")
         HStack(spacing: 6) {
             Image(systemName: on ? "bell.fill" : "bell")

@@ -153,6 +153,13 @@ final class AlertLineTests: XCTestCase {
                        "Alert set · every low tide")
     }
 
+    func testReviewRuleDoesNotClaimItsAlertIsSet() {
+        var rule = AlertRule(stationID: "a", trigger: .slackWindowOpens, once: alertMinute(moment))
+        rule.slackNeedsReview = true
+        XCTAssertEqual(alertLineLabel(.set(rule), offer: rule.trigger, tz: utc, imperial: true, locale: en),
+                       "Review or delete this alert.")
+    }
+
     func testTheLabelReadsTheStationsZone() {
         let pacific = TimeZone(identifier: "America/Vancouver")!
         let label = alertLineLabel(.pressed(moment), offer: .slack, tz: pacific, imperial: true, locale: en)
