@@ -166,24 +166,25 @@ func pinSortRank(_ item: StationItem) -> Double {
 }
 
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
-/// the water is slack — |v| under the same `slackCoreThresholdKn` that
+/// the water is slack — full speed under the same `slackCoreThresholdKn` that
 /// defines the strip's green — and the darkened #97 ramp at the current speed
 /// otherwise. The pin is the instantaneous speed on that ramp, not the strip's window, so it can be yellow where the strip is blue (current-charts §5). Hue no longer says
 /// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
 /// card's arrow + cardinal) carries direction.
 func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      speedUnit: String, detailed: Bool = true) -> PinState {
-    let signed = station.isSubordinate
-        ? subordinateCurrentPinSpeed(station, at: now)
-        : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
-    let slack = abs(signed) <= slackCoreThresholdKn(slackThresholdKn)
+    let point = station.isSubordinate ? nil
+        : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first
+    let signed = station.isSubordinate ? subordinateCurrentPinSpeed(station, at: now) : point?.speed ?? 0
+    let magnitude = point?.magnitude ?? abs(signed)
+    let direction = point.flatMap { [$0].vector(at: now, flood: station.floodDirection, ebb: station.ebbDirection)?.direction }
+    let slack = magnitude <= slackCoreThresholdKn(slackThresholdKn)
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
-                     : pinRampHex(forSpeedKn: abs(signed)),
-        reading: detailed ? formatSpeed(abs(signed), unit: speedUnit) : nil,
+                     : pinRampHex(forSpeedKn: magnitude),
+        reading: detailed ? formatSpeed(magnitude, unit: speedUnit) : nil,
         unit: detailed ? speedUnitLabel(speedUnit) : nil,
-        // Pins keep the major axis: the published bearing for the sign, as React's do.
-        bearing: signed >= 0 ? station.floodDirection : station.ebbDirection)
+        bearing: direction ?? (signed >= 0 ? station.floodDirection : station.ebbDirection))
 }
 
 /// Most current pins are subordinates hanging off a few dozen references, so the reference is

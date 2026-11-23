@@ -438,6 +438,17 @@ import XCTest
                           "a moving pin must never read go")
     }
 
+    func testRotatingCurrentPinShowsFullSpeedAndDirectionAtAxisCrossing() {
+        var station = record(speedKn: 0)
+        station.minorConstituents = [.init(name: "M2", amplitude: 0, phase: 0)]
+        station.minorMeanFlow = 1
+        station.azimuth = 0
+        let pin = currentPinState(station, at: refTime, speedUnit: "kn")
+        XCTAssertEqual(pin.reading, "1.0")
+        XCTAssertEqual(pin.state, pinRampHex(forSpeedKn: 1))
+        XCTAssertEqual(pin.bearing ?? -1, 90, accuracy: 0.001)
+    }
+
     /// The pin ramp must never read green at any speed it can actually render
     /// (above the threshold — below it the pin is go): green is the window's,
     /// exclusively. Contrast over the satellite imagery can't be asserted
