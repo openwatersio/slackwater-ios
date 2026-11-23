@@ -209,6 +209,15 @@ final class AlertLineTests: XCTestCase {
         XCTAssertEqual(fromLater.map(\.event), [opening], "its own opening, for the strip to clip")
     }
 
+    func testRuleNeedingReviewHasNoMarker() {
+        let id = "current:noaa/PUG1701"
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(3 * 86_400)
+        var rule = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        XCTAssertFalse(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
+        rule.slackNeedsReview = true
+        XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
+    }
+
     func testTwoRulesOnOneMomentGiveOneMarker() throws {
         let id = TideStationRecord.fridayHarborID
         let hour = AlertRule(stationID: id, trigger: .tideExtreme(high: false), lead: 3_600)

@@ -68,7 +68,7 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertTrue(resolved.occurrences.isEmpty)
         XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []).isEmpty)
         XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true),
-                       "Edit this alert to review its time.")
+                       "Review or delete this alert.")
     }
 
     func testOffModeRotaryCalendarReportsNoPredictedSlack() {

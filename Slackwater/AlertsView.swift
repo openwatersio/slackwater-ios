@@ -8,7 +8,7 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
         return String(localized: "Set the height again: this place now measures from a different chart datum.", comment: "Alert status for a tide-height alert switched off because its station's data moved to a record measured from another chart datum.")
     }
     if rule.slackNeedsReview == true {
-        return String(localized: "Edit this alert to review its time.", comment: "Status for an alert that needs the user to confirm its selected time.")
+        return String(localized: "Review or delete this alert.", comment: "Status for an alert paused until the user reviews or deletes it.")
     }
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }

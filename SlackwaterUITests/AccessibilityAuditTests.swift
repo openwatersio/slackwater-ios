@@ -19,7 +19,7 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
     /// Contrast is judged on rendered pixels, not the audit's own guess: it
     /// misreads text over the sky and over translucent card fills (a 90%
     /// eyebrow measured at 11.8:1 came back "failed"). An element's own
-    /// screenshot settles it — the brightest pixels are the text, the median
+    /// screenshot settles it — the extreme pixels are the text, the median
     /// is its ground.
     private func audit(_ app: XCUIApplication, _ screen: String, premiumContent: CGRect? = nil) throws {
         save(app, "audit-\(screen.replacingOccurrences(of: " ", with: "-")).png")
@@ -58,8 +58,7 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
         XCTAssertTrue(issues.isEmpty, "\(screen) audit:\n" + issues.joined(separator: "\n"))
     }
 
-    /// WCAG contrast between an element's text (its brightest half-percent of
-    /// pixels) and its ground (the median pixel).
+    /// WCAG contrast between text (the light or dark extreme) and its median ground.
     private func renderedContrast(_ element: XCUIElement) -> Double? {
         guard let cg = element.screenshot().image.cgImage else { return nil }
         let w = cg.width, h = cg.height
@@ -81,8 +80,9 @@ final class AccessibilityAuditTests: ScreenshotTestCase {
         lums.sort()
         guard lums.count > 200 else { return nil }
         let ground = lums[lums.count / 2]
-        let text = lums[Int(Double(lums.count) * 0.995)]
-        return (max(text, ground) + 0.05) / (min(text, ground) + 0.05)
+        let light = lums[Int(Double(lums.count) * 0.995)]
+        let dark = lums[Int(Double(lums.count) * 0.005)]
+        return max((light + 0.05) / (ground + 0.05), (ground + 0.05) / (dark + 0.05))
     }
 
     func testStationListPassesTheAudit() throws {

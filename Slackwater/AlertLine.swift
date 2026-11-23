@@ -72,7 +72,7 @@ let alertOnceReach: TimeInterval = 6 * 3_600
 /// over the reach either side of its own minute. A current window can open much earlier, so
 /// that query also covers the loaded strip. The moment may lie outside the strip; it clips.
 func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
-    let mine = rules.filter { $0.stationID == stationID && $0.enabled }
+    let mine = rules.filter { $0.stationID == stationID && $0.enabled && $0.slackNeedsReview != true }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
     let station = WidgetStationLoader.station(from: record)
     return alertMoments(station: station, position: record.alertPosition, rules: mine, from: from, to: to, threshold: threshold)
@@ -80,7 +80,7 @@ func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, t
 
 func alertMoments(station: WidgetStation, position: (lat: Double, lon: Double), rules: [AlertRule],
                   from: Date, to: Date, threshold: Double) -> [AlertMoment] {
-    let all = rules.flatMap { rule in
+    let all = rules.filter { $0.enabled && $0.slackNeedsReview != true }.flatMap { rule in
         let range = rule.once.map { once in
             let near = (once.addingTimeInterval(-alertOnceReach), once.addingTimeInterval(alertOnceReach))
             return rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
