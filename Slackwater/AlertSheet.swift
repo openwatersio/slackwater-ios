@@ -38,7 +38,7 @@ func alertSheetOpeningCanSave(_ availability: AlertOpeningAvailability, now: Dat
 func alertSheetOpeningAvailability(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
                                    now: Date, threshold: Double) -> AlertOpeningAvailability {
     guard rule.trigger == .slackWindowOpens, let once = rule.once else { return .available(.distantFuture) }
-    let from = now.addingTimeInterval(-26 * 3600)
+    let from = max(now, once).addingTimeInterval(-26 * 3600)
     let to = max(now, once).addingTimeInterval(6 * 3600)
     guard let opening = alertOccurrences(rule, station: station, position: position,
                                          from: from, to: to, threshold: threshold).first else { return .unavailable }

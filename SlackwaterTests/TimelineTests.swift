@@ -1807,7 +1807,7 @@ private struct FoldPageTestHarness: View {
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
         let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
                                           anchor: todayLocal(station.tz), threshold: 1)
-        let run = try XCTUnwrap(timeline.windowRuns.first { !$0.isDot })
+        let run = try XCTUnwrap(timeline.windowRuns.first { !$0.isDot && timeline.contains($0.start) && timeline.contains($0.end) })
         XCTAssertTrue(timeline.snapTimes.contains(run.start))
         XCTAssertTrue(timeline.snapTimes.contains(run.end))
     }

@@ -66,6 +66,24 @@ final class AlertSheetTests: XCTestCase {
         func events(from: Date, to: Date) -> [CurrentEvent] { [] }
     }
 
+    private final class RangeRecordingCurrent: CurrentPredicting, @unchecked Sendable {
+        var queriedDuration: TimeInterval = 0
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            queriedDuration = to.timeIntervalSince(from)
+            return []
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    func testFarFutureOpeningCheckDoesNotScanTheInterveningMonths() {
+        let current = RangeRecordingCurrent()
+        let station = WidgetStation.current(current, tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: moment.addingTimeInterval(300 * 86_400))
+        _ = alertSheetOpeningAvailability(rule, station: station, position: (0, 0), now: moment, threshold: 0.5)
+        XCTAssertLessThanOrEqual(current.queriedDuration, 48 * 3600)
+    }
+
     func testOpeningAlertCannotSaveAfterItsWindowOpened() {
         let points = [1.0, 0.1, 0.1, 1.0].enumerated().map {
             CurrentPoint(time: moment.addingTimeInterval(Double($0.offset - 1) * 3600), speed: $0.element)
