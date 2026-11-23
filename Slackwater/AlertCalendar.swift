@@ -170,6 +170,10 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
                 StationCalendarStore.shared.forgetWindowCalendar(for: stationID)
             }
         }
+        CurrentCalendarInvalidations.retryDeferred { stationID, calendarID in
+            guard let calendar = store.calendar(withIdentifier: calendarID) else { return false }
+            return clearGeneratedEvents(in: [calendar], stationID: stationID, now: now)
+        }
         CurrentCalendarInvalidations.retry { clearInvalidatedCurrent($0, now: now) }
         let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
@@ -203,10 +207,13 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
             calendars = [calendar]
         } else {
             calendars = ids.compactMap { store.calendar(withIdentifier: $0) }
-            // A missing legacy calendar may have been deleted. Keep retrying if the
-            // current window calendar itself has not appeared on this device yet.
-            guard calendarInvalidationCanProceed(windowID: StationCalendarStore.shared.calendarID(for: stationID),
-                                                 found: Set(calendars.map(\.calendarIdentifier))) else { return false }
+            let found = Set(calendars.map(\.calendarIdentifier))
+            let windowID = StationCalendarStore.shared.calendarID(for: stationID)
+            // Missing legacy calendars can sync later. Remember them separately so the
+            // current calendar can be cleared and reused without losing that cleanup.
+            CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
+                calendarIDs: Set(ids).subtracting(found).subtracting(windowID.map { [$0] } ?? []))
+            guard calendarInvalidationCanProceed(windowID: windowID, found: found) else { return false }
             if calendars.isEmpty { return true }
         }
         return clearGeneratedEvents(in: calendars, stationID: stationID, now: now)

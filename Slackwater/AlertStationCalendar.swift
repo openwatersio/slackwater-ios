@@ -16,6 +16,7 @@ func calendarInvalidationCanProceed(windowID: String?, found: Set<String>) -> Bo
 /// A rejected model can disappear before Calendar access is granted, so the cleanup survives launch.
 enum CurrentCalendarInvalidations {
     private static let key = "slackwater.invalidatedCurrentCalendars"
+    private static let deferredKey = "slackwater.deferredCurrentCalendarInvalidations"
 
     static func pending(in defaults: UserDefaults = AppGroup.defaults) -> Set<String> {
         Set(defaults.stringArray(forKey: key) ?? [])
@@ -23,6 +24,35 @@ enum CurrentCalendarInvalidations {
 
     static func reset(in defaults: UserDefaults = AppGroup.defaults) {
         defaults.removeObject(forKey: key)
+        defaults.removeObject(forKey: deferredKey)
+    }
+
+    static func deferred(in defaults: UserDefaults = AppGroup.defaults) -> [String: [String]] {
+        defaults.dictionary(forKey: deferredKey) as? [String: [String]] ?? [:]
+    }
+
+    static func recordDeferred(stationID: String, calendarIDs: Set<String>, in defaults: UserDefaults = AppGroup.defaults) {
+        guard !calendarIDs.isEmpty else { return }
+        var entries = deferred(in: defaults)
+        entries[stationID] = Array(Set(entries[stationID] ?? []).union(calendarIDs)).sorted()
+        defaults.set(entries, forKey: deferredKey)
+    }
+
+    @MainActor static func retryDeferred(in defaults: UserDefaults = AppGroup.defaults,
+                                         clear: (String, String) -> Bool) {
+        var entries = deferred(in: defaults)
+        for (stationID, ids) in entries {
+            let remaining = ids.filter { !clear(stationID, $0) }
+            entries[stationID] = remaining.isEmpty ? nil : remaining
+        }
+        defaults.set(entries, forKey: deferredKey)
+    }
+
+    static func forget(stationID: String, in defaults: UserDefaults = AppGroup.defaults) {
+        var entries = deferred(in: defaults)
+        entries.removeValue(forKey: stationID)
+        defaults.set(entries, forKey: deferredKey)
+        defaults.set(pending(in: defaults).subtracting([stationID]).sorted(), forKey: key)
     }
 
     static func record(_ ids: Set<String>, in defaults: UserDefaults = AppGroup.defaults) {
@@ -243,6 +273,7 @@ func calendarSubscriptionReady(calendarID: String?) -> Bool {
     }
 
     func unsubscribe(_ stationID: String) {
+        CurrentCalendarInvalidations.forget(stationID: stationID, in: defaults)
         subscriptions.removeAll { $0.stationID == stationID }
         persist()
     }

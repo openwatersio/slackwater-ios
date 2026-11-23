@@ -9,6 +9,28 @@ final class CalendarInvalidationTests: XCTestCase {
         return UserDefaults(suiteName: name)!
     }
 
+    @MainActor func testMissingLegacyCalendarIsRetriedAfterItAppears() {
+        let d = defaults()
+        CurrentCalendarInvalidations.recordDeferred(stationID: "gate", calendarIDs: ["legacy"], in: d)
+        CurrentCalendarInvalidations.retryDeferred(in: d) { _, _ in false }
+        XCTAssertEqual(CurrentCalendarInvalidations.deferred(in: d)["gate"], ["legacy"])
+        CurrentCalendarInvalidations.retryDeferred(in: d) { station, calendar in
+            station == "gate" && calendar == "legacy"
+        }
+        XCTAssertTrue(CurrentCalendarInvalidations.deferred(in: d).isEmpty)
+    }
+
+    @MainActor func testUnsubscribeCancelsDeferredEventRemoval() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.subscribe("gate")
+        CurrentCalendarInvalidations.record(["gate"], in: d)
+        CurrentCalendarInvalidations.recordDeferred(stationID: "gate", calendarIDs: ["legacy"], in: d)
+        store.unsubscribe("gate")
+        XCTAssertTrue(CurrentCalendarInvalidations.pending(in: d).isEmpty)
+        XCTAssertTrue(CurrentCalendarInvalidations.deferred(in: d).isEmpty)
+    }
+
     func testMissingLegacyCalendarDoesNotBlockInvalidatingCurrentCalendar() {
         XCTAssertTrue(calendarInvalidationCanProceed(windowID: "current", found: ["current"]))
         XCTAssertFalse(calendarInvalidationCanProceed(windowID: "current", found: ["legacy"]))
