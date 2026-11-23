@@ -123,9 +123,9 @@ terms are worse than "no" — silence is not permission.
 
 ### The other sources, and why they behave differently
 
-- **NOAA** — public domain. 3,263 tide stations and 2,572 current stations (harmonic or
+- **NOAA** — public domain. 3,264 tide stations and 2,572 current stations (harmonic or
   subordinate-offset) ship with full constituents, offline from first launch.
-- **TICON-4** — the CC BY 4.0 half ships, 1,381 stations; the ones in Canadian water CHS does
+- **TICON-4** — the CC BY 4.0 half ships, 1,379 stations; the ones in Canadian water CHS does
   not gauge are the gap-fills `tools/gen-tides.mjs` counts in its census line. Attribution is in
   Settings. **This is the precedent for bundling third-party harmonic constants** — see
   `tools/gen-tides.mjs`.
