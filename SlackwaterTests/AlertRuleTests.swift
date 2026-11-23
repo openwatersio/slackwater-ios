@@ -42,6 +42,25 @@ import XCTest
         XCTAssertNil(reloaded.rules.first?.slackNeedsReview)
     }
 
+    func testReviewedSlackRuleSurvivesLegacyWrite() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        store.upsert(rule)
+        store.markSlackNeedsReview([rule], ids: [rule.id])
+        let data = try XCTUnwrap(defaults.data(forKey: AppGroup.alertRulesKey))
+        let items = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [Any])
+        let item = try XCTUnwrap(items.first)
+        let encoded = try JSONSerialization.data(withJSONObject: item)
+        struct LegacyRule: Decodable { let trigger: AlertTrigger }
+        XCTAssertThrowsError(try JSONDecoder().decode(LegacyRule.self, from: encoded))
+        defaults.set(try JSONSerialization.data(withJSONObject: items), forKey: AppGroup.alertRulesKey)
+        let restored = try XCTUnwrap(AlertRuleStore(defaults: defaults).rules.first)
+        XCTAssertEqual(restored.slackNeedsReview, true)
+        XCTAssertFalse(restored.enabled)
+    }
+
     func testSlackReviewDoesNotOverwriteAConcurrentEdit() {
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }

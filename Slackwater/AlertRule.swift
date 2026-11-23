@@ -44,6 +44,9 @@ struct AlertRule: Codable, Identifiable, Equatable {
         self.heightNeedsReview = heightNeedsReview
     }
 
+    // An older build preserves unknown triggers verbatim rather than expiring them.
+    private enum ReviewTrigger: Codable { case slackWindowReview }
+
     private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview, slackNeedsReview }
 
     // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
@@ -54,21 +57,26 @@ struct AlertRule: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         stationID = try c.decode(String.self, forKey: .stationID)
-        trigger = try c.decode(AlertTrigger.self, forKey: .trigger)
+        let reviewTrigger = (try? c.decode(ReviewTrigger.self, forKey: .trigger)) != nil
+        trigger = reviewTrigger ? .slackWindowOpens : try c.decode(AlertTrigger.self, forKey: .trigger)
         once = try c.decodeIfPresent(Date.self, forKey: .once)
         lead = try c.decode(TimeInterval.self, forKey: .lead)
         sun = try c.decodeIfPresent(SunWindow.self, forKey: .sun)
             ?? (try c.decodeIfPresent(Bool.self, forKey: .daylightOnly) == true ? .daylight : nil)
         enabled = try c.decode(Bool.self, forKey: .enabled)
         heightNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .heightNeedsReview)
-        slackNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .slackNeedsReview)
+        slackNeedsReview = reviewTrigger ? true : try c.decodeIfPresent(Bool.self, forKey: .slackNeedsReview)
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(stationID, forKey: .stationID)
-        try c.encode(trigger, forKey: .trigger)
+        if slackNeedsReview == true {
+            try c.encode(ReviewTrigger.slackWindowReview, forKey: .trigger)
+        } else {
+            try c.encode(trigger, forKey: .trigger)
+        }
         try c.encodeIfPresent(once, forKey: .once)
         try c.encode(lead, forKey: .lead)
         try c.encodeIfPresent(sun, forKey: .sun)
