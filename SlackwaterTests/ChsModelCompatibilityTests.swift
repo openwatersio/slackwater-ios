@@ -28,6 +28,30 @@ final class ChsModelCompatibilityTests: XCTestCase {
         XCTAssertEqual(info.record(with: model).constituents.map(\.phase), [170, 12])
     }
 
+    func testFittedTideRetainsPhaseThroughStoredModel() async throws {
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let end = start.addingTimeInterval(90 * 86_400)
+        let source = Station(constituents: [HarmonicConstituent(name: "M3", amplitude: 1, phase: 37)], offset: 1)
+        let samples = source.heights(from: start, to: end, step: 3600).map {
+            ChsSample(t: $0.time.timeIntervalSince1970 * 1000, v: $0.height)
+        }
+        let fit = try await ChsFitter().fit(samples: samples, basis: ChsFitter.tideBasis)
+        let info = try XCTUnwrap(ChsStationInfo.all.first)
+        let model = ChsModel(stationID: info.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                             fitStartMs: 0, fitEndMs: 1, offset: fit.offset, rms: fit.rms,
+                             constituents: translatedLegacyTidePhases(fit.constituents))
+        let record = info.record(with: model)
+        let restored = Station(constituents: record.constituents.map {
+            HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
+        }, offset: record.datumOffset)
+        let heldStart = end.addingTimeInterval(3600)
+        let heldEnd = heldStart.addingTimeInterval(24 * 3600)
+        let expected = source.heights(from: heldStart, to: heldEnd, step: 3600)
+        let actual = restored.heights(from: heldStart, to: heldEnd, step: 3600)
+        XCTAssertEqual(actual.count, expected.count)
+        for (a, e) in zip(actual, expected) { XCTAssertEqual(a.height, e.height, accuracy: 0.001) }
+    }
+
     func testOnlyMeasuredWindowsAreUsable() {
         XCTAssertNotNil(gate().usableModel(model()))
         XCTAssertNotNil(gate().usableModel(model(days: 60)))
