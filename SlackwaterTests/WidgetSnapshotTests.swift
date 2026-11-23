@@ -567,10 +567,21 @@ import SlackwaterKit
         let record = try XCTUnwrap(CurrentStationRecord.all.first)
         let t = day
         let points = [CurrentPoint(time: t, speed: 1, magnitude: 1.5, direction: 45),
+                      CurrentPoint(time: t.addingTimeInterval(300), speed: 0, magnitude: 1.5, direction: 90),
                       CurrentPoint(time: t.addingTimeInterval(600), speed: -1, magnitude: 1.5, direction: 135)]
         let station = FixedWidgetCurrent(points: points, slacks: [t.addingTimeInterval(300)])
         XCTAssertNil(record.cardState(at: t, station: station).next)
         XCTAssertNil(WidgetSnapshot.build(.current(station, tz: .gmt, name: record.name), now: t).next)
+    }
+
+    func testNextEventKeepsARealUnverifiedSlack() throws {
+        let record = try XCTUnwrap(CurrentStationRecord.all.first)
+        let t = day
+        let slack = t.addingTimeInterval(300)
+        let station = FixedWidgetCurrent(points: [CurrentPoint(time: t, speed: 1),
+                                                  CurrentPoint(time: slack, speed: 0)], slacks: [slack])
+        XCTAssertEqual(record.cardState(at: t, station: station).next?.time, slack)
+        XCTAssertEqual(WidgetSnapshot.build(.current(station, tz: .gmt, name: record.name), now: t).next?.time, slack)
     }
 
     /// The card's state keeps the whole engine-exact point, and the lock-screen widget's value is the same full speed the card prints.
@@ -634,6 +645,13 @@ import SlackwaterKit
         return ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
                                start: day, end: Date(timeIntervalSince1970: times.last!),
                                floodDirection: 355, ebbDirection: 155, times: times, speeds: speeds)
+    }
+
+    func testOnlineNextEventKeepsSampledSlack() throws {
+        let window = doddWindow
+        let slack = try XCTUnwrap(window.events(from: day, to: window.end).first { $0.kind == .slack })
+        let events = currentEventsMatchingWater(window, events: [slack])
+        XCTAssertEqual(events.map(\.time), [slack.time])
     }
 
     /// The online card reads its nearest sample's speed, and an ebb sample sets along the published ebb bearing.

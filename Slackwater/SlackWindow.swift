@@ -63,8 +63,7 @@ func currentEventsMatchingWater(_ points: [CurrentPoint], events: [CurrentEvent]
 func currentEventsMatchingWater(_ station: any CurrentPredicting, events: [CurrentEvent]) -> [CurrentEvent] {
     events.filter { event in
         guard event.kind == .slack, !event.verifiedZero else { return true }
-        let points = station.speeds(from: event.time.addingTimeInterval(-300),
-                                    to: event.time.addingTimeInterval(300), step: 600)
+        let points = Array(station.speeds(from: event.time, to: event.time.addingTimeInterval(1), step: 1).prefix(1))
         return !currentEventsMatchingWater(points, events: [event]).isEmpty
     }
 }
