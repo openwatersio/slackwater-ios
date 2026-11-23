@@ -100,7 +100,7 @@ import CoreLocation
         let midnight = try XCTUnwrap(calendar.date(from: DateComponents(year: 2028, month: 10, day: 27)))
         let day = try XCTUnwrap(calendar.dateInterval(of: .day, for: midnight))
         let hours = [-12.0, -6, -2, -1, 0, 1, 2, 6, 12, 18, 24, 30]
-        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name,
+        let online = ChsOnlineWindow(axisOnly: true, stationID: record.id, iwlsName: record.name,
             timezone: record.tz.identifier, fetchedAt: midnight,
             start: midnight.addingTimeInterval(-12 * 3_600), end: midnight.addingTimeInterval(30 * 3_600),
             floodDirection: 0, ebbDirection: 180,
@@ -370,7 +370,7 @@ import CoreLocation
             WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let hours = [-12.0, 0, 1, 2, 3, 4, 5, 24]
-        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name,
+        let online = ChsOnlineWindow(axisOnly: true, stationID: record.id, iwlsName: record.name,
             timezone: record.tz.identifier, fetchedAt: now,
             start: now.addingTimeInterval(-12 * 3_600), end: now.addingTimeInterval(24 * 3_600),
             floodDirection: 0, ebbDirection: 180,
@@ -391,7 +391,7 @@ import CoreLocation
             WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let hours = Array(stride(from: -6.0, through: 54.0, by: 1.0 / 6))
-        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name,
+        let online = ChsOnlineWindow(axisOnly: true, stationID: record.id, iwlsName: record.name,
             timezone: record.tz.identifier, fetchedAt: now,
             start: now.addingTimeInterval(-6 * 3_600), end: now.addingTimeInterval(54 * 3_600),
             floodDirection: 0, ebbDirection: 180,

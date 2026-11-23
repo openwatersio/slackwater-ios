@@ -621,7 +621,7 @@ import SlackwaterKit
     private var doddWindow: ChsOnlineWindow {
         let speeds = [1.0, 0.6, 0.2, -0.6, -1.2, -0.8]
         let times = speeds.indices.map { day.addingTimeInterval(Double($0) * 600).timeIntervalSince1970 }
-        return ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
+        return ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
                                start: day, end: Date(timeIntervalSince1970: times.last!),
                                floodDirection: 355, ebbDirection: 155, times: times, speeds: speeds)
     }

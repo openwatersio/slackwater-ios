@@ -135,7 +135,7 @@ import SlackwaterDatabase
             let to = start.addingTimeInterval(lastDay * 86_400)
             let times = stride(from: from.timeIntervalSince1970,
                                through: to.timeIntervalSince1970, by: 900).map { $0 }
-            return ChsOnlineWindow(
+            return ChsOnlineWindow(axisOnly: true,
                 stationID: id, iwlsName: gate.name, timezone: gate.timezone,
                 fetchedAt: start, start: from, end: to,
                 floodDirection: 290, ebbDirection: 110,
@@ -340,7 +340,7 @@ import SlackwaterDatabase
                 if let previous { try? previous.write(to: url) }
                 else { try? FileManager.default.removeItem(at: url) }
             }
-            try ChsModelStore.saveOnline(ChsOnlineWindow(
+            try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
                 stationID: id, iwlsName: gate.name, timezone: gate.timezone,
                 fetchedAt: now, start: start,
                 end: start.addingTimeInterval(12 * 86_400),

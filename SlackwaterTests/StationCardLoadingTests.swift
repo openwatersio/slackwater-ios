@@ -99,7 +99,7 @@ final class StationCardLoadingTests: XCTestCase {
     }
 
     private func window() -> ChsOnlineWindow {
-        ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC",
+        ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC",
                         fetchedAt: t0, start: t0, end: t0.addingTimeInterval(86_400),
                         floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
     }
