@@ -44932,6 +44932,101 @@
         }
       }
     },
+    "Edit this alert to review its time." : {
+      "comment": "Status for an alert that needs the user to confirm its selected time.",
+      "localizations": {
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger denne påmindelse for at gennemgå tidspunktet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bearbeite diesen Hinweis, um die Uhrzeit zu überprüfen."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edita este aviso para revisar su hora."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muokkaa tätä hälytystä tarkistaaksesi sen ajan."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifiez cette alerte pour vérifier son heure."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuir an foláireamh seo in eagar chun an t-am a sheiceáil."
+          }
+        },
+        "gd": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deasaich an rabhadh seo gus an t-àm a sgrùdadh."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica questo avviso per verificarne l’orario."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この通知を編集して時刻を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 알림을 편집하여 시간을 확인하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger dette varselet for å kontrollere tidspunktet."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bewerk deze melding om de tijd te controleren."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edite este alerta para conferir o horário."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edite este alerta para verificar a hora."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redigera den här aviseringen för att granska tiden."
+          }
+        }
+      }
+    },
     "No slack in available predictions" : {
       "comment" : "Alert status when the available current predictions contain no true slack for a repeating alert.",
       "localizations" : {

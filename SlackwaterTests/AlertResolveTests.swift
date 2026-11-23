@@ -67,7 +67,8 @@ final class AlertResolveTests: XCTestCase {
         let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
         XCTAssertTrue(resolved.occurrences.isEmpty)
         XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []).isEmpty)
-        XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true), "No slack in available predictions")
+        XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true),
+                       "Edit this alert to review its time.")
     }
 
     func testOffModeRotaryCalendarReportsNoPredictedSlack() {
