@@ -42,6 +42,14 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertTrue(resolved.occurrences.allSatisfy { $0.event.timeIntervalSince(self.now) <= AlertHorizon.calendar })
     }
 
+    func testOffModeRotaryRuleReportsNoPredictedSlack() {
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens)
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertTrue(resolved.occurrences.isEmpty)
+        XCTAssertTrue(resolved.noSlack.contains(rule.id))
+        XCTAssertFalse(resolved.unresolved.contains(rule.id))
+    }
+
     func testASubscribedStationResolvesItsOwnTriggersAndNoRules() {
         let resolved = resolveAlerts([], subscriptions: [TideStationRecord.fridayHarborID],
                                      now: now, threshold: 0.5)

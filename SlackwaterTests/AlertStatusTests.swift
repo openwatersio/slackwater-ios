@@ -3,6 +3,11 @@ import XCTest
 @testable import Slackwater
 
 final class AlertStatusTests: XCTestCase {
+    func testAQuietRotaryRuleExplainsThatNoSlackWasFound() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let status = AlertStatusSnapshot(noSlack: [rule.id], notificationsAuthorized: true)
+        XCTAssertEqual(alertStatusText(rule, status, premium: true), "No slack in available predictions")
+    }
     func testAPremiumlessRuleSaysSo() {
         let rule = AlertRule(stationID: "a", trigger: .slack)
         XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: false),

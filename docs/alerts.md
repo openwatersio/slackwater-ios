@@ -380,7 +380,8 @@ rather than a silent stop.
 
 **Rule states** (Alerts screen), in the order they are tested: Off · Waiting for station data (a
 CHS station not yet fitted) · Notifications are Premium (rendered as a `PremiumRequirement` link)
-· Notifications are off in Settings · Nothing coming up · Scheduled through *date* · Set the
+· Notifications are off in Settings · No slack in available predictions (a repeating current alert
+with the window Off and no true slack in the available series) · Nothing coming up · Scheduled through *date* · Set the
 height again (below).
 
 **A rule's station replaced by another record** (`Resources/station-successors.json`, list.md

@@ -11,6 +11,9 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
     if !premium { return "Notifications are Premium" }
     if !status.notificationsAuthorized { return "Notifications are off in Settings" }
+    if status.noSlack.contains(rule.id) {
+        return String(localized: "No slack in available predictions", comment: "Alert status when the available current predictions contain no true slack for a repeating alert.")
+    }
     guard let date = status.scheduledThrough[rule.id] else { return "Nothing coming up" }
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"
 }
