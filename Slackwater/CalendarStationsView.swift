@@ -171,6 +171,7 @@ struct CalendarStationsView: View {
             // this toggle reads off. Tell the truth instead: drop the subscription, which is all
             // this device can actually do, and say so.
             guard AlertCalendar.authorized else {
+                calendars.forgetWindowCalendar(for: stationID)
                 calendars.unsubscribe(stationID)
                 revokedName = name(stationID)
                 revoked = true
@@ -204,8 +205,7 @@ struct CalendarStationsView: View {
     private func subscribeAndVerify(_ stationID: String) async {
         calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()
-        guard !calendarSubscriptionReady(calendarID: calendars.calendarID(for: stationID),
-                                         noSlack: AlertScheduler.shared.status.calendarNoSlack.contains(stationID)) else { return }
+        guard !calendarSubscriptionReady(calendarID: calendars.calendarID(for: stationID)) else { return }
         calendars.unsubscribe(stationID)
         failedName = name(stationID)
         failed = true

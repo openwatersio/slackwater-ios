@@ -9,6 +9,12 @@ final class CalendarInvalidationTests: XCTestCase {
         return UserDefaults(suiteName: name)!
     }
 
+    func testMissingLegacyCalendarDoesNotBlockInvalidatingCurrentCalendar() {
+        XCTAssertTrue(calendarInvalidationCanProceed(windowID: "current", found: ["current"]))
+        XCTAssertFalse(calendarInvalidationCanProceed(windowID: "current", found: ["legacy"]))
+        XCTAssertTrue(calendarInvalidationCanProceed(windowID: nil, found: []))
+    }
+
     func testOnlyFutureEventsWithTheAffectedStationsMintedURLAreRemoved() throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000), id = "chs-dodd-narrows"
         let own = deepLink(forStationID: id)

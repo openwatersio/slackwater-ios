@@ -8,6 +8,11 @@ func calendarInvalidationRemovals(_ events: [(start: Date, url: URL?)], stationI
     }
 }
 
+/// A missing legacy calendar can have been deleted; a missing current calendar may still sync in.
+func calendarInvalidationCanProceed(windowID: String?, found: Set<String>) -> Bool {
+    windowID.map { found.contains($0) } ?? true
+}
+
 /// A rejected model can disappear before Calendar access is granted, so the cleanup survives launch.
 enum CurrentCalendarInvalidations {
     private static let key = "slackwater.invalidatedCurrentCalendars"
@@ -123,7 +128,7 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     return premium ? .add : .upsell
 }
 
-func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
+func calendarSubscriptionReady(calendarID: String?) -> Bool {
     calendarID != nil
 }
 

@@ -193,8 +193,11 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
             calendars = [calendar]
         } else {
             calendars = ids.compactMap { store.calendar(withIdentifier: $0) }
-            // An iCloud calendar may not have appeared on this device yet. Retry later.
-            guard calendars.count == ids.count else { return false }
+            // A missing legacy calendar may have been deleted. Keep retrying if the
+            // current window calendar itself has not appeared on this device yet.
+            guard calendarInvalidationCanProceed(windowID: StationCalendarStore.shared.calendarID(for: stationID),
+                                                 found: Set(calendars.map(\.calendarIdentifier))) else { return false }
+            if calendars.isEmpty { return true }
         }
         let existing = store.events(matching: store.predicateForEvents(
             withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: calendars))
