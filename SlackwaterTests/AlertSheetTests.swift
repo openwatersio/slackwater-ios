@@ -6,6 +6,14 @@ import SlackwaterKit
 final class AlertSheetTests: XCTestCase {
     private let moment = Date(timeIntervalSince1970: 1_700_000_040)
 
+    func testReviewSheetStartsEnabledWithoutChangingOrdinaryOffRules() {
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        rule.enabled = false
+        XCTAssertFalse(alertSheetInitialRule(rule).enabled)
+        rule.slackNeedsReview = true
+        XCTAssertTrue(alertSheetInitialRule(rule).enabled)
+    }
+
     func testEditingWindowSelectionUpdatesItsOffOrigin() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         var saved = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: date)

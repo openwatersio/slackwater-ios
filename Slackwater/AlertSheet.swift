@@ -32,6 +32,12 @@ func alertSheetWindowWasOff(_ rule: AlertRule, saved: AlertRule?, threshold: Dou
     return slackWindowIsOff(threshold)
 }
 
+func alertSheetInitialRule(_ rule: AlertRule) -> AlertRule {
+    var initial = rule
+    if initial.slackNeedsReview == true { initial.enabled = true }
+    return initial
+}
+
 enum AlertOpeningAvailability: Equatable, Sendable {
     case checking, available(Date), alreadyOpen, unavailable, waitingForStation, held
 }
@@ -121,7 +127,7 @@ struct AlertSheet: View {
 
     init(rule: AlertRule, stationName: String, boundMoment: Date?, isNew: Bool = false,
          focusSentence: Bool = false) {
-        _rule = State(initialValue: rule)
+        _rule = State(initialValue: alertSheetInitialRule(rule))
         self.stationName = stationName
         _boundMoment = State(initialValue: boundMoment)
         self.isNew = isNew

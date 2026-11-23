@@ -73,7 +73,7 @@ import XCTest
         XCTAssertFalse(marked.enabled, "older builds must see the retained rule as off")
         struct LegacyRule: Decodable { let enabled: Bool }
         XCTAssertFalse(try JSONDecoder().decode(LegacyRule.self, from: JSONEncoder().encode(marked)).enabled)
-        XCTAssertTrue(expiredUnchangedRules([marked], current: [marked], now: .distantFuture, occurrences: []).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([marked], current: [marked], now: .distantFuture, occurrences: []), [marked.id])
         reloaded.upsert(marked)
         XCTAssertNil(reloaded.rules.first?.slackNeedsReview)
     }
