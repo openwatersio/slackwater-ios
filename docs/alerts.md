@@ -366,7 +366,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
-- Once rules are removed when their stored instant is past and no resolved event remains ahead.
+- Once rules are removed when their stored instant is past and no resolved event remains ahead. An Off-mode current rule with no predicted true slack stays visible for review instead of expiring silently.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
 calendar turned on or off; the slack threshold changing; `PremiumStore.isPremium` changing; a CHS
@@ -380,8 +380,7 @@ rather than a silent stop.
 
 **Rule states** (Alerts screen), in the order they are tested: Off · Waiting for station data (a
 CHS station not yet fitted) · Notifications are Premium (rendered as a `PremiumRequirement` link)
-· Notifications are off in Settings · No slack in available predictions (a repeating current alert
-with the window Off and no true slack in the available series) · Nothing coming up · Scheduled through *date* · Set the
+· Notifications are off in Settings · No slack in available predictions (a current alert with the window Off and no true slack in the available series) · Nothing coming up · Scheduled through *date* · Set the
 height again (below).
 
 **A rule's station replaced by another record** (`Resources/station-successors.json`, list.md
@@ -506,7 +505,7 @@ with "Does not repeat", and is asked to support the app only when they ask to be
 there; a `once` rule bound there would be dropped by the reschedule its save triggers (§6). The
 sheet says "This moment has passed" under When and disables Save. The Rest tap never meets this:
 it binds to the offer's next occurrence after now, or opens a repeating draft when the
-notification horizon holds none. A one-time current-window alert also requires its selected opening to be in the future. The sheet resolves it off the main thread, disables Save while checking, and says when the opening has passed or cannot be resolved. If station data is missing, the sheet allows Save and says it is waiting for station data; the scheduler retains the rule while it waits. Repeating rules remain available.
+notification horizon holds none. A one-time current-window alert also requires its selected opening to be in the future. The sheet resolves it off the main thread, disables Save while checking, and says when the opening has passed or cannot be resolved. If station data is missing, the sheet allows Save and says it is waiting for station data; the scheduler retains a one-time rule until six hours after its selected moment while it waits. Repeating rules remain available.
 
 ### 7.3 The sentence
 

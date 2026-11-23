@@ -50,6 +50,16 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertFalse(resolved.unresolved.contains(rule.id))
     }
 
+    func testOffModeRotaryOnceRuleNeedsReviewInsteadOfExpiringSilently() {
+        var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens)
+        rule.once = now.addingTimeInterval(-60)
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertTrue(resolved.noSlack.contains(rule.id))
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
+                                            occurrences: resolved.occurrences,
+                                            noSlack: resolved.noSlack).isEmpty)
+    }
+
     func testOffModeRotaryCalendarReportsNoPredictedSlack() {
         let stationID = "current:noaa/KOD0901"
         let resolved = resolveAlerts([], subscriptions: [stationID], now: now, threshold: 0)

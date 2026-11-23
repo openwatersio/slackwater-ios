@@ -38,7 +38,7 @@ struct ResolvedAlerts: Sendable {
     /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
     /// device, or an id that left the catalog.
     var unresolved: Set<UUID> = []
-    /// Repeating Off-mode current rules for which the available predictions contain no true slack.
+    /// Off-mode current rules for which the available predictions contain no true slack.
     var noSlack: Set<UUID> = []
     /// Subscribed current stations with predictions but no true slack in Off mode.
     var calendarNoSlack: Set<String> = []
@@ -67,14 +67,24 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
         let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
                                            from: now, to: until, threshold: threshold)
         resolved.occurrences += occurrences
-        if rule.trigger == .slackWindowOpens, rule.once == nil, slackWindowIsOff(threshold),
+        if rule.trigger == .slackWindowOpens, slackWindowIsOff(threshold),
            case .current(let current, _, _) = station,
            current.speeds(from: now, to: now.addingTimeInterval(600), step: 600).count >= 2 {
             var withoutSun = rule
             withoutSun.sun = nil
-            let allSlacks = rule.sun == nil ? occurrences : alertOccurrences(withoutSun, station: station,
+            withoutSun.once = nil
+            let allSlacks = rule.sun == nil && rule.once == nil ? occurrences : alertOccurrences(withoutSun, station: station,
                 position: record.alertPosition, from: now, to: until, threshold: threshold)
-            if allSlacks.isEmpty { resolved.noSlack.insert(rule.id) }
+            if allSlacks.isEmpty {
+                var selected = rule
+                selected.sun = nil
+                let selectedSlacks = rule.once.map { moment in
+                    alertOccurrences(selected, station: station, position: record.alertPosition,
+                                     from: moment.addingTimeInterval(-21_600),
+                                     to: moment.addingTimeInterval(21_600), threshold: threshold)
+                } ?? []
+                if selectedSlacks.isEmpty { resolved.noSlack.insert(rule.id) }
+            }
         }
     }
 
@@ -174,7 +184,8 @@ struct AlertStatusSnapshot: Equatable {
             resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
-                                                now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved))
+                                                now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
+                                                noSlack: resolved.noSlack))
         for id in expired { AlertRuleStore.shared.remove(id) }
         let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
             .filter { !expired.contains($0.id) }
