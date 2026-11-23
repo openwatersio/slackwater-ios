@@ -208,7 +208,8 @@ func expiredUnchangedRules(_ snapshot: [AlertRule], current: [AlertRule], now: D
                            occurrences: [AlertOccurrence], unresolved: Set<UUID> = [],
                            noSlack: Set<UUID> = [], heldWindows: Set<UUID> = []) -> [UUID] {
     let unchanged = snapshot.filter { rule in
-        current.contains(rule) && rule.slackNeedsReview != true
+        current.contains(rule)
+            && !(rule.slackNeedsReview == true && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
             && !(noSlack.contains(rule.id) && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
             && !(heldWindows.contains(rule.id) && rule.once.map { $0.addingTimeInterval(21_600) >= now } == true)
             && !(unresolved.contains(rule.id) && rule.once.map {

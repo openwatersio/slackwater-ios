@@ -132,9 +132,10 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
                 calendars.rememberOrphanCalendar(id, for: stationID)
                 continue
             }
-            if (try? store.removeCalendar(calendar, commit: true)) != nil,
-               id == calendars.calendarID(for: stationID) {
-                calendars.forgetWindowCalendar(for: stationID)
+            if (try? store.removeCalendar(calendar, commit: true)) != nil {
+                if id == calendars.calendarID(for: stationID) { calendars.forgetWindowCalendar(for: stationID) }
+            } else {
+                calendars.rememberOrphanCalendar(id, for: stationID)
             }
         }
     }

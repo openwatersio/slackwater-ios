@@ -161,7 +161,7 @@ final class AlertResolveTests: XCTestCase {
         rule.slackNeedsReview = true
         let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
         XCTAssertTrue(resolved.occurrences.isEmpty)
-        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []), [rule.id])
         XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true),
                        "Review or delete this alert.")
     }
