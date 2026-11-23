@@ -198,11 +198,21 @@ final class ChsCurrentGateTests: XCTestCase {
     func testOnlineVectorPairsDownloadedSpeedAndDirection() throws {
         let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
         let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 900_000, v: 90), ChsSample(t: 1_800_000, v: 120)]
-        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds + [speeds[1]], dirs: directions, flood: 0))
         XCTAssertEqual(result.projected.count, 3)
         XCTAssertEqual(result.projected[1].v, 0, accuracy: 1e-9)
         XCTAssertEqual(result.magnitudes, [2, 2, 2])
         XCTAssertEqual(result.directions, [60, 90, 120])
+    }
+
+    func testOnlineVectorsRejectMissingSamplesAndUseFirstDirection() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 0), ChsSample(t: 900_000, v: 90),
+                          ChsSample(t: 900_000, v: 270), ChsSample(t: 1_800_000, v: 180)]
+        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        XCTAssertEqual(result.directions, [0, 90, 180])
+        XCTAssertNil(ChsFitService.onlineVectors(speeds: speeds, dirs: [directions[0], directions[3]], flood: 0))
+        XCTAssertNil(ChsFitService.onlineVectors(speeds: [speeds[0], speeds[2]], dirs: directions, flood: 0))
     }
 
     func testOnlineVectorSurvivesCacheAndDoesNotInventSlack() throws {
@@ -223,6 +233,24 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertTrue(currentWindows(loaded.points, events: loaded.events(from: window.start, to: window.end),
                                      threshold: 0.5).isEmpty)
         XCTAssertFalse(loaded.events(from: window.start, to: window.end).contains { $0.kind == .slack })
+    }
+
+    func testOlderAppCacheWriteDoesNotEraseVectorCache() throws {
+        let id = "chs-vector-rollback"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1],
+                                     magnitudes: [2, 2], directions: [60, 120])
+        try ChsModelStore.saveOnline(window)
+        defer {
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id))
+            try? FileManager.default.removeItem(at: ChsModelStore.url(id, suffix: "-online"))
+        }
+        let oldWindow = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                        start: window.start, end: window.end, floodDirection: 0, ebbDirection: 180,
+                                        times: [0, 900], speeds: [1, -1])
+        try ChsModelStore.save(ChsOnlineStore(stationID: id, blocks: [oldWindow]), id: id, suffix: "-online")
+        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.magnitudes, [2, 2])
     }
 
     func testOnlineVectorInterpolationCrossesNorthWithoutReversing() throws {
@@ -594,7 +622,9 @@ final class ChsCurrentGateTests: XCTestCase {
     /// A single-window file carrying vectors still decodes as one block.
     func testLoadOnlineMigratesSingleWindowWithVectors() throws {
         let legacy = onlineWindow([0, 900], [1, 2], id: "chs-test-legacy")
-        try ChsModelStore.save(legacy, id: "chs-test-legacy", suffix: "-online")  // v1 bytes, straight to disk
+        let url = ChsModelStore.onlineUrl("chs-test-legacy")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(legacy).write(to: url)
         defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl("chs-test-legacy")) }
         let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-legacy"))
         XCTAssertEqual(store.blocks.count, 1)
