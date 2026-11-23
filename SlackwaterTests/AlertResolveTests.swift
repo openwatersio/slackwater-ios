@@ -71,6 +71,18 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertTrue(result.occurrences.isEmpty)
     }
 
+    func testPastLegacyWindowWaitsThenExpiresWithoutReview() {
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-3600))
+        let result = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertFalse(result.legacyReview.contains(rule.id))
+        XCTAssertTrue(result.occurrences.isEmpty)
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
+                                            occurrences: [], noSlack: result.noSlack).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(21_600),
+                                              occurrences: [], noSlack: result.noSlack), [rule.id])
+    }
+
     func testPastLegacyWindowDoesNotRequireReview() {
         let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
                              once: now.addingTimeInterval(-21_601))

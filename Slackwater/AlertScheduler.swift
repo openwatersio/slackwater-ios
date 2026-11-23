@@ -96,7 +96,8 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
            (!rule.currentWindowRule || rule.currentWindowWasOff),
            once.addingTimeInterval(21_600) >= now, !slackWindowIsOff(threshold),
            case .current = station {
-            resolved.legacyReview.insert(rule.id)
+            if once >= now { resolved.legacyReview.insert(rule.id) }
+            else { resolved.noSlack.insert(rule.id) }
             continue
         }
         let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
@@ -210,9 +211,7 @@ struct AlertStatusSnapshot: Equatable {
         let resolved = await Task.detached(priority: .utility) {
             resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
-        let reviewIDs = Set(storedRules.filter { rule in
-            resolved.noSlack.contains(rule.id) && rule.once.map { $0.addingTimeInterval(21_600) < now } == true
-        }.map(\.id)).union(resolved.legacyReview)
+        let reviewIDs = resolved.legacyReview
         AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
