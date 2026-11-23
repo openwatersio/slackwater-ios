@@ -69,16 +69,25 @@ let alertOnceReach: TimeInterval = 6 * 3_600
 /// Where the strip marks an alert: the event of each occurrence of the station's enabled rules
 /// inside the query, one per minute however many rules share it. Resolved against the bundled
 /// record, the way the Rest tap resolves (`alertNextOccurrence`). A `once` rule is resolved
-/// over the reach either side of its own minute, whatever the query. The occurrence is selected
-/// before the range filter, so rescheduling cannot retarget it to a later event. The moment it
-/// finds may lie outside the strip's query; the strip clips.
+/// over the reach either side of its own minute. A current window can open much earlier, so
+/// that query also covers the loaded strip. The moment may lie outside the strip; it clips.
 func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
     let mine = rules.filter { $0.stationID == stationID && $0.enabled }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
     let station = WidgetStationLoader.station(from: record)
-    let all = mine.flatMap { rule in
-        let range = rule.once.map { ($0.addingTimeInterval(-alertOnceReach), $0.addingTimeInterval(alertOnceReach)) } ?? (from, to)
-        return alertOccurrences(rule, station: station, position: record.alertPosition,
+    return alertMoments(station: station, position: record.alertPosition, rules: mine, from: from, to: to, threshold: threshold)
+}
+
+func alertMoments(station: WidgetStation, position: (lat: Double, lon: Double), rules: [AlertRule],
+                  from: Date, to: Date, threshold: Double) -> [AlertMoment] {
+    let all = rules.flatMap { rule in
+        let range = rule.once.map { once in
+            let near = (once.addingTimeInterval(-alertOnceReach), once.addingTimeInterval(alertOnceReach))
+            return rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
+                && once >= from.addingTimeInterval(-alertOnceReach) && once <= to.addingTimeInterval(alertOnceReach)
+                ? (min(from, near.0), max(to, near.1)) : near
+        } ?? (from, to)
+        return alertOccurrences(rule, station: station, position: position,
                                 from: range.0, to: range.1, threshold: threshold)
             .map { AlertMoment(ruleID: rule.id, event: $0.event) }
     }
