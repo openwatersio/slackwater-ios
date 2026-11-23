@@ -128,7 +128,10 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
         guard authorized else { return }
         let calendars = StationCalendarStore.shared
         for id in calendars.calendarIDsForRemoval(stationID) {
-            guard let calendar = store.calendar(withIdentifier: id) else { continue }
+            guard let calendar = store.calendar(withIdentifier: id) else {
+                calendars.rememberOrphanCalendar(id, for: stationID)
+                continue
+            }
             if (try? store.removeCalendar(calendar, commit: true)) != nil,
                id == calendars.calendarID(for: stationID) {
                 calendars.forgetWindowCalendar(for: stationID)

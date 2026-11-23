@@ -214,6 +214,12 @@ func calendarSubscriptionReady(calendarID: String?) -> Bool {
         return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty }
     }
 
+    func rememberOrphanCalendar(_ id: String, for stationID: String) {
+        guard !id.isEmpty else { return }
+        windowIDs["orphaned-window:removed:" + stationID + ":" + id] = id
+        defaults.set(windowIDs, forKey: Self.windowIDsKey)
+    }
+
     func forgetWindowCalendar(for stationID: String) {
         guard windowIDs.removeValue(forKey: stationID) != nil else { return }
         defaults.set(windowIDs, forKey: Self.windowIDsKey)

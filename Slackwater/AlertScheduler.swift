@@ -211,6 +211,12 @@ struct AlertStatusSnapshot: Equatable {
         let resolved = await Task.detached(priority: .utility) {
             resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
+        // A preference change can land while the prediction scan is off the main actor.
+        // Discard its old result before changing alerts, then resolve the new setting.
+        guard threshold == slackThresholdKn else {
+            Self.requestReschedule()
+            return
+        }
         let reviewIDs = resolved.legacyReview
         AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
