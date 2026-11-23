@@ -201,10 +201,6 @@ struct CalendarStationsView: View {
     /// drops the id for a station not yet subscribed. EventKit's writes in `AlertCalendar` are
     /// all `try?` with no logging, so a source that refuses new calendars — Google, Exchange —
     /// would otherwise leave the toggle on with a calendar that never arrives and no explanation.
-    /// ponytail: a station with zero occurrences in the 90-day horizon would read the same as a
-    /// creation failure (`AlertCalendar.apply` skips making an empty calendar) — not reachable
-    /// by any bundled tide or current station, which always has a next high/low or slack window
-    /// inside that window.
     private func subscribeAndVerify(_ stationID: String) async {
         calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()

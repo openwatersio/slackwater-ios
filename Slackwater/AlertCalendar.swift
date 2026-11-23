@@ -32,6 +32,10 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     return groups
 }
 
+func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
+    !stopped.contains(stationID)
+}
+
 @MainActor enum AlertCalendar {
     private static let store = EKEventStore()
     private static let logger = Logger(subsystem: "org.openwaters.slackwater", category: "Calendar")
@@ -169,9 +173,10 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
                                                         stopped: stopped) {
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
-            // Nothing planned and no calendar yet: don't make an empty one.
+            // A valid forecast can have no opening within the horizon; keep its subscription
+            // with an empty calendar so it can be filled by a later pass.
             guard let calendar = calendarFor(stationID: stationID, title: title,
-                                             create: !planned.isEmpty, now: now) else { continue }
+                                             create: calendarShouldCreate(stationID: stationID, stopped: stopped), now: now) else { continue }
             sync(calendar, to: planned, now: now)
         }
     }

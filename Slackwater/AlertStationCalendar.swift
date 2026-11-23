@@ -146,9 +146,22 @@ func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
         self.defaults = defaults
         let savedWindowIDs = defaults.dictionary(forKey: Self.windowIDsKey) as? [String: String] ?? [:]
         var migratedWindowIDs: [String: String] = [:]
-        for (id, calendarID) in savedWindowIDs.sorted(by: { $0.key < $1.key }) {
+        var displaced: [(String, String)] = []
+        // Prefer a successor's own calendar over an older station's calendar.
+        let ordered = savedWindowIDs.sorted {
+            let a = StationSuccessors.resolve($0.key, in: successors) == $0.key
+            let b = StationSuccessors.resolve($1.key, in: successors) == $1.key
+            return a == b ? $0.key < $1.key : a
+        }
+        for (id, calendarID) in ordered {
             let resolved = StationSuccessors.resolve(id, in: successors)
             if migratedWindowIDs[resolved] == nil { migratedWindowIDs[resolved] = calendarID }
+            else { displaced.append((id, calendarID)) }
+        }
+        // Keep displaced identifiers for the orphan sweep, except when both names refer
+        // to the same EventKit calendar (which is still in use by the successor).
+        for (id, calendarID) in displaced where !migratedWindowIDs.values.contains(calendarID) {
+            migratedWindowIDs["orphaned-window:" + id] = calendarID
         }
         windowIDs = migratedWindowIDs
         if migratedWindowIDs != savedWindowIDs { defaults.set(migratedWindowIDs, forKey: Self.windowIDsKey) }

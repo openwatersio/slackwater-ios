@@ -12,12 +12,30 @@ final class StationCalendarTests: XCTestCase {
 
     // MARK: what a kind publishes
 
+    @MainActor func testSuccessorCollisionRetainsDisplacedCalendarForCleanup() throws {
+        let d = defaults()
+        let old = "current:noaa/old", successor = "current:noaa/new"
+        let subscriptions = [StationCalendar(stationID: successor, calendarID: "legacy")]
+        d.set(try JSONEncoder().encode(subscriptions), forKey: AppGroup.stationCalendarsKey)
+        d.set([old: "old-window", successor: "new-window"], forKey: "slackwater.currentWindowCalendarIDs")
+        let store = StationCalendarStore(defaults: d, successors: [old: successor])
+        XCTAssertEqual(store.calendarID(for: successor), "new-window")
+        XCTAssertEqual(Array(store.orphanedWindowCalendars.values), ["old-window"])
+    }
+
     @MainActor func testCorruptSubscriptionDataDoesNotOrphanCalendars() {
         let defaults = defaults()
         defaults.set(Data("invalid".utf8), forKey: AppGroup.stationCalendarsKey)
         defaults.set(["current:noaa/test": "calendar-id"], forKey: "slackwater.currentWindowCalendarIDs")
         let store = StationCalendarStore(defaults: defaults, successors: [:])
         XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+    }
+
+    func testEmptyValidForecastCanCreateCalendar() {
+        let id = "current:noaa/weak"
+        XCTAssertTrue(calendarWriteGroups([], subscribed: [id], live: [id], skipping: [])[id]?.isEmpty == true)
+        XCTAssertTrue(calendarShouldCreate(stationID: id, stopped: []))
+        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [id]))
     }
 
     func testATideStationPublishesBothExtremesAndEclipses() {
