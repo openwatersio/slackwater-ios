@@ -98,7 +98,8 @@ func calendarTriggers(for kind: StationCalendarKind) -> [AlertTrigger] {
 func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
     switch kind {
     case .tide: "\(name) Tides"
-    case .current, .derived: "\(name) Currents · Slackwater"
+    case .current: "\(name) Currents · Slackwater"
+    case .derived: "\(name) Currents"
     }
 }
 
@@ -137,6 +138,7 @@ func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
     // Kept outside the subscription encoding so an older app cannot overwrite the new id.
     private static let windowIDsKey = "slackwater.currentWindowCalendarIDs"
     private var windowIDs: [String: String]
+    private let subscriptionsDecoded: Bool
 
     /// `successors` moves a subscription whose station left the bundle to the
     /// station that replaced it (`StationSuccessors`), keeping its calendar.
@@ -159,8 +161,10 @@ func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
             defaults.removeObject(forKey: Self.windowIDsKey)
             windowIDs = [:]
         }
-        let stored = defaults.data(forKey: AppGroup.stationCalendarsKey)
-            .flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) } ?? []
+        let data = defaults.data(forKey: AppGroup.stationCalendarsKey)
+        let decoded = data.flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) }
+        subscriptionsDecoded = data == nil || decoded != nil
+        let stored = decoded ?? []
         var seen = Set<String>()
         subscriptions = stored.compactMap { subscription in
             var moved = subscription
@@ -187,6 +191,7 @@ func calendarSubscriptionReady(calendarID: String?, noSlack: Bool) -> Bool {
     }
 
     var orphanedWindowCalendars: [String: String] {
+        guard subscriptionsDecoded else { return [:] }
         let active = Set(subscriptions.map(\.stationID))
         return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty }
     }

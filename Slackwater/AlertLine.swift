@@ -73,7 +73,7 @@ let alertOnceReach: TimeInterval = 6 * 3_600
 /// that query also covers the loaded strip. The moment may lie outside the strip; it clips.
 func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
     let mine = rules.filter { $0.stationID == stationID && $0.enabled && $0.slackNeedsReview != true
-        && !($0.trigger == .slackWindowOpens && $0.once != nil && !$0.currentWindowRule && !slackWindowIsOff(threshold)) }
+        && !($0.trigger == .slackWindowOpens && $0.once != nil && (!$0.currentWindowRule || $0.currentWindowWasOff) && !slackWindowIsOff(threshold)) }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
     let station = WidgetStationLoader.station(from: record)
     return alertMoments(station: station, position: record.alertPosition, rules: mine, from: from, to: to, threshold: threshold)

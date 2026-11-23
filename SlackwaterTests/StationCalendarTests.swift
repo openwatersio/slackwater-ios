@@ -12,6 +12,14 @@ final class StationCalendarTests: XCTestCase {
 
     // MARK: what a kind publishes
 
+    @MainActor func testCorruptSubscriptionDataDoesNotOrphanCalendars() {
+        let defaults = defaults()
+        defaults.set(Data("invalid".utf8), forKey: AppGroup.stationCalendarsKey)
+        defaults.set(["current:noaa/test": "calendar-id"], forKey: "slackwater.currentWindowCalendarIDs")
+        let store = StationCalendarStore(defaults: defaults, successors: [:])
+        XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+    }
+
     func testATideStationPublishesBothExtremesAndEclipses() {
         XCTAssertEqual(calendarTriggers(for: .tide), [.tideExtreme(high: true),
                                                       .tideExtreme(high: false), .eclipse])
@@ -43,7 +51,7 @@ final class StationCalendarTests: XCTestCase {
     func testATitleNamesTheStationAndItsSeries() {
         XCTAssertEqual(stationCalendarTitle(name: "Friday Harbor", kind: .tide), "Friday Harbor Tides")
         XCTAssertEqual(stationCalendarTitle(name: "Race Passage", kind: .current), "Race Passage Currents · Slackwater")
-        XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived), "Dodd Narrows Currents · Slackwater")
+        XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived), "Dodd Narrows Currents")
     }
 
     // MARK: calendars are Premium

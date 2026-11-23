@@ -226,6 +226,16 @@ final class AlertLineTests: XCTestCase {
         XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
     }
 
+    func testOffModeOnceRuleHasNoMarkerAfterComfortIsEnabled() {
+        let id = "current:noaa/PUG1701"
+        let from = Date(timeIntervalSince1970: 1_755_800_000)
+        var rule = AlertRule(stationID: id, trigger: .slackWindowOpens, once: from.addingTimeInterval(3600))
+        rule.currentWindowRule = true
+        rule.currentWindowWasOff = true
+        XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from,
+                                   to: from.addingTimeInterval(86_400), threshold: 0.5).isEmpty)
+    }
+
     func testTwoRulesOnOneMomentGiveOneMarker() throws {
         let id = TideStationRecord.fridayHarborID
         let hour = AlertRule(stationID: id, trigger: .tideExtreme(high: false), lead: 3_600)
