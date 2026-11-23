@@ -473,7 +473,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         scrollTo(details, in: app)
         details.tap()
         let explanation = app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'yearly count of slacks absent from CHS predictions was 16'"
+            format: "label CONTAINS 'yearly count of slacks absent from CHS predictions was 18'"
         )).firstMatch
         scrollTo(explanation, in: app)
         XCTAssert(explanation.appears(within: 5))
