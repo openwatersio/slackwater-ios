@@ -175,6 +175,12 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
                                                         live: live, skipping: skipping,
                                                         stopped: stopped) {
+            if stopped.contains(stationID) {
+                let activeID = StationCalendarStore.shared.calendarID(for: stationID)
+                let legacy = StationCalendarStore.shared.calendarIDsForRemoval(stationID)
+                    .filter { $0 != activeID }.compactMap { store.calendar(withIdentifier: $0) }
+                _ = clearGeneratedEvents(in: legacy, stationID: stationID, now: now)
+            }
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
             // A valid forecast can have no opening within the horizon; keep its subscription
@@ -203,6 +209,12 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
                                                  found: Set(calendars.map(\.calendarIdentifier))) else { return false }
             if calendars.isEmpty { return true }
         }
+        return clearGeneratedEvents(in: calendars, stationID: stationID, now: now)
+    }
+
+    /// Remove only this station's future generated events, leaving personal events alone.
+    private static func clearGeneratedEvents(in calendars: [EKCalendar], stationID: String, now: Date) -> Bool {
+        guard !calendars.isEmpty else { return true }
         let existing = store.events(matching: store.predicateForEvents(
             withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: calendars))
         let removals = calendarInvalidationRemovals(existing.map {
@@ -214,7 +226,7 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>) -> Bool {
             return true
         } catch {
             store.reset()
-            logger.error("Current calendar invalidation failed: \(String(describing: error), privacy: .public)")
+            logger.error("Current calendar cleanup failed: \(String(describing: error), privacy: .public)")
             return false
         }
     }
