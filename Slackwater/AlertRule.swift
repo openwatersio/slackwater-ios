@@ -151,6 +151,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
         for rule in snapshot where ids.contains(rule.id) && rule.once != nil && rule.enabled {
             guard let index = rules.firstIndex(of: rule), rules[index].slackNeedsReview != true else { continue }
             rules[index].slackNeedsReview = true
+            rules[index].enabled = false
             changed = true
         }
         if changed { persist() }
