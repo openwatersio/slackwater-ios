@@ -89,6 +89,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
         resolved.kinds[rule.stationID] = record.calendarKind
         let station = WidgetStationLoader.station(from: record)
         resolved.stations[rule.stationID] = station
+        // TODO(#944): Retire the legacy-rule review after older builds are no longer supported.
         // Old rules can refer to an axis crossing that is not a true slack. The new
         // event list cannot reconstruct that selection, so do not silently retarget it.
         if rule.trigger == .slackWindowOpens, let once = rule.once,
