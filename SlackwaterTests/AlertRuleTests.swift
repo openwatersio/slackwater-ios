@@ -24,6 +24,34 @@ import XCTest
         XCTAssertEqual(changes, 3)
     }
 
+    func testSlackReviewSurvivesReloadAndExplicitEditClearsIt() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        store.upsert(rule)
+        store.markSlackNeedsReview([rule], ids: [rule.id])
+        let reloaded = AlertRuleStore(defaults: defaults)
+        let marked = try XCTUnwrap(reloaded.rules.first)
+        XCTAssertEqual(marked.slackNeedsReview, true)
+        XCTAssertTrue(expiredUnchangedRules([marked], current: [marked], now: .distantFuture, occurrences: []).isEmpty)
+        reloaded.upsert(marked)
+        XCTAssertNil(reloaded.rules.first?.slackNeedsReview)
+    }
+
+    func testSlackReviewDoesNotOverwriteAConcurrentEdit() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        store.upsert(rule)
+        var edited = rule
+        edited.lead = 300
+        store.upsert(edited)
+        store.markSlackNeedsReview([rule], ids: [rule.id])
+        XCTAssertEqual(store.rules, [edited])
+    }
+
     func testARuleThisBuildCannotReadSurvivesAnEdit() throws {
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }

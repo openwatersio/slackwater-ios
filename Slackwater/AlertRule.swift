@@ -34,6 +34,8 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// a tide height is then a number on the wrong datum, so the rule is off
     /// until the user sets it again. Nil otherwise, never false.
     var heightNeedsReview: Bool?
+    /// A once alert with no predicted slack stays visible until the user edits it.
+    var slackNeedsReview: Bool?
 
     init(id: UUID = UUID(), stationID: String, trigger: AlertTrigger, once: Date? = nil,
          lead: TimeInterval = 0, sun: SunWindow? = nil, enabled: Bool = true, heightNeedsReview: Bool? = nil) {
@@ -42,7 +44,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
         self.heightNeedsReview = heightNeedsReview
     }
 
-    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview }
+    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview, slackNeedsReview }
 
     // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
     // It is still read as a fallback, and written for the two windows it can say; a golden- or
@@ -59,6 +61,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
             ?? (try c.decodeIfPresent(Bool.self, forKey: .daylightOnly) == true ? .daylight : nil)
         enabled = try c.decode(Bool.self, forKey: .enabled)
         heightNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .heightNeedsReview)
+        slackNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .slackNeedsReview)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -75,6 +78,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
         }
         try c.encode(enabled, forKey: .enabled)
         try c.encodeIfPresent(heightNeedsReview, forKey: .heightNeedsReview)
+        try c.encodeIfPresent(slackNeedsReview, forKey: .slackNeedsReview)
     }
 }
 
@@ -132,12 +136,24 @@ struct AlertRule: Codable, Identifiable, Equatable {
     func upsert(_ rule: AlertRule) {
         var rule = rule
         rule.heightNeedsReview = nil
+        rule.slackNeedsReview = nil
         if let i = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[i] = rule
         } else {
             rules.append(rule)
         }
         persist()
+    }
+
+    /// Record only unchanged one-time rules from a completed resolution.
+    func markSlackNeedsReview(_ snapshot: [AlertRule], ids: Set<UUID>) {
+        var changed = false
+        for rule in snapshot where ids.contains(rule.id) && rule.once != nil && rule.enabled {
+            guard let index = rules.firstIndex(of: rule), rules[index].slackNeedsReview != true else { continue }
+            rules[index].slackNeedsReview = true
+            changed = true
+        }
+        if changed { persist() }
     }
 
     func remove(_ id: UUID) {

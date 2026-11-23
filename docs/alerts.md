@@ -366,7 +366,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
-- Once rules are removed when their stored instant is past and no resolved event remains ahead. While the window is Off, a current rule with no predicted true slack stays visible for review. Changing the comfort setting can cause a past one-time rule to expire; its migration remains unresolved.
+- Once rules are removed when their stored instant is past and no resolved event remains ahead. A one-time current rule with no predicted true slack is marked for review and stays visible until edited or removed, even if the comfort setting changes.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
 calendar turned on or off; the slack threshold changing; `PremiumStore.isPremium` changing; a CHS

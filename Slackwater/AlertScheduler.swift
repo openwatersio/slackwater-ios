@@ -55,7 +55,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
     var resolved = ResolvedAlerts()
     let until = now.addingTimeInterval(AlertHorizon.calendar)
 
-    for rule in rules where rule.enabled {
+    for rule in rules where rule.enabled && rule.slackNeedsReview != true {
         guard let record = WidgetStationLoader.loadRecord(id: rule.stationID, at: now) else {
             resolved.unresolved.insert(rule.id)
             continue
@@ -183,6 +183,7 @@ struct AlertStatusSnapshot: Equatable {
         let resolved = await Task.detached(priority: .utility) {
             resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
+        AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: resolved.noSlack)
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
                                                 noSlack: resolved.noSlack))

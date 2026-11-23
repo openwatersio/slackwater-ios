@@ -60,6 +60,16 @@ final class AlertResolveTests: XCTestCase {
                                             noSlack: resolved.noSlack).isEmpty)
     }
 
+    func testMarkedRuleDoesNotResumeWhenComfortSettingChanges() {
+        var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3600))
+        rule.slackNeedsReview = true
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(resolved.occurrences.isEmpty)
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []).isEmpty)
+        XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true), "No slack in available predictions")
+    }
+
     func testOffModeRotaryCalendarReportsNoPredictedSlack() {
         let stationID = "current:noaa/KOD0901"
         let resolved = resolveAlerts([], subscriptions: [stationID], now: now, threshold: 0)

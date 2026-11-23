@@ -7,6 +7,7 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     if rule.heightNeedsReview == true {
         return String(localized: "Set the height again: this place now measures from a different chart datum.", comment: "Alert status for a tide-height alert switched off because its station's data moved to a record measured from another chart datum.")
     }
+    if rule.slackNeedsReview == true { return String(localized: "No slack in available predictions") }
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
     if !premium { return "Notifications are Premium" }
@@ -85,7 +86,7 @@ struct AlertsView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.borderless)
-                            if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
+                            if rule.enabled, rule.slackNeedsReview != true, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
                                 PremiumRequirement(title: "Notifications are Premium", feature: .alerts)
                             } else {
                                 Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
