@@ -123,7 +123,7 @@ struct TideShortcutResult {
 }
 
 struct SlackWindowShortcutResult {
-    let slack: CurrentEvent
+    let slack: CurrentEvent?
     let start: Date
     let end: Date
     let stationName: String
@@ -186,25 +186,25 @@ struct SlackWindowShortcutResult {
                      after now: Date = appNow()) -> SlackWindowShortcutResult? {
         guard let selected, case .current(let record, let engine) = selected,
               !slackWindowIsOff(slackThresholdKn) else { return nil }
-        let events = engine.events(from: now.addingTimeInterval(-21_600), to: now.addingTimeInterval(172_800))
-        for slack in events where slack.kind == .slack {
-            let requestedEnd = slack.time.addingTimeInterval(21_600)
-            let end = (engine as? ChsOnlineWindow).map { min(requestedEnd, $0.end) } ?? requestedEnd
-            var card = WidgetCard.build(selected, now: now, through: end)
-            guard let graph = card.graph else { continue }
-            // Speech and the card must use the same sample grid and window boundaries.
-            let points = graph.points.map { CurrentPoint(time: $0.time, speed: $0.value) }
-            guard let window = slackWindow(points, around: slack.time, threshold: slackThresholdKn),
-                  window.end > now else { continue }
-            let hasOpening = window.start > points[0].time
-            let hasClosing = window.end < points[points.count - 1].time
-            let focus = window.start > now ? window.start : now
-            card.graph?.highlight = hasOpening && hasClosing ? window.start...window.end : focus...focus
-            return .init(slack: slack, start: window.start, end: window.end,
-                         stationName: record.name, timeZone: record.tz, queriedAt: now, card: card,
-                         hasOpeningBoundary: hasOpening, hasClosingBoundary: hasClosing)
-        }
-        return nil
+        let searchEnd = now.addingTimeInterval(172_800)
+        let requestedEnd = searchEnd.addingTimeInterval(21_600)
+        let end = (engine as? ChsOnlineWindow).map { min(requestedEnd, $0.end) } ?? requestedEnd
+        let start = now.addingTimeInterval(-StationCardGraph.backWindow)
+        guard end > start else { return nil }
+        let points = engine.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
+        let events = currentEventsMatchingWater(points, events: engine.events(from: start, to: end))
+        guard let window = currentWindows(points, events: events, threshold: slackThresholdKn)
+            .first(where: { $0.end > now && $0.start < searchEnd }), !points.isEmpty else { return nil }
+        let slack = events.first { $0.kind == .slack && window.slackTimes.contains($0.time) }
+        let cardEnd = min(end, window.end.addingTimeInterval(21_600))
+        var card = WidgetCard.build(selected, now: now, through: cardEnd)
+        let hasOpening = window.start > points[0].time
+        let hasClosing = window.end < points[points.count - 1].time
+        let focus = window.start > now ? window.start : now
+        card.graph?.highlight = hasOpening && hasClosing ? window.start...window.end : focus...focus
+        return .init(slack: slack, start: window.start, end: window.end,
+                     stationName: record.name, timeZone: record.tz, queriedAt: now, card: card,
+                     hasOpeningBoundary: hasOpening, hasClosingBoundary: hasClosing)
     }
 }
 
@@ -270,17 +270,18 @@ extension SlackWindowShortcutQuery {
         var card = WidgetCard.build(selected, now: day.start, through: end)
         card.countdownEnd = nil
         guard let graph = card.graph else { return nil }
-        let points = graph.points.map { CurrentPoint(time: $0.time, speed: $0.value) }
-        var windows: [SlackWindowShortcutResult] = []
-        for slack in engine.events(from: day.start.addingTimeInterval(-21_600), to: day.end.addingTimeInterval(21_600)) where slack.kind == .slack {
-            guard let window = slackWindow(points, around: slack.time, threshold: slackThresholdKn),
-                  window.start < day.end, window.end > day.start,
-                  windows.last.map({ window.start > $0.end }) ?? true else { continue }
-            windows.append(.init(slack: slack, start: window.start, end: window.end,
-                stationName: record.name, timeZone: record.tz, queriedAt: day.start, card: card,
-                hasOpeningBoundary: window.start > points[0].time,
-                hasClosingBoundary: window.end < points[points.count - 1].time))
-        }
+        guard let firstPoint = graph.points.first, let lastPoint = graph.points.last else { return nil }
+        let points = engine.speeds(from: firstPoint.time, to: lastPoint.time, step: StationCardGraph.sampleStep)
+        let events = currentEventsMatchingWater(points, events: engine.events(from: firstPoint.time, to: lastPoint.time))
+        let windows: [SlackWindowShortcutResult] = currentWindows(points, events: events, threshold: slackThresholdKn)
+            .filter { $0.start < day.end && $0.end > day.start }
+            .map { window in
+                let slack = events.first { $0.kind == .slack && window.slackTimes.contains($0.time) }
+                return .init(slack: slack, start: window.start, end: window.end,
+                    stationName: record.name, timeZone: record.tz, queriedAt: day.start, card: card,
+                    hasOpeningBoundary: window.start > points[0].time,
+                    hasClosingBoundary: window.end < points[points.count - 1].time)
+            }
         guard let first = windows.first else { return nil }
         let times = ListFormatter.localizedString(byJoining: windows.map { window in
             window.detail ?? String(localized: "Closing time unavailable", comment: "Siri dated slack-window answer when its closing crossing is outside saved predictions.")
@@ -289,7 +290,7 @@ extension SlackWindowShortcutQuery {
         let name = record.name
         let answer = String(localized: "Slack windows at \(name) on \(date): \(times).", comment: "Siri answer listing current windows on a day. Values are place, localized date and a localized list of local time ranges.")
         card.graph?.highlight = first.hasOpeningBoundary && first.hasClosingBoundary
-            ? first.start...first.end : first.slack.time...first.slack.time
+            ? first.start...first.end : day.start...day.start
         return .init(windows: windows, spoken: answer, detail: nil, card: card)
     }
 }

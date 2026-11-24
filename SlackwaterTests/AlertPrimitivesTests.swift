@@ -46,6 +46,22 @@ final class AlertPrimitivesTests: XCTestCase {
         }
     }
 
+    func testOnceInsideLongWindowSelectsItsOpening() {
+        let speeds: [Double] = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 0.1, 0.1]
+        let points = speeds.enumerated().map {
+            CurrentPoint(time: at(Double($0.offset) * 3600), speed: $0.element)
+        }
+        let station = FakeCurrent(points: points, slacks: [])
+        let press = at(5.5 * 3600)
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: press)
+        let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                     position: (0, 0), from: at(-60), to: at(9 * 3600), threshold: 0.5)
+        XCTAssertEqual(found.map(\.event), [alertMinute(at(0))])
+        let narrowed = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                        position: (0, 0), from: at(2 * 3600), to: at(9 * 3600), threshold: 0.5)
+        XCTAssertEqual(narrowed.map(\.event), [alertMinute(at(0))], "the selected window opens before the query range")
+    }
+
     func testMergedWindowsOpenOnceAndAFastReversalOpensItsOwn() {
         let speeds: [Double] = [2, 1.5, 1, 0.6, 0.3, 0.1, 0,   // 0…3600: slack A at 3600
                                 0.1, 0.3, 0,                   // 4200…5400: slack B at 5400

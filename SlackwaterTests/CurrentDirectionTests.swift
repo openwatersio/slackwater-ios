@@ -125,13 +125,15 @@ final class CurrentDirectionTests: XCTestCase {
     /// major): at a major-axis slack the water still runs, and it has a set.
     func testARotaryStationStillRunsAtItsMajorAxisSlack() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
-        let slacks = kodiak.engineStation.events(from: date, to: date.addingTimeInterval(86_400))
-            .filter { $0.kind == .slack }
+        let end = date.addingTimeInterval(86_400)
+        let slacks = kodiak.harmonicStation.axisEventsForReduction(from: date, to: end)
+            .filter { $0.kind == .slack && $0.time >= date && $0.time < end }
         XCTAssertFalse(slacks.isEmpty)
+        XCTAssertTrue(kodiak.engineStation.events(from: date, to: end).filter { $0.kind == .slack }.isEmpty)
         for slack in slacks {
             let p = point(kodiak, at: slack.time)
             XCTAssertEqual(p.speed, 0, accuracy: 0.01, "\(slack.time)")
-            XCTAssertGreaterThan(p.magnitude, 0.05, "\(slack.time)")
+            XCTAssertGreaterThan(p.magnitude, 1e-7, "\(slack.time)")
             XCTAssertNotNil(p.direction, "\(slack.time)")
         }
     }

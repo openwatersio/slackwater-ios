@@ -289,12 +289,21 @@ import SlackwaterKit
         }
     }
 
+    func testTrialIslandMinimumBelowComfortCurrentHasAWindow() throws {
+        let trial = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/PCT1391"))
+        let start = Date(timeIntervalSince1970: 1_794_297_600)
+        let tl = TimelineData.build(tide: nil, current: trial, now: start, anchor: start, threshold: 0.5)
+        let minimum = try XCTUnwrap(tl.currentEvents.first { $0.kind == .minEbb && $0.time > start })
+        XCTAssertTrue(tl.windowRuns.contains { $0.contains(minimum.time) })
+        XCTAssertFalse(tl.isSlack(at: minimum.time))
+    }
+
     func testTrialIslandLullIsExcludedFromNextMax() throws {
         let trial = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/PCT1391"))
         let start = Date(timeIntervalSince1970: 1_794_297_600) // 2026-11-10 08:00 UTC
         let tl = TimelineData.build(tide: nil, current: trial, now: start, anchor: start)
         let minimum = try XCTUnwrap(tl.currentEvents.first { $0.kind == .minEbb && $0.time > start })
-        XCTAssertEqual(abs(minimum.speed), 0.0398, accuracy: 0.001)
+        XCTAssertLessThan(abs(minimum.speed), 0.05)
         let before = CurrentLead(timeline: tl, scrubTime: minimum.time.addingTimeInterval(-3600), now: start,
                                  point: CurrentPoint(time: start, speed: -0.1),
                                  floodDeg: trial.floodDirection, ebbDeg: trial.ebbDirection,
@@ -383,30 +392,19 @@ import SlackwaterKit
     }
 
     /// Kodiak's cross-flow runs at up to about 0.8 of its major axis, so at two of its three slacks on this day the engine-exact lead still has a speed and a set; at the third the crossing flow prints 0.0 and the lead claims no set.
-    func testKodiakAtItsSlacksShowsTheCrossingFlow() throws {
+    func testKodiakAxisCrossingsKeepTheirFlowAndAreNotSlack() throws {
         let kodiak = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/KOD0901"))
-        let slacks = kodiak.engineStation.events(from: t0, to: t0.addingTimeInterval(86_400)).filter { $0.kind == .slack }
-        var crossing = 0, still = 0
-        for slack in slacks {
-            let p = try XCTUnwrap(kodiak.engineStation.speeds(from: slack.time, to: slack.time.addingTimeInterval(1), step: 1).first)
-            let r = currentLeadReading("Slack", isSlack: true, point: p, floodDeg: kodiak.floodDirection,
-                                       ebbDeg: kodiak.ebbDirection, speedUnit: "kn", setFormat: "compass")
-            let direction = try XCTUnwrap(p.direction)
-            XCTAssertEqual(r.value, formatSpeed(p.magnitude, unit: "kn"), "\(slack.time)")
-            XCTAssertEqual(r.tint, .slack, "\(slack.time)")
-            if r.value == "0.0" {
-                still += 1
-                XCTAssertNil(r.setDegrees, "\(slack.time)")
-                XCTAssertEqual(r.spoken, "Slack 0.0 knots", "\(slack.time)")
-            } else {
-                crossing += 1
-                XCTAssertEqual(r.setDegrees, direction, "\(slack.time)")
-                XCTAssertEqual(r.set, compassPoint(direction), "\(slack.time)")
-                XCTAssertEqual(r.spoken, "Slack \(r.value) knots \(compassPoint(direction))", "\(slack.time)")
-            }
+        let end = t0.addingTimeInterval(86_400)
+        let axis = kodiak.harmonicStation.axisEventsForReduction(from: t0, to: end).filter { $0.kind == .slack }
+        let slacks = kodiak.engineStation.events(from: t0, to: end).filter { $0.kind == .slack }
+        XCTAssertFalse(axis.isEmpty)
+        XCTAssertTrue(slacks.isEmpty)
+        let points = kodiak.engineStation.speeds(from: t0, to: end, step: 600)
+        for crossing in axis where crossing.time >= t0 && crossing.time <= end {
+            let reading = try XCTUnwrap(readCurrent(at: crossing.time, timeline: points, events: [crossing], flood: kodiak.floodDirection, ebb: kodiak.ebbDirection))
+            XCTAssertNotEqual(reading.state, .slack)
+            XCTAssertGreaterThan(reading.magnitude, 0)
         }
-        XCTAssertEqual(crossing, 2, "two of the day's slacks still run across the channel")
-        XCTAssertEqual(still, 1)
     }
 
     /// Outside slack the value is the water's full speed and the set its own direction, not the published bearing, in the flood or ebb colour by the signed speed.

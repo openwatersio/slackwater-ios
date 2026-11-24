@@ -113,9 +113,9 @@ import SlackwaterKit
 
     func testAnOffWindowAlertsAtEachSlack() throws {
         // Off has no window to open, so the rule fires at the slack itself, named Slack (#821).
-        let (station, position) = try load(deception)
+        let (station, position) = try load("current:noaa/ACT1616")
         guard case .current(let engine, _, _) = station else { return XCTFail("expected a current station") }
-        let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens)
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
         let found = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0)
         let slacks = engine.events(from: now, to: week).filter { $0.kind == .slack && $0.time >= now && $0.time <= week }
 

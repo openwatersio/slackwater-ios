@@ -41,13 +41,15 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
-    let slacks = station.events(from: start, to: stop).filter { $0.kind == .slack }.map(\.time)
-    let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) }).runs
-    let opened: [(event: Date, end: Date?)] = runs.map { ($0.start, $0.end) }
-    let uncovered: [(event: Date, end: Date?)] = slacks
-        .filter { t in !runs.contains { $0.contains(t) } }
-        .map { ($0, nil) }
-    return (opened + uncovered).sorted { $0.event < $1.event }
+    let events = currentEventsMatchingWater(points, events: station.events(from: start, to: stop))
+    let windows = currentWindows(points, events: events, threshold: threshold)
+    let openings: [(event: Date, end: Date?)] = windows.map { window in
+        (event: window.start, end: window.start == window.end ? nil : window.end)
+    }
+    let uncovered: [(event: Date, end: Date?)] = events.filter { event in
+        event.kind == .slack && !windows.contains { $0.start <= event.time && event.time <= $0.end }
+    }.map { (event: $0.time, end: nil) }
+    return (openings + uncovered).sorted { $0.event < $1.event }
 }
 
 /// One dated event a rule found (docs/alerts.md §4).
@@ -143,20 +145,20 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     }
 
     found = found.map { (event: alertMinute($0.event), end: $0.end.map(alertMinute), noWindow: $0.noWindow, heightM: $0.heightM) }
+    let candidates = found
     found = found.filter { $0.event >= from && $0.event <= to }
     if let once = rule.once {
-        // The stored instant is the pressed minute, which is not always the event's own: a
-        // press on a current strip parks on the slack instant while the occurrence is the
-        // window's opening, and a press on the curve names a minute the rounded height crosses
-        // a little before or after. The occurrence nearest the press is the one meant. Six
-        // hours is under the gap between two occurrences of any trigger, so nearest is never
-        // ambiguous, and far enough to reach a window that opens long before its slack.
+        // Prefer the window containing the pressed instant; another opening can be closer
+        // than the start of a long window. Other triggers use the nearest event.
         let minute = alertMinute(once)
         let distance = { (o: (event: Date, end: Date?, noWindow: Bool, heightM: Double?)) in
             abs(o.event.timeIntervalSince(minute))
         }
-        if let nearest = found.min(by: { distance($0) < distance($1) }), distance(nearest) <= 6 * 3600 {
-            found = [nearest]
+        let containing = rule.trigger == .slackWindowOpens
+            ? candidates.first { $0.event <= minute && $0.end.map { minute < $0 } == true } : nil
+        if let selected = containing ?? found.min(by: { distance($0) < distance($1) }),
+           containing != nil || distance(selected) <= 6 * 3600 {
+            found = [selected]
         } else {
             found = []
         }

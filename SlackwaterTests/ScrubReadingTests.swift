@@ -185,26 +185,19 @@ final class ScrubReadingTests: XCTestCase {
         XCTAssertGreaterThan(departs, 0, "the day's water leaves the major axis")
     }
 
-    /// At a slack the watch still says Slack and prints the water's full speed; it names a set only while the crossing flow prints above zero.
-    func testARotaryCurrentAtSlackKeepsItsWordAndShowsTheCrossingFlow() throws {
+    /// A rotary axis crossing keeps its flow word and full vector.
+    func testARotaryAxisCrossingDoesNotBecomeSlack() throws {
         let (kodiak, tl) = try timeline("noaa/KOD0901")
-        let slacks = tl.currentEvents.filter { $0.kind == .slack && $0.time >= day && $0.time < day.addingTimeInterval(86_400) }
-        XCTAssertFalse(slacks.isEmpty)
-        var crossing = 0
-        for slack in slacks {
-            let v = try XCTUnwrap(tl.currentPoints.vector(at: slack.time, flood: kodiak.floodDirection, ebb: kodiak.ebbDirection))
-            let speed = tl.velocityAt(slack.time)
-            let r = reading(slack.time, kodiak, tl)
-            XCTAssertEqual(r.title, "Slack", "\(slack.time)")
-            XCTAssertEqual(r.value, formatSpeed(v.magnitude, unit: "kn"), "\(slack.time)")
-            let across = max(0, v.magnitude * v.magnitude - speed * speed).squareRoot()
-            if formatSpeed(across, unit: "kn") == "0.0" {
-                XCTAssertNil(r.set, "\(slack.time)")
-            } else {
-                crossing += 1
-                XCTAssertEqual(r.set, compassPoint(try XCTUnwrap(v.direction)), "\(slack.time)")
-            }
+        let end = day.addingTimeInterval(86_400)
+        let crossings = kodiak.harmonicStation.axisEventsForReduction(from: day, to: end)
+            .filter { $0.kind == .slack && $0.time >= day && $0.time < end }
+        XCTAssertFalse(crossings.isEmpty)
+        for event in crossings {
+            let vector = try XCTUnwrap(tl.currentPoints.vector(at: event.time, flood: kodiak.floodDirection, ebb: kodiak.ebbDirection))
+            let result = reading(event.time, kodiak, tl)
+            XCTAssertNotEqual(result.title, "Slack")
+            XCTAssertEqual(result.value, formatSpeed(vector.magnitude, unit: "kn"))
         }
-        XCTAssertGreaterThan(crossing, 0, "the water still crosses at one of the day's slacks")
     }
+
 }
