@@ -98,6 +98,7 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
+    private var onlineIncompleteRetryAfter: [String: Date] = [:]
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
     /// The station-local day of each gate's last automatic fetch. A station
     /// that still covers today refreshes at most once on that day, so a
@@ -520,6 +521,7 @@ final class ChsFitService: ObservableObject {
             onlineFetches[id]?.cancel()
             if onlineFetches[id] == nil { onlineStates.removeValue(forKey: id) }
             onlineAttempts.removeValue(forKey: id)
+            onlineIncompleteRetryAfter.removeValue(forKey: id)
         }
     }
 
@@ -757,6 +759,7 @@ final class ChsFitService: ObservableObject {
     func onlineState(_ id: String, at now: Date = appNow()) -> OnlineFetchState {
         guard let state = onlineStates[id] else { return .idle }
         if case .deferred(let due) = state, due <= now { return .idle }
+        if case .failed = state, let due = onlineIncompleteRetryAfter[id], due <= now { return .idle }
         return state
     }
 
@@ -804,6 +807,7 @@ final class ChsFitService: ObservableObject {
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
                            maxAttempts: Int? = nil, at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()
+        onlineIncompleteRetryAfter[id] = nil
         guard !permanent else {
             releaseRequest(id)
             onlineStates[id] = .failed(error)
@@ -814,6 +818,17 @@ final class ChsFitService: ObservableObject {
         if let maxAttempts, attempts >= maxAttempts {
             releaseRequest(id)
             onlineStates[id] = .failed(error)
+            let due = now.addingTimeInterval(86_400)
+            onlineIncompleteRetryAfter[id] = due
+            guard let gate = onlineDesired[id] else { return }
+            onlineRetryTimers[id] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
+                guard !Task.isCancelled else { return }
+                self?.onlineStates[id] = .idle
+                self?.onlineAttempts[id] = 0
+                self?.onlineIncompleteRetryAfter[id] = nil
+                self?.prefetchOnlineGates([gate])
+            }
             return
         }
         let due = now.addingTimeInterval(ChsQueue.backoff(attempts: attempts))
@@ -860,6 +875,7 @@ final class ChsFitService: ObservableObject {
         onlineRetryTimers[gate.id] = nil
         onlinePending.removeAll { $0.id == gate.id }
         onlineAttempts[gate.id] = 0
+        onlineIncompleteRetryAfter[gate.id] = nil
         return true
     }
 
@@ -889,6 +905,7 @@ final class ChsFitService: ObservableObject {
     }
 
     func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
+        if onlineIncompleteRetryAfter.removeValue(forKey: gate.id) != nil { onlineAttempts[gate.id] = 0 }
         onlineRetryTimers[gate.id]?.cancel()
         onlineRetryTimers[gate.id] = nil
         onlineDesired[gate.id] = gate
@@ -901,6 +918,7 @@ final class ChsFitService: ObservableObject {
         onlineProgress[id] = 10
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
+        onlineIncompleteRetryAfter[id] = nil
     }
 
     func setOnlineProgress(_ id: String, done: Int, total: Int) {
@@ -913,6 +931,7 @@ final class ChsFitService: ObservableObject {
         onlineStates = [:]
         onlineProgress = [:]
         onlineAttempts = [:]
+        onlineIncompleteRetryAfter = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]
         onlineRefreshedOn = [:]

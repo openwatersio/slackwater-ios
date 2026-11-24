@@ -248,6 +248,8 @@ final class ChsQueueTests: XCTestCase {
         }
         service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
         XCTAssertEqual(service.onlineState(gate.id, at: t0), .failed("Incomplete predictions"))
+        XCTAssertEqual(service.onlineState(gate.id, at: t0.addingTimeInterval(86_401)), .idle,
+                       "A later refresh must be able to recover when predictions are repaired")
         XCTAssertTrue(service.prepareOnlineUpdate(gate), "Manual retry must remain available")
     }
 
