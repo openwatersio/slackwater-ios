@@ -73,16 +73,37 @@ final class ChsCurrentGateTests: XCTestCase {
         do {
             _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
                 requests.append(anchor)
-                if anchor == future { throw ChsError.transient("Incomplete predictions") }
+                if anchor == future { throw ChsError.incomplete("Incomplete predictions") }
                 return todayWindow
             }
             XCTFail("The original future-date failure should be returned")
-        } catch ChsError.transient(let message) {
+        } catch ChsError.incomplete(let message) {
             XCTAssertEqual(message, "Incomplete predictions")
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
         XCTAssertEqual(requests, [future, today])
+    }
+
+    @MainActor
+    func testRateLimitedFutureUpdateDoesNotFetchToday() async throws {
+        let gate = ChsCurrentGateInfo(id: "chs-test-\(UUID().uuidString)", name: "Test", region: "Test",
+                                     aliases: [], latitude: 49, longitude: -123, timezone: "America/Vancouver",
+                                     tideReference: nil, fitDays: 0, provisionalSlackMinutes: nil, online: true)
+        let future = todayLocal(gate.tz).addingTimeInterval(60 * 86_400)
+        var requests: [Date] = []
+        do {
+            _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+                requests.append(anchor)
+                throw ChsError.transient("HTTP 429")
+            }
+            XCTFail("The rate limit should be returned")
+        } catch ChsError.transient(let message) {
+            XCTAssertEqual(message, "HTTP 429")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requests, [future])
     }
 
     // MARK: - Bundled identity (chs-current-gates.json, generated from the registry)

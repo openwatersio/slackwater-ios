@@ -1289,7 +1289,7 @@ final class ChsFitService: ObservableObject {
         switch error {
         case let chs as ChsError:
             switch chs {
-            case .permanent(let reason), .transient(let reason): return reason
+            case .permanent(let reason), .transient(let reason), .incomplete(let reason): return reason
             case .networkDisabled: return "no connection"
             }
         case let iwls as IwlsError: return iwls.localizedDescription
@@ -1449,9 +1449,11 @@ enum ChsError: Error {
     case networkDisabled
     case permanent(String)
     case transient(String)
+    case incomplete(String)
 
     static func isPermanent(_ error: Error) -> Bool {
         if case .permanent = error as? ChsError { return true }
+        if case .incomplete = error as? ChsError { return true }
         if case .permanent = error as? IwlsError { return true }
         return false
     }

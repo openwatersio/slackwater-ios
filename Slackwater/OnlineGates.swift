@@ -84,7 +84,7 @@ extension ChsFitService {
 
     nonisolated static func onlineCoveredWindow(_ blocks: [ChsOnlineWindow], anchor: Date, name: String) throws -> ChsOnlineWindow {
         guard let window = blocks.first(where: { $0.covers(anchor: anchor) }) else {
-            throw ChsError.permanent("\(name): IWLS returned incomplete current vectors")
+            throw ChsError.incomplete("\(name): IWLS returned incomplete current vectors")
         }
         return window
     }
@@ -159,6 +159,7 @@ extension ChsFitService {
             result = .success(try await fetch(anchor))
         } catch {
             if error is CancellationError || Task.isCancelled { throw error }
+            guard case .incomplete = error as? ChsError else { throw error }
             result = .failure(error)
         }
         let today = todayLocal(gate.tz)
@@ -235,7 +236,7 @@ extension ChsFitService {
         try Task.checkCancellation()
         // Empty or unmatched IWLS series cannot establish coverage or a current vector.
         guard let rawVectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
-            throw ChsError.permanent("\(gate.name): IWLS returned incomplete current vectors")
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors")
         }
         let vectors = Self.fillSingleOnlineGaps(projected: rawVectors.projected, magnitudes: rawVectors.magnitudes, directions: rawVectors.directions, measuredSpeeds: speeds, flood: flood)
         let projected = vectors.projected
@@ -254,7 +255,7 @@ extension ChsFitService {
                                    times: range.map { projected[$0].t / 1000 }, speeds: range.map { projected[$0].v },
                                    magnitudes: range.map { vectors.magnitudes[$0] }, directions: range.map { vectors.directions[$0] })
         }
-        guard !windows.isEmpty else { throw ChsError.permanent("\(gate.name): IWLS returned incomplete current vectors") }
+        guard !windows.isEmpty else { throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors") }
         var saved: [ChsOnlineWindow] = []
         for window in windows {
             try Task.checkCancellation()
