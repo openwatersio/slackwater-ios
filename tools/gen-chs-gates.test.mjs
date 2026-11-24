@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { currentGate, recipe } from "./chs-current-gates.mjs";
 import { curatedRecords } from "./bundle.mjs";
-const evidence = "fit-2026-10-22-8f85912-r2";
+const evidence = "fit-2026-10-29-bb3c78a-r1";
 const entry = {name: "Gate", position: [49, -123], chsFit: {tier: "bounded", days: 210, slack_bound_minutes: 35, provisional_slack_minutes: 40, evidence}};
 test("bounded gates carry measured bounds and stamp without online context", () => {
   const g = currentGate("gate", {...entry, magnitudeNote: "context"}, []);
