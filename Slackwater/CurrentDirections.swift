@@ -20,8 +20,16 @@ final class DoddMapFlowProvider: Sendable {
     /// Missing predictions stay absent rather than inventing a map flow.
     init() {
         flowAtDate = { date in
-            guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == "chs-dodd-narrows" }),
-                  let reading = gate.cachedReading(at: date) else { return nil }
+            guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == "chs-dodd-narrows" }) else { return nil }
+            if gate.isOnline {
+                guard let window = ChsModelStore.loadOnline(gate.id)?.blocks.first(where: { $0.start <= date && date <= $0.end }),
+                      window.signedSpeed(at: date) != nil,
+                      let point = window.speeds(from: date, to: date, step: 1).first,
+                      point.magnitude > 0, let bearing = point.direction else { return nil }
+                return StationMapFlow(center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
+                                      speedKn: point.magnitude, bearingDeg: bearing)
+            }
+            guard let reading = gate.cachedReading(at: date) else { return nil }
             return Self.flow(
                 center: CLLocationCoordinate2D(latitude: gate.latitude, longitude: gate.longitude),
                 signedKn: reading.signedKn, flood: reading.floodDirection,

@@ -65,7 +65,7 @@ extension ChsModelStore {
     /// The online gate's fetched window lives beside the fitted models, under
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
     static func onlineUrl(_ stationID: String) -> URL {
-        dir.appendingPathComponent("online-vectors", isDirectory: true).appendingPathComponent("\(stationID).json")
+        url(stationID, suffix: "-online")
     }
 
     /// Store decode first, then the legacy single-window shape (schemaVersion 1,

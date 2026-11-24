@@ -426,12 +426,7 @@ final class ChsFitService: ObservableObject {
             }
             try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
         }
-        let vectorDir = ChsModelStore.dir.appendingPathComponent("online-vectors", isDirectory: true)
-        let vectorFiles = (try? FileManager.default.contentsOfDirectory(atPath: vectorDir.path)) ?? []
-        let online = Set(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id))
-        for file in vectorFiles where file.hasSuffix(".json") && !online.contains(String(file.dropLast(5))) {
-            try? FileManager.default.removeItem(at: vectorDir.appendingPathComponent(file))
-        }
+
     }
 
     // Moving the origin keeps queued work; explicit deselection can narrow it.

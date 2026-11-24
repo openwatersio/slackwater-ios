@@ -82,13 +82,11 @@ final class ChsVisibilityTests: XCTestCase {
             try Data().write(to: dir.appendingPathComponent(name))
         }
         XCTAssertEqual(ChsModelStore.fittedIDs(in: dir), ["chs-07120"])
-        let vectorDir = dir.appendingPathComponent("online-vectors", isDirectory: true)
-        try FileManager.default.createDirectory(at: vectorDir, withIntermediateDirectories: true)
         let window = ChsOnlineWindow(axisOnly: true, stationID: "chs-y", iwlsName: "Test", timezone: "UTC",
                                      fetchedAt: .now, start: .now, end: .now, floodDirection: 0,
                                      ebbDirection: 180, times: [0, 900], speeds: [1, -1])
         try JSONEncoder().encode(ChsOnlineStore(stationID: "chs-y", blocks: [window]))
-            .write(to: vectorDir.appendingPathComponent("chs-y.json"))
+            .write(to: dir.appendingPathComponent("chs-y-online.json"))
         XCTAssertEqual(ChsModelStore.fittedIDs(in: dir), ["chs-07120", "chs-y-online"])
     }
 

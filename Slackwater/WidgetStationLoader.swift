@@ -184,6 +184,7 @@ extension ChsOnlineWindow: CurrentPredicting {
     func speeds(from start: Date, to end: Date, step: TimeInterval) -> [CurrentPoint] {
         guard step > 0, times.count > 1, times.count == speeds.count, let first = times.first,
               let last = times.last else { return [] }
+        let vectorAvailable = hasVectors
         var result: [CurrentPoint] = []
         var time = start.timeIntervalSince1970
         var index = 1
@@ -195,7 +196,7 @@ extension ChsOnlineWindow: CurrentPredicting {
                 // CHS samples are `ChsGrid` apart; widget readings also land between them.
                 let fraction = (time - times[index - 1]) / span
                 let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
-                if hasVectors, let magnitudes, let directions {
+                if vectorAvailable, let magnitudes, let directions {
                     let a = directions[index - 1] * .pi / 180, b = directions[index] * .pi / 180
                     let east = magnitudes[index - 1] * sin(a) * (1 - fraction) + magnitudes[index] * sin(b) * fraction
                     let north = magnitudes[index - 1] * cos(a) * (1 - fraction) + magnitudes[index] * cos(b) * fraction
@@ -213,6 +214,7 @@ extension ChsOnlineWindow: CurrentPredicting {
     }
 
     func events(from start: Date, to end: Date) -> [CurrentEvent] {
-        currentEventsMatchingWater(self, events: sampleEvents(points)).filter { $0.time >= start && $0.time <= end }
+        let candidates = sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        return currentEventsMatchingWater(self, events: candidates)
     }
 }

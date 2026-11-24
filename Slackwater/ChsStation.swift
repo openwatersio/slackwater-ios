@@ -184,10 +184,21 @@ extension ChsModelStore {
     /// Current models must pass the same recipe/window check as the detail loader.
     static func fittedIDs(in directory: URL = dir) -> Set<String> {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        var fitted = Set(names.compactMap { name -> String? in
+        return Set(names.compactMap { name -> String? in
             guard name.hasSuffix(".json") else { return nil }
             let stem = String(name.dropLast(5))
-            if stem.hasSuffix("-online") { return nil }
+            if stem.hasSuffix("-online") {
+                let id = String(stem.dropLast("-online".count))
+                let store: ChsOnlineStore?
+                if directory == dir {
+                    store = loadOnline(id)
+                } else if let data = try? Data(contentsOf: directory.appendingPathComponent(name)) {
+                    store = try? JSONDecoder().decode(ChsOnlineStore.self, from: data)
+                } else { store = nil }
+                guard let store, store.stationID == id,
+                      store.blocks.contains(where: { $0.stationID == id && $0.hasVectors && $0.times.count > 1 }) else { return nil }
+                return stem
+            }
             guard stem.hasSuffix("-current") else { return stem }
             let id = String(stem.dropLast("-current".count))
             guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == id }),
@@ -196,24 +207,6 @@ extension ChsModelStore {
                   gate.usableModel(model) != nil else { return nil }
             return stem
         })
-        let vectorDir = directory.appendingPathComponent("online-vectors", isDirectory: true)
-        let vectorNames = (try? FileManager.default.contentsOfDirectory(atPath: vectorDir.path)) ?? []
-        for name in vectorNames where name.hasSuffix(".json") {
-            let id = String(name.dropLast(5))
-            let store: ChsOnlineStore?
-            if directory == dir {
-                store = loadOnline(id)
-            } else if let data = try? Data(contentsOf: vectorDir.appendingPathComponent(name)) {
-                store = try? JSONDecoder().decode(ChsOnlineStore.self, from: data)
-            } else {
-                store = nil
-            }
-            guard let store,
-                  store.stationID == id,
-                  store.blocks.contains(where: { $0.stationID == id && $0.hasVectors && $0.times.count > 1 }) else { continue }
-            fitted.insert(id + "-online")
-        }
-        return fitted
     }
 }
 

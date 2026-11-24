@@ -58,6 +58,16 @@ func currentEventsMatchingWater(_ points: [CurrentPoint], events: [CurrentEvent]
     }
 }
 
+/// Check an event against the interpolated full current vector at its time.
+func currentEventsMatchingWater(_ station: any CurrentPredicting, events: [CurrentEvent]) -> [CurrentEvent] {
+    events.filter { event in
+        guard event.kind == .slack, !event.verifiedZero else { return true }
+        let points = station.speeds(from: event.time, to: event.time.addingTimeInterval(1), step: 1)
+        guard !points.isEmpty else { return false }
+        return !currentEventsMatchingWater(points, events: [event]).isEmpty
+    }
+}
+
 /// Full-speed comfort windows from SlackwaterKit, with true slack instants kept separate.
 func measureSlacks(_ points: [CurrentPoint], events: [CurrentEvent], threshold: Double)
     -> (windows: [(slack: Date, start: Date, end: Date)], cores: [(slack: Date, start: Date, end: Date)]) {

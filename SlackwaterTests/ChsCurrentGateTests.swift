@@ -215,6 +215,39 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertTrue(ChsFitService.onlineRuns(incomplete.projected).isEmpty)
     }
 
+    func testSingleMissingOnlineSampleInterpolatesFullVectorAcrossNorth() throws {
+        let samples = [ChsSample(t: 0, v: 1), ChsSample(t: 1_800_000, v: 1)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
+        XCTAssertEqual(filled.projected.map(\.t), [0, 900_000, 1_800_000])
+        XCTAssertEqual(filled.magnitudes[1], 2, accuracy: 1e-9)
+        XCTAssertLessThan(min(filled.directions[1], 360 - filled.directions[1]), 1e-9)
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<3])
+        let wide = ChsFitService.fillSingleOnlineGaps(projected: [samples[0], ChsSample(t: 2_700_000, v: 1)],
+                                                        magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
+        XCTAssertEqual(wide.projected.count, 2)
+        let opposing = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [0, 180], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
+        XCTAssertEqual(opposing.projected.count, 2)
+        let missingSpeed = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
+        XCTAssertEqual(missingSpeed.projected.count, 2)
+    }
+
+    func testMissingDirectionKeepsMeasuredCrossFlowInsteadOfInventingSlack() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 1_800_000, v: 120)]
+        let raw = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw.projected, magnitudes: raw.magnitudes,
+                                                         directions: raw.directions, measuredSpeeds: speeds, flood: 0)
+        XCTAssertEqual(filled.projected.count, 3)
+        XCTAssertEqual(filled.magnitudes[1], 2, accuracy: 1e-9)
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1800),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: filled.projected.map { $0.t / 1000 }, speeds: filled.projected.map(\.v),
+                                     magnitudes: filled.magnitudes, directions: filled.directions)
+        XCTAssertFalse(window.events(from: window.start, to: window.end).contains { $0.kind == .slack })
+        XCTAssertTrue(currentWindows(window.points, events: [], threshold: 0.5).isEmpty)
+    }
+
     func testOnlineRunsPreserveSamplesOnBothSidesOfGap() throws {
         let speeds = (0..<5).map { ChsSample(t: Double($0) * 900_000, v: 2) }
         let dirs = speeds.enumerated().filter { $0.offset != 2 }.map { ChsSample(t: $0.element.t, v: 90) }
@@ -262,24 +295,6 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertFalse(loaded.events(from: window.start, to: window.end).contains { $0.kind == .slack })
     }
 
-    func testOlderAppCacheWriteDoesNotEraseVectorCache() throws {
-        let id = "chs-vector-rollback"
-        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
-                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
-                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1],
-                                     magnitudes: [2, 2], directions: [60, 120])
-        try ChsModelStore.saveOnline(window)
-        defer {
-            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id))
-            try? FileManager.default.removeItem(at: ChsModelStore.url(id, suffix: "-online"))
-        }
-        let oldWindow = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
-                                        start: window.start, end: window.end, floodDirection: 0, ebbDirection: 180,
-                                        times: [0, 900], speeds: [1, -1])
-        try ChsModelStore.save(ChsOnlineStore(stationID: id, blocks: [oldWindow]), id: id, suffix: "-online")
-        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.magnitudes, [2, 2])
-    }
-
     func testOnlineVectorInterpolationCrossesNorthWithoutReversing() throws {
         let window = ChsOnlineWindow(stationID: "vector", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
                                      start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
@@ -318,7 +333,12 @@ final class ChsCurrentGateTests: XCTestCase {
         try ChsModelStore.saveOnline(window)
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertNil(ChsModelStore.loadOnline(id))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "keep the old file for rollback")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: window.start, end: window.end, floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900], speeds: [1, -1], magnitudes: [2, 2], directions: [60, 120])
+        try ChsModelStore.saveOnline(vector)
+        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.magnitudes, [2, 2])
     }
 
     func testOnlineWindowStoreRoundTrip() throws {
