@@ -196,8 +196,11 @@ extension ChsFitService {
                           ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil {
                     noteOnlineRefreshFailure(gate.id)
                 } else {
+                    let incomplete: Bool
+                    if case .incomplete = error as? ChsError { incomplete = true } else { incomplete = false }
                     noteOnlineFailure(gate.id, error: Self.reason(error),
-                                      permanent: ChsError.isPermanent(error))
+                                      permanent: ChsError.isPermanent(error) && !incomplete,
+                                      maxAttempts: incomplete ? 3 : nil)
                 }
                 throw error
             }
@@ -236,6 +239,7 @@ extension ChsFitService {
         try Task.checkCancellation()
         // Empty or unmatched IWLS series cannot establish coverage or a current vector.
         guard let rawVectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
+            IwlsFetcher.chunkCache.purge(station.id)
             throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors")
         }
         let vectors = Self.fillSingleOnlineGaps(projected: rawVectors.projected, magnitudes: rawVectors.magnitudes, directions: rawVectors.directions, measuredSpeeds: speeds, flood: flood)
@@ -255,7 +259,10 @@ extension ChsFitService {
                                    times: range.map { projected[$0].t / 1000 }, speeds: range.map { projected[$0].v },
                                    magnitudes: range.map { vectors.magnitudes[$0] }, directions: range.map { vectors.directions[$0] })
         }
-        guard !windows.isEmpty else { throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors") }
+        guard !windows.isEmpty else {
+            IwlsFetcher.chunkCache.purge(station.id)
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors")
+        }
         var saved: [ChsOnlineWindow] = []
         for window in windows {
             try Task.checkCancellation()
@@ -269,7 +276,12 @@ extension ChsFitService {
         try Task.checkCancellation()
         let desired = anchor ?? todayLocal(gate.tz)
         let blocks = (ChsModelStore.loadOnline(gate.id)?.blocks ?? []) + saved
-        return try Self.onlineCoveredWindow(blocks, anchor: desired, name: gate.name)
+        do {
+            return try Self.onlineCoveredWindow(blocks, anchor: desired, name: gate.name)
+        } catch {
+            IwlsFetcher.chunkCache.purge(station.id)
+            throw error
+        }
     }
 }
 

@@ -237,6 +237,21 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testIncompleteOnlinePredictionsStopAfterThreeAttempts() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+            if case .deferred = service.onlineState(gate.id, at: t0) {} else { XCTFail("Should retry incomplete predictions") }
+        }
+        service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+        XCTAssertEqual(service.onlineState(gate.id, at: t0), .failed("Incomplete predictions"))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate), "Manual retry must remain available")
+    }
+
+    @MainActor
     func testManualOnlineUpdateResetsRetryBackoff() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()

@@ -802,7 +802,7 @@ final class ChsFitService: ObservableObject {
     }
 
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
-                           at now: Date = appNow()) {
+                           maxAttempts: Int? = nil, at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()
         guard !permanent else {
             releaseRequest(id)
@@ -811,6 +811,11 @@ final class ChsFitService: ObservableObject {
         }
         let attempts = (onlineAttempts[id] ?? 0) + 1
         onlineAttempts[id] = attempts
+        if let maxAttempts, attempts >= maxAttempts {
+            releaseRequest(id)
+            onlineStates[id] = .failed(error)
+            return
+        }
         let due = now.addingTimeInterval(ChsQueue.backoff(attempts: attempts))
         onlineStates[id] = .deferred(due)
         guard let gate = onlineDesired[id] else { return }
