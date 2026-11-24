@@ -76,8 +76,7 @@ struct PinState: Equatable {
     var reading: String?
     var unit: String?
     /// True bearing the water flows toward — the arrow every current pin
-    /// wears, slack included: near slack the sign still names the set, and
-    /// the go-green fill is what says "slack".
+    /// wears, including at a major-axis crossing with water still moving.
     var bearing: Double?
     /// Tide gauge fill, bucketed 0...PIN_GAUGE_BUCKETS: where the current
     /// height sits between the surrounding low and high. nil when either
@@ -165,12 +164,9 @@ func pinSortRank(_ item: StationItem) -> Double {
     }
 }
 
-/// A speed-bearing current pin's state IS a colour (#13): green exactly when
-/// the water is slack — full speed under the same `slackCoreThresholdKn` that
-/// defines the strip's green — and the darkened #97 ramp at the current speed
-/// otherwise. The pin is the instantaneous speed on that ramp, not the strip's window, so it can be yellow where the strip is blue (current-charts §5). Hue no longer says
-/// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
-/// card's arrow + cardinal) carries direction.
+/// A current pin is green at zero full speed and otherwise uses the darkened
+/// speed ramp. Its colour is instantaneous, so it can differ from the strip
+/// window (current-charts §6.1). The flow arrow carries the set direction.
 func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      speedUnit: String, detailed: Bool = true) -> PinState {
     let point = station.isSubordinate ? nil
