@@ -227,6 +227,7 @@ extension StationItem {
 
 /// Translate between the stored tide-fit convention and the engine's M3/S3/M7 arguments.
 /// Applying this twice returns the original phases, so older paired devices keep reading saved fits.
+// TODO(#943): Record the shipping release and retire this transform once customers have updated.
 func translatedLegacyTidePhases(_ constituents: [Con]) -> [Con] {
     constituents.map { constituent in
         guard ["M3", "S3", "M7"].contains(constituent.name) else { return constituent }
