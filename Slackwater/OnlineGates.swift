@@ -22,18 +22,37 @@ extension ChsFitService {
     /// Pair the original IWLS vectors with the signed projection at each timestamp.
     nonisolated static func onlineVectors(speeds: [ChsSample], dirs: [ChsSample], flood: Double)
         -> (projected: [ChsSample], magnitudes: [Double], directions: [Double])? {
-        guard (speeds + dirs).allSatisfy({ $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite }) else { return nil }
-        let speedByTime = Dictionary(speeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let valid: (ChsSample) -> Bool = { $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite }
+        let validDirections = dirs.filter(valid)
+        let speedByTime = Dictionary(speeds.filter { valid($0) && $0.v >= 0 }.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
         let uniqueSpeeds = speedByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
-        let projected = project(speeds: uniqueSpeeds, dirs: dirs, floodDirection: flood)
+        let projected = project(speeds: uniqueSpeeds, dirs: validDirections, floodDirection: flood)
         guard !projected.isEmpty else { return nil }
-        let directionByTime = Dictionary(dirs.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let directionByTime = Dictionary(validDirections.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
         let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
         let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
         guard magnitudes.count == projected.count, directions.count == projected.count,
-              zip(projected, projected.dropFirst()).allSatisfy({ $1.t > $0.t && $1.t - $0.t <= ChsOnlineWindow.sampleInterval * 1000 }),
               magnitudes.allSatisfy({ $0.isFinite && $0 >= 0 }), directions.allSatisfy(\.isFinite) else { return nil }
         return (projected, magnitudes, directions)
+    }
+
+    nonisolated static func onlineRuns(_ projected: [ChsSample]) -> [Range<Int>] {
+        guard !projected.isEmpty else { return [] }
+        var runs: [Range<Int>] = []
+        var start = 0
+        for i in 1..<projected.count where projected[i].t - projected[i - 1].t > ChsOnlineWindow.sampleInterval * 1000 {
+            if i - start > 1 { runs.append(start..<i) }
+            start = i
+        }
+        if projected.count - start > 1 { runs.append(start..<projected.count) }
+        return runs
+    }
+
+    nonisolated static func onlineCoveredWindow(_ blocks: [ChsOnlineWindow], anchor: Date, name: String) throws -> ChsOnlineWindow {
+        guard let window = blocks.first(where: { $0.covers(anchor: anchor) }) else {
+            throw ChsError.transient("\(name): IWLS returned incomplete current vectors")
+        }
+        return window
     }
 
     /// The fit-reject gates (`ChsCurrentGateInfo.isOnline`) get no on-device fit
@@ -184,29 +203,30 @@ extension ChsFitService {
         // would make `covers` pass on a window with a hole in it and
         // render a strip with a dead zone. Clamp to what actually came back,
         // symmetrically, so a truncated fetch honestly fails coverage instead.
-        let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
-        let sampleEnd = projected.last.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? end
-        let window = ChsOnlineWindow(
-            stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
-            fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
-            floodDirection: flood, ebbDirection: ebb,
-            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v },
-            magnitudes: vectors.magnitudes, directions: vectors.directions)
-        do {
-            // The MERGED window goes back to the caller, not `window`: the
-            // fetched block is only the part that was missing, and a caller
-            // rendering it alone would have less on screen than it has on disk
-            // (`saveOnline`'s doc comment).
-            let merged = try ChsModelStore.saveOnline(window)
-            await MainActor.run { shared.bumpOnlineFetchStamp() }
-            return merged
-        } catch {
-            // ponytail: a local disk-write failure on an already-fetched
-            // window isn't worth failing the whole fetch over — the caller
-            // still gets `window` to render; only the reload-elsewhere signal
-            // (the stamp) and next launch's offline copy are what's lost.
+        let windows = Self.onlineRuns(projected).compactMap { range -> ChsOnlineWindow? in
+            let first = Date(timeIntervalSince1970: projected[range.lowerBound].t / 1000)
+            let last = Date(timeIntervalSince1970: projected[range.upperBound - 1].t / 1000)
+            guard first <= end, last >= start else { return nil }
+            return ChsOnlineWindow(stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
+                                   fetchedAt: .now, start: max(start, first), end: min(end, last),
+                                   floodDirection: flood, ebbDirection: ebb,
+                                   times: range.map { projected[$0].t / 1000 }, speeds: range.map { projected[$0].v },
+                                   magnitudes: range.map { vectors.magnitudes[$0] }, directions: range.map { vectors.directions[$0] })
         }
-        return window
+        guard !windows.isEmpty else { throw ChsError.transient("\(gate.name): IWLS returned incomplete current vectors") }
+        var saved: [ChsOnlineWindow] = []
+        for window in windows {
+            try Task.checkCancellation()
+            if let merged = try? ChsModelStore.saveOnline(window) {
+                saved.append(merged)
+                await MainActor.run { shared.bumpOnlineFetchStamp() }
+            } else {
+                saved.append(window)
+            }
+        }
+        let desired = anchor ?? todayLocal(gate.tz)
+        let blocks = (ChsModelStore.loadOnline(gate.id)?.blocks ?? []) + saved
+        return try Self.onlineCoveredWindow(blocks, anchor: desired, name: gate.name)
     }
 }
 
