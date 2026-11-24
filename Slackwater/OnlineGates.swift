@@ -258,7 +258,7 @@ extension ChsFitService {
         var saved: [ChsOnlineWindow] = []
         for window in windows {
             try Task.checkCancellation()
-            if let merged = try? ChsModelStore.saveOnline(window) {
+            if let merged = try? ChsModelStore.saveOnline(window, retainingFrom: windows[0].start) {
                 saved.append(merged)
                 await MainActor.run { shared.bumpOnlineFetchStamp() }
             } else {
@@ -284,10 +284,10 @@ extension ChsModelStore {
     // care about, and -chsResetModels already clears it. Add a cap when a real
     // file gets big.
     @discardableResult
-    static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
+    static func saveOnline(_ window: ChsOnlineWindow, retainingFrom: Date? = nil) throws -> ChsOnlineWindow {
         let tz = TimeZone(identifier: window.timezone) ?? .current
         let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
-                      window.start)
+                      retainingFrom ?? window.start)
         let store = (loadOnline(window.stationID)
                      ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
             .inserting(window, prunedBefore: cut)

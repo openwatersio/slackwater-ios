@@ -354,6 +354,20 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(pruned.directions, [90, 120])
     }
 
+    func testSavingSplitHistoricalFetchRetainsBothRuns() throws {
+        let id = "chs-split-\(UUID().uuidString)"
+        let start = Date.now.addingTimeInterval(-90 * 86_400).timeIntervalSince1970
+        let first = onlineWindow([start, start + 900], [1, 1], id: id)
+        let second = onlineWindow([start + 2700, start + 3600], [1, 1], id: id)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(first, retainingFrom: first.start)
+        try ChsModelStore.saveOnline(second, retainingFrom: first.start)
+        let blocks = try XCTUnwrap(ChsModelStore.loadOnline(id)).blocks
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertTrue(blocks.contains { $0.start == first.start && $0.end == first.end })
+        XCTAssertTrue(blocks.contains { $0.start == second.start && $0.end == second.end })
+    }
+
     func testAxisOnlyOnlineCacheIsNotUsedAsAFullVector() throws {
         let id = "chs-axis-only-regression"
         let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
