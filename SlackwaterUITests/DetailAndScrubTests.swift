@@ -872,7 +872,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openSearch(app, "Trial Island")
         pickSearchResult(app, app.staticTexts["Trial Island, 4.5 nm SSW of"].firstMatch)
         let pill = commentaryPill(app)
-        XCTAssertTrue(waitFor(pill, "label BEGINSWITH 'Minimum ebb current in '"))
+        XCTAssertTrue(pill.appears(within: 10))
+        for _ in 0..<8 where !pill.label.hasPrefix("Minimum ebb current in ") {
+            pill.tap()
+        }
+        XCTAssertTrue(waitFor(pill, "label BEGINSWITH 'Minimum ebb current in '"), pill.label)
         let tile = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS[c] 'next max' AND label CONTAINS '2.1'")).firstMatch
         XCTAssertTrue(tile.appears(within: 10), "the lull became the next maximum")

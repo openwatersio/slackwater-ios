@@ -1,9 +1,17 @@
 import XCTest
 import SlackwaterDatabase
+import SlackwaterKit
 @testable import Slackwater
 
 @MainActor final class CatalogSnapshotTests: XCTestCase {
     private var directory: URL!
+
+    func testFittedCurrentGateEvidenceMatchesEngineRecipe() {
+        let gates = ChsCurrentGateInfo.all.filter { !$0.isOnline }
+        XCTAssertFalse(gates.isEmpty)
+        for gate in gates { XCTAssertEqual(gate.recipe, ChsCurrentFit.stamp, gate.id) }
+    }
+
 
     override func setUp() async throws {
         try await super.setUp()

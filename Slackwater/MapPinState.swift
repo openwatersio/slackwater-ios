@@ -189,7 +189,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
 /// Most current pins are subordinates hanging off a few dozen references, so the reference is
 /// searched once per build and each pin only reduces — the engine's own
 /// `reduce` and `speed(at:along:)`, so the math has one owner. The engine
-/// extracts reference events per UTC day (`eventsByDay`), so the held list
+/// extracts reference events per UTC day (`axisEventsForReduction`), so the held list
 /// and the one the detail view's `speeds` searches are the same events, and
 /// the pin's colour is the detail's speed at that instant.
 private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double {
@@ -216,7 +216,7 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
         if b != bucket { bucket = b; events = [:] }
         if let cached = events[reference.id] { return cached }
         let start = Date(timeIntervalSince1970: Double(b) * PIN_TIDE_DIFF_DT)
-        let found = reference.harmonicStation.eventsByDay(from: start.addingTimeInterval(-Self.pad),
+        let found = reference.harmonicStation.axisEventsForReduction(from: start.addingTimeInterval(-Self.pad),
                                                           to: start.addingTimeInterval(PIN_TIDE_DIFF_DT + Self.pad))
         events[reference.id] = found
         return found

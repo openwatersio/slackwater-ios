@@ -85,10 +85,11 @@ struct ComplicationReading: Equatable {
                 .filter { span.contains($0.hours) }
             let point = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first ?? CurrentPoint(time: now, speed: 0)
             // The card's windows, so the complication's slack is the app's slack.
-            let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
+            let events = currentEventsMatchingWater(points, events: s.events(from: from, to: end))
+            let slacks = events.filter { $0.kind == .slack }.map(\.time)
             // Slack is the core inside the window, as on the card's reading.
             let cores = cardCores(points: points, slacks: slacks)
-            let windows = cardWindows(points: points, slacks: slacks).map { hours($0.start)...hours($0.end) }
+            let windows = cardWindows(points: points, slacks: slacks, events: events).map { hours($0.start)...hours($0.end) }
             // With the window off the face thickens slack itself; like the widget, it counts down only a window.
             let off = slackWindowIsOff(slackThresholdKn)
             let runs = off ? slacks.map { hours($0)...hours($0) } : windows

@@ -40,7 +40,7 @@ final class SlackWindowTests: XCTestCase {
                       CurrentPoint(time: slack, speed: 0),
                       CurrentPoint(time: t0.addingTimeInterval(1200), speed: 1)]
         for threshold in [0.0, 0.1, 0.5, 2] {
-            let measured = measureSlacks(points, slacks: [slack], threshold: threshold)
+            let measured = measureSlacks(points, events: [CurrentEvent(time: slack, speed: 0, kind: .slack)], threshold: threshold)
             let cores = mergeWindows(measured.cores.map { SlackWindow(start: $0.start, end: $0.end) }).runs
             XCTAssertTrue(cores.isEmpty, "zero has no duration at comfort current \(threshold)")
             XCTAssertTrue(readsSlack(at: slack, runs: cores, slacks: [slack]))
@@ -48,6 +48,51 @@ final class SlackWindowTests: XCTestCase {
             XCTAssertEqual(measured.windows.isEmpty, threshold == 0)
             XCTAssertEqual(slackCoreThresholdKn(threshold), 0)
         }
+    }
+
+    func testRotatingCurrentUsesFullSpeedForWindows() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [CurrentPoint(time: start, speed: 1, magnitude: 1.414213562, direction: 45),
+                      CurrentPoint(time: start.addingTimeInterval(600), speed: -1, magnitude: 1.414213562, direction: 315)]
+        let axisCrossing = CurrentEvent(time: start.addingTimeInterval(300), speed: 0, kind: .slack)
+        XCTAssertTrue(measureSlacks(points, events: [axisCrossing], threshold: 0.5).windows.isEmpty)
+        XCTAssertTrue(cardWindows(points: points, slacks: [axisCrossing.time], events: [axisCrossing], threshold: 0.5).isEmpty)
+    }
+
+    func testRotaryEventRequiresAZeroVectorOrVerification() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let middle = start.addingTimeInterval(300)
+        let points = [CurrentPoint(time: start, speed: 1, magnitude: 1.5, direction: 45),
+                      CurrentPoint(time: start.addingTimeInterval(600), speed: -1, magnitude: 1.5, direction: 135)]
+        let crossing = CurrentEvent(time: middle, speed: 0, kind: .slack)
+        let verified = CurrentEvent(time: middle, speed: 0, kind: .slack, verifiedZero: true)
+        XCTAssertTrue(currentEventsMatchingWater(points, events: [crossing]).isEmpty)
+        XCTAssertEqual(currentEventsMatchingWater(points, events: [verified]).count, 1)
+    }
+
+    func testContinuousWindowPreservesEverySlackMark() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = (0...4).map { index in
+            CurrentPoint(time: start.addingTimeInterval(Double(index) * 3600), speed: index.isMultiple(of: 2) ? 0 : 0.2)
+        }
+        let slacks = [points[0].time, points[2].time, points[4].time]
+        let events = slacks.map { CurrentEvent(time: $0, speed: 0, kind: .slack) }
+        let measured = measureSlacks(points, events: events, threshold: 0.5)
+        let windows = measured.windows.map { WindowRun(start: $0.start, end: $0.end) }
+        XCTAssertEqual(windows.count, 1)
+        XCTAssertEqual(slackAxisMoments(windows: windows, cores: [], slacks: slacks, pointsPerHour: 18), slacks)
+    }
+
+    func testSameDirectionLullHasWindowWithoutSlack() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [CurrentPoint(time: start, speed: -1),
+                      CurrentPoint(time: start.addingTimeInterval(600), speed: -0.2),
+                      CurrentPoint(time: start.addingTimeInterval(1200), speed: -1)]
+        let minimum = CurrentEvent(time: start.addingTimeInterval(600), speed: -0.2, kind: .minEbb)
+        let result = measureSlacks(points, events: [minimum], threshold: 0.5)
+        XCTAssertEqual(result.windows.count, 1)
+        XCTAssertTrue(result.cores.isEmpty)
+        XCTAssertEqual(cardWindows(points: points, slacks: [], events: [minimum], threshold: 0.5).count, 1)
     }
 
     /// Symmetric V through zero: -1 kn at t0, 0 at t0+600, +1 at t0+1200.
