@@ -26,9 +26,10 @@ extension ChsFitService {
         let validDirections = dirs.filter(valid)
         let speedByTime = Dictionary(speeds.filter { valid($0) && $0.v >= 0 }.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
         let uniqueSpeeds = speedByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
-        let projected = project(speeds: uniqueSpeeds, dirs: validDirections, floodDirection: flood)
-        guard !projected.isEmpty else { return nil }
         let directionByTime = Dictionary(validDirections.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let uniqueDirections = directionByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
+        let projected = project(speeds: uniqueSpeeds, dirs: uniqueDirections, floodDirection: flood)
+        guard !projected.isEmpty else { return nil }
         let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
         let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
         guard magnitudes.count == projected.count, directions.count == projected.count,
@@ -153,13 +154,19 @@ extension ChsFitService {
                                   fetch: @MainActor (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
         shared.holdOnline(gate)
         defer { shared.releaseOnline(gate.id) }
-        let fetched = try await fetch(anchor)
+        let result: Result<ChsOnlineWindow, Error>
+        do {
+            result = .success(try await fetch(anchor))
+        } catch {
+            if error is CancellationError || Task.isCancelled { throw error }
+            result = .failure(error)
+        }
         let today = todayLocal(gate.tz)
-        if anchor != today, !fetched.covers(anchor: today),
+        if anchor != today, (try? result.get().covers(anchor: today)) != true,
            ChsModelStore.loadOnline(gate.id)?.block(covering: today) == nil {
             _ = try? await fetch(today)
         }
-        return fetched
+        return try result.get()
     }
 
     /// The check-and-set, on the main actor so it is atomic: an existing handle

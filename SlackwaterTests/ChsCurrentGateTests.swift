@@ -59,6 +59,28 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(requests, [future], "An existing today block must not be downloaded again")
     }
 
+    @MainActor
+    func testFailedFutureUpdateStillFetchesMissingToday() async throws {
+        let gate = ChsCurrentGateInfo(id: "chs-test-\(UUID().uuidString)", name: "Test", region: "Test",
+                                     aliases: [], latitude: 49, longitude: -123, timezone: "America/Vancouver",
+                                     tideReference: nil, fitDays: 0, provisionalSlackMinutes: nil, online: true)
+        let today = todayLocal(gate.tz)
+        let future = today.addingTimeInterval(60 * 86_400)
+        let span = Timeline.window(anchor: today)
+        let todayWindow = onlineWindow([span.start.timeIntervalSince1970, span.end.timeIntervalSince1970],
+                                       [1, 2], id: gate.id)
+        var requests: [Date] = []
+        do {
+            _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+                requests.append(anchor)
+                if anchor == future { throw ChsError.transient("Incomplete predictions") }
+                return todayWindow
+            }
+            XCTFail("The original future-date failure should be returned")
+        } catch { }
+        XCTAssertEqual(requests, [future, today])
+    }
+
     // MARK: - Bundled identity (chs-current-gates.json, generated from the registry)
 
     func testBundledGatesAreRegistryKeysWithBundledPairings() {
@@ -207,10 +229,11 @@ final class ChsCurrentGateTests: XCTestCase {
 
     func testOnlineVectorsRejectMissingSamplesAndUseFirstDirection() throws {
         let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
-        let directions = [ChsSample(t: 0, v: 0), ChsSample(t: 900_000, v: 90),
-                          ChsSample(t: 900_000, v: 270), ChsSample(t: 1_800_000, v: 180)]
+        let directions = [ChsSample(t: 0, v: 0), ChsSample(t: 900_000.1, v: 60),
+                          ChsSample(t: 900_000, v: 240), ChsSample(t: 1_800_000, v: 180)]
         let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
-        XCTAssertEqual(result.directions, [0, 90, 180])
+        XCTAssertEqual(result.directions, [0, 60, 180])
+        XCTAssertEqual(result.projected[1].v, 1, accuracy: 1e-9)
         let incomplete = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: [directions[0], directions[3]], flood: 0))
         XCTAssertTrue(ChsFitService.onlineRuns(incomplete.projected).isEmpty)
     }
