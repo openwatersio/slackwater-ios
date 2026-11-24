@@ -77,7 +77,11 @@ final class ChsCurrentGateTests: XCTestCase {
                 return todayWindow
             }
             XCTFail("The original future-date failure should be returned")
-        } catch { }
+        } catch ChsError.transient(let message) {
+            XCTAssertEqual(message, "Incomplete predictions")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
         XCTAssertEqual(requests, [future, today])
     }
 
@@ -282,7 +286,7 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(ChsFitService.onlineRuns(cleaned.projected), [0..<2, 2..<4])
     }
 
-    func testIncompleteOnlineBlocksCauseRetryUnlessCachedBlockCoversStrip() throws {
+    func testIncompleteOnlineBlocksStopRetryingUnlessCachedBlockCoversStrip() throws {
         let anchor = Date(timeIntervalSince1970: 1_767_225_600)
         let span = Timeline.window(anchor: anchor)
         func block(_ start: Date, _ end: Date) -> ChsOnlineWindow {
@@ -292,7 +296,10 @@ final class ChsCurrentGateTests: XCTestCase {
         }
         let partial = [block(span.start, anchor), block(anchor.addingTimeInterval(900), span.end)]
         XCTAssertThrowsError(try ChsFitService.onlineCoveredWindow(partial, anchor: anchor, name: "Test")) { error in
-            XCTAssertFalse(ChsError.isPermanent(error))
+            XCTAssertTrue(ChsError.isPermanent(error))
+        }
+        XCTAssertThrowsError(try ChsFitService.onlineCoveredWindow([], anchor: anchor, name: "Test")) { error in
+            XCTAssertTrue(ChsError.isPermanent(error))
         }
         let complete = block(span.start, span.end)
         XCTAssertTrue(try ChsFitService.onlineCoveredWindow(partial + [complete], anchor: anchor, name: "Test").covers(anchor: anchor))
