@@ -449,6 +449,15 @@ import XCTest
         XCTAssertEqual(pin.bearing ?? -1, 90, accuracy: 0.001)
     }
 
+    func testRotatingCurrentPinKeepsVectorDirectionAtFractionalSecond() {
+        var station = record(speedKn: 0)
+        station.minorConstituents = [.init(name: "M2", amplitude: 0, phase: 0)]
+        station.minorMeanFlow = 1
+        station.azimuth = 0
+        let pin = currentPinState(station, at: refTime.addingTimeInterval(0.4), speedUnit: "kn")
+        XCTAssertEqual(pin.bearing ?? -1, 90, accuracy: 0.001)
+    }
+
     /// The pin ramp must never read green at any speed it can actually render
     /// (above the threshold — below it the pin is go): green is the window's,
     /// exclusively. Contrast over the satellite imagery can't be asserted

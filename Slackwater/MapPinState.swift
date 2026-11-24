@@ -177,7 +177,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
         : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first
     let signed = station.isSubordinate ? subordinateCurrentPinSpeed(station, at: now) : point?.speed ?? 0
     let magnitude = point?.magnitude ?? abs(signed)
-    let direction = point.flatMap { [$0].vector(at: now, flood: station.floodDirection, ebb: station.ebbDirection)?.direction }
+    let direction = point.flatMap { [$0].vector(at: $0.time, flood: station.floodDirection, ebb: station.ebbDirection)?.direction }
     let slack = magnitude <= slackCoreThresholdKn(slackThresholdKn)
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
