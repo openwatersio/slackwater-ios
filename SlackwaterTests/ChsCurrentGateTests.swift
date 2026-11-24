@@ -211,8 +211,35 @@ final class ChsCurrentGateTests: XCTestCase {
                           ChsSample(t: 900_000, v: 270), ChsSample(t: 1_800_000, v: 180)]
         let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
         XCTAssertEqual(result.directions, [0, 90, 180])
-        XCTAssertNil(ChsFitService.onlineVectors(speeds: speeds, dirs: [directions[0], directions[3]], flood: 0))
-        XCTAssertNil(ChsFitService.onlineVectors(speeds: [speeds[0], speeds[2]], dirs: directions, flood: 0))
+        let incomplete = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: [directions[0], directions[3]], flood: 0))
+        XCTAssertTrue(ChsFitService.onlineRuns(incomplete.projected).isEmpty)
+    }
+
+    func testOnlineRunsPreserveSamplesOnBothSidesOfGap() throws {
+        let speeds = (0..<5).map { ChsSample(t: Double($0) * 900_000, v: 2) }
+        let dirs = speeds.enumerated().filter { $0.offset != 2 }.map { ChsSample(t: $0.element.t, v: 90) }
+        let vectors = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: dirs, flood: 0))
+        XCTAssertEqual(ChsFitService.onlineRuns(vectors.projected), [0..<2, 2..<4])
+        XCTAssertEqual(vectors.magnitudes, [2, 2, 2, 2])
+        let invalid = speeds.map { ChsSample(t: $0.t, v: $0.t == 1_800_000 ? .nan : 90) }
+        let cleaned = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: invalid, flood: 0))
+        XCTAssertEqual(ChsFitService.onlineRuns(cleaned.projected), [0..<2, 2..<4])
+    }
+
+    func testIncompleteOnlineBlocksCauseRetryUnlessCachedBlockCoversStrip() throws {
+        let anchor = Date(timeIntervalSince1970: 1_767_225_600)
+        let span = Timeline.window(anchor: anchor)
+        func block(_ start: Date, _ end: Date) -> ChsOnlineWindow {
+            ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC",
+                            fetchedAt: .now, start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, -1])
+        }
+        let partial = [block(span.start, anchor), block(anchor.addingTimeInterval(900), span.end)]
+        XCTAssertThrowsError(try ChsFitService.onlineCoveredWindow(partial, anchor: anchor, name: "Test")) { error in
+            XCTAssertFalse(ChsError.isPermanent(error))
+        }
+        let complete = block(span.start, span.end)
+        XCTAssertTrue(try ChsFitService.onlineCoveredWindow(partial + [complete], anchor: anchor, name: "Test").covers(anchor: anchor))
     }
 
     func testOnlineVectorSurvivesCacheAndDoesNotInventSlack() throws {
