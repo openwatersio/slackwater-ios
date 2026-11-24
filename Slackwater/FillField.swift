@@ -193,6 +193,7 @@ final class FillField: Sendable {
                 let phase = r.f16()
                 if let name = idToName[Int(id)] {
                     // Format 1 was fitted with the engine's former M3/S3/M7 arguments.
+                    // TODO(#943): Retire the format-1 phase shift after the shipping release is adopted.
                     let shift = ["M3", "S3", "M7"].contains(name) ? 180.0 : 0.0
                     out.append(HarmonicConstituent(name: name, amplitude: amplitude,
                                                    phase: (phase + shift).truncatingRemainder(dividingBy: 360)))

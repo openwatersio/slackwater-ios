@@ -287,8 +287,8 @@ jobs:
           sh scripts/ci-runner/install.test.sh
           python3 scripts/localization.test.py
 
-      - name: Build fitting validator
-        run: swift build -c release --package-path tools/FitValidation
+      - name: Test fitting validator
+        run: swift test -c release --package-path tools/FitValidation
 
       # MapLibre is a binary download, not a compile — the cache saves the
       # fetch, not a build. Package.resolved pins the downloaded versions.
@@ -668,9 +668,9 @@ jobs:
           sh scripts/ci-runner/install.test.sh
           python3 scripts/localization.test.py
 
-      - name: Build fitting validator
+      - name: Test fitting validator
         if: matrix.device == 'iPhone'
-        run: swift build -c release --package-path tools/FitValidation
+        run: swift test -c release --package-path tools/FitValidation
 
       # The IWLS fixture is compiled into the unit-test bundle, so it is staged
       # before the build. Node comes from the machine.
