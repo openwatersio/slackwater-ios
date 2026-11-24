@@ -57,6 +57,9 @@ final class AlertPrimitivesTests: XCTestCase {
         let found = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
                                      position: (0, 0), from: at(-60), to: at(9 * 3600), threshold: 0.5)
         XCTAssertEqual(found.map(\.event), [alertMinute(at(0))])
+        let narrowed = alertOccurrences(rule, station: .current(station, tz: TimeZone(secondsFromGMT: 0)!, name: "Test"),
+                                        position: (0, 0), from: at(2 * 3600), to: at(9 * 3600), threshold: 0.5)
+        XCTAssertEqual(narrowed.map(\.event), [alertMinute(at(0))], "the selected window opens before the query range")
     }
 
     func testMergedWindowsOpenOnceAndAFastReversalOpensItsOwn() {

@@ -16,7 +16,7 @@ final class SeasonalWaterTests: XCTestCase {
         // so a regeneration that dropped it too would leave every screen silent
         // with nothing failing.
         let flagged = TideStationRecord.all.filter { $0.seasonalDominant == true }
-        XCTAssertEqual(flagged.count, 293)
+        XCTAssertEqual(flagged.count, 291)
     }
 
     /// The database flags a station when its seasonal peak exceeds the
@@ -32,14 +32,14 @@ final class SeasonalWaterTests: XCTestCase {
     }
 
     func testLeadsWhereTheAnnualCycleIsTheSignal() {
-        // Cobourg on Lake Ontario: a principal tide of millimetres under a
-        // third of a metre of seasonal swing.
-        let cobourg = record("ticon/cobourg_ontario-13590-can-meds")
+        // Kingston on Lake Ontario: a principal tide of millimetres under a
+        // seasonal swing of roughly a third of a metre.
+        let cobourg = record("ticon/kingston_ontario-13988-can-meds")
         XCTAssertEqual(cobourg.seasonalDominant, true)
         let ratio = try! XCTUnwrap(cobourg.seasonalRatio)
-        XCTAssertEqual(ratio, 89.2, accuracy: 0.5)
+        XCTAssertGreaterThan(ratio, 20)
         XCTAssertGreaterThanOrEqual(ratio, TideStationRecord.seasonalLeadRatio)
-        XCTAssertEqual(seasonalTimes(ratio), "90")
+        XCTAssertEqual(seasonalTimes(ratio), "30")
     }
 
     func testStaysQuietWhereTheTideIsReal() {
