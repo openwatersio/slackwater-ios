@@ -17,11 +17,12 @@ struct AlertActivityPolicy {
 }
 
 func alertActivityPolicy(rules: [AlertRule], reviewCandidates: Set<UUID>, measuredWindows: Set<UUID>,
-                         runningWindows: Set<UUID>, heldWindows: Set<UUID>, threshold: Double) -> AlertActivityPolicy {
+                         runningActivities: Set<UUID>, runningWindows: Set<UUID>, heldWindows: Set<UUID>,
+                         threshold: Double) -> AlertActivityPolicy {
     let active = activeRuleIDs(rules)
-    let running = runningWindows.intersection(active)
+    let running = runningActivities.intersection(active)
     let currentRules = Set(rules.filter { $0.trigger == .slackWindowOpens }.map(\.id))
-    let offWindows = slackWindowIsOff(threshold) ? running.intersection(currentRules) : []
+    let offWindows = slackWindowIsOff(threshold) ? runningWindows.intersection(active).intersection(currentRules) : []
     return AlertActivityPolicy(reviewIDs: reviewCandidates.subtracting(running),
                                expiryProtected: measuredWindows.union(running),
                                liveRuleIDs: active.subtracting(heldWindows.union(offWindows)))
@@ -252,9 +253,13 @@ struct AlertStatusSnapshot: Equatable {
         // Discard its old result before changing alerts, then resolve the new setting.
         guard threshold == slackThresholdKn else { return false }
         // ActivityKit stores absolute times even when the app's debug clock is pinned.
-        let liveWindows = AlertLiveActivities.activeWindowRuleIDs(at: Date())
+        let activityClock = Date()
+        let liveRecords = AlertLiveActivities.activeRecords()
+        let liveActivities = liveActivityRuleIDs(liveRecords, now: activityClock)
+        let liveWindows = liveWindowRuleIDs(liveRecords, now: activityClock)
         let policy = alertActivityPolicy(rules: storedRules, reviewCandidates: resolved.legacyReview,
-                                         measuredWindows: resolved.activeWindows, runningWindows: liveWindows,
+                                         measuredWindows: resolved.activeWindows, runningActivities: liveActivities,
+                                         runningWindows: liveWindows,
                                          heldWindows: resolved.heldWindows, threshold: threshold)
         let marked = AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: policy.reviewIDs)
         if premium { await AlertNotifications.notifySlackReview(marked, places: resolved.places) }
@@ -296,7 +301,8 @@ struct AlertStatusSnapshot: Equatable {
         let currentLiveRules = AlertRuleStore.shared.rules
         let unchangedIDs = Set(unchangedResolvedRules(storedRules, current: currentLiveRules).map(\.id))
         let livePolicy = alertActivityPolicy(rules: currentLiveRules, reviewCandidates: [],
-                                             measuredWindows: [], runningWindows: liveWindows,
+                                             measuredWindows: [], runningActivities: liveActivities,
+                                             runningWindows: liveWindows,
                                              heldWindows: resolved.heldWindows.intersection(unchangedIDs), threshold: threshold)
         let placed = await AlertLiveActivities.apply(
             entries(plan.liveActivities, includeLead: false, includePlace: true),

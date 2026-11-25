@@ -46,19 +46,44 @@ final class AlertResolveTests: XCTestCase {
         let running = liveWindowRuleIDs([open], now: now)
         XCTAssertEqual(running, [rule.id])
         let policy = alertActivityPolicy(rules: [rule], reviewCandidates: [rule.id], measuredWindows: [],
-                                         runningWindows: running, heldWindows: [], threshold: 0.5)
+                                         runningActivities: running, runningWindows: running, heldWindows: [], threshold: 0.5)
         XCTAssertTrue(policy.reviewIDs.isEmpty, "an active alert is not sent for review")
         XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(2400),
                                             occurrences: [], activeWindows: policy.expiryProtected).isEmpty)
         XCTAssertTrue(liveActivitiesToEnd([open], liveRuleIDs: policy.liveRuleIDs, now: now).isEmpty)
         let off = alertActivityPolicy(rules: [rule], reviewCandidates: [], measuredWindows: [],
-                                      runningWindows: running, heldWindows: [], threshold: 0)
+                                      runningActivities: running, runningWindows: running, heldWindows: [], threshold: 0)
         XCTAssertEqual(liveActivitiesToEnd([open], liveRuleIDs: off.liveRuleIDs, now: now),
                        ["open"], "turning the comfort window off ends its activity")
         XCTAssertTrue(liveWindowRuleIDs([open], now: now.addingTimeInterval(3601)).isEmpty)
         let pending = LiveActivityRecord(key: "pending", ruleID: rule.id, pending: true,
                                          event: open.event, end: open.end)
         XCTAssertTrue(liveWindowRuleIDs([pending], now: now).isEmpty)
+    }
+
+    func testStartedCountdownSurvivesMigrationWithoutConfusingInstantSlack() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3000))
+        let countdown = LiveActivityRecord(key: "countdown", ruleID: rule.id, pending: false,
+                                           event: now.addingTimeInterval(1200), end: now.addingTimeInterval(7200))
+        let activities = liveActivityRuleIDs([countdown], now: now)
+        let windows = liveWindowRuleIDs([countdown], now: now)
+        XCTAssertEqual(activities, [rule.id])
+        XCTAssertEqual(windows, [rule.id])
+        let policy = alertActivityPolicy(rules: [rule], reviewCandidates: [rule.id], measuredWindows: [],
+                                         runningActivities: activities, runningWindows: windows,
+                                         heldWindows: [], threshold: 0.5)
+        XCTAssertTrue(policy.reviewIDs.isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([countdown], liveRuleIDs: policy.liveRuleIDs, now: now).isEmpty)
+        let instant = LiveActivityRecord(key: "slack", ruleID: rule.id, pending: false,
+                                        event: countdown.event, end: nil)
+        let instantPolicy = alertActivityPolicy(rules: [rule], reviewCandidates: [], measuredWindows: [],
+            runningActivities: liveActivityRuleIDs([instant], now: now),
+            runningWindows: liveWindowRuleIDs([instant], now: now), heldWindows: [], threshold: 0)
+        XCTAssertTrue(liveActivitiesToEnd([instant], liveRuleIDs: instantPolicy.liveRuleIDs, now: now).isEmpty)
+        let pending = LiveActivityRecord(key: "pending", ruleID: rule.id, pending: true,
+                                        event: countdown.event, end: countdown.end)
+        XCTAssertTrue(liveActivityRuleIDs([pending], now: now).isEmpty)
     }
 
     func testResolveNamesPlacesAndReportsUnknownStations() {

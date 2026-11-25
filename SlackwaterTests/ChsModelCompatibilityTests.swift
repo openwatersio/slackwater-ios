@@ -102,8 +102,10 @@ final class ChsModelCompatibilityTests: XCTestCase {
 
     func testPinnedRecipeMatchesMeasuredFixture() throws {
         let data = Data(try repoSource("tools/chs-current-recipe.json").utf8)
-        struct Recipe: Decodable { let stamp: String }
+        struct Recipe: Decodable { let stamp: String; let evidenceReleases: [String: String] }
         let fixture = try JSONDecoder().decode(Recipe.self, from: data)
         XCTAssertEqual(ChsCurrentFit.stamp, fixture.stamp)
+        let legacy = try XCTUnwrap(fixture.evidenceReleases["fit-2026-10-22-8f85912-r2"])
+        XCTAssertNotNil(gate(recipe: fixture.stamp).usableModel(model(recipe: legacy)))
     }
 }

@@ -21,8 +21,12 @@ func liveActivitiesToEnd(_ records: [LiveActivityRecord], liveRuleIDs: Set<UUID>
     }.map(\.key)
 }
 
+func liveActivityRuleIDs(_ records: [LiveActivityRecord], now: Date) -> Set<UUID> {
+    Set(records.filter { !$0.pending && ($0.end ?? $0.event) > now }.map(\.ruleID))
+}
+
 func liveWindowRuleIDs(_ records: [LiveActivityRecord], now: Date) -> Set<UUID> {
-    Set(records.filter { !$0.pending && $0.event <= now && $0.end.map { $0 > now } == true }.map(\.ruleID))
+    Set(records.filter { !$0.pending && $0.end.map { $0 > now } == true }.map(\.ruleID))
 }
 
 /// The entries whose event is still ahead of the clock. The plan filtered on the pass's start
@@ -50,13 +54,12 @@ func liveActivityCurve(_ station: WidgetStation, around event: Date) -> AlertLiv
 /// Off the main actor on purpose: `Activity` is not `Sendable`, so ending one from an actor
 /// would be a send across its boundary. Nothing here touches app state.
 enum AlertLiveActivities {
-    nonisolated static func activeWindowRuleIDs(at now: Date) -> Set<UUID> {
-        let records = Activity<AlertLiveActivityAttributes>.activities.compactMap { activity -> LiveActivityRecord? in
+    nonisolated static func activeRecords() -> [LiveActivityRecord] {
+        Activity<AlertLiveActivityAttributes>.activities.compactMap { activity -> LiveActivityRecord? in
             guard activity.activityState == .active || activity.activityState == .stale else { return nil }
             return LiveActivityRecord(key: activity.attributes.key, ruleID: activity.attributes.ruleID,
                                       pending: false, event: activity.attributes.event, end: activity.attributes.end)
         }
-        return liveWindowRuleIDs(records, now: now)
     }
 
     /// Ends what the sweep names, requests `entries` in order until the system refuses, and
