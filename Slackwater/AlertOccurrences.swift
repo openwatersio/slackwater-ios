@@ -41,7 +41,7 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?, noWindow: Bool, observedThrough: Date?, openingObserved: Bool)] {
     let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
-    let events = currentEventsMatchingWater(points, events: station.events(from: start, to: stop))
+    let events = currentEventsMatchingWater(points, events: station.events(from: start, to: stop), station: station)
     let windows = currentWindows(points, events: events, threshold: threshold)
     let openings: [(event: Date, end: Date?, noWindow: Bool, observedThrough: Date?, openingObserved: Bool)] = windows.compactMap { window in
         if window.start == window.end {

@@ -464,7 +464,7 @@ extension CurrentStationRecord {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = max(now.addingTimeInterval(StationCardGraph.forwardWindow), requestedEnd ?? now)
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
-        let events = currentEventsMatchingWater(raw, events: s.events(from: start, to: end))
+        let events = currentEventsMatchingWater(raw, events: s.events(from: start, to: end), station: s)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
@@ -498,7 +498,7 @@ extension ChsOnlineWindow {
         let tz = TimeZone(identifier: timezone) ?? .current
         let samples = points
         let raw = samples.filter { $0.time >= start && $0.time <= end }
-        let events = currentEventsMatchingWater(raw, events: sampleEvents(samples).filter { $0.time >= start && $0.time <= end })
+        let events = currentEventsMatchingWater(raw, events: sampleEvents(samples).filter { $0.time >= start && $0.time <= end }, station: self)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
