@@ -254,6 +254,44 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testIncompleteRetryDeadlineSurvivesServiceRestart() throws {
+        let original = ChsFitService()
+        original.resetOnlineStateForTesting()
+        defer { original.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let now = Date.now
+        for _ in 0..<3 {
+            original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: now)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        if case .failed = restarted.onlineState(gate.id, at: now) {} else {
+            XCTFail("Relaunch must retain the incomplete-prediction cooldown")
+        }
+        XCTAssertEqual(restarted.onlineState(gate.id, at: now.addingTimeInterval(86_401)), .idle)
+    }
+
+    @MainActor
+    func testRestartedIncompleteRetryResumesWhenDeadlineExpires() async throws {
+        let original = ChsFitService()
+        original.resetOnlineStateForTesting()
+        defer { original.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let failure = Date.now.addingTimeInterval(-86_399.5)
+        for _ in 0..<3 {
+            original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: failure)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        restarted.refreshOnline(gate)
+        try await Task.sleep(for: .milliseconds(1500))
+        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
+        let nextLaunch = ChsFitService()
+        defer { nextLaunch.resetOnlineStateForTesting() }
+        XCTAssertEqual(nextLaunch.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
     func testManualOnlineUpdateResetsRetryBackoff() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()

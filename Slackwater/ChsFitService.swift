@@ -98,7 +98,10 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
-    private var onlineIncompleteRetryAfter: [String: Date] = [:]
+    private static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
+    private var onlineIncompleteRetryAfter: [String: Date] = [:] {
+        didSet { UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey) }
+    }
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
     /// The station-local day of each gate's last automatic fetch. A station
     /// that still covers today refreshes at most once on that day, so a
@@ -289,6 +292,11 @@ final class ChsFitService: ObservableObject {
 
     init() {
         ChsModelStore.resetIfRequested()
+        onlineIncompleteRetryAfter = (UserDefaults.standard.dictionary(forKey: Self.incompleteRetryKey) as? [String: Date] ?? [:])
+            .filter { $0.value > appNow() }
+        for id in onlineIncompleteRetryAfter.keys {
+            onlineStates[id] = .failed("IWLS returned incomplete current vectors")
+        }
         // Before anything adopts: `adopt` reads `tier` to decide what the
         // queue may take, and the first call can arrive from the list's
         // `.task` a moment after this returns.
@@ -807,6 +815,7 @@ final class ChsFitService: ObservableObject {
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
                            maxAttempts: Int? = nil, at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()
+        onlineRetryTimers[id] = nil
         onlineIncompleteRetryAfter[id] = nil
         guard !permanent else {
             releaseRequest(id)
@@ -820,15 +829,7 @@ final class ChsFitService: ObservableObject {
             onlineStates[id] = .failed(error)
             let due = now.addingTimeInterval(86_400)
             onlineIncompleteRetryAfter[id] = due
-            guard let gate = onlineDesired[id] else { return }
-            onlineRetryTimers[id] = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
-                guard !Task.isCancelled else { return }
-                self?.onlineStates[id] = .idle
-                self?.onlineAttempts[id] = 0
-                self?.onlineIncompleteRetryAfter[id] = nil
-                self?.prefetchOnlineGates([gate])
-            }
+            if let gate = onlineDesired[id] { scheduleIncompleteRetry(gate, due: due) }
             return
         }
         let due = now.addingTimeInterval(ChsQueue.backoff(attempts: attempts))
@@ -838,6 +839,19 @@ final class ChsFitService: ObservableObject {
             try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
             guard !Task.isCancelled else { return }
             self?.onlineStates[id] = .idle
+            self?.prefetchOnlineGates([gate])
+        }
+    }
+
+    private func scheduleIncompleteRetry(_ gate: ChsCurrentGateInfo, due: Date) {
+        guard onlineRetryTimers[gate.id] == nil else { return }
+        onlineRetryTimers[gate.id] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
+            guard !Task.isCancelled else { return }
+            self?.onlineRetryTimers[gate.id] = nil
+            self?.onlineStates[gate.id] = .idle
+            self?.onlineAttempts[gate.id] = 0
+            self?.onlineIncompleteRetryAfter[gate.id] = nil
             self?.prefetchOnlineGates([gate])
         }
     }
@@ -962,6 +976,11 @@ final class ChsFitService: ObservableObject {
         // Guarded: every fix re-enters here with the same gates, and a
         // published write that changes nothing still redraws the list.
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
+        for gate in gates {
+            if let due = onlineIncompleteRetryAfter[gate.id], due > appNow() {
+                scheduleIncompleteRetry(gate, due: due)
+            }
+        }
         retainRequests(gates.filter { cohort.ids.contains($0.id) && onlineNeedsDownload($0) }.map(\.id))
         guard Connectivity.shared.online, !networkKillSwitch else { return }
         let due = onlineGatesDue(gates)
