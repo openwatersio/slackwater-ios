@@ -2,6 +2,8 @@
 
 Slackwater is a tide and current app that runs its predictions on the device. Bug reports, data corrections, and pull requests are all welcome.
 
+Every change follows the org-wide [rigor rules](https://github.com/openwatersio/.github/blob/main/docs/agents/rigor.md). The first of them: when something fails or looks wrong, find the cause and fix it there instead of working around it.
+
 ## Getting started
 
 You need **Xcode 27** or later (the app targets iOS 26). Open the committed project:
