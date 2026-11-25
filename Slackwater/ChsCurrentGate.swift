@@ -196,7 +196,8 @@ struct ChsOnlineWindow: Codable, Sendable {
             if times[mid] < t { lo = mid + 1 } else { hi = mid }
         }
         func directionKnown(_ index: Int) -> Bool {
-            guard hasVectors, let directions, let magnitudes else { return true }
+            guard let directions, let magnitudes, directions.count == times.count,
+                  magnitudes.count == times.count else { return true }
             return directions[index] != nil || magnitudes[index] == 0
         }
         if times[lo] == t { return directionKnown(lo) ? speeds[lo] : nil }
