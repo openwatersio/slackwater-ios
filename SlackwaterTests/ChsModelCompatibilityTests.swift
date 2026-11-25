@@ -19,9 +19,9 @@ final class ChsModelCompatibilityTests: XCTestCase {
 
     func testTideModelPhaseConventionRoundTripsAcrossVersions() throws {
         let old = [Con(name: "M3", amplitude: 1, phase: 350), Con(name: "M2", amplitude: 2, phase: 12)]
-        let translated = translatedLegacyTidePhases(old)
+        let translated = translatedLegacyFitPhases(old)
         XCTAssertEqual(translated.map(\.phase), [170, 12])
-        XCTAssertEqual(translatedLegacyTidePhases(translated).map(\.phase), [350, 12])
+        XCTAssertEqual(translatedLegacyFitPhases(translated).map(\.phase), [350, 12])
         let info = try XCTUnwrap(ChsStationInfo.all.first)
         let model = ChsModel(stationID: info.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
                              fitStartMs: 0, fitEndMs: 1, offset: 0, rms: 0, constituents: old)
@@ -39,7 +39,7 @@ final class ChsModelCompatibilityTests: XCTestCase {
         let info = try XCTUnwrap(ChsStationInfo.all.first)
         let model = ChsModel(stationID: info.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
                              fitStartMs: 0, fitEndMs: 1, offset: fit.offset, rms: fit.rms,
-                             constituents: translatedLegacyTidePhases(fit.constituents))
+                             constituents: translatedLegacyFitPhases(fit.constituents))
         let record = info.record(with: model)
         let restored = Station(constituents: record.constituents.map {
             HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
@@ -60,6 +60,19 @@ final class ChsModelCompatibilityTests: XCTestCase {
         XCTAssertFalse(gate(provisional: nil).isProvisional(model(days: 60)))
         XCTAssertNil(gate().usableModel(model(days: 90)))
         XCTAssertNil(gate(days: 60).usableModel(model()))
+    }
+
+    func testLegacyCurrentFitRemainsUsableWithoutRewritingStoredPhases() throws {
+        let old = ChsModel(stationID: "chs-test", iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                           fitStartMs: 0, fitEndMs: 1, fitDays: 210, recipe: "8f85912ce223",
+                           floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0,
+                           constituents: [.init(name: "M3", amplitude: 1, phase: 350),
+                                          .init(name: "M2", amplitude: 2, phase: 12)])
+        let compatible = try XCTUnwrap(gate().usableModel(old))
+        XCTAssertEqual(compatible.recipe, "8f85912ce223")
+        XCTAssertEqual(compatible.constituents.map(\.phase), [350, 12], "storage and transfer must retain the old convention")
+        XCTAssertEqual(gate().record(with: compatible).constituents.map(\.phase), [170, 12])
+        XCTAssertNil(gate(recipe: "other").usableModel(old), "only the matching current recipe can translate this fit")
     }
 
     func testRecipeMustMatchEvidenceAndEngine() {

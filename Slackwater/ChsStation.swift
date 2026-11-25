@@ -216,9 +216,9 @@ extension StationItem {
     }
 }
 
-/// Translate between the stored tide-fit convention and the engine's M3/S3/M7 arguments.
+/// Translate between the legacy fit convention and the engine's M3/S3/M7 arguments.
 /// Applying this twice returns the original phases, so older paired devices keep reading saved fits.
-func translatedLegacyTidePhases(_ constituents: [Con]) -> [Con] {
+func translatedLegacyFitPhases(_ constituents: [Con]) -> [Con] {
     constituents.map { constituent in
         guard ["M3", "S3", "M7"].contains(constituent.name) else { return constituent }
         return Con(name: constituent.name, amplitude: constituent.amplitude,
@@ -240,7 +240,7 @@ extension ChsStationInfo {
             latitude: latitude, longitude: longitude, timezone: timezone,
             chartDatum: "LLWLT",  // CHS chart datum: Lower Low Water, Large Tide
             datumOffset: model.offset,
-            constituents: translatedLegacyTidePhases(model.constituents))
+            constituents: translatedLegacyFitPhases(model.constituents))
     }
 }
 
