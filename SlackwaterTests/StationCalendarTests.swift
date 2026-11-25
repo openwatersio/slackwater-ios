@@ -91,6 +91,8 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(stationCalendarTitle(name: "Friday Harbor", kind: .tide), "Friday Harbor Tides")
         XCTAssertEqual(stationCalendarTitle(name: "Race Passage", kind: .current), "Race Passage Currents · Slackwater")
         XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived), "Dodd Narrows Currents")
+        XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived, stationID: "chs-dodd-narrows"),
+                       stationCalendarTitle(name: "Dodd Narrows", kind: .current))
     }
 
     // MARK: calendars are Premium

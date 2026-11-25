@@ -66,7 +66,9 @@ import XCTest
         let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
         defaults.set(try JSONEncoder().encode([rule]), forKey: AppGroup.alertRulesKey)
         let store = AlertRuleStore(defaults: defaults)
-        store.markSlackNeedsReview([rule], ids: [rule.id])
+        XCTAssertEqual(store.markSlackNeedsReview([rule], ids: [rule.id]).map(\.id), [rule.id])
+        XCTAssertTrue(store.markSlackNeedsReview([rule], ids: [rule.id]).isEmpty,
+                      "a later scheduler pass must not notify again")
         let reloaded = AlertRuleStore(defaults: defaults)
         let marked = try XCTUnwrap(reloaded.rules.first)
         XCTAssertEqual(marked.slackNeedsReview, true)

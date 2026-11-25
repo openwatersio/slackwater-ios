@@ -105,6 +105,22 @@ import SlackwaterKit
         XCTAssertEqual(merged[0].end, second.end)
     }
 
+    func testMergedCurrentChunksKeepRealZeroInstants() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
+        let anchor = vancouverMidnight(2026, 8, 11)
+        let mono = TimelineData.build(tide: nil, current: station,
+                                      now: anchor.addingTimeInterval(15 * 3600), anchor: anchor)
+        let chunks = merged(.current(station, threshold: defaultSlackThresholdKn),
+                            origin: anchor, indices: -1...1, anchor: anchor, today: anchor)
+        let expected = mono.bareSlackTimes.filter { mono.contains($0) }
+        let actual = chunks.bareSlackTimes.filter { mono.contains($0) }
+        XCTAssertFalse(expected.isEmpty, "the comparison must include true slack instants")
+        XCTAssertEqual(actual.count, expected.count)
+        for (a, b) in zip(actual, expected) {
+            XCTAssertEqual(a.timeIntervalSince(b), 0, accuracy: 2)
+        }
+    }
+
     func testMergedCurrentChunksMatchMonolithicBuild() {
         let anchor = vancouverMidnight(2026, 8, 11)
         let now = anchor.addingTimeInterval(15 * 3600)

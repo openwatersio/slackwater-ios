@@ -130,11 +130,11 @@ func calendarTriggers(for kind: StationCalendarKind) -> [AlertTrigger] {
 /// because a place can have both: Friday Harbor is a tide station AND a current station, and
 /// one title between the two would have each run adopt the other's calendar and rewrite its
 /// events.
-func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
+func stationCalendarTitle(name: String, kind: StationCalendarKind, stationID: String? = nil) -> String {
     switch kind {
     case .tide: "\(name) Tides"
     case .current: "\(name) Currents · Slackwater"
-    case .derived: "\(name) Currents"
+    case .derived: stationID.map(usesWindowCalendar) == true ? "\(name) Currents · Slackwater" : "\(name) Currents"
     }
 }
 
@@ -272,8 +272,13 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
         persist()
     }
 
-    func unsubscribe(_ stationID: String) {
-        CurrentCalendarInvalidations.forget(stationID: stationID, in: defaults)
+    func unsubscribe(_ stationID: String, preserveInvalidation: Bool = false) {
+        if preserveInvalidation && CurrentCalendarInvalidations.pending(in: defaults).contains(stationID) {
+            CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
+                calendarIDs: Set(calendarIDsForRemoval(stationID)), in: defaults)
+        } else if !preserveInvalidation {
+            CurrentCalendarInvalidations.forget(stationID: stationID, in: defaults)
+        }
         subscriptions.removeAll { $0.stationID == stationID }
         persist()
     }

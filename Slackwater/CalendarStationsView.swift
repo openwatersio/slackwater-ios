@@ -114,7 +114,7 @@ struct CalendarStationsView: View {
         let record = WidgetStationLoader.loadRecord(id: stationID)
         let subtitle: String = if let record {
             if on {
-                stationCalendarTitle(name: name(stationID), kind: record.calendarKind)
+                stationCalendarTitle(name: name(stationID), kind: record.calendarKind, stationID: stationID)
             } else {
                 switch record.calendarKind {
                 case .tide: String(localized: "Add high and low tides")
@@ -171,8 +171,8 @@ struct CalendarStationsView: View {
             // this toggle reads off. Tell the truth instead: drop the subscription, which is all
             // this device can actually do, and say so.
             guard AlertCalendar.authorized else {
+                calendars.unsubscribe(stationID, preserveInvalidation: true)
                 calendars.forgetWindowCalendar(for: stationID)
-                calendars.unsubscribe(stationID)
                 revokedName = name(stationID)
                 revoked = true
                 return

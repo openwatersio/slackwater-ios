@@ -31,6 +31,18 @@ final class CalendarInvalidationTests: XCTestCase {
         XCTAssertTrue(CurrentCalendarInvalidations.deferred(in: d).isEmpty)
     }
 
+    @MainActor func testUnsubscribeWithoutAccessKeepsPendingCleanup() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.subscribe("current:test")
+        store.setCalendarID("new", for: "current:test")
+        CurrentCalendarInvalidations.record(["current:test"], in: d)
+        store.unsubscribe("current:test", preserveInvalidation: true)
+        XCTAssertEqual(CurrentCalendarInvalidations.pending(in: d), ["current:test"])
+        XCTAssertEqual(CurrentCalendarInvalidations.deferred(in: d)["current:test"], ["new"])
+        XCTAssertTrue(store.subscriptions.isEmpty)
+    }
+
     func testMissingLegacyCalendarDoesNotBlockInvalidatingCurrentCalendar() {
         XCTAssertTrue(calendarInvalidationCanProceed(windowID: "current", found: ["current"]))
         XCTAssertFalse(calendarInvalidationCanProceed(windowID: "current", found: ["legacy"]))

@@ -406,6 +406,25 @@ import CoreLocation
                                  online.end.timeIntervalSince(now))
     }
 
+    func testOnlineWindowUsesOriginalSampleCorners() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+            fetchedAt: start, start: start, end: start.addingTimeInterval(2700), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800, 2700].map { start.addingTimeInterval(Double($0)).timeIntervalSince1970 },
+            speeds: [0, 0.4, 1, 1.2])
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(
+            DateInterval(start: start, end: start.addingTimeInterval(2700)), at: .current(record, station: online)))
+        let spokenWindow = try XCTUnwrap(result.windows.first)
+        let cardWindow = try XCTUnwrap(result.card.graph?.windows.first)
+        XCTAssertEqual(spokenWindow.end.timeIntervalSince(cardWindow.end), 0, accuracy: 1)
+        XCTAssertEqual(spokenWindow.end.timeIntervalSince(start), 1050, accuracy: 1)
+    }
+
     func testOnlineWindowRetainsPeaksBetweenResampledPoints() throws {
         let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
         defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }

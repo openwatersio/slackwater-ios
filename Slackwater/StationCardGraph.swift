@@ -463,7 +463,8 @@ extension CurrentStationRecord {
                    through requestedEnd: Date? = nil) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = max(now.addingTimeInterval(StationCardGraph.forwardWindow), requestedEnd ?? now)
-        let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
+        let raw = (s as? ChsOnlineWindow)?.points.filter { $0.time >= start && $0.time <= end }
+            ?? s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
         let events = currentEventsMatchingWater(raw, events: s.events(from: start, to: end), station: s)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(

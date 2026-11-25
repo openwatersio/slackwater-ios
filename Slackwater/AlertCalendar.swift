@@ -186,7 +186,7 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>, hasEvents: Bo
                 _ = clearGeneratedEvents(in: legacy, stationID: stationID, now: now)
             }
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
-            let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
+            let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind, stationID: stationID)
             // Wait for an event before creating a calendar: another device can only
             // recognize a calendar as ours by its station-linked events.
             guard let calendar = calendarFor(stationID: stationID, title: title,

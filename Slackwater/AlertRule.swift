@@ -166,16 +166,17 @@ struct AlertRule: Codable, Identifiable, Equatable {
     }
 
     /// Record only unchanged one-time rules from a completed resolution.
-    func markSlackNeedsReview(_ snapshot: [AlertRule], ids: Set<UUID>) {
-        var changed = false
-        for rule in snapshot where ids.contains(rule.id) && rule.once != nil && rule.enabled
-            && (!rule.currentWindowRule || rule.currentWindowWasOff) {
+    @discardableResult func markSlackNeedsReview(_ snapshot: [AlertRule], ids: Set<UUID>) -> [AlertRule] {
+        var marked: [AlertRule] = []
+        for rule in snapshot where ids.contains(rule.id) && rule.trigger == .slackWindowOpens
+            && rule.once != nil && rule.enabled && (!rule.currentWindowRule || rule.currentWindowWasOff) {
             guard let index = rules.firstIndex(of: rule), rules[index].slackNeedsReview != true else { continue }
             rules[index].slackNeedsReview = true
             rules[index].enabled = false
-            changed = true
+            marked.append(rules[index])
         }
-        if changed { persist() }
+        if !marked.isEmpty { persist() }
+        return marked
     }
 
     func remove(_ id: UUID) {

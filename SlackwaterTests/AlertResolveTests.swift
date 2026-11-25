@@ -130,6 +130,35 @@ final class AlertResolveTests: XCTestCase {
                                          until: now.addingTimeInterval(2 * 86_400), occurrences: []))
     }
 
+    func testOnceWindowStaysActiveUntilItsSelectedWindowCloses() throws {
+        let id = "current:noaa/ACT1616"
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id, at: now))
+        let station = WidgetStationLoader.station(from: record)
+        let repeating = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let window = try XCTUnwrap(alertOccurrences(repeating, station: station, position: record.alertPosition,
+            from: now, to: now.addingTimeInterval(86_400), threshold: 0.5).first { $0.end != nil })
+        let end = try XCTUnwrap(window.end)
+        let selected = window.event.addingTimeInterval(end.timeIntervalSince(window.event) / 3)
+        let during = window.event.addingTimeInterval(end.timeIntervalSince(window.event) * 2 / 3)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: selected)
+        once.currentWindowRule = true
+        let resolved = resolveAlerts([once], subscriptions: [], now: during, threshold: 0.5)
+        XCTAssertTrue(resolved.occurrences.isEmpty, "an open window must not schedule a second opening")
+        XCTAssertTrue(resolved.activeWindows.contains(once.id))
+        var before = once
+        before.once = window.event.addingTimeInterval(-30 * 60)
+        let beforeResolved = resolveAlerts([before], subscriptions: [], now: during, threshold: 0.5)
+        XCTAssertTrue(beforeResolved.activeWindows.contains(before.id), "the next selected opening is still active")
+        XCTAssertTrue(expiredUnchangedRules([before], current: [before], now: during,
+            occurrences: beforeResolved.occurrences, activeWindows: beforeResolved.activeWindows).isEmpty)
+        XCTAssertTrue(expiredUnchangedRules([once], current: [once], now: during,
+            occurrences: resolved.occurrences, activeWindows: resolved.activeWindows).isEmpty)
+        let closed = resolveAlerts([once], subscriptions: [], now: end.addingTimeInterval(120), threshold: 0.5)
+        XCTAssertFalse(closed.activeWindows.contains(once.id))
+        XCTAssertEqual(expiredUnchangedRules([once], current: [once], now: end.addingTimeInterval(120),
+            occurrences: closed.occurrences, activeWindows: closed.activeWindows), [once.id])
+    }
+
     func testTemporaryOffKeepsSavedWindowUntilItCanBeResolvedAgain() {
         var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens,
                              once: now.addingTimeInterval(-60))

@@ -41,6 +41,8 @@ struct ResolvedAlerts: Sendable {
     /// Off-mode current rules for which the available predictions contain no true slack.
     var noSlack: Set<UUID> = []
     var heldWindows: Set<UUID> = []
+    /// Once selections whose comfort window still contains the present.
+    var activeWindows: Set<UUID> = []
     var legacyReview: Set<UUID> = []
     /// Subscribed current stations with predictions but no true slack in Off mode.
     var calendarNoSlack: Set<String> = []
@@ -100,6 +102,20 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             if once >= now { resolved.legacyReview.insert(rule.id) }
             else { resolved.noSlack.insert(rule.id) }
             continue
+        }
+        if rule.trigger == .slackWindowOpens, rule.currentWindowRule, !slackWindowIsOff(threshold),
+           let selected = rule.once, selected < now, case .current(let current, _, _) = station {
+            let minute = alertMinute(selected)
+            let windows = slackWindowOpenings(current, from: minute, to: now, threshold: threshold)
+            let containing = windows.first {
+                alertMinute($0.event) <= minute && ($0.end ?? $0.observedThrough).map { minute <= alertMinute($0) } == true
+            }
+            let next = windows.first { alertMinute($0.event) >= minute
+                && alertMinute($0.event).timeIntervalSince(minute) <= 21_600 }
+            if let selected = containing ?? next,
+               (selected.end ?? selected.observedThrough).map({ $0 >= now }) == true {
+                resolved.activeWindows.insert(rule.id)
+            }
         }
         let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
                                            from: now, to: until, threshold: threshold)
@@ -219,10 +235,12 @@ struct AlertStatusSnapshot: Equatable {
         // Discard its old result before changing alerts, then resolve the new setting.
         guard threshold == slackThresholdKn else { return false }
         let reviewIDs = resolved.legacyReview
-        AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
+        let marked = AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
+        if premium { await AlertNotifications.notifySlackReview(marked, places: resolved.places) }
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
-                                                noSlack: resolved.noSlack, heldWindows: resolved.heldWindows))
+                                                noSlack: resolved.noSlack, heldWindows: resolved.heldWindows,
+                                                activeWindows: resolved.activeWindows))
         for id in expired { AlertRuleStore.shared.remove(id) }
         let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
             .filter { !expired.contains($0.id) }

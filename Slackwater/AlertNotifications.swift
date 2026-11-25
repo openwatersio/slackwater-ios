@@ -24,6 +24,23 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
+    /// Tell people when an older one-time selection needs their attention after migration.
+    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace]) async {
+        guard !rules.isEmpty, await authorized() else { return }
+        let center = UNUserNotificationCenter.current()
+        for rule in rules {
+            let content = UNMutableNotificationContent()
+            content.title = places[rule.stationID]?.name ?? "Slackwater"
+            content.body = String(localized: "Review or delete this alert.")
+            content.sound = .default
+            if let url = deepLink(forStationID: rule.stationID) {
+                content.userInfo = [AlertTap.urlKey: url.absoluteString]
+            }
+            try? await center.add(UNNotificationRequest(identifier: "review." + rule.id.uuidString,
+                                                        content: content, trigger: nil))
+        }
+    }
+
     /// Replaces every pending alert request with `entries`.
     static func apply(_ entries: [AlertEntry]) async {
         let center = UNUserNotificationCenter.current()
