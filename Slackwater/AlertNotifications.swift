@@ -28,15 +28,17 @@ func pendingSlackReviewNotices(_ rules: [AlertRule], notified: Set<String>) -> [
     }
 
     /// Tell people when an older one-time selection needs their attention after migration.
-    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace],
+    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace], premium: Bool,
                                   defaults: UserDefaults = AppGroup.defaults) async {
         let key = "slackwater.sentSlackReviewNotices"
         let reviewIDs = Set(rules.filter { $0.slackNeedsReview == true }.map { $0.id.uuidString })
-        var notified = Set(defaults.stringArray(forKey: key) ?? []).intersection(reviewIDs)
+        let previous = Set(defaults.stringArray(forKey: key) ?? [])
+        var notified = previous.intersection(reviewIDs)
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: previous.subtracting(reviewIDs).map { "review." + $0 })
         defaults.set(Array(notified).sorted(), forKey: key)
         let pending = pendingSlackReviewNotices(rules, notified: notified)
-        guard !pending.isEmpty, await authorized() else { return }
-        let center = UNUserNotificationCenter.current()
+        guard premium, !pending.isEmpty, await authorized() else { return }
         for rule in pending {
             let content = UNMutableNotificationContent()
             content.title = places[rule.stationID]?.name ?? "Slackwater"

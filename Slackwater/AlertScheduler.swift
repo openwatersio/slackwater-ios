@@ -262,12 +262,12 @@ struct AlertStatusSnapshot: Equatable {
                                          runningWindows: liveWindows,
                                          heldWindows: resolved.heldWindows, threshold: threshold)
         _ = AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: policy.reviewIDs)
-        if premium { await AlertNotifications.notifySlackReview(AlertRuleStore.shared.rules, places: resolved.places) }
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
                                                 noSlack: resolved.noSlack, heldWindows: resolved.heldWindows,
                                                 activeWindows: policy.expiryProtected))
         for id in expired { AlertRuleStore.shared.remove(id) }
+        await AlertNotifications.notifySlackReview(AlertRuleStore.shared.rules, places: resolved.places, premium: premium)
         let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
             .filter { !expired.contains($0.id) }
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
