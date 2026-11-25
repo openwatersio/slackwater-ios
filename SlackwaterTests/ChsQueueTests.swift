@@ -277,18 +277,48 @@ final class ChsQueueTests: XCTestCase {
         original.resetOnlineStateForTesting()
         defer { original.resetOnlineStateForTesting() }
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
-        let failure = Date.now.addingTimeInterval(-86_399.5)
+        let failure = Date.now.addingTimeInterval(-86_397)
         for _ in 0..<3 {
             original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: failure)
         }
         let restarted = ChsFitService()
         defer { restarted.resetOnlineStateForTesting() }
+        if case .failed = restarted.onlineStates[gate.id] {} else { XCTFail("Cooldown must be restored before the timer starts") }
         restarted.refreshOnline(gate)
-        try await Task.sleep(for: .milliseconds(1500))
-        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
+        for _ in 0..<60 where restarted.onlineStates[gate.id] != .idle {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        XCTAssertEqual(restarted.onlineStates[gate.id], .idle)
+        XCTAssertNil(UserDefaults.standard.dictionary(forKey: "slackwater.onlineIncompleteRetryAfter")?[gate.id])
         let nextLaunch = ChsFitService()
         defer { nextLaunch.resetOnlineStateForTesting() }
         XCTAssertEqual(nextLaunch.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
+    func testRetryNowClearsSavedIncompleteDeadline() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<3 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3)
+        }
+        service.retryNow()
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
+    func testImplausiblyDistantSavedRetryDoesNotBlockAStation() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let key = "slackwater.onlineIncompleteRetryAfter"
+        UserDefaults.standard.set([gate.id: Date.now.addingTimeInterval(365 * 86_400)], forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
     }
 
     @MainActor

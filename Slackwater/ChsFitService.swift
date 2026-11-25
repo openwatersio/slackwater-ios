@@ -98,7 +98,7 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
-    private static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
+    nonisolated fileprivate static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
     private var onlineIncompleteRetryAfter: [String: Date] = [:] {
         didSet { UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey) }
     }
@@ -292,8 +292,10 @@ final class ChsFitService: ObservableObject {
 
     init() {
         ChsModelStore.resetIfRequested()
+        let now = appNow()
         onlineIncompleteRetryAfter = (UserDefaults.standard.dictionary(forKey: Self.incompleteRetryKey) as? [String: Date] ?? [:])
-            .filter { $0.value > appNow() }
+            .filter { $0.value > now && $0.value <= now.addingTimeInterval(86_400) }
+        UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey)
         for id in onlineIncompleteRetryAfter.keys {
             onlineStates[id] = .failed("IWLS returned incomplete current vectors")
         }
@@ -1053,6 +1055,8 @@ final class ChsFitService: ObservableObject {
         queue.retryNow()
         for id in Array(onlineStates.keys) where onlineState(id) != .fetching {
             onlineRetryTimers[id]?.cancel()
+            onlineRetryTimers[id] = nil
+            onlineIncompleteRetryAfter[id] = nil
             onlineStates[id] = .idle
             onlineAttempts[id] = 0
         }
@@ -1136,6 +1140,7 @@ final class ChsFitService: ObservableObject {
                     }
                     for id in deferred {
                         self.onlineRetryTimers[id]?.cancel()
+                        self.onlineRetryTimers[id] = nil
                         self.onlineStates[id] = .idle
                         self.onlineAttempts[id] = 0
                     }
@@ -1531,6 +1536,7 @@ extension ChsModelStore {
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.cancelledDownloadsKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.requestedDownloadsKey)
+        UserDefaults.standard.removeObject(forKey: ChsFitService.incompleteRetryKey)
         try? FileManager.default.removeItem(at: dir)
         IwlsFetcher.chunkCache.reset()
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
