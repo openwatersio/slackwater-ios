@@ -15,6 +15,7 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     if !premium { return "Notifications are Premium" }
     if !status.notificationsAuthorized { return "Notifications are off in Settings" }
     if status.heldWindows.contains(rule.id) {
+        if rule.currentWindowWasOff { return String(localized: "Review or delete this alert.") }
         return String(localized: "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
     }
     if status.reviewPending.contains(rule.id) { return String(localized: "Review or delete this alert.") }

@@ -109,26 +109,36 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertFalse(resolved.unresolved.contains(rule.id))
     }
 
-    func testOnceSavedWithWindowOffRequiresReviewWhenTurnedOn() {
+    func testOnceSavedWithWindowOffResumesIfSettingReturnsBeforeItsMoment() {
         var rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
                              once: now.addingTimeInterval(3600))
         rule.currentWindowRule = true
         rule.currentWindowWasOff = true
+        let held = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(held.heldWindows.contains(rule.id))
+        XCTAssertFalse(held.legacyReview.contains(rule.id))
+        let resumed = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertFalse(resumed.heldWindows.contains(rule.id))
+        let due = resolveAlerts([rule], subscriptions: [], now: now.addingTimeInterval(3600), threshold: 0.5)
+        XCTAssertTrue(due.legacyReview.contains(rule.id))
+    }
+
+    func testPastLegacyWindowRequiresReviewWhileItsEventMayStillBeAhead() {
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-3600))
         let result = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
         XCTAssertTrue(result.legacyReview.contains(rule.id))
         XCTAssertTrue(result.occurrences.isEmpty)
     }
 
-    func testPastLegacyWindowWaitsThenExpiresWithoutReview() {
-        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+    func testDisabledWindowSelectionRemainsAvailableForItsUpcomingEvent() {
+        var rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
                              once: now.addingTimeInterval(-3600))
-        let result = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
-        XCTAssertFalse(result.legacyReview.contains(rule.id))
-        XCTAssertTrue(result.occurrences.isEmpty)
-        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
-                                            occurrences: [], noSlack: result.noSlack).isEmpty)
+        rule.currentWindowRule = true
+        rule.enabled = false
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now, occurrences: []).isEmpty)
         XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(21_600),
-                                              occurrences: [], noSlack: result.noSlack), [rule.id])
+                                             occurrences: []), [rule.id])
     }
 
     func testPastLegacyWindowDoesNotRequireReview() {

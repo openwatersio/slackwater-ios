@@ -98,7 +98,8 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
     let until = now.addingTimeInterval(AlertHorizon.calendar)
 
     for rule in rules where rule.enabled && rule.slackNeedsReview != true {
-        if rule.currentWindowRule && !rule.currentWindowWasOff && slackWindowIsOff(threshold) {
+        if rule.currentWindowRule && ((!rule.currentWindowWasOff && slackWindowIsOff(threshold))
+            || (rule.currentWindowWasOff && !slackWindowIsOff(threshold) && rule.once.map { $0 > now } == true)) {
             resolved.heldWindows.insert(rule.id)
             continue
         }
@@ -117,8 +118,7 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
            (!rule.currentWindowRule || rule.currentWindowWasOff),
            once.addingTimeInterval(21_600) >= now, !slackWindowIsOff(threshold),
            case .current = station {
-            if once >= now { resolved.legacyReview.insert(rule.id) }
-            else { resolved.noSlack.insert(rule.id) }
+            resolved.legacyReview.insert(rule.id)
             continue
         }
         if rule.trigger == .slackWindowOpens, rule.currentWindowRule, !slackWindowIsOff(threshold),

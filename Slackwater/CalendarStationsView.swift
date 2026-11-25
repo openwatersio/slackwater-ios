@@ -172,6 +172,7 @@ struct CalendarStationsView: View {
             // this device can actually do, and say so.
             guard AlertCalendar.authorized else {
                 calendars.unsubscribe(stationID, preserveInvalidation: true)
+                calendars.forgetWindowCalendar(for: stationID)
                 revokedName = name(stationID)
                 revoked = true
                 return

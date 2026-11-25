@@ -279,11 +279,6 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
     }
 
     func unsubscribe(_ stationID: String, preserveInvalidation: Bool = false) {
-        if preserveInvalidation {
-            for id in calendarIDsForRemoval(stationID) where id != windowIDs[stationID] {
-                rememberOrphanCalendar(id, for: stationID)
-            }
-        }
         if preserveInvalidation && CurrentCalendarInvalidations.pending(in: defaults).contains(stationID) {
             CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
                 calendarIDs: Set(calendarIDsForRemoval(stationID)), in: defaults)
