@@ -18,4 +18,5 @@ let package = Package(
         .executableTarget(
             name: "fit-validation",
             dependencies: [.product(name: "SlackwaterKit", package: "slackwater")]),
+        .testTarget(name: "FitValidationTests", dependencies: ["fit-validation"]),
     ])

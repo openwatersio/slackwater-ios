@@ -1,6 +1,15 @@
 // Slackwater — GPL v3. Runs the alert pipeline — rules → occurrences → plan → writers — on launch and on every change (docs/alerts.md §6).
 import Foundation
 
+/// A detached resolution is valid only for rules that still match its snapshot.
+func unchangedResolvedRules(_ snapshot: [AlertRule], current: [AlertRule]) -> [AlertRule] {
+    snapshot.filter { current.contains($0) }
+}
+
+func activeRuleIDs(_ rules: [AlertRule]) -> Set<UUID> {
+    Set(rules.filter(\.enabled).map(\.id))
+}
+
 /// One planned delivery with everything a writer needs.
 struct AlertEntry {
     /// Which station's calendar this belongs in.
@@ -29,9 +38,35 @@ struct ResolvedAlerts: Sendable {
     /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
     /// device, or an id that left the catalog.
     var unresolved: Set<UUID> = []
+    /// Off-mode current rules for which the available predictions contain no true slack.
+    var noSlack: Set<UUID> = []
+    var heldWindows: Set<UUID> = []
+    var legacyReview: Set<UUID> = []
+    /// Subscribed current stations with predictions but no true slack in Off mode.
+    var calendarNoSlack: Set<String> = []
+    var calendarEmpty: Set<String> = []
     /// Subscribed stations that can't be loaded. Their calendars are left exactly as they
     /// are: an empty plan is "nothing known yet", not "delete the next 90 days".
     var unresolvedStations: Set<String> = []
+}
+
+func offModeHasNoSlack(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
+                       now: Date, until: Date, occurrences: [AlertOccurrence]) -> Bool {
+    if let moment = rule.once {
+        var selected = rule
+        selected.sun = nil
+        let slacks = alertOccurrences(selected, station: station, position: position,
+                                      from: moment.addingTimeInterval(-21_600),
+                                      to: moment.addingTimeInterval(21_600), threshold: 0)
+        if rule.currentWindowRule { return slacks.isEmpty }
+        return !slacks.contains { abs($0.event.timeIntervalSince(alertMinute(moment))) <= 120 }
+    }
+    var withoutSun = rule
+    withoutSun.sun = nil
+    withoutSun.once = nil
+    let allSlacks = rule.sun == nil && rule.once == nil ? occurrences : alertOccurrences(withoutSun, station: station,
+        position: position, from: now, to: until, threshold: 0)
+    return allSlacks.isEmpty
 }
 
 /// Occurrences for every enabled rule and every subscribed station, from `now` to the calendar
@@ -42,7 +77,11 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
     var resolved = ResolvedAlerts()
     let until = now.addingTimeInterval(AlertHorizon.calendar)
 
-    for rule in rules where rule.enabled {
+    for rule in rules where rule.enabled && rule.slackNeedsReview != true {
+        if rule.currentWindowRule && !rule.currentWindowWasOff && slackWindowIsOff(threshold) {
+            resolved.heldWindows.insert(rule.id)
+            continue
+        }
         guard let record = WidgetStationLoader.loadRecord(id: rule.stationID, at: now) else {
             resolved.unresolved.insert(rule.id)
             continue
@@ -51,9 +90,29 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
         resolved.kinds[rule.stationID] = record.calendarKind
         let station = WidgetStationLoader.station(from: record)
         resolved.stations[rule.stationID] = station
-        resolved.occurrences += alertOccurrences(rule, station: station,
-                                                 position: record.alertPosition,
-                                                 from: now, to: until, threshold: threshold)
+        // TODO(#944): Retire the legacy-rule review after older builds are no longer supported.
+        // Old rules can refer to an axis crossing that is not a true slack. The new
+        // event list cannot reconstruct that selection, so do not silently retarget it.
+        if rule.trigger == .slackWindowOpens, let once = rule.once,
+           (!rule.currentWindowRule || rule.currentWindowWasOff),
+           once.addingTimeInterval(21_600) >= now, !slackWindowIsOff(threshold),
+           case .current = station {
+            if once >= now { resolved.legacyReview.insert(rule.id) }
+            else { resolved.noSlack.insert(rule.id) }
+            continue
+        }
+        let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
+                                           from: now, to: until, threshold: threshold)
+        if rule.trigger == .slackWindowOpens, slackWindowIsOff(threshold),
+           case .current(let current, _, _) = station,
+           current.speeds(from: now, to: now.addingTimeInterval(600), step: 600).count >= 2 {
+            if offModeHasNoSlack(rule, station: station, position: record.alertPosition,
+                                 now: now, until: until, occurrences: occurrences) {
+                resolved.noSlack.insert(rule.id)
+                continue
+            }
+        }
+        resolved.occurrences += occurrences
     }
 
     for stationID in subscriptions {
@@ -70,17 +129,29 @@ func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
             let rule = AlertRule(stationID: stationID, trigger: trigger)
             resolved.calendarRules[rule.id] = rule
             resolved.calendarStations[rule.id] = stationID
-            resolved.calendarOccurrences += alertOccurrences(rule, station: station,
-                                                             position: record.alertPosition,
-                                                             from: now, to: until, threshold: threshold)
+            let occurrences = alertOccurrences(rule, station: station, position: record.alertPosition,
+                                               from: now, to: until, threshold: threshold)
+            resolved.calendarOccurrences += occurrences
+            if trigger == .slackWindowOpens, slackWindowIsOff(threshold), occurrences.isEmpty,
+               case .current(let current, _, _) = station,
+               current.speeds(from: now, to: now.addingTimeInterval(600), step: 600).count >= 2 {
+                resolved.calendarNoSlack.insert(stationID)
+            }
         }
     }
+    let withEvents = Set(resolved.calendarOccurrences.compactMap { resolved.calendarStations[$0.ruleID] })
+    resolved.calendarEmpty = Set(subscriptions).subtracting(resolved.unresolvedStations).subtracting(withEvents)
     return resolved
 }
 
 struct AlertStatusSnapshot: Equatable {
     var scheduledThrough: [UUID: Date] = [:]
     var unresolved: Set<UUID> = []
+    var noSlack: Set<UUID> = []
+    var heldWindows: Set<UUID> = []
+    var reviewPending: Set<UUID> = []
+    var calendarNoSlack: Set<String> = []
+    var calendarEmpty: Set<String> = []
     var notificationsAuthorized = false
 }
 
@@ -123,18 +194,15 @@ struct AlertStatusSnapshot: Equatable {
         let previous = pass
         let mine = Task { @MainActor in
             await previous?.value
-            await self.runPass(now: now)
+            while !(await self.runPass(now: now)) {}
         }
         pass = mine
         await mine.value
     }
 
-    private func runPass(now: Date) async {
+    private func runPass(now: Date) async -> Bool {
         _ = ChsFitService.shared
-        for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
-            AlertRuleStore.shared.remove(id)
-        }
-        let rules = AlertRuleStore.shared.rules
+        let storedRules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium
         let premiumEnds = PremiumStore.shared.hasPurchased ? nil : FreeDayStore.shared.current?.end
@@ -145,8 +213,19 @@ struct AlertStatusSnapshot: Equatable {
         let stopped = Set(stored.map(\.stationID)).subtracting(subscriptions)
 
         let resolved = await Task.detached(priority: .utility) {
-            resolveAlerts(rules, subscriptions: subscriptions, now: now, threshold: threshold)
+            resolveAlerts(storedRules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
+        // A preference change can land while the prediction scan is off the main actor.
+        // Discard its old result before changing alerts, then resolve the new setting.
+        guard threshold == slackThresholdKn else { return false }
+        let reviewIDs = resolved.legacyReview
+        AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
+        let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
+                                                now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
+                                                noSlack: resolved.noSlack, heldWindows: resolved.heldWindows))
+        for id in expired { AlertRuleStore.shared.remove(id) }
+        let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
+            .filter { !expired.contains($0.id) }
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
                                 calendarOccurrences: resolved.calendarOccurrences,
                                 now: now, premium: premium, premiumEnds: premiumEnds)
@@ -179,12 +258,19 @@ struct AlertStatusSnapshot: Equatable {
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
             curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
-            liveRuleIDs: Set(rules.filter(\.enabled).map(\.id)), imperial: imperial)
+            liveRuleIDs: activeRuleIDs(AlertRuleStore.shared.rules), imperial: imperial)
         await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
-                                     unresolved: resolved.unresolved,
+                                     unresolved: resolved.unresolved.intersection(Set(rules.map(\.id))),
+                                     noSlack: resolved.noSlack.intersection(Set(rules.map(\.id))),
+                                     heldWindows: resolved.heldWindows.intersection(Set(rules.map(\.id))),
+                                     reviewPending: Set(rules.filter { $0.once != nil && !$0.currentWindowRule
+                                         && resolved.noSlack.contains($0.id) }.map(\.id)),
+                                     calendarNoSlack: resolved.calendarNoSlack.intersection(Set(StationCalendarStore.shared.subscriptions.map(\.stationID))),
+                                     calendarEmpty: resolved.calendarEmpty.intersection(Set(StationCalendarStore.shared.subscriptions.map(\.stationID))),
                                      notificationsAuthorized: await AlertNotifications.authorized())
+        return true
     }
 }

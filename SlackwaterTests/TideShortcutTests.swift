@@ -406,6 +406,45 @@ import CoreLocation
                                  online.end.timeIntervalSince(now))
     }
 
+    func testOnlineWindowRetainsPeaksBetweenResampledPoints() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.8, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+            fetchedAt: start, start: start, end: start.addingTimeInterval(1800), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800].map { start.addingTimeInterval(Double($0)).timeIntervalSince1970 }, speeds: [0, 1, 0])
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(
+            DateInterval(start: start, end: start.addingTimeInterval(1800)), at: .current(record, station: online)))
+        XCTAssertEqual(result.windows.count, 2)
+        XCTAssertEqual(result.card.graph?.windows.count, 2)
+        XCTAssertEqual(result.windows[0].end.timeIntervalSince(start), 720, accuracy: 1)
+        XCTAssertEqual(result.windows[1].start.timeIntervalSince(start), 1080, accuracy: 1)
+    }
+
+    func testDatedWindowWithUnobservedCloseHighlightsItsOpening() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let end = start.addingTimeInterval(12 * 3600)
+        let times = stride(from: 0.0, through: 12 * 3600, by: 600).map { start.addingTimeInterval($0).timeIntervalSince1970 }
+        let speeds = times.map { $0 < start.addingTimeInterval(4 * 3600).timeIntervalSince1970 ? 1.0 : 0.1 }
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+                                     fetchedAt: start, start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                                     times: times, speeds: speeds)
+        let day = DateInterval(start: start, end: start.addingTimeInterval(86_400))
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(day, at: .current(record, station: online)))
+        let window = try XCTUnwrap(result.windows.first)
+        XCTAssertTrue(window.hasOpeningBoundary)
+        XCTAssertFalse(window.hasClosingBoundary)
+        XCTAssertEqual(result.card.graph?.highlight?.lowerBound, window.start)
+    }
+
     func testWaitsRoundToMinutesWithoutSpeakingZero() {
         XCTAssertEqual(shortcutDuration(10), "1 minute")
         XCTAssertEqual(shortcutDuration(25 * 60), "25 minutes")

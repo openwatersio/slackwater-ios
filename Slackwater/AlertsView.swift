@@ -7,10 +7,20 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     if rule.heightNeedsReview == true {
         return String(localized: "Set the height again: this place now measures from a different chart datum.", comment: "Alert status for a tide-height alert switched off because its station's data moved to a record measured from another chart datum.")
     }
+    if rule.slackNeedsReview == true {
+        return String(localized: "Review or delete this alert.", comment: "Status for an alert paused until the user reviews or deletes it.")
+    }
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
     if !premium { return "Notifications are Premium" }
     if !status.notificationsAuthorized { return "Notifications are off in Settings" }
+    if status.heldWindows.contains(rule.id) {
+        return String(localized: "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
+    }
+    if status.reviewPending.contains(rule.id) { return String(localized: "Review or delete this alert.") }
+    if status.noSlack.contains(rule.id) {
+        return String(localized: "No slack in available predictions", comment: "Alert status when the available current predictions contain no true slack for an alert.")
+    }
     guard let date = status.scheduledThrough[rule.id] else { return "Nothing coming up" }
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"
 }
@@ -82,7 +92,7 @@ struct AlertsView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.borderless)
-                            if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
+                            if rule.enabled, rule.slackNeedsReview != true, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
                                 PremiumRequirement(title: "Notifications are Premium", feature: .alerts)
                             } else {
                                 Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))

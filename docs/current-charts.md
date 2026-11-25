@@ -48,7 +48,7 @@ drawn.
 
 Sign is phase, never magnitude. Magnitude is drift; the flood axis is set.
 
-The chart draws the along-axis component only. The readings beside it (the lead, the list card, the widget, the complication and the watch) show the full vector's speed and set from the kit, with the published flood or ebb bearing chosen by sign where a station has no minor-axis data. Cross-axis flow is read, not drawn. Scrubber §9.2 holds the reading rule. The map pin stays on the major axis: its colour and reading use the signed along-axis speed, while the Dodd map arrow uses the kit vector.
+The chart draws the along-axis component only. The readings beside it (the lead, the list card, the widget, the complication and the watch) show the full vector's speed and set from the kit, with the published flood or ebb bearing chosen by sign where a station has no minor-axis data. Cross-axis flow is read, not drawn. Scrubber §9.2 holds the reading rule. The map pin uses the full vector speed for its colour and reading and the vector set for its arrow; a one-axis or subordinate station uses its published flood or ebb bearing.
 
 This model assumes a **rectilinear** station — a pass that reverses between two
 roughly opposed bearings. It is a lie at a rotary station, where the set sweeps
@@ -777,6 +777,7 @@ scrubber §18 holds the detail strip's own list. Fixing one should remove it her
   the run summaries of §4.1 and §4.2 (*under 0.5 kn all day*, *~5h, 1.1 kn blip midway*) are
   target wording. The shipped commentary stops are Slack, Slack window, Slack window closes, Max
   flood and Max ebb (scrubber §10).
-- **Slack cores are inert.** `slackCoreThresholdKn` is 0 and the kit returns no window for a
-  threshold of 0, so the go colour reduces to the one-second rule at the zero instant plus a
-  stroke of fixed minimum width (`SlackWindow.swift`), as scrubber §13.2 describes.
+- **Slack is an instant.** `slackCoreThresholdKn` is 0 and the kit returns no duration at a
+  zero threshold. The go colour uses the one-second reading rule and a fixed-width stroke for
+  each zero instant (`SlackWindow.swift`), as scrubber §13.2 describes. The maximum-detail sheet
+  does not report a slack-duration comparison because an instant has no measured duration.

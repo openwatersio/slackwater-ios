@@ -8,6 +8,45 @@ final class AlertLineTests: XCTestCase {
     private let utc = TimeZone(identifier: "UTC")!
     private let en = Locale(identifier: "en_US")
 
+    private struct LongWindowCurrent: CurrentPredicting {
+        let start: Date
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            (0...14).map { i in
+                CurrentPoint(time: start.addingTimeInterval(Double(i) * 3600),
+                             speed: i == 0 || i == 14 ? 1 : 0.1)
+            }
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    private final class RangeRecordingCurrent: CurrentPredicting, @unchecked Sendable {
+        var queriedDuration: TimeInterval = 0
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            queriedDuration = to.timeIntervalSince(from)
+            return []
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    func testMarkerFindsOpeningMoreThanSixHoursBeforePress() {
+        let station = WidgetStation.current(LongWindowCurrent(start: moment), tz: utc, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: moment.addingTimeInterval(10 * 3600))
+        let markers = alertMoments(station: station, position: (0, 0), rules: [rule],
+                                   from: moment, to: moment.addingTimeInterval(14 * 3600), threshold: 0.5)
+        XCTAssertEqual(markers.map(\.event), [alertMinute(moment.addingTimeInterval(2000))])
+    }
+
+    func testDistantOnceMarkerDoesNotScanMonthsOfPredictions() {
+        let current = RangeRecordingCurrent()
+        let station = WidgetStation.current(current, tz: utc, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: moment.addingTimeInterval(-365 * 86_400))
+        _ = alertMoments(station: station, position: (0, 0), rules: [rule],
+                         from: moment, to: moment.addingTimeInterval(86_400), threshold: 0.5)
+        XCTAssertLessThanOrEqual(current.queriedDuration, 26 * 3600)
+    }
+
     // MARK: which rule the line reads
 
     func testNoRuleReadsRestOrPressed() {
@@ -114,6 +153,13 @@ final class AlertLineTests: XCTestCase {
                        "Alert set · every low tide")
     }
 
+    func testReviewRuleDoesNotClaimItsAlertIsSet() {
+        var rule = AlertRule(stationID: "a", trigger: .slackWindowOpens, once: alertMinute(moment))
+        rule.slackNeedsReview = true
+        XCTAssertEqual(alertLineLabel(.set(rule), offer: rule.trigger, tz: utc, imperial: true, locale: en),
+                       "Review or delete this alert.")
+    }
+
     func testTheLabelReadsTheStationsZone() {
         let pacific = TimeZone(identifier: "America/Vancouver")!
         let label = alertLineLabel(.pressed(moment), offer: .slack, tz: pacific, imperial: true, locale: en)
@@ -144,22 +190,18 @@ final class AlertLineTests: XCTestCase {
     }
 
     func testAOnceRuleBoundJustBeforeTheWindowKeepsItsOwnMoment() throws {
-        // `alertOccurrences` filters to the query before a once rule picks the occurrence nearest
-        // its minute, within six hours. A press on a current strip parks on the slack while the
-        // occurrence is the window's opening, so a window that opened just before the loaded
-        // window, with the next opening under six hours from the press, would hand the marker
-        // to that next opening if the query were cut at the edge. The request's padding keeps
-        // the one meant in reach; the strip clips it.
+        // A press inside a measured window binds to its opening even when the strip clips it.
         let id = "current:noaa/PUG1701"
-        let every = AlertRule(stationID: id, trigger: .slackWindowOpens, lead: 900)
         let from = Date(timeIntervalSince1970: 1_755_800_000)
-        let openings = alertMoments(stationID: id, rules: [every], from: from, to: from.addingTimeInterval(5 * 86_400), threshold: 0.5).map(\.event)
-        let press = 20 * 60.0
-        guard let i = openings.indices.dropLast().first(where: { openings[$0 + 1].timeIntervalSince(openings[$0]) - press < 6 * 3_600 }) else {
-            throw XCTSkip("no two openings under 6 h 20 m apart in five days")
+        guard case .current(_, let engine) = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id)) else {
+            return XCTFail("expected current station")
         }
-        let opening = openings[i]
-        let once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: opening.addingTimeInterval(press), lead: 900)
+        let window = try XCTUnwrap(slackWindowOpenings(engine, from: from, to: from.addingTimeInterval(5 * 86_400), threshold: 0.5)
+            .first { $0.openingObserved && ($0.end?.timeIntervalSince($0.event) ?? 0) > 600 })
+        let opening = alertMinute(window.event)
+        let press = min(20 * 60.0, window.end!.timeIntervalSince(opening) / 2)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: opening.addingTimeInterval(press), lead: 900)
+        once.currentWindowRule = true
         let request = AlertMomentRequest(stationID: id, rules: [once], start: opening.addingTimeInterval(press / 2),
                                          end: opening.addingTimeInterval(2 * 86_400), threshold: 0.5)
 
@@ -173,6 +215,25 @@ final class AlertLineTests: XCTestCase {
                                        end: opening.addingTimeInterval(2 * 86_400), threshold: 0.5)
         let fromLater = alertMoments(stationID: id, rules: [once], from: later.from, to: later.to, threshold: 0.5)
         XCTAssertEqual(fromLater.map(\.event), [opening], "its own opening, for the strip to clip")
+    }
+
+    func testRuleNeedingReviewHasNoMarker() {
+        let id = "current:noaa/PUG1701"
+        let from = Date(timeIntervalSince1970: 1_755_800_000), to = from.addingTimeInterval(3 * 86_400)
+        var rule = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        XCTAssertFalse(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
+        rule.slackNeedsReview = true
+        XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
+    }
+
+    func testOffModeOnceRuleHasNoMarkerAfterComfortIsEnabled() {
+        let id = "current:noaa/PUG1701"
+        let from = Date(timeIntervalSince1970: 1_755_800_000)
+        var rule = AlertRule(stationID: id, trigger: .slackWindowOpens, once: from.addingTimeInterval(3600))
+        rule.currentWindowRule = true
+        rule.currentWindowWasOff = true
+        XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from,
+                                   to: from.addingTimeInterval(86_400), threshold: 0.5).isEmpty)
     }
 
     func testTwoRulesOnOneMomentGiveOneMarker() throws {

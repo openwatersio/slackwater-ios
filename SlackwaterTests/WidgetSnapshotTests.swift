@@ -20,6 +20,17 @@ import SlackwaterKit
         return .derived(gate, tz: tz, name: "Test Gate")
     }
 
+    func testRotaryCrossingIsNotAnnouncedAsTheNextSlack() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let crossing = now.addingTimeInterval(600)
+        let station = FixedWidgetCurrent(points: [CurrentPoint(time: now, speed: 0.5, magnitude: 1, direction: 90),
+                                                  CurrentPoint(time: crossing, speed: 0, magnitude: 1, direction: 90)],
+                                         slacks: [crossing])
+        let record = try XCTUnwrap(CurrentStationRecord.all.first)
+        XCTAssertNil(record.cardState(at: now, station: station).next)
+        XCTAssertNil(WidgetSnapshot.build(.current(station, tz: record.tz, name: record.name), now: now).next)
+    }
+
     func testTideNextEventIsFuture() {
         let now = Date()
         let s = WidgetSnapshot.build(friday, now: now)

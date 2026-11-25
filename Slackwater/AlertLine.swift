@@ -69,18 +69,26 @@ let alertOnceReach: TimeInterval = 6 * 3_600
 /// Where the strip marks an alert: the event of each occurrence of the station's enabled rules
 /// inside the query, one per minute however many rules share it. Resolved against the bundled
 /// record, the way the Rest tap resolves (`alertNextOccurrence`). A `once` rule is resolved
-/// over the reach either side of its own minute, whatever the query: `alertOccurrences`
-/// filters to its range before it picks the occurrence nearest the minute, so a range cut
-/// short of the one meant would hand the rule to a neighbour inside the range, where a press
-/// sat well off its event (a current strip parks on the slack while the occurrence is the
-/// window's opening). The moment it finds may lie outside the query; the strip clips.
+/// over the reach either side of its own minute. A current window can open much earlier, so
+/// that query also covers the loaded strip. The moment may lie outside the strip; it clips.
 func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, threshold: Double) -> [AlertMoment] {
-    let mine = rules.filter { $0.stationID == stationID && $0.enabled }
+    let mine = rules.filter { $0.stationID == stationID && $0.enabled && $0.slackNeedsReview != true
+        && !($0.trigger == .slackWindowOpens && $0.once != nil && (!$0.currentWindowRule || $0.currentWindowWasOff) && !slackWindowIsOff(threshold)) }
     guard !mine.isEmpty, let record = WidgetStationLoader.loadRecord(id: stationID) else { return [] }
     let station = WidgetStationLoader.station(from: record)
-    let all = mine.flatMap { rule in
-        let range = rule.once.map { ($0.addingTimeInterval(-alertOnceReach), $0.addingTimeInterval(alertOnceReach)) } ?? (from, to)
-        return alertOccurrences(rule, station: station, position: record.alertPosition,
+    return alertMoments(station: station, position: record.alertPosition, rules: mine, from: from, to: to, threshold: threshold)
+}
+
+func alertMoments(station: WidgetStation, position: (lat: Double, lon: Double), rules: [AlertRule],
+                  from: Date, to: Date, threshold: Double) -> [AlertMoment] {
+    let all = rules.filter { $0.enabled && $0.slackNeedsReview != true }.flatMap { rule in
+        let range = rule.once.map { once in
+            let near = (once.addingTimeInterval(-alertOnceReach), once.addingTimeInterval(alertOnceReach))
+            return rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
+                && once >= from.addingTimeInterval(-alertOnceReach) && once <= to.addingTimeInterval(alertOnceReach)
+                ? (min(from, near.0), max(to, near.1)) : near
+        } ?? (from, to)
+        return alertOccurrences(rule, station: station, position: position,
                                 from: range.0, to: range.1, threshold: threshold)
             .map { AlertMoment(ruleID: rule.id, event: $0.event) }
     }
@@ -109,6 +117,7 @@ func alertLineLabel(_ state: AlertLineState, offer: AlertTrigger, tz: TimeZone, 
         return String(localized: "Set alert for \(event) · \(when(moment))",
                       comment: "The line under the timeline after a press and hold. First argument is an event such as 'low tide', second a weekday and time.")
     case .set(let rule):
+        if rule.slackNeedsReview == true { return String(localized: "Review or delete this alert.") }
         if let once = rule.once {
             return String(localized: "Alert set · \(event) · \(when(once))",
                           comment: "The line under the timeline when a one-time alert already exists. First argument is an event such as 'low tide', second a weekday and time.")
@@ -128,7 +137,7 @@ struct AlertLine: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
 
     var body: some View {
-        let on: Bool = { if case .set = state { return true } else { return false } }()
+        let on: Bool = { if case .set(let rule) = state { return rule.slackNeedsReview != true } else { return false } }()
         let label = alertLineLabel(state, offer: offer, tz: tz, imperial: units == "imperial")
         HStack(spacing: 6) {
             Image(systemName: on ? "bell.fill" : "bell")

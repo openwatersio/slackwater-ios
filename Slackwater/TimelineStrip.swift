@@ -645,7 +645,7 @@ struct TimelineData {
             let s = current.engineStation
             currentPoints = s.speeds(from: start, to: end, step: 600)
             currentEvents = currentEventsMatchingWater(currentPoints, events: s.events(from: start.addingTimeInterval(-pad),
-                                     to: end.addingTimeInterval(pad)))
+                                     to: end.addingTimeInterval(pad)), station: s)
             (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
         }
         if let gate {

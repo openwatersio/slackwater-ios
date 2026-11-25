@@ -12,6 +12,53 @@ final class StationCalendarTests: XCTestCase {
 
     // MARK: what a kind publishes
 
+    @MainActor func testSuccessorCollisionRetainsDisplacedCalendarForCleanup() throws {
+        let d = defaults()
+        let old = "current:noaa/old", successor = "current:noaa/new"
+        let subscriptions = [StationCalendar(stationID: successor, calendarID: "legacy")]
+        d.set(try JSONEncoder().encode(subscriptions), forKey: AppGroup.stationCalendarsKey)
+        d.set([old: "old-window", successor: "new-window"], forKey: "slackwater.currentWindowCalendarIDs")
+        let store = StationCalendarStore(defaults: d, successors: [old: successor])
+        XCTAssertEqual(store.calendarID(for: successor), "new-window")
+        XCTAssertEqual(Array(store.orphanedWindowCalendars.values), ["old-window"])
+    }
+
+    @MainActor func testReusedCalendarIsNotDeletedByOrphanCleanup() {
+        let store = StationCalendarStore(defaults: defaults(), successors: [:])
+        let id = "current:noaa/test"
+        store.rememberOrphanCalendar("calendar", for: id)
+        store.subscribe(id)
+        store.setCalendarID("calendar", for: id)
+        XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+    }
+
+    @MainActor func testUnavailableLegacyCalendarIsRetainedAfterUnsubscribe() {
+        let d = defaults()
+        let id = "current:noaa/test"
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.subscribe(id)
+        store.rememberOrphanCalendar("legacy", for: id)
+        store.unsubscribe(id)
+        let restored = StationCalendarStore(defaults: d, successors: [:])
+        XCTAssertEqual(Array(restored.orphanedWindowCalendars.values), ["legacy"])
+    }
+
+    @MainActor func testCorruptSubscriptionDataDoesNotOrphanCalendars() {
+        let defaults = defaults()
+        defaults.set(Data("invalid".utf8), forKey: AppGroup.stationCalendarsKey)
+        defaults.set(["current:noaa/test": "calendar-id"], forKey: "slackwater.currentWindowCalendarIDs")
+        let store = StationCalendarStore(defaults: defaults, successors: [:])
+        XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+    }
+
+    func testEmptyValidForecastWaitsForAnEventBeforeCreatingCalendar() {
+        let id = "current:noaa/weak"
+        XCTAssertTrue(calendarWriteGroups([], subscribed: [id], live: [id], skipping: [])[id]?.isEmpty == true)
+        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [], hasEvents: false))
+        XCTAssertTrue(calendarShouldCreate(stationID: id, stopped: [], hasEvents: true))
+        XCTAssertFalse(calendarShouldCreate(stationID: id, stopped: [id], hasEvents: true))
+    }
+
     func testATideStationPublishesBothExtremesAndEclipses() {
         XCTAssertEqual(calendarTriggers(for: .tide), [.tideExtreme(high: true),
                                                       .tideExtreme(high: false), .eclipse])
@@ -42,7 +89,7 @@ final class StationCalendarTests: XCTestCase {
 
     func testATitleNamesTheStationAndItsSeries() {
         XCTAssertEqual(stationCalendarTitle(name: "Friday Harbor", kind: .tide), "Friday Harbor Tides")
-        XCTAssertEqual(stationCalendarTitle(name: "Race Passage", kind: .current), "Race Passage Currents")
+        XCTAssertEqual(stationCalendarTitle(name: "Race Passage", kind: .current), "Race Passage Currents · Slackwater")
         XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived), "Dodd Narrows Currents")
     }
 
@@ -73,6 +120,13 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(calendarSubscriptionChange(on, stationID: "a", premium: true), .remove)
     }
 
+    func testCalendarSubscriptionRequiresCalendarOrAnEmptyForecast() {
+        XCTAssertTrue(calendarSubscriptionReady(calendarID: nil, noEvents: true))
+        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noEvents: false))
+        XCTAssertTrue(calendarSubscriptionReady(calendarID: "calendar", noEvents: false))
+        XCTAssertFalse(calendarSubscriptionReady(calendarID: nil, noEvents: false))
+    }
+
     // MARK: the store
 
     @MainActor func testSubscriptionsSurviveARoundTrip() {
@@ -85,6 +139,40 @@ final class StationCalendarTests: XCTestCase {
 
         XCTAssertEqual(reloaded.subscriptions, [StationCalendar(stationID: "a", calendarID: "cal-a")])
         XCTAssertEqual(reloaded.calendarID(for: "a"), "cal-a")
+    }
+
+    @MainActor func testCurrentCalendarKeepsItsOwnIdentifierAcrossOlderAppWrites() throws {
+        let d = defaults()
+        let id = "current:noaa/PUG1701"
+        let legacy = [StationCalendar(stationID: id, calendarID: "legacy-calendar")]
+        let legacyData = try JSONEncoder().encode(legacy)
+        d.set(legacyData, forKey: AppGroup.stationCalendarsKey)
+        let store = StationCalendarStore(defaults: d)
+        XCTAssertNil(store.calendarID(for: id), "an updated app must not write to the old calendar")
+        store.setCalendarID("window-calendar", for: id)
+        XCTAssertEqual(try JSONDecoder().decode([StationCalendar].self,
+                                                  from: XCTUnwrap(d.data(forKey: AppGroup.stationCalendarsKey))), legacy)
+        d.set(legacyData, forKey: AppGroup.stationCalendarsKey)
+        XCTAssertEqual(StationCalendarStore(defaults: d).calendarID(for: id), "window-calendar")
+        XCTAssertNotEqual(stationCalendarTitle(name: "Race Passage", kind: .current), "Race Passage Currents")
+        XCTAssertEqual(Set(store.calendarIDsForRemoval(id)), ["legacy-calendar", "window-calendar"])
+        store.unsubscribe(id)
+        let reloaded = StationCalendarStore(defaults: d)
+        XCTAssertNil(reloaded.calendarID(for: id))
+        XCTAssertEqual(reloaded.orphanedWindowCalendars[id], "window-calendar")
+        reloaded.forgetWindowCalendar(for: id)
+        XCTAssertTrue(reloaded.orphanedWindowCalendars.isEmpty)
+    }
+
+    @MainActor func testChsCurrentCalendarsAlsoKeepTheirOwnIdentifier() throws {
+        let d = defaults()
+        let id = try XCTUnwrap(ChsCurrentGateInfo.all.first?.id)
+        let legacy = [StationCalendar(stationID: id, calendarID: "legacy-calendar")]
+        d.set(try JSONEncoder().encode(legacy), forKey: AppGroup.stationCalendarsKey)
+        let store = StationCalendarStore(defaults: d)
+        XCTAssertNil(store.calendarID(for: id))
+        store.setCalendarID("window-calendar", for: id)
+        XCTAssertEqual(StationCalendarStore(defaults: d).calendarID(for: id), "window-calendar")
     }
 
     // MARK: which calendars a run rewrites

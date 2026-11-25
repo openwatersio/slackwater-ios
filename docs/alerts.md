@@ -49,7 +49,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var id = UUID()
     var stationID: String        // a concrete catalog id, never a location sentinel
     var trigger: AlertTrigger
-    /// Set: only the occurrence at this instant, and the rule expires once it passes.
+    /// Set: one occurrence near this instant; the rule expires after both have passed.
     var once: Date?
     /// Seconds before the event that the notification fires. Zero by default: the calendar's
     /// throwaway rules (§5.1) are rules with no lead, and the alert sheet starts a new rule at
@@ -57,6 +57,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var lead: TimeInterval = 0
     var sun: SunWindow?          // nil is any time; daylight, goldenHour, blueHour
     var enabled = true
+    var heightNeedsReview: Bool?
+    var slackNeedsReview: Bool?
+    var currentWindowRule = false
+    var currentWindowWasOff = false
 }
 
 enum AlertTrigger: Codable, Equatable {
@@ -73,11 +77,11 @@ enum AlertTrigger: Codable, Equatable {
 - A rule names a place the user chose. Rules are created from a detail view, whose station id is
   always concrete, so a rule never follows Current Location.
 - **`once` is the whole difference between the sheet's repeat choices (§7.2).** Set, the rule
-  watches for the single occurrence nearest that instant — within six hours, under the gap
-  between two of any trigger — because the pressed minute is not always the event's own: a press
-  on a current strip parks on the slack instant while the occurrence is the window's opening, and
-  a press on the curve names a minute the rounded height crosses a little before or after. The
-  reschedule drops the rule once the instant is past. Unset, the rule watches every occurrence of
+  watches for the window containing that instant, or the next opening within six hours when
+  no window contains it. Other triggers use the nearest occurrence within six hours. A press on a current strip can be later than the window opening, and a
+  press on the curve can name a minute the rounded height crosses a little before or after. If the
+  selected opening has already passed, rescheduling does not retarget a later window. The
+  reschedule drops the rule once the instant and its resolved event are past. Unset, the rule watches every occurrence of
   its trigger. Copy comes from `trigger` either way, so nothing stores a rendered string.
 - A sentence makes the same two kinds of rule. "The next low tide" is a `once` rule on the first
   occurrence the sentence describes; "every low tide" is the rule without `once`. The sentence is
@@ -198,9 +202,8 @@ of the sources it would create in is adopted only when it already holds one of t
 future events for that station (`owns`); a title match alone is never adopted, because station
 names collide. The title match matters because the calendar syncs: without it a second device
 turning the same station on creates a duplicate calendar with the same name and the user sees every
-event twice. The title carries the series, "*Name* Tides" or "*Name* Currents"
-(`stationCalendarTitle`), so a place that is both a tide and a current station gets two calendars. The comfort speed syncs through iCloud with the units, so devices on one account
-write the same slack windows when they use the same prediction rules. Devices on different app versions can calculate different windows and rewrite each other's synced calendar events until both are updated. Two devices that do not share settings, and are set to *different* comfort
+event twice. The title carries the series: "*Name* Tides", "*Name* Currents · Slackwater" for current windows, or "*Name* Currents" for a derived gate (`stationCalendarTitle`). Current windows use a separate calendar and a separately stored identifier from the older app's "*Name* Currents" calendar, so devices on different app versions do not rewrite each other's plans. Both calendars can be visible during the rollout; the older calendar is kept for older devices and remains until the subscription is turned off, even after the rollout. Turning the subscription off on an updated device counts and removes both known calendars; an unavailable calendar identifier is retained for cleanup when it appears. If an older build removes the subscription, the updated build removes its orphaned window calendar when access and the calendar are available. If the user turns it off while access is revoked, the app leaves its calendars alone. If there are no events in the forecast, the subscription stays on and the app waits to create its calendar until an event exists; this lets another device identify and adopt it. The comfort speed syncs through iCloud with the units, so devices on one account
+write the same slack windows when they use the same prediction rules. Two devices that do not share settings, and are set to *different* comfort
 speeds, can likewise rewrite each other's slack windows on every foreground. That is a setting describing one
 boat, and the events are otherwise identical on both devices.
 
@@ -223,9 +226,9 @@ itself cannot be removed from here: delete it by hand in Calendar.
 
 **A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be turned off — but turning a station on opens the Premium sheet and changes nothing. Without Premium the toggles read off and do the same.
 
-**A free day's calendars stop when it ends.** A station turned on during a free day ([premium](premium.md#free-day)) is marked as the free day's (`StationCalendar.freeDay`). Once the day ends, the next reschedule removes the events Slackwater wrote to that calendar and stops publishing it; the calendar and the subscription stay, and the row in Settings' Calendars list reads "Stopped — needs Premium", which opens the Premium sheet. Buying Premium clears the marks, so the calendar fills again on the next run and keeps publishing through any later lapse. Calendar events cannot expire on their own, so the removal waits for the first run after the end; what the free day wrote reaches at most 90 days ahead.
+**A free day's calendars stop when it ends.** A station turned on during a free day ([premium](premium.md#free-day)) is marked as the free day's (`StationCalendar.freeDay`). Once the day ends, the next reschedule removes the events Slackwater wrote to both known calendars and stops publishing them; the calendar and the subscription stay, and the row in Settings' Calendars list reads "Stopped — needs Premium", which opens the Premium sheet. Buying Premium clears the marks, so the calendar fills again on the next run and keeps publishing through any later lapse. Calendar events cannot expire on their own, so the removal waits for the first run after the end; what the free day wrote reaches at most 90 days ahead.
 
-A rejected CHS current model is an explicit invalidation, rather than a temporary missing prediction. The app records the affected place when rejecting its stored model. A place that remains fitted keeps the unusable file until a replacement lands, preserving its queued refit across launches; a fitted-to-online transition removes its file and chunk cache. Once Calendar grants full access, the app removes only that place's future generated events, identified by its own station URLs. It leaves events already underway, personal events without those URLs, and the subscription itself in place. A durable pending set survives model deletion and denied Calendar access; an EventKit failure keeps the entry for retry. A missing online window alone never invalidates a calendar.
+A rejected CHS current model is an explicit invalidation, rather than a temporary missing prediction. The app records the affected place when rejecting its stored model. A place that remains fitted keeps the unusable file until a replacement lands, preserving its queued refit across launches; a fitted-to-online transition removes its file and chunk cache. Once Calendar grants full access, the app removes only that place's future generated events, identified by its own station URLs. It leaves events already underway, personal events without those URLs, and the subscription itself in place. A durable pending set survives model deletion and denied Calendar access; an EventKit failure keeps the entry for retry. A missing legacy calendar has its own deferred cleanup so the new calendar can recover, and unsubscribing cancels pending invalidation for that station. A missing online window alone never invalidates a calendar.
 
 ### 5.2 Notifications
 
@@ -366,7 +369,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
 - During a free day: no notification is planned to fire at or after the day's end, and no Live Activity is a candidate unless its event falls before the end, so nothing iOS delivers with the app closed outlasts the free day. When the app next runs after the end, `isPremium` is false and the rule above clears what is left.
-- Rules whose `once` is in the past are removed.
+- Once rules are removed when their stored instant is past and no resolved event remains ahead. An older one-time current rule is marked for review when a comfort window is on, because its original selected event cannot be reconstructed reliably. With the setting Off, it only fires if a true slack falls within two minutes of its saved minute; an ambiguous selection waits until six hours after that minute and then expires. Future ambiguous selections stay visible for review until edited, removed, or six hours after their selected moment. The review sheet starts with the alert On; the user can switch it Off before saving. A one-time alert saved for a comfort window waits while the setting is Off instead of moving to a different slack; it can resume if the setting is restored within six hours of its selected moment. An alert saved while the setting is Off follows true slacks while Off; if the setting is turned on, the alert is held for review instead of moving to a different window opening. Older builds preserve new one-time window rules and marked rules as unreadable triggers; they cannot deliver them until the app is updated again.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; a station
 calendar turned on or off; the slack threshold changing; `PremiumStore.isPremium` changing; a CHS
@@ -380,7 +383,7 @@ rather than a silent stop.
 
 **Rule states** (Alerts screen), in the order they are tested: Off · Waiting for station data (a
 CHS station not yet fitted) · Notifications are Premium (rendered as a `PremiumRequirement` link)
-· Notifications are off in Settings · Nothing coming up · Scheduled through *date* · Set the
+· Notifications are off in Settings · No slack in available predictions (a current alert with the window Off and no true slack in the available series) · Nothing coming up · Scheduled through *date* · Set the
 height again (below).
 
 **A rule's station replaced by another record** (`Resources/station-successors.json`, list.md
@@ -505,7 +508,7 @@ with "Does not repeat", and is asked to support the app only when they ask to be
 there; a `once` rule bound there would be dropped by the reschedule its save triggers (§6). The
 sheet says "This moment has passed" under When and disables Save. The Rest tap never meets this:
 it binds to the offer's next occurrence after now, or opens a repeating draft when the
-notification horizon holds none.
+notification horizon holds none. A one-time current-window alert also requires its selected opening to be in the future. The sheet resolves it off the main thread, disables Save while checking, and says when the opening has passed or cannot be resolved. If station data is missing, the sheet allows Save and says it is waiting for station data; the scheduler retains a one-time rule until six hours after its selected moment while it waits. Repeating rules remain available.
 
 ### 7.3 The sentence
 
@@ -661,8 +664,8 @@ No engine or Almanac version change.
   the first upcoming opening agrees with `SlackWindowShortcutQuery.next` when Siri is not reporting an already-open window; crossings interpolate and respect
   direction; the sun window holds across a DST transition day and keeps only the lows inside the golden hour; an eclipse lands on
   `WindowEclipse.start`; a wider threshold opens a window earlier.
-- `once` — one occurrence at that minute and no more; none once the instant is past; the reschedule
-  drops the rule then; clearing `once` makes the same rule repeat.
+- `once` — one occurrence selected from the pressed minute; the reschedule removes the rule after
+  the minute and resolved event have passed. Clearing `once` makes the same rule repeat.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
   free plan keeps every subscribed calendar and no notifications. The activity candidates are
   the notification list's short-lead subset in fire order, none without Premium; the sweep ends

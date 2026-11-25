@@ -8,9 +8,15 @@ func calendarInvalidationRemovals(_ events: [(start: Date, url: URL?)], stationI
     }
 }
 
+/// A missing legacy calendar can have been deleted; a missing current calendar may still sync in.
+func calendarInvalidationCanProceed(windowID: String?, found: Set<String>) -> Bool {
+    windowID.map { found.contains($0) } ?? true
+}
+
 /// A rejected model can disappear before Calendar access is granted, so the cleanup survives launch.
 enum CurrentCalendarInvalidations {
     private static let key = "slackwater.invalidatedCurrentCalendars"
+    private static let deferredKey = "slackwater.deferredCurrentCalendarInvalidations"
 
     static func pending(in defaults: UserDefaults = AppGroup.defaults) -> Set<String> {
         Set(defaults.stringArray(forKey: key) ?? [])
@@ -18,6 +24,35 @@ enum CurrentCalendarInvalidations {
 
     static func reset(in defaults: UserDefaults = AppGroup.defaults) {
         defaults.removeObject(forKey: key)
+        defaults.removeObject(forKey: deferredKey)
+    }
+
+    static func deferred(in defaults: UserDefaults = AppGroup.defaults) -> [String: [String]] {
+        defaults.dictionary(forKey: deferredKey) as? [String: [String]] ?? [:]
+    }
+
+    static func recordDeferred(stationID: String, calendarIDs: Set<String>, in defaults: UserDefaults = AppGroup.defaults) {
+        guard !calendarIDs.isEmpty else { return }
+        var entries = deferred(in: defaults)
+        entries[stationID] = Array(Set(entries[stationID] ?? []).union(calendarIDs)).sorted()
+        defaults.set(entries, forKey: deferredKey)
+    }
+
+    @MainActor static func retryDeferred(in defaults: UserDefaults = AppGroup.defaults,
+                                         clear: (String, String) -> Bool) {
+        var entries = deferred(in: defaults)
+        for (stationID, ids) in entries {
+            let remaining = ids.filter { !clear(stationID, $0) }
+            entries[stationID] = remaining.isEmpty ? nil : remaining
+        }
+        defaults.set(entries, forKey: deferredKey)
+    }
+
+    static func forget(stationID: String, in defaults: UserDefaults = AppGroup.defaults) {
+        var entries = deferred(in: defaults)
+        entries.removeValue(forKey: stationID)
+        defaults.set(entries, forKey: deferredKey)
+        defaults.set(pending(in: defaults).subtracting([stationID]).sorted(), forKey: key)
     }
 
     static func record(_ ids: Set<String>, in defaults: UserDefaults = AppGroup.defaults) {
@@ -98,8 +133,13 @@ func calendarTriggers(for kind: StationCalendarKind) -> [AlertTrigger] {
 func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
     switch kind {
     case .tide: "\(name) Tides"
-    case .current, .derived: "\(name) Currents"
+    case .current: "\(name) Currents · Slackwater"
+    case .derived: "\(name) Currents"
     }
+}
+
+private func usesWindowCalendar(_ stationID: String) -> Bool {
+    stationID.hasPrefix("current:") || ChsCurrentGateInfo.all.contains { $0.id == stationID }
 }
 
 /// What turning a station's toggle does, given what is already on.
@@ -118,6 +158,10 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     return premium ? .add : .upsell
 }
 
+func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
+    calendarID != nil || noEvents
+}
+
 @MainActor final class StationCalendarStore: ObservableObject {
     static let shared = StationCalendarStore(defaults: AppGroup.defaults)
 
@@ -125,20 +169,50 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     /// Assigned once at launch (SlackwaterApp.init) to the scheduler, like AlertRuleStore's.
     var onChange: () -> Void = {}
     private let defaults: UserDefaults
+    // TODO(#944): Revisit separate calendars after older builds and rollback are no longer supported.
+    // Kept outside the subscription encoding so an older app cannot overwrite the new id.
+    private static let windowIDsKey = "slackwater.currentWindowCalendarIDs"
+    private var windowIDs: [String: String]
+    private let subscriptionsDecoded: Bool
 
     /// `successors` moves a subscription whose station left the bundle to the
     /// station that replaced it (`StationSuccessors`), keeping its calendar.
     init(defaults: UserDefaults, successors: [String: String] = StationSuccessors.bundled) {
         self.defaults = defaults
+        let savedWindowIDs = defaults.dictionary(forKey: Self.windowIDsKey) as? [String: String] ?? [:]
+        var migratedWindowIDs: [String: String] = [:]
+        var displaced: [(String, String)] = []
+        // Prefer a successor's own calendar over an older station's calendar.
+        let ordered = savedWindowIDs.sorted {
+            let a = StationSuccessors.resolve($0.key, in: successors) == $0.key
+            let b = StationSuccessors.resolve($1.key, in: successors) == $1.key
+            return a == b ? $0.key < $1.key : a
+        }
+        for (id, calendarID) in ordered {
+            let resolved = StationSuccessors.resolve(id, in: successors)
+            if migratedWindowIDs[resolved] == nil { migratedWindowIDs[resolved] = calendarID }
+            else { displaced.append((id, calendarID)) }
+        }
+        // Keep displaced identifiers for the orphan sweep, except when both names refer
+        // to the same EventKit calendar (which is still in use by the successor).
+        for (id, calendarID) in displaced where !migratedWindowIDs.values.contains(calendarID) {
+            migratedWindowIDs["orphaned-window:" + id] = calendarID
+        }
+        windowIDs = migratedWindowIDs
+        if migratedWindowIDs != savedWindowIDs { defaults.set(migratedWindowIDs, forKey: Self.windowIDsKey) }
         // UI-test hook, like FavoritesStore's `-resetFavorites`: this store and the
         // EventKit calendars it names both persist across a run's separate app launches
         // (same simulator, same App Group), so a test that toggles a calendar on needs its
         // own way back to a clean slate.
         if CommandLine.arguments.contains("-resetCalendars") {
             defaults.removeObject(forKey: AppGroup.stationCalendarsKey)
+            defaults.removeObject(forKey: Self.windowIDsKey)
+            windowIDs = [:]
         }
-        let stored = defaults.data(forKey: AppGroup.stationCalendarsKey)
-            .flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) } ?? []
+        let data = defaults.data(forKey: AppGroup.stationCalendarsKey)
+        let decoded = data.flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) }
+        subscriptionsDecoded = data == nil || decoded != nil
+        let stored = decoded ?? []
         var seen = Set<String>()
         subscriptions = stored.compactMap { subscription in
             var moved = subscription
@@ -149,8 +223,37 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     }
 
     func calendarID(for stationID: String) -> String? {
-        subscriptions.first { $0.stationID == stationID }
+        guard subscriptions.contains(where: { $0.stationID == stationID }) else { return nil }
+        if usesWindowCalendar(stationID) { return windowIDs[stationID].flatMap { $0.isEmpty ? nil : $0 } }
+        return subscriptions.first { $0.stationID == stationID }
             .map(\.calendarID).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    func calendarIDsForRemoval(_ stationID: String) -> [String] {
+        guard let subscription = subscriptions.first(where: { $0.stationID == stationID }) else { return [] }
+        var ids: [String] = []
+        for id in [calendarID(for: stationID), subscription.calendarID].compactMap({ $0 }) where !id.isEmpty && !ids.contains(id) {
+            ids.append(id)
+        }
+        return ids
+    }
+
+    var orphanedWindowCalendars: [String: String] {
+        guard subscriptionsDecoded else { return [:] }
+        let active = Set(subscriptions.map(\.stationID))
+        let usedIDs = Set(subscriptions.flatMap { calendarIDsForRemoval($0.stationID) })
+        return windowIDs.filter { !active.contains($0.key) && !$0.value.isEmpty && !usedIDs.contains($0.value) }
+    }
+
+    func rememberOrphanCalendar(_ id: String, for stationID: String) {
+        guard !id.isEmpty else { return }
+        windowIDs["orphaned-window:removed:" + stationID + ":" + id] = id
+        defaults.set(windowIDs, forKey: Self.windowIDsKey)
+    }
+
+    func forgetWindowCalendar(for stationID: String) {
+        guard windowIDs.removeValue(forKey: stationID) != nil else { return }
+        defaults.set(windowIDs, forKey: Self.windowIDsKey)
     }
 
     /// Idempotent: subscribing to a station already on keeps the calendar it already has.
@@ -170,12 +273,19 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     }
 
     func unsubscribe(_ stationID: String) {
+        CurrentCalendarInvalidations.forget(stationID: stationID, in: defaults)
         subscriptions.removeAll { $0.stationID == stationID }
         persist()
     }
 
     func setCalendarID(_ id: String, for stationID: String) {
         guard let i = subscriptions.firstIndex(where: { $0.stationID == stationID }) else { return }
+        if usesWindowCalendar(stationID) {
+            windowIDs[stationID] = id
+            defaults.set(windowIDs, forKey: Self.windowIDsKey)
+            onChange()
+            return
+        }
         subscriptions[i].calendarID = id
         persist()
     }

@@ -712,7 +712,7 @@ Do not rely on colour alone:
 
 - high/low have different to-bar glyphs;
 - current direction has bearing arrows and compass text;
-- a measured slack window is a wider run, and named by the commentary; measured slack is a wider run joined to it, stretched to the shortest slack stroke for a run shorter than a turn dot or a slack with no run; derived slack is a dot; and every slack is named in text;
+- a measured slack window is a wider run, named by the commentary; each measured zero-current instant is drawn as a short green stroke rather than a duration, derived slack is a dot, and every slack is named in text;
 - speed magnitude remains printed at maxima; and
 - schematic magnitude is omitted rather than encoded only by colour.
 

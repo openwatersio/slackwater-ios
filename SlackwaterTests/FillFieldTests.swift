@@ -72,6 +72,24 @@ final class FillFieldTests: XCTestCase {
         XCTAssertFalse(triangleContains(.init(latitude: 1, longitude: 1), vertices: triangle))
     }
 
+    func testLegacyFillFieldConvertsS3Phase() throws {
+        let bundle = Bundle(for: FillFieldTests.self)
+        let binURL = try XCTUnwrap(bundle.url(forResource: "fill-fixture", withExtension: "bin"))
+        let jsonURL = try XCTUnwrap(bundle.url(forResource: "fill-fixture", withExtension: "json"))
+        var header = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: jsonURL)) as? [String: Any])
+        var names = try XCTUnwrap(header["constituents"] as? [String: String])
+        names["0"] = "S3"
+        header["constituents"] = names
+        let field = try XCTUnwrap(FillField(bin: Data(contentsOf: binURL),
+                                            headerJSON: JSONSerialization.data(withJSONObject: header)))
+        let time = Date(timeIntervalSince1970: 1_767_225_600)
+        let cell = try XCTUnwrap(field.cells(at: time).first)
+        let station = CurrentStation(constituents: [HarmonicConstituent(name: "S3", amplitude: 1.2001953125, phase: 180)],
+                                     floodDirection: 0, ebbDirection: 180, offset: 0.5)
+        let east = try XCTUnwrap(station.speeds(from: time, to: time.addingTimeInterval(1), step: 1).first?.speed)
+        XCTAssertEqual(cell.speedKn * sin(cell.bearingDeg * .pi / 180), east, accuracy: 1e-9)
+    }
+
     func testSampleReturnsFixtureVectorOnlyInsideTriangle() throws {
         let field = try loadFixture()
         let date = Date(timeIntervalSince1970: 1_787_000_000)

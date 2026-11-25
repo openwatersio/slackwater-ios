@@ -47,7 +47,7 @@ import SlackwaterDatabase
         let database = try currentDatabase(directory: directory)
         var stations = database.map(StationInput.init)
         change(&stations)
-        try StationDatabase.build(stations, version: database.version)
+        try StationDatabase.build(stations, version: database.version, constituentDefinitions: database.constituentDefinitions)
             .write(to: directory.appendingPathComponent("currents.tcdb"))
     }
 

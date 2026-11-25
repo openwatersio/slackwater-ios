@@ -32,6 +32,10 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     return groups
 }
 
+func calendarShouldCreate(stationID: String, stopped: Set<String>, hasEvents: Bool) -> Bool {
+    !stopped.contains(stationID) && hasEvents
+}
+
 @MainActor enum AlertCalendar {
     private static let store = EKEventStore()
     private static let logger = Logger(subsystem: "org.openwaters.slackwater", category: "Calendar")
@@ -121,19 +125,30 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
     /// Turning a station off takes its events with it — that is what the confirmation the user
     /// read said would happen.
     static func removeCalendar(for stationID: String) {
-        guard authorized, let id = StationCalendarStore.shared.calendarID(for: stationID),
-              let calendar = store.calendar(withIdentifier: id) else { return }
-        try? store.removeCalendar(calendar, commit: true)
+        guard authorized else { return }
+        let calendars = StationCalendarStore.shared
+        for id in calendars.calendarIDsForRemoval(stationID) {
+            guard let calendar = store.calendar(withIdentifier: id) else {
+                calendars.rememberOrphanCalendar(id, for: stationID)
+                continue
+            }
+            if (try? store.removeCalendar(calendar, commit: true)) != nil {
+                if id == calendars.calendarID(for: stationID) { calendars.forgetWindowCalendar(for: stationID) }
+            } else {
+                calendars.rememberOrphanCalendar(id, for: stationID)
+            }
+        }
     }
 
     /// How many of this station's events are still to come — the number the swap and the
     /// turn-off confirmations name.
     static func futureEventCount(for stationID: String, now: Date) -> Int {
-        guard authorized, let id = StationCalendarStore.shared.calendarID(for: stationID),
-              let calendar = store.calendar(withIdentifier: id) else { return 0 }
+        guard authorized else { return 0 }
+        let calendars = StationCalendarStore.shared.calendarIDsForRemoval(stationID).compactMap { store.calendar(withIdentifier: $0) }
+        guard !calendars.isEmpty else { return 0 }
         return store.events(matching: store.predicateForEvents(
             withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),
-            calendars: [calendar])).count
+            calendars: calendars)).count
     }
 
     /// Makes each subscribed station's calendar match its plan — but only where the caller's
@@ -149,29 +164,66 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
         // invisible here, and `calendarFor`'s ownership check creates the duplicate it exists to
         // prevent.
         store.reset()
+        for (stationID, id) in StationCalendarStore.shared.orphanedWindowCalendars {
+            guard let calendar = store.calendar(withIdentifier: id) else { continue }
+            if (try? store.removeCalendar(calendar, commit: true)) != nil {
+                StationCalendarStore.shared.forgetWindowCalendar(for: stationID)
+            }
+        }
+        CurrentCalendarInvalidations.retryDeferred { stationID, calendarID in
+            guard let calendar = store.calendar(withIdentifier: calendarID) else { return false }
+            return clearGeneratedEvents(in: [calendar], stationID: stationID, now: now)
+        }
         CurrentCalendarInvalidations.retry { clearInvalidatedCurrent($0, now: now) }
         let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
                                                         live: live, skipping: skipping,
                                                         stopped: stopped) {
+            if stopped.contains(stationID) {
+                let activeID = StationCalendarStore.shared.calendarID(for: stationID)
+                let legacy = StationCalendarStore.shared.calendarIDsForRemoval(stationID)
+                    .filter { $0 != activeID }.compactMap { store.calendar(withIdentifier: $0) }
+                _ = clearGeneratedEvents(in: legacy, stationID: stationID, now: now)
+            }
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
-            // Nothing planned and no calendar yet: don't make an empty one.
+            // Wait for an event before creating a calendar: another device can only
+            // recognize a calendar as ours by its station-linked events.
             guard let calendar = calendarFor(stationID: stationID, title: title,
-                                             create: !planned.isEmpty, now: now) else { continue }
+                                             create: calendarShouldCreate(stationID: stationID, stopped: stopped, hasEvents: !planned.isEmpty), now: now) else { continue }
             sync(calendar, to: planned, now: now)
         }
     }
 
     private static func clearInvalidatedCurrent(_ stationID: String, now: Date) -> Bool {
         guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return false }
-        let title = stationCalendarTitle(name: gate.name, kind: .current)
-        guard let calendar = calendarFor(stationID: stationID, title: title, create: false, now: now) else {
-            let subscribed = StationCalendarStore.shared.subscriptions.contains { $0.stationID == stationID }
-            return !subscribed && StationCalendarStore.shared.calendarID(for: stationID) == nil
+        let ids = StationCalendarStore.shared.calendarIDsForRemoval(stationID)
+        let calendars: [EKCalendar]
+        if ids.isEmpty {
+            let title = stationCalendarTitle(name: gate.name, kind: .current)
+            guard let calendar = calendarFor(stationID: stationID, title: title, create: false, now: now) else {
+                return !StationCalendarStore.shared.subscriptions.contains { $0.stationID == stationID }
+            }
+            calendars = [calendar]
+        } else {
+            calendars = ids.compactMap { store.calendar(withIdentifier: $0) }
+            let found = Set(calendars.map(\.calendarIdentifier))
+            let windowID = StationCalendarStore.shared.calendarID(for: stationID)
+            // Missing legacy calendars can sync later. Remember them separately so the
+            // current calendar can be cleared and reused without losing that cleanup.
+            CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
+                calendarIDs: Set(ids).subtracting(found).subtracting(windowID.map { [$0] } ?? []))
+            guard calendarInvalidationCanProceed(windowID: windowID, found: found) else { return false }
+            if calendars.isEmpty { return true }
         }
+        return clearGeneratedEvents(in: calendars, stationID: stationID, now: now)
+    }
+
+    /// Remove only this station's future generated events, leaving personal events alone.
+    private static func clearGeneratedEvents(in calendars: [EKCalendar], stationID: String, now: Date) -> Bool {
+        guard !calendars.isEmpty else { return true }
         let existing = store.events(matching: store.predicateForEvents(
-            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: [calendar]))
+            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400), calendars: calendars))
         let removals = calendarInvalidationRemovals(existing.map {
             (start: $0.startDate, url: $0.url)
         }, stationID: stationID, now: now)
@@ -181,7 +233,7 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Se
             return true
         } catch {
             store.reset()
-            logger.error("Current calendar invalidation failed: \(String(describing: error), privacy: .public)")
+            logger.error("Current calendar cleanup failed: \(String(describing: error), privacy: .public)")
             return false
         }
     }

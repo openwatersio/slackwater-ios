@@ -3,6 +3,23 @@ import XCTest
 @testable import Slackwater
 
 final class AlertStatusTests: XCTestCase {
+    func testAWindowHeldByTheOffSettingExplainsWhy() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let status = AlertStatusSnapshot(heldWindows: [rule.id], notificationsAuthorized: true)
+        XCTAssertEqual(alertStatusText(rule, status, premium: true),
+                       "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
+    }
+
+    func testAnAmbiguousLegacySelectionRequestsReview() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let status = AlertStatusSnapshot(reviewPending: [rule.id], notificationsAuthorized: true)
+        XCTAssertEqual(alertStatusText(rule, status, premium: true), "Review or delete this alert.")
+    }
+    func testAQuietRotaryRuleExplainsThatNoSlackWasFound() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        let status = AlertStatusSnapshot(noSlack: [rule.id], notificationsAuthorized: true)
+        XCTAssertEqual(alertStatusText(rule, status, premium: true), "No slack in available predictions")
+    }
     func testAPremiumlessRuleSaysSo() {
         let rule = AlertRule(stationID: "a", trigger: .slack)
         XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: false),
