@@ -226,6 +226,23 @@ final class AlertLineTests: XCTestCase {
         XCTAssertTrue(alertMoments(stationID: id, rules: [rule], from: from, to: to, threshold: 0.5).isEmpty)
     }
 
+    func testLegacyOffModeMarkerRequiresTheSelectedSlack() throws {
+        let id = "current:noaa/ACT1616"
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id, at: start))
+        let station = WidgetStationLoader.station(from: record)
+        let repeating = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let end = start.addingTimeInterval(86_400)
+        let slack = try XCTUnwrap(alertOccurrences(repeating, station: station, position: record.alertPosition,
+                                                   from: start, to: end, threshold: 0).first?.event)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: slack.addingTimeInterval(-2400))
+        XCTAssertTrue(alertMoments(station: station, position: record.alertPosition, rules: [once],
+                                   from: start, to: end, threshold: 0).isEmpty)
+        once.once = slack
+        XCTAssertEqual(alertMoments(station: station, position: record.alertPosition, rules: [once],
+                                     from: start, to: end, threshold: 0).map(\.event), [slack])
+    }
+
     func testOffModeOnceRuleHasNoMarkerAfterComfortIsEnabled() {
         let id = "current:noaa/PUG1701"
         let from = Date(timeIntervalSince1970: 1_755_800_000)

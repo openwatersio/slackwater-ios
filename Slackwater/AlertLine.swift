@@ -81,16 +81,23 @@ func alertMoments(stationID: String, rules: [AlertRule], from: Date, to: Date, t
 
 func alertMoments(station: WidgetStation, position: (lat: Double, lon: Double), rules: [AlertRule],
                   from: Date, to: Date, threshold: Double) -> [AlertMoment] {
-    let all = rules.filter { $0.enabled && $0.slackNeedsReview != true }.flatMap { rule in
+    let all = rules.filter { $0.enabled && $0.slackNeedsReview != true }.flatMap { rule -> [AlertMoment] in
+        if rule.trigger == .slackWindowOpens, rule.once != nil,
+           (!rule.currentWindowRule || rule.currentWindowWasOff), !slackWindowIsOff(threshold) { return [] }
         let range = rule.once.map { once in
             let near = (once.addingTimeInterval(-alertOnceReach), once.addingTimeInterval(alertOnceReach))
             return rule.trigger == .slackWindowOpens && !slackWindowIsOff(threshold)
                 && once >= from.addingTimeInterval(-alertOnceReach) && once <= to.addingTimeInterval(alertOnceReach)
                 ? (min(from, near.0), max(to, near.1)) : near
         } ?? (from, to)
-        return alertOccurrences(rule, station: station, position: position,
-                                from: range.0, to: range.1, threshold: threshold)
-            .map { AlertMoment(ruleID: rule.id, event: $0.event) }
+        let occurrences = alertOccurrences(rule, station: station, position: position,
+                                           from: range.0, to: range.1, threshold: threshold)
+        if rule.trigger == .slackWindowOpens, rule.once != nil, !rule.currentWindowRule,
+           slackWindowIsOff(threshold), case .current = station,
+           offModeHasNoSlack(rule, station: station, position: position, now: from, until: to, occurrences: occurrences) {
+            return []
+        }
+        return occurrences.map { AlertMoment(ruleID: rule.id, event: $0.event) }
     }
     .sorted { $0.event < $1.event }
     return all.reduce(into: []) { kept, m in

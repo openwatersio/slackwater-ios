@@ -19,7 +19,9 @@ final class AlertSheetTests: XCTestCase {
         var saved = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: date)
         saved.currentWindowRule = true
         saved.currentWindowWasOff = true
-        XCTAssertTrue(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5))
+        XCTAssertTrue(alertSheetWindowWasOff(saved, saved: saved, threshold: 0))
+        XCTAssertFalse(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5),
+                       "confirming the displayed comfort window resolves the old Off selection")
         var edited = saved
         edited.once = date.addingTimeInterval(3600)
         XCTAssertFalse(alertSheetWindowWasOff(edited, saved: saved, threshold: 0.5))

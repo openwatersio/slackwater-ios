@@ -171,7 +171,9 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      speedUnit: String, detailed: Bool = true) -> PinState {
     let point = station.isSubordinate ? nil
         : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first
-    let signed = station.isSubordinate ? subordinateCurrentPinSpeed(station, at: now) : point?.speed ?? 0
+    guard let signed = station.isSubordinate ? subordinateCurrentPinSpeed(station, at: now) : point?.speed else {
+        return PinState(state: "unknown")
+    }
     let magnitude = point?.magnitude ?? abs(signed)
     let direction = point.flatMap { [$0].vector(at: $0.time, flood: station.floodDirection, ebb: station.ebbDirection)?.direction }
     let slack = magnitude <= slackCoreThresholdKn(slackThresholdKn)
@@ -180,7 +182,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      : pinRampHex(forSpeedKn: magnitude),
         reading: detailed ? formatSpeed(magnitude, unit: speedUnit) : nil,
         unit: detailed ? speedUnitLabel(speedUnit) : nil,
-        bearing: direction ?? (signed >= 0 ? station.floodDirection : station.ebbDirection))
+        bearing: slack ? nil : direction ?? (signed >= 0 ? station.floodDirection : station.ebbDirection))
 }
 
 /// Most current pins are subordinates hanging off a few dozen references, so the reference is
@@ -189,10 +191,10 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date,
 /// extracts reference events per UTC day (`axisEventsForReduction`), so the held list
 /// and the one the detail view's `speeds` searches are the same events, and
 /// the pin's colour is the detail's speed at that instant.
-private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double {
+private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double? {
     // One read of the reference for both: each `referenceRecord` decodes it.
     guard let ref = station.referenceRecord,
-          case let sub as SubordinateStation = station.engineStation(referenceRecord: ref) else { return 0 }
+          case let sub as SubordinateStation = station.engineStation(referenceRecord: ref) else { return nil }
     return SubordinateStation.speed(at: now, along: sub.reduce(ReferenceCurrentEvents.shared.events(of: ref, at: now)))
 }
 

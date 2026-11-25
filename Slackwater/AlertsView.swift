@@ -19,7 +19,7 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     }
     if status.reviewPending.contains(rule.id) { return String(localized: "Review or delete this alert.") }
     if status.noSlack.contains(rule.id) {
-        return String(localized: "No slack in available predictions", comment: "Alert status when the available current predictions contain no true slack for an alert.")
+        return String(localized: "No slack in available predictions", comment: "Status when the available current predictions contain no true slack for an alert or calendar.")
     }
     guard let date = status.scheduledThrough[rule.id] else { return "Nothing coming up" }
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"

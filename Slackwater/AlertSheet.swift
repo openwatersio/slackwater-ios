@@ -25,6 +25,7 @@ func alertSheetCanSave(_ rule: AlertRule, now: Date, holding: Bool = false) -> B
 }
 
 func alertSheetWindowWasOff(_ rule: AlertRule, saved: AlertRule?, threshold: Double) -> Bool {
+    guard slackWindowIsOff(threshold) else { return false }
     if let saved, saved.slackNeedsReview != true, saved.currentWindowRule,
        saved.once == rule.once, saved.trigger == rule.trigger {
         return saved.currentWindowWasOff
@@ -216,7 +217,7 @@ struct AlertSheet: View {
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .unavailable {
-                        Text("Slackwater can't alert on that here yet", comment: "Under the sentence field when the words ask for something this station cannot alert on.")
+                        Text("Slackwater can't alert on that here yet", comment: "Message when the requested alert is unavailable for this station or selected time.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     } else if holdingWindow {
@@ -300,7 +301,7 @@ struct AlertSheet: View {
         case .nothingThatDay:
             return String(localized: "Nothing that day", comment: "Under the sentence field when the ask named a day that holds no such event.")
         case .notOffered:
-            return String(localized: "Slackwater can't alert on that here yet", comment: "Under the sentence field when the words ask for something this station cannot alert on.")
+            return String(localized: "Slackwater can't alert on that here yet", comment: "Message when the requested alert is unavailable for this station or selected time.")
         case .failed:
             return String(localized: "Couldn't read that. Try other words.", comment: "Under the sentence field when the on-device model could not answer.")
         }
