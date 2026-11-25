@@ -213,7 +213,11 @@ func calendarShouldCreate(stationID: String, stopped: Set<String>, hasEvents: Bo
             // current calendar can be cleared and reused without losing that cleanup.
             CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
                 calendarIDs: Set(ids).subtracting(found).subtracting(windowID.map { [$0] } ?? []))
-            guard calendarInvalidationCanProceed(windowID: windowID, found: found) else { return false }
+            if !calendarInvalidationCanProceed(windowID: windowID, found: found) {
+                // Clear the calendars that are available now, but keep retrying the missing one.
+                _ = clearGeneratedEvents(in: calendars, stationID: stationID, now: now)
+                return false
+            }
             if calendars.isEmpty { return true }
         }
         return clearGeneratedEvents(in: calendars, stationID: stationID, now: now)
