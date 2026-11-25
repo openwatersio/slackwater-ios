@@ -146,7 +146,7 @@ struct AlertSheet: View {
     }
     private var holdingWindow: Bool { checkedOpeningRule == rule && openingAvailability == .held }
     private var canSave: Bool {
-        guard alertSheetCanSave(rule, now: appNow(), holding: holdingWindow) else { return false }
+        guard alertSheetCanSave(rule, now: appNow(), holding: holdingWindow || checksOpening) else { return false }
         guard checksOpening else { return true }
         return checkedOpeningRule == rule && alertSheetOpeningCanSave(openingAvailability, now: appNow())
     }
@@ -204,7 +204,7 @@ struct AlertSheet: View {
                         Text("Blue hour").tag(SunWindow?.some(.blueHour))
                     }
                     .accessibilityIdentifier("alert-sheet-sun")
-                    if !alertSheetCanSave(rule, now: appNow(), holding: holdingWindow) {
+                    if !alertSheetCanSave(rule, now: appNow(), holding: holdingWindow || checksOpening) {
                         Text("This moment has passed", comment: "Under the alert sheet's When section, when the chosen moment is already behind us.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))

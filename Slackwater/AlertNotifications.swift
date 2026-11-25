@@ -10,6 +10,10 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
     return wait > 0 ? wait : nil
 }
 
+func pendingSlackReviewNotices(_ rules: [AlertRule], notified: Set<String>) -> [AlertRule] {
+    rules.filter { $0.slackNeedsReview == true && !notified.contains($0.id.uuidString) }
+}
+
 @MainActor enum AlertNotifications {
     /// Limit replacement to scheduled alert requests.
     static let prefix = "alert."
@@ -24,10 +28,16 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
     }
 
     /// Tell people when an older one-time selection needs their attention after migration.
-    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace]) async {
-        guard !rules.isEmpty, await authorized() else { return }
+    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace],
+                                  defaults: UserDefaults = AppGroup.defaults) async {
+        let key = "slackwater.sentSlackReviewNotices"
+        let reviewIDs = Set(rules.filter { $0.slackNeedsReview == true }.map { $0.id.uuidString })
+        var notified = Set(defaults.stringArray(forKey: key) ?? []).intersection(reviewIDs)
+        defaults.set(Array(notified).sorted(), forKey: key)
+        let pending = pendingSlackReviewNotices(rules, notified: notified)
+        guard !pending.isEmpty, await authorized() else { return }
         let center = UNUserNotificationCenter.current()
-        for rule in rules {
+        for rule in pending {
             let content = UNMutableNotificationContent()
             content.title = places[rule.stationID]?.name ?? "Slackwater"
             content.body = String(localized: "Review or delete this alert.")
@@ -35,8 +45,14 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
             if let url = deepLink(forStationID: rule.stationID) {
                 content.userInfo = [AlertTap.urlKey: url.absoluteString]
             }
-            try? await center.add(UNNotificationRequest(identifier: "review." + rule.id.uuidString,
-                                                        content: content, trigger: nil))
+            do {
+                try await center.add(UNNotificationRequest(identifier: "review." + rule.id.uuidString,
+                                                           content: content, trigger: nil))
+                notified.insert(rule.id.uuidString)
+                defaults.set(Array(notified).sorted(), forKey: key)
+            } catch {
+                continue
+            }
         }
     }
 

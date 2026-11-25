@@ -101,6 +101,14 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertTrue(resolved.occurrences.allSatisfy { $0.event.timeIntervalSince(self.now) <= AlertHorizon.calendar })
     }
 
+    func testReviewNoticesRetryUntilSentAndIgnoreOtherRules() {
+        var needsReview = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
+        needsReview.slackNeedsReview = true
+        let normal = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
+        XCTAssertEqual(pendingSlackReviewNotices([needsReview, normal], notified: []).map(\.id), [needsReview.id])
+        XCTAssertTrue(pendingSlackReviewNotices([needsReview, normal], notified: [needsReview.id.uuidString]).isEmpty)
+    }
+
     func testOffModeRotaryRuleReportsNoPredictedSlack() {
         let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens)
         let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
