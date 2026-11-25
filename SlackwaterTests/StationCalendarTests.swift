@@ -58,6 +58,22 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(Array(restored.orphanedWindowCalendars.values), ["legacy"])
     }
 
+    @MainActor func testRevokedAccessPreservesCalendarIdentifiersWithoutDeletingCalendars() throws {
+        let d = defaults()
+        let id = "current:noaa/test"
+        d.set(try JSONEncoder().encode([StationCalendar(stationID: id, calendarID: "legacy")]),
+              forKey: AppGroup.stationCalendarsKey)
+        d.set([id: "window"], forKey: "slackwater.currentWindowCalendarIDs")
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.unsubscribe(id, preserveInvalidation: true)
+        store.forgetWindowCalendar(for: id)
+        let restored = StationCalendarStore(defaults: d, successors: [:])
+        XCTAssertTrue(restored.orphanedWindowCalendars.isEmpty)
+        restored.subscribe(id)
+        XCTAssertEqual(Set(restored.calendarIDsForRemoval(id)), ["legacy", "window"])
+        XCTAssertTrue(restored.orphanedWindowCalendars.isEmpty)
+    }
+
     @MainActor func testCorruptSubscriptionDataDoesNotOrphanCalendars() {
         let defaults = defaults()
         defaults.set(Data("invalid".utf8), forKey: AppGroup.stationCalendarsKey)

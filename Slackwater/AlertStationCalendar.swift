@@ -172,6 +172,7 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
     // TODO(#944): Revisit separate calendars after older builds and rollback are no longer supported.
     // Kept outside the subscription encoding so an older app cannot overwrite the new id.
     private static let windowIDsKey = "slackwater.currentWindowCalendarIDs"
+    private static let preservedIDsKey = "slackwater.preservedCalendarIDs"
     private var windowIDs: [String: String]
     private let subscriptionsDecoded: Bool
 
@@ -207,6 +208,7 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
         if CommandLine.arguments.contains("-resetCalendars") {
             defaults.removeObject(forKey: AppGroup.stationCalendarsKey)
             defaults.removeObject(forKey: Self.windowIDsKey)
+            defaults.removeObject(forKey: Self.preservedIDsKey)
             windowIDs = [:]
         }
         let data = defaults.data(forKey: AppGroup.stationCalendarsKey)
@@ -261,10 +263,17 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
     /// firing `onChange` too would start a second, unawaited pass over the same work.
     func subscribe(_ stationID: String, notify: Bool = true, freeDay: Bool = false) {
         guard !subscriptions.contains(where: { $0.stationID == stationID }) else { return }
+        var preserved = defaults.dictionary(forKey: Self.preservedIDsKey) as? [String: [String: String]] ?? [:]
+        let saved = preserved.removeValue(forKey: stationID) ?? [:]
+        defaults.set(preserved, forKey: Self.preservedIDsKey)
+        if let window = saved["window"], !window.isEmpty, windowIDs[stationID] == nil {
+            windowIDs[stationID] = window
+            defaults.set(windowIDs, forKey: Self.windowIDsKey)
+        }
         let prefix = "orphaned-window:removed:" + stationID + ":"
         let pending = windowIDs.filter { $0.key == prefix + $0.value }
         let activeWindow = windowIDs[stationID]
-        let legacy = pending.values.sorted().first { $0 != activeWindow } ?? ""
+        let legacy = pending.values.sorted().first { $0 != activeWindow } ?? saved["legacy"] ?? ""
         for (key, id) in pending where id == legacy || id == activeWindow { windowIDs.removeValue(forKey: key) }
         if !pending.isEmpty { defaults.set(windowIDs, forKey: Self.windowIDsKey) }
         subscriptions.append(StationCalendar(stationID: stationID, calendarID: legacy, freeDay: freeDay))
@@ -279,6 +288,11 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
     }
 
     func unsubscribe(_ stationID: String, preserveInvalidation: Bool = false) {
+        if preserveInvalidation, let sub = subscriptions.first(where: { $0.stationID == stationID }) {
+            var preserved = defaults.dictionary(forKey: Self.preservedIDsKey) as? [String: [String: String]] ?? [:]
+            preserved[stationID] = ["legacy": sub.calendarID, "window": windowIDs[stationID] ?? ""]
+            defaults.set(preserved, forKey: Self.preservedIDsKey)
+        }
         if preserveInvalidation && CurrentCalendarInvalidations.pending(in: defaults).contains(stationID) {
             CurrentCalendarInvalidations.recordDeferred(stationID: stationID,
                 calendarIDs: Set(calendarIDsForRemoval(stationID)), in: defaults)
