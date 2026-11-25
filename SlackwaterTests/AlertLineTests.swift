@@ -30,8 +30,9 @@ final class AlertLineTests: XCTestCase {
 
     func testMarkerFindsOpeningMoreThanSixHoursBeforePress() {
         let station = WidgetStation.current(LongWindowCurrent(start: moment), tz: utc, name: "Test")
-        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
                              once: moment.addingTimeInterval(10 * 3600))
+        rule.currentWindowRule = true
         let markers = alertMoments(station: station, position: (0, 0), rules: [rule],
                                    from: moment, to: moment.addingTimeInterval(14 * 3600), threshold: 0.5)
         XCTAssertEqual(markers.map(\.event), [alertMinute(moment.addingTimeInterval(2000))])
@@ -40,10 +41,12 @@ final class AlertLineTests: XCTestCase {
     func testDistantOnceMarkerDoesNotScanMonthsOfPredictions() {
         let current = RangeRecordingCurrent()
         let station = WidgetStation.current(current, tz: utc, name: "Test")
-        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
                              once: moment.addingTimeInterval(-365 * 86_400))
+        rule.currentWindowRule = true
         _ = alertMoments(station: station, position: (0, 0), rules: [rule],
                          from: moment, to: moment.addingTimeInterval(86_400), threshold: 0.5)
+        XCTAssertGreaterThan(current.queriedDuration, 0)
         XCTAssertLessThanOrEqual(current.queriedDuration, 26 * 3600)
     }
 

@@ -261,7 +261,13 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
     /// firing `onChange` too would start a second, unawaited pass over the same work.
     func subscribe(_ stationID: String, notify: Bool = true, freeDay: Bool = false) {
         guard !subscriptions.contains(where: { $0.stationID == stationID }) else { return }
-        subscriptions.append(StationCalendar(stationID: stationID, freeDay: freeDay))
+        let prefix = "orphaned-window:removed:" + stationID + ":"
+        let pending = windowIDs.filter { $0.key == prefix + $0.value }
+        let activeWindow = windowIDs[stationID]
+        let legacy = pending.values.sorted().first { $0 != activeWindow } ?? ""
+        for (key, id) in pending where id == legacy || id == activeWindow { windowIDs.removeValue(forKey: key) }
+        if !pending.isEmpty { defaults.set(windowIDs, forKey: Self.windowIDsKey) }
+        subscriptions.append(StationCalendar(stationID: stationID, calendarID: legacy, freeDay: freeDay))
         persist(notify: notify)
     }
 

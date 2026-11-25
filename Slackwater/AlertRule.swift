@@ -34,7 +34,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// a tide height is then a number on the wrong datum, so the rule is off
     /// until the user sets it again. Nil otherwise, never false.
     var heightNeedsReview: Bool?
-    /// A once alert with no predicted slack stays visible until the user edits it.
+    /// A one-time alert held for review until it is edited, deleted, or expires.
     var slackNeedsReview: Bool?
     /// A one-time window selected with the current window semantics.
     var currentWindowRule = false

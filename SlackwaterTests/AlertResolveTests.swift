@@ -38,6 +38,29 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertEqual(liveActivitiesToEnd([active], liveRuleIDs: activeRuleIDs([edited]), now: now), ["open"])
     }
 
+    func testRunningWindowProtectsLegacyRuleUntilItCloses() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(1800))
+        let open = LiveActivityRecord(key: "open", ruleID: rule.id, pending: false,
+                                      event: now.addingTimeInterval(-600), end: now.addingTimeInterval(3600))
+        let running = liveWindowRuleIDs([open], now: now)
+        XCTAssertEqual(running, [rule.id])
+        let policy = alertActivityPolicy(rules: [rule], reviewCandidates: [rule.id], measuredWindows: [],
+                                         runningWindows: running, heldWindows: [], threshold: 0.5)
+        XCTAssertTrue(policy.reviewIDs.isEmpty, "an active alert is not sent for review")
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(2400),
+                                            occurrences: [], activeWindows: policy.expiryProtected).isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([open], liveRuleIDs: policy.liveRuleIDs, now: now).isEmpty)
+        let off = alertActivityPolicy(rules: [rule], reviewCandidates: [], measuredWindows: [],
+                                      runningWindows: running, heldWindows: [], threshold: 0)
+        XCTAssertEqual(liveActivitiesToEnd([open], liveRuleIDs: off.liveRuleIDs, now: now),
+                       ["open"], "turning the comfort window off ends its activity")
+        XCTAssertTrue(liveWindowRuleIDs([open], now: now.addingTimeInterval(3601)).isEmpty)
+        let pending = LiveActivityRecord(key: "pending", ruleID: rule.id, pending: true,
+                                         event: open.event, end: open.end)
+        XCTAssertTrue(liveWindowRuleIDs([pending], now: now).isEmpty)
+    }
+
     func testResolveNamesPlacesAndReportsUnknownStations() {
         let good = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: true))
         let unknown = AlertRule(stationID: "noaa/does-not-exist", trigger: .tideExtreme(high: true))

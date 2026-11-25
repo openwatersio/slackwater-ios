@@ -10,6 +10,23 @@ func activeRuleIDs(_ rules: [AlertRule]) -> Set<UUID> {
     Set(rules.filter(\.enabled).map(\.id))
 }
 
+struct AlertActivityPolicy {
+    let reviewIDs: Set<UUID>
+    let expiryProtected: Set<UUID>
+    let liveRuleIDs: Set<UUID>
+}
+
+func alertActivityPolicy(rules: [AlertRule], reviewCandidates: Set<UUID>, measuredWindows: Set<UUID>,
+                         runningWindows: Set<UUID>, heldWindows: Set<UUID>, threshold: Double) -> AlertActivityPolicy {
+    let active = activeRuleIDs(rules)
+    let running = runningWindows.intersection(active)
+    let currentRules = Set(rules.filter { $0.trigger == .slackWindowOpens }.map(\.id))
+    let offWindows = slackWindowIsOff(threshold) ? running.intersection(currentRules) : []
+    return AlertActivityPolicy(reviewIDs: reviewCandidates.subtracting(running),
+                               expiryProtected: measuredWindows.union(running),
+                               liveRuleIDs: active.subtracting(heldWindows.union(offWindows)))
+}
+
 /// One planned delivery with everything a writer needs.
 struct AlertEntry {
     /// Which station's calendar this belongs in.
@@ -234,13 +251,17 @@ struct AlertStatusSnapshot: Equatable {
         // A preference change can land while the prediction scan is off the main actor.
         // Discard its old result before changing alerts, then resolve the new setting.
         guard threshold == slackThresholdKn else { return false }
-        let reviewIDs = resolved.legacyReview
-        let marked = AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: reviewIDs)
+        // ActivityKit stores absolute times even when the app's debug clock is pinned.
+        let liveWindows = AlertLiveActivities.activeWindowRuleIDs(at: Date())
+        let policy = alertActivityPolicy(rules: storedRules, reviewCandidates: resolved.legacyReview,
+                                         measuredWindows: resolved.activeWindows, runningWindows: liveWindows,
+                                         heldWindows: resolved.heldWindows, threshold: threshold)
+        let marked = AlertRuleStore.shared.markSlackNeedsReview(storedRules, ids: policy.reviewIDs)
         if premium { await AlertNotifications.notifySlackReview(marked, places: resolved.places) }
         let expired = Set(expiredUnchangedRules(storedRules, current: AlertRuleStore.shared.rules,
                                                 now: now, occurrences: resolved.occurrences, unresolved: resolved.unresolved,
                                                 noSlack: resolved.noSlack, heldWindows: resolved.heldWindows,
-                                                activeWindows: resolved.activeWindows))
+                                                activeWindows: policy.expiryProtected))
         for id in expired { AlertRuleStore.shared.remove(id) }
         let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
             .filter { !expired.contains($0.id) }
@@ -272,11 +293,16 @@ struct AlertStatusSnapshot: Equatable {
         // Candidates first: an occurrence the system takes as a scheduled activity is delivered by
         // that activity's start alert, so it leaves the notification list for this run (spec §5.3).
         let kinds = resolved.kinds, stations = resolved.stations
+        let currentLiveRules = AlertRuleStore.shared.rules
+        let unchangedIDs = Set(unchangedResolvedRules(storedRules, current: currentLiveRules).map(\.id))
+        let livePolicy = alertActivityPolicy(rules: currentLiveRules, reviewCandidates: [],
+                                             measuredWindows: [], runningWindows: liveWindows,
+                                             heldWindows: resolved.heldWindows.intersection(unchangedIDs), threshold: threshold)
         let placed = await AlertLiveActivities.apply(
             entries(plan.liveActivities, includeLead: false, includePlace: true),
             water: { kinds[$0] == .tide ? .tide : .current },
             curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
-            liveRuleIDs: activeRuleIDs(AlertRuleStore.shared.rules), imperial: imperial)
+            liveRuleIDs: livePolicy.liveRuleIDs, imperial: imperial)
         await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
                                                includeLead: true, includePlace: true))
 

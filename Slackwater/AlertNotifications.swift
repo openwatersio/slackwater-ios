@@ -11,8 +11,7 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
 }
 
 @MainActor enum AlertNotifications {
-    /// Every request this writer owns. Nothing else in the app schedules notifications, but
-    /// the prefix keeps a replace from ever touching one that isn't ours.
+    /// Limit replacement to scheduled alert requests.
     static let prefix = "alert."
 
     static func authorized() async -> Bool {

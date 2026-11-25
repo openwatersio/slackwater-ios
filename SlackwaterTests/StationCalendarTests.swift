@@ -32,6 +32,21 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
     }
 
+    @MainActor func testResubscribingCancelsPendingCalendarRemoval() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        let id = "current:noaa/test"
+        store.rememberOrphanCalendar("legacy", for: id)
+        store.subscribe(id)
+        XCTAssertTrue(store.orphanedWindowCalendars.isEmpty)
+        XCTAssertEqual(store.calendarIDsForRemoval(id), ["legacy"],
+                       "the old calendar must remain tracked for a later turn-off")
+        store.setCalendarID("new-window", for: id)
+        let restored = StationCalendarStore(defaults: d, successors: [:])
+        XCTAssertEqual(Set(restored.calendarIDsForRemoval(id)), ["legacy", "new-window"])
+        XCTAssertTrue(restored.orphanedWindowCalendars.isEmpty)
+    }
+
     @MainActor func testUnavailableLegacyCalendarIsRetainedAfterUnsubscribe() {
         let d = defaults()
         let id = "current:noaa/test"
