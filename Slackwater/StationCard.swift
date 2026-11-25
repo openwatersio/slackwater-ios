@@ -424,7 +424,8 @@ struct OnlineGateCardView: View {
                 direction: state.direction,
                 speed: state.signed,
                 unit: speedUnit,
-                inWindow: graph.isSlack(at: now)))
+                inWindow: graph.isSlack(at: now),
+                directionUnknown: state.directionUnknown))
         }
     }
 }
@@ -519,7 +520,8 @@ struct CurrentCardView: View {
                     speed: state.signed,
                     unit: speedUnit,
                     tilde: provisional != nil || bounded,
-                    inWindow: graph?.isSlack(at: cardCalculationTime(refreshTime)) ?? false))
+                    inWindow: graph?.isSlack(at: cardCalculationTime(refreshTime)) ?? false,
+                    directionUnknown: state.directionUnknown))
             }
         }
         .task(id: refreshKey) {

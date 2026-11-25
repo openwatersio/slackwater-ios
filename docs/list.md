@@ -167,6 +167,7 @@ Readings describe the moment the card was built (§6.5).
 |---|---|---|
 | Tide | Height: feet to one decimal or metres to two, then " ft" or " m" | "Rising" with a teal (`#2DD4BF`) up-right arrow, or "Falling" with an amber (`#FBBF24`) down-right arrow |
 | Measured current | The water's full speed from SlackwaterKit to one decimal, then "kn", "km/h", or "m/s"; on a station that publishes cross-flow constants it counts the flow across the channel too | A state word, the set as a 16-point compass direction or a three-digit true bearing (Settings), and an arrow rotated to the set. The set is the water's direction from SlackwaterKit, or the published flood or ebb bearing for the speed's sign on a station without cross-flow constants |
+| Measured current with unknown direction | Full speed and unit | A circular rotation symbol; no inferred phase or set |
 | Derived gate | None | The phase word with a forward, back, or slack glyph |
 | Canadian tide preview | Downloaded height, with the ordinary tide state | Additional download status below the identity |
 | Canadian station without readings | None | The download status (§6.3) |

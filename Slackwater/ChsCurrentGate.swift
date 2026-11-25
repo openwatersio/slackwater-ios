@@ -195,8 +195,13 @@ struct ChsOnlineWindow: Codable, Sendable {
             let mid = (lo + hi) / 2
             if times[mid] < t { lo = mid + 1 } else { hi = mid }
         }
-        if times[lo] == t { return speeds[lo] }
-        guard lo > 0, times[lo] - times[lo - 1] <= Self.sampleInterval else { return nil }
+        func directionKnown(_ index: Int) -> Bool {
+            guard hasVectors, let directions, let magnitudes else { return true }
+            return directions[index] != nil || magnitudes[index] == 0
+        }
+        if times[lo] == t { return directionKnown(lo) ? speeds[lo] : nil }
+        guard lo > 0, times[lo] - times[lo - 1] <= Self.sampleInterval,
+              directionKnown(lo - 1), directionKnown(lo) else { return nil }
         let fraction = (t - times[lo - 1]) / (times[lo] - times[lo - 1])
         return speeds[lo - 1] + fraction * (speeds[lo] - speeds[lo - 1])
     }

@@ -393,7 +393,8 @@ func currentCardFace(magnitude: Double, direction: Double?, speed: Double, unit:
     let phase = currentPhase(signed: speed, inWindow: inWindow)
     let set = currentSet(direction: direction, isSlack: phase == .slack, speed: speed, magnitude: magnitude, speedUnit: unit)
     let value = formatSpeed(magnitude, unit: unit)
-    let said = directionUnknown ? "\(value) \(speedUnitLabel(unit))" : "\(value) \(speedUnitLabel(unit)), \(phase == .slack ? "slack" : phase.word)"
+    let noState = ""
+    let said = directionUnknown ? String(localized: "\(noState) \(value) \(spokenUnit(speedUnitLabel(unit)))", comment: "VoiceOver tide or current reading. Values are the tide or current state, a formatted height or speed, and its spoken unit.").trimmingCharacters(in: .whitespacesAndNewlines) : "\(value) \(speedUnitLabel(unit)), \(phase == .slack ? "slack" : phase.word)"
     return CurrentCardFace(value: value, markedSet: magnitude < 0.05 ? nil : set,
                            spoken: set.map { "\(said), setting \(formatSet($0, format: setFormat))" } ?? said)
 }

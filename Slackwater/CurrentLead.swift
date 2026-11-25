@@ -176,7 +176,7 @@ func currentLeadReading(_ state: String, isSlack: Bool, point: CurrentPoint, flo
     let set = setDegrees.map { formatSet($0, format: setFormat) }
     let rotaryUnknown = !isSlack && direction == nil && point.magnitude > 0 &&
         (point.magnitudeIsKnown || rotaryDirectionIsUnknown(speed: point.speed, magnitude: point.magnitude, direction: direction))
-    let words = rotaryUnknown ? "\(value) \(spokenUnit(speedUnitLabel(speedUnit)))" : spokenReading(state, value, unit: speedUnitLabel(speedUnit))
+    let words = rotaryUnknown ? spokenReading("", value, unit: speedUnitLabel(speedUnit)).trimmingCharacters(in: .whitespacesAndNewlines) : spokenReading(state, value, unit: speedUnitLabel(speedUnit))
     return CurrentLeadReading(state: rotaryUnknown ? "" : state, value: value, setDegrees: setDegrees, set: set,
                               tint: isSlack || (setDegrees == nil && !rotaryUnknown) ? .slack : point.speed >= 0 ? .flood : .ebb,
                               spoken: set.map { "\(words) \($0)" } ?? words, rotaryDirectionUnknown: rotaryUnknown)
