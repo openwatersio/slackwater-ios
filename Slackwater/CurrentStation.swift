@@ -252,7 +252,11 @@ func currentPhase(signed: Double, inWindow: Bool) -> CurrentPhase {
     inWindow ? .slack : signed >= 0 ? .flood : .ebb
 }
 
-/// The set a current reading shows, given the water's direction from the kit (the published bearing for its sign on a one-axis point, nil for a zero vector). At `Slack` there is no flood or ebb to point at, so the set shows only while the water still crosses the major axis fast enough to print above zero in `speedUnit`; a one-axis station never crosses, so its slack shows none. The lead, the card, the widget and the watch all ask this.
+func rotaryDirectionIsUnknown(speed: Double, magnitude: Double, direction: Double?) -> Bool {
+    direction == nil && magnitude > abs(speed) + 1e-9
+}
+
+/// A true slack has no set unless its cross-flow prints above zero in the chosen unit.
 func currentSet(direction: Double?, isSlack: Bool, speed: Double, magnitude: Double, speedUnit: String) -> Double? {
     guard isSlack else { return direction }
     let crossing = max(0, magnitude * magnitude - speed * speed).squareRoot()

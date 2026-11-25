@@ -308,7 +308,7 @@ struct ConditionsItem: View {
                     // The number never truncates; a tight row loses the set's words.
                     value.layoutPriority(1)
                     if slack { Text("Slack").font(.caption).foregroundStyle(tint) }
-                    set(deg: face.markedSet, tint: tint, font: .caption, arrowFirst: true)
+                    set(deg: face.markedSet, rotaryUnknown: !slack && rotaryDirectionIsUnknown(speed: speed, magnitude: magnitude, direction: direction), tint: tint, font: .caption, arrowFirst: true)
                 }
                 .lineLimit(1)
                 .accessibilityElement(children: .combine)
@@ -321,7 +321,7 @@ struct ConditionsItem: View {
                     // testSlackIsGreenWhereverItAppears.
                     Text(slack ? "Slack" : phase.word).font(.caption2)
                         .foregroundStyle(slack ? tint : SN.foam.opacity(0.6))
-                    set(deg: face.markedSet, tint: tint, font: .caption2, arrowFirst: false)
+                    set(deg: face.markedSet, rotaryUnknown: !slack && rotaryDirectionIsUnknown(speed: speed, magnitude: magnitude, direction: direction), tint: tint, font: .caption2, arrowFirst: false)
                 }
             }
         case .gate(let phase):
@@ -338,7 +338,7 @@ struct ConditionsItem: View {
     /// The set: cardinal and bearing arrow, or a neutral mark of the same
     /// footprint where the reading marks none (`CurrentCardFace.markedSet`).
     @ViewBuilder
-    private func set(deg: Double?, tint: Color, font: Font, arrowFirst: Bool) -> some View {
+    private func set(deg: Double?, rotaryUnknown: Bool, tint: Color, font: Font, arrowFirst: Bool) -> some View {
         if let deg {
             Group {
                 if arrowFirst {
@@ -358,6 +358,8 @@ struct ConditionsItem: View {
                     }
                 }
             }.font(font).foregroundStyle(tint)
+        } else if rotaryUnknown {
+            Image(systemName: "arrow.triangle.2.circlepath").font(font).foregroundStyle(tint)
         } else {
             Text(verbatim: "•").font(font).foregroundStyle(SN.foam.opacity(0.6))
                 .frame(width: 30)

@@ -160,7 +160,11 @@ struct CurrentLeadReading: Equatable {
     /// The lead in words: the state, the speed with its unit written out, then the set where one is shown.
     let spoken: String
 
-    var glyph: String { setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up" }
+    var rotaryDirectionUnknown = false
+    var glyph: String {
+        if rotaryDirectionUnknown { return "arrow.triangle.2.circlepath" }
+        return setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up"
+    }
 }
 
 /// The value is the water's full speed and the set its direction. A one-axis point takes the published flood or ebb bearing for its sign through the kit, and a zero vector has no set. At `Slack` the lead points only at water still crossing the major axis fast enough to print above zero, in the go colour (`currentSet`); a one-axis station never crosses, so its slack keeps the slack glyph.
@@ -170,10 +174,11 @@ func currentLeadReading(_ state: String, isSlack: Bool, point: CurrentPoint, flo
     let setDegrees = currentSet(direction: direction, isSlack: isSlack, speed: point.speed,
                                 magnitude: point.magnitude, speedUnit: speedUnit)
     let set = setDegrees.map { formatSet($0, format: setFormat) }
+    let rotaryUnknown = !isSlack && rotaryDirectionIsUnknown(speed: point.speed, magnitude: point.magnitude, direction: direction)
     let words = spokenReading(state, value, unit: speedUnitLabel(speedUnit))
     return CurrentLeadReading(state: state, value: value, setDegrees: setDegrees, set: set,
-                              tint: isSlack || setDegrees == nil ? .slack : point.speed >= 0 ? .flood : .ebb,
-                              spoken: set.map { "\(words) \($0)" } ?? words)
+                              tint: isSlack || (setDegrees == nil && !rotaryUnknown) ? .slack : point.speed >= 0 ? .flood : .ebb,
+                              spoken: set.map { "\(words) \($0)" } ?? words, rotaryDirectionUnknown: rotaryUnknown)
 }
 
 /// The scrub card both current details draw: the strip, the lead overlaid on
