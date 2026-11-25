@@ -280,6 +280,7 @@ struct CurrentCardState {
     let magnitude: Double
     /// Where the water is going, the published bearing for its sign on a one-axis station; nil for a zero vector.
     let direction: Double?
+    let directionUnknown: Bool
     let next: CurrentEvent?
 
     /// The card's reading of `point`, whose set falls back to `flood` or `ebb` by its sign through the kit.
@@ -287,6 +288,8 @@ struct CurrentCardState {
         signed = point.speed
         magnitude = point.magnitude
         direction = [point].vector(at: point.time, flood: flood, ebb: ebb)?.direction
+        directionUnknown = direction == nil && point.magnitude > 0 &&
+            (point.magnitudeIsKnown || point.magnitude > abs(point.speed) + 1e-9)
         self.next = next
     }
 }

@@ -150,11 +150,11 @@ struct ChsOnlineWindow: Codable, Sendable {
     let speeds: [Double]       // signed kn along the flood axis (project())
     // Optional for decoding older files; production readers refetch axis-only blocks.
     var magnitudes: [Double]? = nil
-    var directions: [Double]? = nil
+    var directions: [Double?]? = nil
 
     init(axisOnly: Bool = false, stationID: String, iwlsName: String, timezone: String, fetchedAt: Date,
          start: Date, end: Date, floodDirection: Double, ebbDirection: Double,
-         times: [Double], speeds: [Double], magnitudes: [Double]? = nil, directions: [Double]? = nil) {
+         times: [Double], speeds: [Double], magnitudes: [Double]? = nil, directions: [Double?]? = nil) {
         self.stationID = stationID; self.iwlsName = iwlsName; self.timezone = timezone
         self.fetchedAt = fetchedAt; self.start = start; self.end = end
         self.floodDirection = floodDirection; self.ebbDirection = ebbDirection
@@ -166,15 +166,17 @@ struct ChsOnlineWindow: Codable, Sendable {
     var hasVectors: Bool {
         guard let magnitudes, let directions, magnitudes.count == times.count,
               directions.count == times.count, speeds.count == times.count else { return false }
-        return magnitudes.allSatisfy { $0.isFinite && $0 >= 0 } && directions.allSatisfy(\.isFinite)
+        return magnitudes.allSatisfy { $0.isFinite && $0 >= 0 } && directions.allSatisfy { $0?.isFinite ?? true }
     }
 
     var points: [CurrentPoint] {
         let vector = hasVectors
         return zip(times.indices, zip(times, speeds)).map { index, pair in
-            CurrentPoint(time: Date(timeIntervalSince1970: pair.0), speed: pair.1,
-                         magnitude: vector ? magnitudes?[index] : nil,
-                         direction: vector ? directions?[index] : nil)
+            let magnitude = vector ? magnitudes?[index] : nil
+            let direction = vector ? directions?[index] : nil
+            return CurrentPoint(time: Date(timeIntervalSince1970: pair.0), speed: pair.1,
+                                magnitude: magnitude, direction: direction,
+                                magnitudeIsKnown: vector && direction == nil && (magnitude ?? 0) > 0)
         }
     }
 
@@ -231,7 +233,7 @@ struct ChsOnlineWindow: Codable, Sendable {
             floodDirection: other.floodDirection, ebbDirection: other.ebbDirection,
             times: kept.map(\.key), speeds: kept.map { $0.value.0 },
             magnitudes: hasVectors ? kept.map { $0.value.1! } : nil,
-            directions: hasVectors ? kept.map { $0.value.2! } : nil)
+            directions: hasVectors ? kept.map { $0.value.2 } : nil)
     }
 
     /// This window with everything before `cut` dropped — nil when nothing

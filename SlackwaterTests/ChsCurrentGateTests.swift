@@ -268,13 +268,18 @@ final class ChsCurrentGateTests: XCTestCase {
         let filled = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
         XCTAssertEqual(filled.projected.map(\.t), [0, 900_000, 1_800_000])
         XCTAssertEqual(filled.magnitudes[1], 2, accuracy: 1e-9)
-        XCTAssertLessThan(min(filled.directions[1], 360 - filled.directions[1]), 1e-9)
+        let filledDirection = try XCTUnwrap(filled.directions[1])
+        XCTAssertLessThan(min(filledDirection, 360 - filledDirection), 1e-9)
         XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<3])
         let wide = ChsFitService.fillSingleOnlineGaps(projected: [samples[0], ChsSample(t: 2_700_000, v: 1)],
                                                         magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
         XCTAssertEqual(wide.projected.count, 2)
         let opposing = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [0, 180], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
-        XCTAssertEqual(opposing.projected.count, 2)
+        XCTAssertEqual(opposing.projected.count, 3)
+        if opposing.projected.count == 3 {
+            XCTAssertEqual(opposing.magnitudes[1], 2)
+            XCTAssertNil(opposing.directions[1] as Double?)
+        }
         let missingSpeed = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
         XCTAssertEqual(missingSpeed.projected.count, 2)
     }
@@ -294,6 +299,35 @@ final class ChsCurrentGateTests: XCTestCase {
                                      magnitudes: filled.magnitudes, directions: filled.directions)
         XCTAssertFalse(window.events(from: window.start, to: window.end).contains { $0.kind == .slack })
         XCTAssertTrue(currentWindows(window.points, events: [], threshold: 0.5).isEmpty)
+    }
+
+    func testMissingDirectionAtReversalKeepsSpeedWithoutClaimingSlack() throws {
+        let start = Date(timeIntervalSince1970: 1_767_225_600)
+        let base = start.timeIntervalSince1970 * 1000
+        let raw = [ChsSample(t: base, v: -1), ChsSample(t: base + 1_800_000, v: 1)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw, magnitudes: [2, 2], directions: [180, 0],
+                                                       measuredSpeeds: [ChsSample(t: base + 900_000, v: 2)], flood: 0)
+        let id = "chs-unknown-direction-\(UUID().uuidString)"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: start, end: start.addingTimeInterval(1800), floodDirection: 0, ebbDirection: 180,
+                                     times: filled.projected.map { $0.t / 1000 }, speeds: filled.projected.map(\.v),
+                                     magnitudes: filled.magnitudes, directions: filled.directions)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(window)
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline(id)?.blocks.first)
+        let midpoint = start.addingTimeInterval(900)
+        let point = try XCTUnwrap(loaded.speeds(from: midpoint, to: midpoint, step: 1).first)
+        XCTAssertEqual(point.magnitude, 2, accuracy: 1e-9)
+        XCTAssertNil(point.direction)
+        XCTAssertTrue(point.magnitudeIsKnown)
+        let crossing = CurrentEvent(time: midpoint, speed: 0, kind: .slack)
+        XCTAssertNotEqual(readCurrent(at: midpoint, timeline: loaded.points, events: [crossing], flood: 0, ebb: 180)?.state, .slack)
+        XCTAssertTrue(currentWindows(loaded.points, events: [crossing], threshold: 0.5).isEmpty)
+        XCTAssertFalse(sampleEvents(loaded.points).contains { $0.kind == .slack })
+        XCTAssertTrue(sampleEvents(loaded.points).contains { $0.time == start })
+        let reading = currentLeadReading("Flooding", isSlack: false, point: point, floodDeg: 0, ebbDeg: 180, speedUnit: "kn", setFormat: "compass")
+        XCTAssertEqual(reading.glyph, "arrow.triangle.2.circlepath")
+        XCTAssertTrue(reading.state.isEmpty)
     }
 
     func testOnlineRunsPreserveSamplesOnBothSidesOfGap() throws {

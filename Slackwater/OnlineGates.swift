@@ -37,32 +37,32 @@ extension ChsFitService {
         return (projected, magnitudes, directions)
     }
 
-    /// Fill one missing prediction only when neighboring vectors have an unambiguous direction.
+    /// Fill a single missing direction only when its speed was measured.
     nonisolated static func fillSingleOnlineGaps(
         projected: [ChsSample], magnitudes: [Double], directions: [Double],
         measuredSpeeds: [ChsSample], flood: Double
-    ) -> (projected: [ChsSample], magnitudes: [Double], directions: [Double]) {
+    ) -> (projected: [ChsSample], magnitudes: [Double], directions: [Double?]) {
         guard projected.count == magnitudes.count, projected.count == directions.count else {
-            return (projected, magnitudes, directions)
+            return (projected, magnitudes, directions.map { Optional($0) })
         }
         let validSpeeds = measuredSpeeds.filter { $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite && $0.v >= 0 }
         let byTime = Dictionary(validSpeeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { first, _ in first })
-        var samples: [ChsSample] = [], speeds: [Double] = [], bearings: [Double] = []
+        var samples: [ChsSample] = [], speeds: [Double] = [], bearings: [Double?] = []
         for i in projected.indices {
             if i > 0, projected[i].t - projected[i - 1].t == 2 * ChsOnlineWindow.sampleInterval * 1000 {
-                let a = directions[i - 1] * .pi / 180, b = directions[i] * .pi / 180
-                // A turn of 90° or more cannot establish the missing direction safely.
-                if cos(a - b) > 0 {
+                let midpoint = (projected[i - 1].t + projected[i].t) / 2
+                if let magnitude = byTime[Int64(midpoint.rounded())] {
+                    let a = directions[i - 1] * .pi / 180, b = directions[i] * .pi / 180
                     let east = (magnitudes[i - 1] * sin(a) + magnitudes[i] * sin(b)) / 2
                     let north = (magnitudes[i - 1] * cos(a) + magnitudes[i] * cos(b)) / 2
-                    let interpolated = hypot(east, north)
-                    let midpoint = (projected[i - 1].t + projected[i].t) / 2
-                    if interpolated > 1e-9, let magnitude = byTime[Int64(midpoint.rounded())] {
-                        let bearing = (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
-                        samples.append(ChsSample(t: midpoint, v: magnitude * cos((bearing - flood) * .pi / 180)))
-                        speeds.append(magnitude)
-                        bearings.append(bearing)
-                    }
+                    let bearing: Double? = cos(a - b) > 0 && hypot(east, north) > 1e-9
+                        ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
+                    let estimate = (projected[i - 1].v + projected[i].v) / 2
+                    let signed = bearing.map { magnitude * cos(($0 - flood) * .pi / 180) }
+                        ?? max(-magnitude, min(magnitude, estimate))
+                    samples.append(ChsSample(t: midpoint, v: signed))
+                    speeds.append(magnitude)
+                    bearings.append(bearing)
                 }
             }
             samples.append(projected[i]); speeds.append(magnitudes[i]); bearings.append(directions[i])

@@ -248,7 +248,7 @@ private struct StationCardPlaceholder: View {
 struct ConditionsItem: View {
     enum Reading {
         case tide(CardState, imperial: Bool)
-        case current(magnitude: Double, direction: Double?, speed: Double, unit: String, tilde: Bool = false, inWindow: Bool = false)
+        case current(magnitude: Double, direction: Double?, speed: Double, unit: String, tilde: Bool = false, inWindow: Bool = false, directionUnknown: Bool = false)
         case gate(DerivedPhase)
     }
     let reading: Reading
@@ -287,12 +287,13 @@ struct ConditionsItem: View {
                 }
             }
 
-        case .current(let magnitude, let direction, let speed, let unit, let tilde, let inWindow):
+        case .current(let magnitude, let direction, let speed, let unit, let tilde, let inWindow, let directionUnknown):
             // Always the speed and the set (current-charts §15.2): a pill
             // states a phase without either.
             let phase = reading.currentWord ?? .flood
             let slack = phase == .slack
-            let face = currentCardFace(magnitude: magnitude, direction: direction, speed: speed, unit: unit, inWindow: inWindow, setFormat: setFormat)
+            let unknown = !slack && (directionUnknown || rotaryDirectionIsUnknown(speed: speed, magnitude: magnitude, direction: direction))
+            let face = currentCardFace(magnitude: magnitude, direction: direction, speed: speed, unit: unit, inWindow: inWindow, setFormat: setFormat, directionUnknown: unknown)
             let value = (Text((tilde ? "~" : "") + face.value)
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(speedUnitLabel(unit))")
@@ -302,13 +303,13 @@ struct ConditionsItem: View {
             // the word demotes to a dimmer label. "Slack" wears the go
             // colour — the same meaning it has everywhere else, and the
             // colour of a set still crossing at a slack.
-            let tint = tilde ? SN.amber : slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
+            let tint = tilde ? SN.amber : unknown ? SN.foam : slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
             if compact {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     // The number never truncates; a tight row loses the set's words.
                     value.layoutPriority(1)
                     if slack { Text("Slack").font(.caption).foregroundStyle(tint) }
-                    set(deg: face.markedSet, rotaryUnknown: !slack && rotaryDirectionIsUnknown(speed: speed, magnitude: magnitude, direction: direction), tint: tint, font: .caption, arrowFirst: true)
+                    set(deg: face.markedSet, rotaryUnknown: unknown, tint: tint, font: .caption, arrowFirst: true)
                 }
                 .lineLimit(1)
                 .accessibilityElement(children: .combine)
@@ -319,9 +320,11 @@ struct ConditionsItem: View {
                     // The word stays neutral like the detail lead's; only the
                     // arrow speaks the phase colour. Slack keeps SN.go —
                     // testSlackIsGreenWhereverItAppears.
-                    Text(slack ? "Slack" : phase.word).font(.caption2)
-                        .foregroundStyle(slack ? tint : SN.foam.opacity(0.6))
-                    set(deg: face.markedSet, rotaryUnknown: !slack && rotaryDirectionIsUnknown(speed: speed, magnitude: magnitude, direction: direction), tint: tint, font: .caption2, arrowFirst: false)
+                    if !unknown {
+                        Text(slack ? "Slack" : phase.word).font(.caption2)
+                            .foregroundStyle(slack ? tint : SN.foam.opacity(0.6))
+                    }
+                    set(deg: face.markedSet, rotaryUnknown: unknown, tint: tint, font: .caption2, arrowFirst: false)
                 }
             }
         case .gate(let phase):
@@ -370,7 +373,7 @@ struct ConditionsItem: View {
 extension ConditionsItem.Reading {
     /// Slack only on a mark the curve draws green (current-charts §6.1, §15.2), as the detail lead and the complication say it.
     var currentWord: CurrentPhase? {
-        guard case .current(_, _, let speed, _, _, let inWindow) = self else { return nil }
+        guard case .current(_, _, let speed, _, _, let inWindow, _) = self else { return nil }
         return currentPhase(signed: speed, inWindow: inWindow)
     }
 }
@@ -386,11 +389,11 @@ struct CurrentCardFace: Equatable {
 }
 
 /// The set is the lead's (`currentSet`). Under 0.05 kn of water the arrow gives way to a neutral mark of the same footprint so the header never resizes, though the label still speaks the set.
-func currentCardFace(magnitude: Double, direction: Double?, speed: Double, unit: String, inWindow: Bool, setFormat: String) -> CurrentCardFace {
+func currentCardFace(magnitude: Double, direction: Double?, speed: Double, unit: String, inWindow: Bool, setFormat: String, directionUnknown: Bool = false) -> CurrentCardFace {
     let phase = currentPhase(signed: speed, inWindow: inWindow)
     let set = currentSet(direction: direction, isSlack: phase == .slack, speed: speed, magnitude: magnitude, speedUnit: unit)
     let value = formatSpeed(magnitude, unit: unit)
-    let said = "\(value) \(speedUnitLabel(unit)), \(phase == .slack ? "slack" : phase.word)"
+    let said = directionUnknown ? "\(value) \(speedUnitLabel(unit))" : "\(value) \(speedUnitLabel(unit)), \(phase == .slack ? "slack" : phase.word)"
     return CurrentCardFace(value: value, markedSet: magnitude < 0.05 ? nil : set,
                            spoken: set.map { "\(said), setting \(formatSet($0, format: setFormat))" } ?? said)
 }

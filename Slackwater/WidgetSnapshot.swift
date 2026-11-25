@@ -120,7 +120,7 @@ struct WidgetCard {
             let countdownEnd = inside.flatMap { $0.end.timeIntervalSince(now) <= 7_200 ? $0.end : nil }
             return .init(name: r.name, region: r.region,
                          reading: .current(magnitude: state.magnitude, direction: state.direction, speed: state.signed,
-                                           unit: speedUnit, inWindow: graph.isSlack(at: now)),
+                                           unit: speedUnit, inWindow: graph.isSlack(at: now), directionUnknown: state.directionUnknown),
                          graph: graph, nextSlack: nil,
                          locationMark: locationMark, countdownEnd: countdownEnd)
         case .derived(let r):

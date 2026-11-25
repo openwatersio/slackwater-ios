@@ -197,13 +197,25 @@ extension ChsOnlineWindow: CurrentPredicting {
                 let fraction = (time - times[index - 1]) / span
                 let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
                 if vectorAvailable, let magnitudes, let directions {
-                    let a = directions[index - 1] * .pi / 180, b = directions[index] * .pi / 180
-                    let east = magnitudes[index - 1] * sin(a) * (1 - fraction) + magnitudes[index] * sin(b) * fraction
-                    let north = magnitudes[index - 1] * cos(a) * (1 - fraction) + magnitudes[index] * cos(b) * fraction
-                    let magnitude = hypot(east, north)
-                    let direction = magnitude > 0 ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
+                    let magnitude: Double
+                    let direction: Double?
+                    if fraction == 0 {
+                        magnitude = magnitudes[index - 1]; direction = directions[index - 1]
+                    } else if fraction == 1 {
+                        magnitude = magnitudes[index]; direction = directions[index]
+                    } else if let a = directions[index - 1], let b = directions[index] {
+                        let ar = a * .pi / 180, br = b * .pi / 180
+                        let east = magnitudes[index - 1] * sin(ar) * (1 - fraction) + magnitudes[index] * sin(br) * fraction
+                        let north = magnitudes[index - 1] * cos(ar) * (1 - fraction) + magnitudes[index] * cos(br) * fraction
+                        magnitude = hypot(east, north)
+                        direction = magnitude > 0 ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
+                    } else {
+                        magnitude = magnitudes[index - 1] + (magnitudes[index] - magnitudes[index - 1]) * fraction
+                        direction = nil
+                    }
                     result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value,
-                                               magnitude: magnitude, direction: direction))
+                                               magnitude: magnitude, direction: direction,
+                                               magnitudeIsKnown: direction == nil && magnitude > 0))
                 } else {
                     result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
                 }

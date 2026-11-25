@@ -426,7 +426,7 @@ import SlackwaterKit
         XCTAssertEqual(unknownReading.value, "1.5")
         XCTAssertNil(unknownReading.setDegrees)
         XCTAssertEqual(unknownReading.tint, .flood)
-        XCTAssertEqual(unknownReading.spoken, "Flooding 1.5 knots")
+        XCTAssertEqual(unknownReading.spoken, "1.5 knots")
         XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading.glyph, "arrow.triangle.2.circlepath")
         XCTAssertEqual(lead(scrub: at(1000), signed: 0).reading,
                        reading("Flooding", "0.0", set: nil, nil, tint: .slack, spoken: "Flooding 0.0 knots"),

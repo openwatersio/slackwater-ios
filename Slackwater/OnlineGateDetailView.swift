@@ -277,7 +277,8 @@ struct OnlineGateDetailView: View {
     /// for that week yet, so there is nothing to apologise for. If they do
     /// land there and it is missing, `applyAnchor` below says so properly.
     private func prefetchNextBlock() {
-        guard let window, net.online, fetchState != .fetching else { return }
+        guard let window, net.online, fetchState != .fetching,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         let from = prefetchAnchor(after: window, tz: tz)
         ChsFitService.startOnlineWork(for: gate) { _ = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
     }
@@ -288,7 +289,10 @@ struct OnlineGateDetailView: View {
     private func applyAnchor() {
         if let block = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) { window = block }
         rebuild()
-        if timeline == nil, net.online { fetchNow(from: anchor) }
+        if timeline == nil, net.online {
+            if ChsFitService.shared.onlineCooldownActive(gate.id) { _ = ChsFitService.shared.prepareOnlineUpdate(gate) }
+            fetchNow(from: anchor)
+        }
     }
 
     /// A scrub settled at the strip's end. A stored block moves the window at
@@ -323,7 +327,8 @@ struct OnlineGateDetailView: View {
     /// Twice at most: the first call joins any fetch already in flight (the
     /// picker's prefetch), which may be for a different block.
     private func fetchPending() {
-        guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
+        guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         if landIfCovered(next, fetched: window) { return }
         pendingFetchAnchor = next
         ChsFitService.startOnlineWork(for: gate) {
@@ -347,7 +352,8 @@ struct OnlineGateDetailView: View {
     /// identical card, with no way out but the back button. (Named `from`, not
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
-        guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
+        guard ChsFitService.shared.onlineState(gate.id) != .fetching,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         requestedFrom = from
         ChsFitService.startOnlineWork(for: gate) {
             if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {

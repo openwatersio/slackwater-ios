@@ -190,5 +190,11 @@ func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
         }
     }
     closeRun(points.count - 1)
-    return events.sorted { $0.time < $1.time }
+    let uncertainSpans = points.indices.compactMap { index -> ClosedRange<Date>? in
+        let point = points[index]
+        guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > 0 else { return nil }
+        return points[max(0, index - 1)].time...points[min(points.count - 1, index + 1)].time
+    }
+    return events.filter { event in !uncertainSpans.contains { $0.lowerBound < event.time && event.time < $0.upperBound } }
+        .sorted { $0.time < $1.time }
 }

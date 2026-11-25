@@ -302,7 +302,7 @@ import SlackwaterKit
 
         let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
         let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
-        if case .current(_, _, _, _, _, let slack) = card.reading {
+        if case .current(_, _, _, _, _, let slack, _) = card.reading {
             XCTAssertFalse(slack, "an hour before the window closes the water is moving, though the countdown runs")
         } else {
             XCTFail("expected a .current reading")
@@ -403,7 +403,7 @@ import SlackwaterKit
 
     /// A current card's reading as it prints and speaks: the word, the value, the set it shows (`•` where the neutral mark stands) and the spoken label.
     private func face(_ reading: ConditionsItem.Reading) -> [String] {
-        guard case .current(let magnitude, let direction, let speed, let unit, _, let inWindow) = reading,
+        guard case .current(let magnitude, let direction, let speed, let unit, _, let inWindow, _) = reading,
               let phase = reading.currentWord else { return [] }
         let f = currentCardFace(magnitude: magnitude, direction: direction, speed: speed, unit: unit,
                                 inWindow: inWindow, setFormat: "compass")

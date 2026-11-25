@@ -254,6 +254,24 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testTransientFailuresDoNotUseTheIncompleteRetryBudget() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<2 { service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: t0) }
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+            if case .deferred = service.onlineState(gate.id, at: t0) {} else { XCTFail("Incomplete responses get their own retries") }
+        }
+        service.noteOnlineFailure(gate.id, error: "offline again", permanent: false, at: t0)
+        service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+        XCTAssertTrue(service.onlineCooldownActive(gate.id, at: t0))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        XCTAssertFalse(service.onlineCooldownActive(gate.id, at: t0), "A manual retry clears the cooldown")
+    }
+
+    @MainActor
     func testIncompleteRetryDeadlineSurvivesServiceRestart() throws {
         let original = ChsFitService()
         original.resetOnlineStateForTesting()

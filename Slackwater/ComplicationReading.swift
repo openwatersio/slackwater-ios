@@ -94,12 +94,13 @@ struct ComplicationReading: Equatable {
             let off = slackWindowIsOff(slackThresholdKn)
             let runs = off ? slacks.map { hours($0)...hours($0) } : windows
             let phase = currentPhase(signed: point.speed, inWindow: readsSlack(at: now, runs: cores, slacks: slacks))
-            let symbol = phase == .slack ? "arrow.left.arrow.right"
+            let unknown = point.magnitudeIsKnown && point.direction == nil && point.magnitude > 0
+            let symbol = unknown ? "arrow.triangle.2.circlepath" : phase == .slack ? "arrow.left.arrow.right"
                 : phase == .flood ? "arrow.up.right" : "arrow.down.right"
             // The value is the water's full speed; the word and symbol keep the major axis's phase.
             return ComplicationReading(
                 kind: .current, valueText: formatSpeed(point.magnitude, unit: speedUnit),
-                word: phase.word,
+                word: unknown ? "" : phase.word,
                 symbol: symbol,
                 samples: samples,
                 slackRuns: runs.filter { $0.overlaps(span) },
