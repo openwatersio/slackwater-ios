@@ -16,6 +16,10 @@ let networkKillSwitch: Bool = {
     return CommandLine.arguments.contains("-networkKillSwitch")
 }()
 
+func legacyOnlineNeedsRefresh(vector: ChsOnlineStore?, legacy: ChsOnlineStore?, today: Date) -> Bool {
+    vector?.block(covering: today) == nil && legacy?.blocks.contains { $0.end >= today } == true
+}
+
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.
 enum ChsState {
@@ -324,8 +328,13 @@ final class ChsFitService: ObservableObject {
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
         for gate in ChsCurrentGateInfo.all where gate.isOnline && !cancelledDownloads.contains(gate.id)
-            && files.contains(gate.id + "-online.json") && ChsModelStore.loadLegacyOnline(gate.id) != nil {
-            onlineDesired[gate.id] = gate
+            && files.contains(gate.id + "-online.json") {
+            let today = todayLocal(gate.tz)
+            let vector = ChsModelStore.loadOnline(gate.id)
+            let legacy = ChsModelStore.loadLegacyOnline(gate.id)
+            if legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: today) {
+                onlineDesired[gate.id] = gate
+            }
         }
         #if os(iOS)
         Self.invalidateCurrentCalendars(in: files)

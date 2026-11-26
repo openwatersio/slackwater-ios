@@ -523,6 +523,26 @@ final class ChsCurrentGateTests: XCTestCase {
                      "a deleted file is gone immediately, never served from the memo")
     }
 
+    func testLegacyOnlineReaderSharesTheFileCache() throws {
+        let id = "chs-legacy-cache-\(UUID().uuidString)"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1])
+        try ChsModelStore.saveOnline(window, retainingFrom: window.start)
+        let url = ChsModelStore.onlineUrl(id)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let stamp = Date(timeIntervalSince1970: 1_000_000)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadOnline(id))
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.first?.speeds, [1, -1])
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        try Data(repeating: 0x7B, count: size).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.first?.speeds, [1, -1])
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadLegacyOnline(id))
+    }
+
     func testOnlineWindowCoversStrip() throws {
         let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
         var cal = Calendar(identifier: .gregorian)

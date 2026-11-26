@@ -39,6 +39,22 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertNotNil(service.queue.job("chs-johnstone-strait-central"), "unchecking bulk work must keep the earlier automatic download")
     }
 
+    func testLegacyRefreshOnlyWhenCurrentVectorIsMissing() {
+        let today = dayLocal(t0, TimeZone(secondsFromGMT: 0)!)
+        let span = Timeline.window(anchor: today)
+        func window(start: Date, end: Date, vector: Bool) -> ChsOnlineWindow {
+            ChsOnlineWindow(axisOnly: vector, stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: today,
+                            start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, -1])
+        }
+        let legacy = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start, end: span.end, vector: false)])
+        let vector = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start, end: span.end, vector: true)])
+        let expired = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start.addingTimeInterval(-86_400), end: today.addingTimeInterval(-1), vector: false)])
+        XCTAssertTrue(legacyOnlineNeedsRefresh(vector: nil, legacy: legacy, today: today))
+        XCTAssertFalse(legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: today))
+        XCTAssertFalse(legacyOnlineNeedsRefresh(vector: nil, legacy: expired, today: today))
+    }
+
     @MainActor
     func testCompletedOnlineRequestsDoNotBecomeRefreshSubscriptions() throws {
         let markers = savedDownloadMarkers()

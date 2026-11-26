@@ -383,7 +383,11 @@ struct ChsCurrentGateCardView: View {
         if let block = onlineStore?.block(covering: today) {
             OnlineGateCardView(gate: gate, window: block, km: km)
         } else if let speed = legacyOnlineStore?.blocks.lazy.compactMap({ $0.signedSpeed(at: cardCalculationTime(refreshTime)) }).first {
-            StationCard(name: gate.name, region: gate.region, km: km) {
+            let fetchState = service.onlineState(gate.id)
+            let status = onlineGateStatus(nil, online: net.online, state: fetchState, position: service.onlinePosition(gate.id))
+            StationCard(name: gate.name, region: gate.region, km: km,
+                        status: status == .notQueued ? nil : status, usableWhileDownloading: true,
+                        statusDetail: onlineCardDownloadLabel(state: fetchState, position: service.onlinePosition(gate.id))) {
                 LegacyAxisReading(speed: speed)
             }
         } else {
@@ -419,7 +423,8 @@ struct LegacyAxisReading: View {
                 .font(.headline.monospacedDigit())
                 .foregroundStyle(.white)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(String(localized: "Approximate axis speed")) \(formatSpeed(abs(speed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))")
     }
 }
 

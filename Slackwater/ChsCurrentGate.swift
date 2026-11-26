@@ -85,53 +85,46 @@ extension ChsModelStore {
     /// exists. A file that fails both decodes is cached as nil, so a bad file
     /// (a newer schema after a downgrade) costs one decode until it changes.
     static func loadOnline(_ stationID: String) -> ChsOnlineStore? {
+        onlineParts(stationID)?.vector
+    }
+
+    /// Axis-only downloads stay separate from predictions that establish full speed.
+    static func loadLegacyOnline(_ stationID: String) -> ChsOnlineStore? {
+        onlineParts(stationID)?.legacy
+    }
+
+    private static func onlineParts(_ stationID: String) -> (vector: ChsOnlineStore?, legacy: ChsOnlineStore?)? {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: onlineUrl(stationID).path),
               let mtime = attrs[.modificationDate] as? Date,
               let size = attrs[.size] as? Int else { return nil }
         onlineCacheLock.lock()
         defer { onlineCacheLock.unlock() }
-        if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size { return hit.store }
-        // A read can fail and then succeed with the file unchanged (data
-        // protection before first unlock, in the widget), so only a decode
-        // failure is cached.
-        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
-        let decoder = JSONDecoder()
-        let store: ChsOnlineStore?
-        if let s = try? decoder.decode(ChsOnlineStore.self, from: data) {
-            store = s
-        } else if let legacy = try? decoder.decode(ChsOnlineWindow.self, from: data) {
-            store = ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
-        } else {
-            store = nil
+        if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size {
+            return (hit.vector, hit.legacy)
         }
-        // Axis-only online caches cannot establish true slack; refetch them.
-        let vectorStore = store.map { ChsOnlineStore(stationID: $0.stationID, blocks: $0.blocks.filter(\.hasVectors)) }
-        let usable = vectorStore.flatMap { $0.blocks.isEmpty ? nil : $0 }
-        onlineCache[stationID] = (mtime, size, usable)
-        return usable
-    }
-
-    /// Older downloads contain only the signed station-axis component. They are
-    /// kept separate from full-vector predictions so they cannot create slack windows.
-    static func loadLegacyOnline(_ stationID: String) -> ChsOnlineStore? {
+        // A protected file can become readable without changing its metadata.
         guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
         let decoder = JSONDecoder()
-        let store = (try? decoder.decode(ChsOnlineStore.self, from: data))
+        let decoded = (try? decoder.decode(ChsOnlineStore.self, from: data))
             ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
                 ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
             }
-        guard let store, store.stationID == stationID else { return nil }
-        let blocks = store.blocks.filter {
+        let store = decoded.flatMap { $0.stationID == stationID ? $0 : nil }
+        let vectors = store?.blocks.filter(\.hasVectors) ?? []
+        let legacy = store?.blocks.filter {
             $0.stationID == stationID && !$0.hasVectors && $0.times.count > 1
                 && $0.times.count == $0.speeds.count
                 && $0.times.allSatisfy(\.isFinite) && $0.speeds.allSatisfy(\.isFinite)
                 && zip($0.times, $0.times.dropFirst()).allSatisfy { pair in pair.0 < pair.1 }
-        }
-        return blocks.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: blocks)
+        } ?? []
+        let fullStore = vectors.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: vectors)
+        let legacyStore = legacy.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: legacy)
+        onlineCache[stationID] = (mtime, size, fullStore, legacyStore)
+        return (fullStore, legacyStore)
     }
 
     // Every access holds onlineCacheLock, including decoding and replacement.
-    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore?)] = [:]
+    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, vector: ChsOnlineStore?, legacy: ChsOnlineStore?)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 
