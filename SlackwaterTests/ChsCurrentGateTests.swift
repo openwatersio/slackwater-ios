@@ -385,6 +385,17 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertNotNil(ChsModelStore.loadOnline(id))
     }
 
+    func testEventDetectionPerformanceForAYearOfSamples() {
+        let points = (0..<35_040).map { index in
+            let speed = 3 * sin(Double(index) * .pi / 25)
+            let unknown = index % 97 == 0
+            return CurrentPoint(time: Date(timeIntervalSince1970: Double(index) * 900), speed: speed,
+                                magnitude: abs(speed), direction: unknown ? nil : (speed >= 0 ? 0 : 180),
+                                magnitudeIsKnown: unknown && speed != 0)
+        }
+        measure { XCTAssertFalse(sampleEvents(points).isEmpty) }
+    }
+
     func testUnknownFasterCurrentDoesNotProduceAFalseAdjacentPeak() {
         let values: [Double] = [1, 2, 0, 2, 1]
         let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,

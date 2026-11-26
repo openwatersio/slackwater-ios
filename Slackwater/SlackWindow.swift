@@ -151,6 +151,10 @@ func slackAxisMoments(windows: [WindowRun], cores: [WindowRun], slacks: [Date],
 func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
     let points = samples.filter { !($0.magnitudeIsKnown && $0.direction == nil && $0.magnitude > 0) }
     guard points.count > 1 else { return [] }
+    let unknownIndices = samples.indices.filter {
+        samples[$0].magnitudeIsKnown && samples[$0].direction == nil && samples[$0].magnitude > 0
+    }
+    var unknownCursor = 0
     var events: [CurrentEvent] = []
     var runStart = 0
     var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
@@ -163,8 +167,17 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
         guard !nonzeroInRun.isEmpty else { return }
         let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
         let start = points[runStart].time, finish = points[end].time
-        guard !samples.contains(where: { $0.time >= start && $0.time <= finish && $0.magnitudeIsKnown
-            && $0.direction == nil && $0.magnitude > abs(peak.speed) }) else { return }
+        while unknownCursor < unknownIndices.count && samples[unknownIndices[unknownCursor]].time < start {
+            unknownCursor += 1
+        }
+        var cursor = unknownCursor
+        var uncertain = false
+        while cursor < unknownIndices.count && samples[unknownIndices[cursor]].time <= finish {
+            uncertain = uncertain || samples[unknownIndices[cursor]].magnitude > abs(peak.speed)
+            cursor += 1
+        }
+        unknownCursor = cursor
+        guard !uncertain else { return }
         events.append(CurrentEvent(time: peak.time, speed: peak.speed,
                                    kind: peak.speed > 0 ? .maxFlood : .maxEbb))
     }
@@ -199,18 +212,20 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
         }
     }
     closeRun(points.count - 1)
-    let uncertainSpans = samples.indices.compactMap { index -> ClosedRange<Date>? in
-        let point = samples[index]
-        guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > 0 else { return nil }
-        return samples[max(0, index - 1)].time...samples[min(samples.count - 1, index + 1)].time
+    var boundaryMagnitudes: [Date: Double] = [:]
+    let uncertainSpans = unknownIndices.map { index -> ClosedRange<Date> in
+        let lower = samples[max(0, index - 1)].time, upper = samples[min(samples.count - 1, index + 1)].time
+        boundaryMagnitudes[lower] = max(boundaryMagnitudes[lower] ?? 0, samples[index].magnitude)
+        boundaryMagnitudes[upper] = max(boundaryMagnitudes[upper] ?? 0, samples[index].magnitude)
+        return lower...upper
     }
     return events.filter { event in
-        guard !uncertainSpans.contains(where: { $0.lowerBound < event.time && event.time < $0.upperBound }) else { return false }
-        guard event.kind != .slack else { return true }
-        return !samples.indices.contains { index in
-            let point = samples[index]
-            guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > abs(event.speed) else { return false }
-            return samples[max(0, index - 1)].time == event.time || samples[min(samples.count - 1, index + 1)].time == event.time
+        var low = 0, high = uncertainSpans.count
+        while low < high {
+            let middle = (low + high) / 2
+            if uncertainSpans[middle].lowerBound < event.time { low = middle + 1 } else { high = middle }
         }
+        if low > 0 && event.time < uncertainSpans[low - 1].upperBound { return false }
+        return event.kind == .slack || (boundaryMagnitudes[event.time] ?? 0) <= abs(event.speed)
     }.sorted { $0.time < $1.time }
 }

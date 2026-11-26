@@ -545,7 +545,7 @@ final class ChsFitService: ObservableObject {
             trimDownloads()
         }
         pump()
-        prefetchOnlineGates(tierOnlineGates[newTier] ?? [])
+        prefetchOnlineGates(tierOnlineGates[newTier] ?? [], resumeCancelled: widened)
 #if os(iOS)
         if widened { BackgroundDownloads.submitIfPossible() }
 #endif
@@ -772,7 +772,7 @@ final class ChsFitService: ObservableObject {
         }
         addDownloads(gatesToDownload)
         pump()
-        prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
+        prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline), resumeCancelled: true)
         #if os(iOS)
         BackgroundDownloads.submitIfPossible()
         #endif
@@ -912,7 +912,10 @@ final class ChsFitService: ObservableObject {
     func noteOnlineRefreshFailure(_ id: String) {
         onlineRetryTimers[id]?.cancel()
         onlineRetryTimers[id] = nil
-        releaseRequest(id)
+        if let gate = ChsCurrentGateInfo.all.first(where: { $0.id == id }),
+           ChsModelStore.loadOnline(id)?.block(covering: todayLocal(gate.tz)) != nil {
+            releaseRequest(id)
+        }
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
         onlineIncompleteAttempts[id] = 0
@@ -920,10 +923,11 @@ final class ChsFitService: ObservableObject {
 
     /// Whether the queue should fetch this gate now: always when today is not
     /// covered, otherwise once a day while the copy reaches less than a month.
-    func onlineRefreshDue(_ gate: ChsCurrentGateInfo) -> Bool {
+    func onlineRefreshDue(_ gate: ChsCurrentGateInfo, constrained: Bool = Connectivity.shared.constrained) -> Bool {
         let today = todayLocal(gate.tz)
-        guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else { return true }
-        let constrained = Connectivity.shared.constrained
+        guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else {
+            return !(constrained && ChsModelStore.loadLegacyOnline(gate.id)?.blocks.contains { $0.end >= today } == true)
+        }
         let end = today.addingTimeInterval(Timeline.onlineFetchDays * 86_400).timeIntervalSince1970
         let missingBearings = !constrained && dayLocal(block.fetchedAt, gate.tz) < today
             && block.times.indices.contains { index in
@@ -1041,11 +1045,12 @@ final class ChsFitService: ObservableObject {
 #endif
 
     /// Adds online gates to the serial prefetch queue; transient failures schedule themselves again.
-    private func prefetchOnlineGates(_ gates: [ChsCurrentGateInfo]) {
+    private func prefetchOnlineGates(_ candidates: [ChsCurrentGateInfo], resumeCancelled: Bool = false) {
 #if os(watchOS)
         // The watch detail requires harmonics; online gates have no fitted model.
         return
 #else
+        let gates = resumeCancelled ? candidates : candidates.filter { !cancelledDownloads.contains($0.id) }
         // Guarded: every fix re-enters here with the same gates, and a
         // published write that changes nothing still redraws the list.
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
