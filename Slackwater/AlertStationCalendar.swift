@@ -299,6 +299,7 @@ func calendarSubscriptionReady(calendarID: String?, noEvents: Bool) -> Bool {
         } else if !preserveInvalidation {
             CurrentCalendarInvalidations.forget(stationID: stationID, in: defaults)
         }
+        if preserveInvalidation { forgetWindowCalendar(for: stationID) }
         subscriptions.removeAll { $0.stationID == stationID }
         persist()
     }

@@ -41,7 +41,8 @@ func pendingSlackReviewNotices(_ rules: [AlertRule], notified: Set<String>) -> [
         guard premium, !pending.isEmpty, await authorized() else { return }
         for rule in pending {
             let content = UNMutableNotificationContent()
-            content.title = places[rule.stationID]?.name ?? "Slackwater"
+            content.title = places[rule.stationID]?.name
+                ?? WidgetStationLoader.loadRecord(id: rule.stationID)?.alertPlace.name ?? "Slackwater"
             content.body = String(localized: "Review or delete this alert.")
             content.sound = .default
             if let url = deepLink(forStationID: rule.stationID) {

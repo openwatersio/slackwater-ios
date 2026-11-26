@@ -66,7 +66,6 @@ final class StationCalendarTests: XCTestCase {
         d.set([id: "window"], forKey: "slackwater.currentWindowCalendarIDs")
         let store = StationCalendarStore(defaults: d, successors: [:])
         store.unsubscribe(id, preserveInvalidation: true)
-        store.forgetWindowCalendar(for: id)
         let restored = StationCalendarStore(defaults: d, successors: [:])
         XCTAssertTrue(restored.orphanedWindowCalendars.isEmpty)
         restored.subscribe(id)
