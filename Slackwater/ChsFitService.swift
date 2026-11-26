@@ -789,8 +789,11 @@ final class ChsFitService: ObservableObject {
     /// download set, and re-order what is still queued closest-first.
     func prioritize(lat: Double, lon: Double, favorites: [String]? = nil,
                     visibleID: String? = nil) {
+        let previous = Set((tierOnlineGates[tier] ?? []).map(\.id))
         adopt(lat: lat, lon: lon)
         onlineOrigin = (lat, lon)
+        let entered = (tierOnlineGates[tier] ?? []).filter { !previous.contains($0.id) }
+        prefetchOnlineGates(entered, resumeCancelled: true)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
         prefetchOnlineGates(favoriteGates, resumeCancelled: true)
         prefetchOnlineGates(allCurrentsSelected

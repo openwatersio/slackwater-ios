@@ -378,6 +378,23 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testCancelledGateResumesWhenItEntersNearbyTier() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        AppGroup.defaults.set(DownloadTier.nearby.rawValue, forKey: AppGroup.downloadTierKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.prioritize(lat: -89, lon: 0, favorites: [])
+        XCTAssertFalse(service.isFetchingOnline(gate.id))
+        service.prioritize(lat: gate.latitude, lon: gate.longitude, favorites: [])
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
     func testVisibleCancelledGateResumesItsDownload() throws {
         let markers = savedDownloadMarkers()
         defer { restoreDownloadMarkers(markers) }
