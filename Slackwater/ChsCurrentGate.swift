@@ -65,13 +65,17 @@ extension ChsModelStore {
     /// The online gate's fetched window lives beside the fitted models, under
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
     static func onlineUrl(_ stationID: String) -> URL {
+        dir.appendingPathComponent("\(stationID)-online-v2")
+    }
+
+    static func legacyOnlineUrl(_ stationID: String) -> URL {
         url(stationID, suffix: "-online")
     }
 
     /// Store decode first, then the legacy single-window shape (schemaVersion 1,
     /// pre-#67): each fails cleanly on the other's bytes (`blocks` vs
     /// `times`/`speeds` are required keys), so the order is just preference.
-    /// The first save rewrites the file in the store shape.
+    /// New saves use a separate file so older app versions keep their downloads.
     ///
     /// Decoded stores are memoized because callers treat this as a cheap
     /// getter — the downloads manager reads it inside a sort comparator, per
@@ -79,7 +83,7 @@ extension ChsModelStore {
     /// (`saveOnline`'s no-forward-cap note). Uncached, one render was
     /// hundreds of main-thread decodes and the scene-update watchdog killed
     /// the app at 10s (0x8BADF00D, build 31). The entry is validated by the
-    /// file's mtime+size rather than invalidated at call sites, so every
+    /// files' mtime+size rather than invalidated at call sites, so every
     /// writer and deleter — `saveOnline`, the orphan prune, `-chsResetModels`,
     /// tests using raw FileManager — stays correct without knowing a cache
     /// exists. A file that fails both decodes is cached as nil, so a bad file
@@ -93,38 +97,58 @@ extension ChsModelStore {
         onlineParts(stationID)?.legacy
     }
 
+    private struct OnlineFileSignature: Equatable {
+        let modified: Date
+        let size: Int
+    }
+
+    private static func onlineSignature(_ url: URL) -> OnlineFileSignature? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modified = attrs[.modificationDate] as? Date, let size = attrs[.size] as? Int else { return nil }
+        return OnlineFileSignature(modified: modified, size: size)
+    }
+
     private static func onlineParts(_ stationID: String) -> (vector: ChsOnlineStore?, legacy: ChsOnlineStore?)? {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: onlineUrl(stationID).path),
-              let mtime = attrs[.modificationDate] as? Date,
-              let size = attrs[.size] as? Int else { return nil }
+        let currentURL = onlineUrl(stationID), oldURL = legacyOnlineUrl(stationID)
+        let currentSignature = onlineSignature(currentURL), oldSignature = onlineSignature(oldURL)
+        guard currentSignature != nil || oldSignature != nil else { return nil }
         onlineCacheLock.lock()
         defer { onlineCacheLock.unlock() }
-        if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size {
+        if let hit = onlineCache[stationID], hit.current == currentSignature, hit.old == oldSignature {
             return (hit.vector, hit.legacy)
         }
-        // A protected file can become readable without changing its metadata.
-        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
-        let decoder = JSONDecoder()
-        let decoded = (try? decoder.decode(ChsOnlineStore.self, from: data))
-            ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
-                ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
-            }
-        let store = decoded.flatMap { $0.stationID == stationID ? $0 : nil }
-        let vectors = store?.blocks.filter(\.hasVectors) ?? []
-        let legacy = store?.blocks.filter {
-            $0.stationID == stationID && !$0.hasVectors && $0.times.count > 1
-                && $0.times.count == $0.speeds.count
+        var readFailed = false
+        func decode(_ url: URL, signature: OnlineFileSignature?) -> ChsOnlineStore? {
+            guard signature != nil else { return nil }
+            guard let data = try? Data(contentsOf: url) else { readFailed = true; return nil }
+            let decoder = JSONDecoder()
+            let store = (try? decoder.decode(ChsOnlineStore.self, from: data))
+                ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
+                    ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
+                }
+            return store.flatMap { $0.stationID == stationID ? $0 : nil }
+        }
+        let current = decode(currentURL, signature: currentSignature)
+        let old = decode(oldURL, signature: oldSignature)
+        guard !readFailed else { return nil }
+        let selected = current ?? old
+        let vectors = selected?.blocks.filter(\.hasVectors) ?? []
+        var legacy = selected?.blocks.filter { !$0.hasVectors } ?? []
+        if current != nil, let oldSignature, let currentSignature, oldSignature.modified > currentSignature.modified {
+            legacy.insert(contentsOf: old?.blocks.filter { !$0.hasVectors } ?? [], at: 0)
+        }
+        legacy = legacy.filter {
+            $0.stationID == stationID && $0.times.count > 1 && $0.times.count == $0.speeds.count
                 && $0.times.allSatisfy(\.isFinite) && $0.speeds.allSatisfy(\.isFinite)
                 && zip($0.times, $0.times.dropFirst()).allSatisfy { pair in pair.0 < pair.1 }
-        } ?? []
+        }
         let fullStore = vectors.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: vectors)
         let legacyStore = legacy.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: legacy)
-        onlineCache[stationID] = (mtime, size, fullStore, legacyStore)
+        onlineCache[stationID] = (currentSignature, oldSignature, fullStore, legacyStore)
         return (fullStore, legacyStore)
     }
 
-    // Every access holds onlineCacheLock, including decoding and replacement.
-    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, vector: ChsOnlineStore?, legacy: ChsOnlineStore?)] = [:]
+    nonisolated(unsafe) private static var onlineCache: [String: (current: OnlineFileSignature?, old: OnlineFileSignature?, vector: ChsOnlineStore?, legacy: ChsOnlineStore?)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 
@@ -173,6 +197,58 @@ struct ChsOnlineWindow: Codable, Sendable {
         self.times = times; self.speeds = speeds
         self.magnitudes = magnitudes ?? (axisOnly ? speeds.map { abs($0) } : nil)
         self.directions = directions ?? (axisOnly ? speeds.map { $0 >= 0 ? floodDirection : ebbDirection } : nil)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, stationID, iwlsName, timezone, fetchedAt, start, end
+        case floodDirection, ebbDirection, times, speeds, magnitudes, directions
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        stationID = try c.decode(String.self, forKey: .stationID)
+        iwlsName = try c.decode(String.self, forKey: .iwlsName)
+        timezone = try c.decode(String.self, forKey: .timezone)
+        fetchedAt = try c.decode(Date.self, forKey: .fetchedAt)
+        start = try c.decode(Date.self, forKey: .start)
+        end = try c.decode(Date.self, forKey: .end)
+        floodDirection = try c.decode(Double.self, forKey: .floodDirection)
+        ebbDirection = try c.decode(Double.self, forKey: .ebbDirection)
+        times = try c.decode([Double].self, forKey: .times)
+        magnitudes = try c.decodeIfPresent([Double].self, forKey: .magnitudes)
+        directions = try c.decodeIfPresent([Double?].self, forKey: .directions)
+        let stored = try c.decode([Double?].self, forKey: .speeds)
+        for (index, value) in stored.enumerated() where value == nil {
+            guard let magnitudes, let directions, index < magnitudes.count, index < directions.count,
+                  magnitudes[index] > 0, directions[index] == nil else {
+                throw DecodingError.dataCorruptedError(forKey: .speeds, in: c, debugDescription: "Missing axis speed without a measured directionless current")
+            }
+        }
+        speeds = stored.map { $0 ?? 0 }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(stationID, forKey: .stationID)
+        try c.encode(iwlsName, forKey: .iwlsName)
+        try c.encode(timezone, forKey: .timezone)
+        try c.encode(fetchedAt, forKey: .fetchedAt)
+        try c.encode(start, forKey: .start)
+        try c.encode(end, forKey: .end)
+        try c.encode(floodDirection, forKey: .floodDirection)
+        try c.encode(ebbDirection, forKey: .ebbDirection)
+        try c.encode(times, forKey: .times)
+        // A null axis prevents older readers from interpreting an unknown bearing as calm.
+        let axis: [Double?] = speeds.enumerated().map { index, speed in
+            if let magnitudes, let directions, index < magnitudes.count, index < directions.count,
+               magnitudes[index] > 0, directions[index] == nil { return nil }
+            return speed
+        }
+        try c.encode(axis, forKey: .speeds)
+        try c.encodeIfPresent(magnitudes, forKey: .magnitudes)
+        try c.encodeIfPresent(directions, forKey: .directions)
     }
 
     var hasVectors: Bool {
@@ -257,7 +333,11 @@ struct ChsOnlineWindow: Codable, Sendable {
         var byTime: [Double: (Double, Double?, Double?)] = [:]
         let vector = hasVectors
         for point in points { byTime[point.time.timeIntervalSince1970] = (point.speed, vector ? point.magnitude : nil, point.direction) }
-        for point in other.points { byTime[point.time.timeIntervalSince1970] = (point.speed, vector ? point.magnitude : nil, point.direction) }
+        for point in other.points {
+            let time = point.time.timeIntervalSince1970
+            if vector, point.direction == nil, point.magnitude > 0, byTime[time]?.2 != nil { continue }
+            byTime[time] = (point.speed, vector ? point.magnitude : nil, point.direction)
+        }
         let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
         return ChsOnlineWindow(
             stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,

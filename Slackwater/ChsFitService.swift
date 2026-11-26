@@ -332,21 +332,17 @@ final class ChsFitService: ObservableObject {
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
         for (id, due) in onlineIncompleteRetryAfter {
-            let attrs = try? FileManager.default.attributesOfItem(atPath: ChsModelStore.onlineUrl(id).path)
-            if onlineCacheChangedAfterFailure(modified: attrs?[.modificationDate] as? Date, retryAfter: due) {
+            let modified = [ChsModelStore.onlineUrl(id), ChsModelStore.legacyOnlineUrl(id)].compactMap { url in
+                (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+            }.max()
+            if onlineCacheChangedAfterFailure(modified: modified, retryAfter: due) {
                 onlineIncompleteRetryAfter.removeValue(forKey: id)
                 onlineStates.removeValue(forKey: id)
             }
         }
-        for gate in ChsCurrentGateInfo.all where gate.isOnline && !cancelledDownloads.contains(gate.id)
-            && files.contains(gate.id + "-online.json") {
-            let today = todayLocal(gate.tz)
-            let vector = ChsModelStore.loadOnline(gate.id)
-            let legacy = ChsModelStore.loadLegacyOnline(gate.id)
-            if legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: today) {
-                onlineDesired[gate.id] = gate
-            }
-        }
+        let legacyCandidates = ChsCurrentGateInfo.all.filter {
+            $0.isOnline && !cancelledDownloads.contains($0.id) && (files.contains($0.id + "-online.json") || files.contains($0.id + "-online-v2"))
+        }.map { (id: $0.id, today: todayLocal($0.tz)) }
         #if os(iOS)
         Self.invalidateCurrentCalendars(in: files)
         #endif
@@ -392,6 +388,22 @@ final class ChsFitService: ObservableObject {
         Self.sweepOrphans(files)
         observeConnectivity()
         observeDataMode()
+        Task { [weak self] in
+            let ids = await Task.detached(priority: .utility) {
+                legacyCandidates.compactMap { candidate in
+                    let vector = ChsModelStore.loadOnline(candidate.id)
+                    let legacy = ChsModelStore.loadLegacyOnline(candidate.id)
+                    return legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: candidate.today) ? candidate.id : nil
+                }
+            }.value
+            guard let self else { return }
+            let gates = ChsCurrentGateInfo.all.filter { gate in
+                ids.contains(gate.id) && !self.cancelledDownloads.contains(gate.id)
+                    && legacyOnlineNeedsRefresh(vector: ChsModelStore.loadOnline(gate.id),
+                                                legacy: ChsModelStore.loadLegacyOnline(gate.id), today: todayLocal(gate.tz))
+            }
+            self.prefetchOnlineGates(gates)
+        }
     }
 
     #if os(iOS)
@@ -419,14 +431,18 @@ final class ChsFitService: ObservableObject {
     nonisolated static func orphanFiles(in files: Set<String>,
                                         ports: Set<String>, gates: Set<String>, onlineGates: Set<String>) -> [String] {
         files.sorted().filter { file in
-            guard file.hasSuffix(".json") else { return false }
-            let stem = String(file.dropLast(5))
+            guard file.hasSuffix(".json") || file.hasSuffix("-online-v2") else { return false }
+            let stem = file.hasSuffix(".json") ? String(file.dropLast(5)) : file
             if stem.hasSuffix("-tide-preview") {
                 return !ports.contains(String(stem.dropLast("-tide-preview".count)))
             }
             if stem.hasSuffix("-current") {
                 let id = String(stem.dropLast("-current".count))
                 return !gates.contains(id) || onlineGates.contains(id)
+            }
+            if stem.hasSuffix("-online-v2") {
+                let id = String(stem.dropLast("-online-v2".count))
+                return !gates.contains(id) || !onlineGates.contains(id)
             }
             if stem.hasSuffix("-online") {
                 let id = String(stem.dropLast("-online".count))
@@ -905,9 +921,11 @@ final class ChsFitService: ObservableObject {
     /// covered, otherwise once a day while the copy reaches less than a month.
     func onlineRefreshDue(_ gate: ChsCurrentGateInfo) -> Bool {
         let today = todayLocal(gate.tz)
-        guard let store = ChsModelStore.loadOnline(gate.id), store.block(covering: today) != nil else { return true }
+        guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else { return true }
+        let missingBearings = block.directions?.allSatisfy { $0 == nil } == true
+            && block.magnitudes?.contains { $0 > 0 } == true
         return onlineRefreshedOn[gate.id] != today
-            && store.needsRefresh(today: today, lowData: Connectivity.shared.constrained)
+            && (missingBearings || store.needsRefresh(today: today, lowData: Connectivity.shared.constrained))
     }
 
     func markOnlineRefresh(_ gate: ChsCurrentGateInfo) {

@@ -237,7 +237,7 @@ The practical list. Each of these has cost someone time.
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | Bundled tide stations (5,027: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.tcdb` (reviewable copy `stations.json`) |
 | NOAA current stations (2,572) | `Slackwater/Resources/currents.tcdb` (reviewable copy `currents.json`) |
-| Fitted models, online blocks and tide previews | App Group container, `ChsModels/{id}.json`, `-current.json`, `-online.json`, `-tide-preview.json` (moved once from Application Support) |
+| Fitted models, online blocks and tide previews | App Group container, `ChsModels/{id}.json`, `-current.json`, `-online.json`, `-online-v2`, `-tide-preview.json` (moved once from Application Support) |
 | Chunk cache and the 7-day IWLS station list cache | Application Support, `ChsChunks/` and `IwlsStations.json` (backup-excluded) |
 | Regeneration | `cd tools && npm install && npm run build:data` |
 | Fit validation criteria and evidence | `docs/validation/chs-currents.md` |

@@ -747,6 +747,27 @@ final class ChsQueueTests: XCTestCase {
     /// One automatic try a day for a station that still works, and a failure
     /// of that try neither shows nor retries.
     @MainActor
+    func testDirectionlessDownloadRetriesEvenWhenItCoversTheMonth() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: appNow(), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0],
+            magnitudes: [1, 1], directions: [nil, nil]))
+        XCTAssertTrue(service.onlineRefreshDue(gate))
+        service.markOnlineRefresh(gate)
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+    }
+
+    @MainActor
     func testACoveredStationRefreshesOnceADayAndFailsQuietly() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()

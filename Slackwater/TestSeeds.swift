@@ -197,7 +197,7 @@ private func seedCurrentModel(stationID: String, provisional: Bool) {
 /// gives the strip real slacks and maxima to assert against, not a flat line.
 ///
 /// `-chsResetModels` (ChsStation.swift) already clears this file too: it
-/// removes the whole `ChsModelStore.dir`, the same directory `-online.json`
+/// removes the whole `ChsModelStore.dir`, the same directory online downloads
 /// files live in beside the fitted `.json`/`-current.json` ones
 /// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
 private func seedOnlineWindow(stationID: String) {

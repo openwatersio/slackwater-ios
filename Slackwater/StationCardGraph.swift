@@ -68,6 +68,7 @@ nonisolated struct StationCardGraph: View {
     struct Point {
         let time: Date
         let value: Double
+        var axisKnown = true
     }
 
     struct Extreme {
@@ -181,7 +182,7 @@ nonisolated struct StationCardGraph: View {
             // The visible water's range: the builders sample the card's full
             // span, and a narrower view must not flatten under an off-screen
             // swing.
-            let visible = points.filter { $0.time >= start && $0.time <= end }.map(\.value)
+            let visible = points.filter { $0.axisKnown && $0.time >= start && $0.time <= end }.map(\.value)
             var lo = visible.min() ?? 0
             var hi = visible.max() ?? 1
             if includesZero { lo = min(lo, 0); hi = max(hi, 0) }
@@ -210,24 +211,36 @@ nonisolated struct StationCardGraph: View {
                 return points[points.count - 1].value
             }
 
+            var groups: [[Point]] = []
+            for point in points {
+                if !point.axisKnown { groups.append([]); continue }
+                if groups.isEmpty { groups.append([]) }
+                groups[groups.count - 1].append(point)
+            }
+            groups = groups.filter { $0.count > 1 }
             var line = Path()
-            line.move(to: CGPoint(x: x(points[0].time), y: y(points[0].value)))
-            for p in points.dropFirst() {
-                line.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+            for group in groups {
+                line.move(to: CGPoint(x: x(group[0].time), y: y(group[0].value)))
+                for p in group.dropFirst() { line.addLine(to: CGPoint(x: x(p.time), y: y(p.value))) }
             }
 
             // Slack: each run is a REAL sub-path of the curve (interpolated
             // endpoints), computed by the builders from the SHARED
             // slackWindow predicate — never re-derived here.
             func segments(_ runs: [WindowRun]) -> [Path] {
-                runs.map { w -> Path in
-                    var seg = Path()
-                    seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
-                    for p in points where p.time > w.start && p.time < w.end {
-                        seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+                runs.flatMap { w in
+                    groups.compactMap { group -> Path? in
+                        guard let first = group.first, let last = group.last else { return nil }
+                        let start = max(w.start, first.time), end = min(w.end, last.time)
+                        guard start < end else { return nil }
+                        var seg = Path()
+                        seg.move(to: CGPoint(x: x(start), y: y(valueAt(start))))
+                        for p in group where p.time > start && p.time < end {
+                            seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+                        }
+                        seg.addLine(to: CGPoint(x: x(end), y: y(valueAt(end))))
+                        return seg
                     }
-                    seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
-                    return seg
                 }
             }
             let segs = segments(windows)
@@ -236,10 +249,15 @@ nonisolated struct StationCardGraph: View {
 
             // The area, closed to the zero line for a current and to chart
             // datum for a tide — the same line each fill is anchored at.
-            var area = line
-            area.addLine(to: CGPoint(x: x(points[points.count - 1].time), y: y(0)))
-            area.addLine(to: CGPoint(x: x(points[0].time), y: y(0)))
-            area.closeSubpath()
+            var area = Path()
+            for group in groups {
+                guard let first = group.first, let last = group.last else { continue }
+                area.move(to: CGPoint(x: x(first.time), y: y(first.value)))
+                for p in group.dropFirst() { area.addLine(to: CGPoint(x: x(p.time), y: y(p.value))) }
+                area.addLine(to: CGPoint(x: x(last.time), y: y(0)))
+                area.addLine(to: CGPoint(x: x(first.time), y: y(0)))
+                area.closeSubpath()
+            }
             if includesZero {
                 CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: plotHeight, zeroY: y(0))
                 if !speedsAreSchematic {
@@ -370,7 +388,9 @@ nonisolated struct StationCardGraph: View {
             }
 
             // The "now" dot rides the curve one swing in from the left edge.
-            if showsNow { CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now)))) }
+            if showsNow && groups.contains(where: { $0.first!.time <= now && now <= $0.last!.time }) {
+                CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now))))
+            }
         }
         .accessibilityLabel("\(Int(((back + forward) / 3600).rounded()))-hour curve")
         .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
@@ -468,7 +488,7 @@ extension CurrentStationRecord {
         let events = currentEventsMatchingWater(raw, events: s.events(from: start, to: end), station: s)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
-            points: raw.map { .init(time: $0.time, value: $0.speed) },
+            points: raw.map { .init(time: $0.time, value: $0.speed, axisKnown: !($0.magnitudeIsKnown && $0.direction == nil && $0.magnitude > 0)) },
             extremes: events
                 .filter { $0.kind != .slack }
                 .map { event in
@@ -502,7 +522,7 @@ extension ChsOnlineWindow {
         let events = events(from: start, to: end)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
-            points: raw.map { .init(time: $0.time, value: $0.speed) },
+            points: raw.map { .init(time: $0.time, value: $0.speed, axisKnown: !($0.magnitudeIsKnown && $0.direction == nil && $0.magnitude > 0)) },
             extremes: events
                 .filter { $0.kind != .slack }
                 .map { event in

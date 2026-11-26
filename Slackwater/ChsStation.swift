@@ -185,19 +185,24 @@ extension ChsModelStore {
     static func fittedIDs(in directory: URL = dir) -> Set<String> {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         return Set(names.compactMap { name -> String? in
-            guard name.hasSuffix(".json") else { return nil }
-            let stem = String(name.dropLast(5))
-            if stem.hasSuffix("-online") {
-                let id = String(stem.dropLast("-online".count))
+            guard name.hasSuffix(".json") || name.hasSuffix("-online-v2") else { return nil }
+            let stem = name.hasSuffix(".json") ? String(name.dropLast(5)) : name
+            if stem.hasSuffix("-online") || stem.hasSuffix("-online-v2") {
+                let suffix = stem.hasSuffix("-online-v2") ? "-online-v2" : "-online"
+                let id = String(stem.dropLast(suffix.count))
                 let store: ChsOnlineStore?
                 if directory == dir {
                     store = loadOnline(id)
                 } else if let data = try? Data(contentsOf: directory.appendingPathComponent(name)) {
-                    store = try? JSONDecoder().decode(ChsOnlineStore.self, from: data)
+                    let decoder = JSONDecoder()
+                    store = (try? decoder.decode(ChsOnlineStore.self, from: data))
+                        ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
+                            ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
+                        }
                 } else { store = nil }
                 guard let store, store.stationID == id,
                       store.blocks.contains(where: { $0.stationID == id && $0.hasVectors && $0.times.count > 1 }) else { return nil }
-                return stem
+                return id + "-online"
             }
             guard stem.hasSuffix("-current") else { return stem }
             let id = String(stem.dropLast("-current".count))

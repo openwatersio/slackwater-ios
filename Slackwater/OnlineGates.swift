@@ -72,17 +72,11 @@ extension ChsFitService {
                     guard time > previous.t, time < next.t, abs(grid - grid.rounded()) < 1e-6,
                           let magnitude = byTime[key] else { continue }
                     let fraction = (time - previous.t) / (next.t - previous.t)
-                    let a = directions[i - 1] * .pi / 180, b = directions[i] * .pi / 180
-                    let east = magnitudes[i - 1] * sin(a) * (1 - fraction) + magnitudes[i] * sin(b) * fraction
-                    let north = magnitudes[i - 1] * cos(a) * (1 - fraction) + magnitudes[i] * cos(b) * fraction
-                    let bearing: Double? = next.t - previous.t == 2 * step && cos(a - b) > 0 && hypot(east, north) > 1e-9
-                        ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
                     let estimate = previous.v + (next.v - previous.v) * fraction
-                    let signed = bearing.map { magnitude * cos(($0 - flood) * .pi / 180) }
-                        ?? max(-magnitude, min(magnitude, estimate))
+                    let signed = max(-magnitude, min(magnitude, estimate))
                     samples.append(ChsSample(t: time, v: signed))
                     speeds.append(magnitude)
-                    bearings.append(bearing)
+                    bearings.append(nil)
                 }
             }
             samples.append(projected[i]); speeds.append(magnitudes[i]); bearings.append(directions[i])

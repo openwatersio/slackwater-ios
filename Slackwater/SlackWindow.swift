@@ -148,7 +148,8 @@ func slackAxisMoments(windows: [WindowRun], cores: [WindowRun], slacks: [Date],
     return (windowTimes + marks.filter { t in !drawn.contains { $0.contains(t) } }).sorted()
 }
 
-func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
+func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
+    let points = samples.filter { !($0.magnitudeIsKnown && $0.direction == nil && $0.magnitude > 0) }
     guard points.count > 1 else { return [] }
     var events: [CurrentEvent] = []
     var runStart = 0
@@ -195,10 +196,10 @@ func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
         }
     }
     closeRun(points.count - 1)
-    let uncertainSpans = points.indices.compactMap { index -> ClosedRange<Date>? in
-        let point = points[index]
+    let uncertainSpans = samples.indices.compactMap { index -> ClosedRange<Date>? in
+        let point = samples[index]
         guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > 0 else { return nil }
-        return points[max(0, index - 1)].time...points[min(points.count - 1, index + 1)].time
+        return samples[max(0, index - 1)].time...samples[min(samples.count - 1, index + 1)].time
     }
     return events.filter { event in !uncertainSpans.contains { $0.lowerBound < event.time && event.time < $0.upperBound } }
         .sorted { $0.time < $1.time }
