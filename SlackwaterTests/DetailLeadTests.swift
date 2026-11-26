@@ -303,7 +303,9 @@ import SlackwaterKit
         let start = Date(timeIntervalSince1970: 1_794_297_600) // 2026-11-10 08:00 UTC
         let tl = TimelineData.build(tide: nil, current: trial, now: start, anchor: start)
         let minimum = try XCTUnwrap(tl.currentEvents.first { $0.kind == .minEbb && $0.time > start })
-        XCTAssertLessThan(abs(minimum.speed), 0.05)
+        // NOAA's prediction at its reference, Race Rocks (PUG1640), bottoms out at 0.09 kn
+        // here; Trial Island's 0.72 ebb ratio makes that 0.065 kn.
+        XCTAssertEqual(abs(minimum.speed), 0.065, accuracy: 0.01)
         let before = CurrentLead(timeline: tl, scrubTime: minimum.time.addingTimeInterval(-3600), now: start,
                                  point: CurrentPoint(time: start, speed: -0.1),
                                  floodDeg: trial.floodDirection, ebbDeg: trial.ebbDirection,

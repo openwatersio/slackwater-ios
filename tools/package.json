@@ -4,7 +4,7 @@
   "type": "module",
   "devDependencies": {
     "@slackwater/database": "1.0.2-beta.20261123",
-    "@slackwater/engine": "1.0.0-beta.13",
+    "@slackwater/engine": "1.0.0-beta.14",
     "tz-lookup": "^6.1.25"
   },
   "scripts": {

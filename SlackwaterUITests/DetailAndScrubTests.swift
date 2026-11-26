@@ -882,7 +882,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertTrue(tile.appears(within: 10), "the lull became the next maximum")
         save(app, "trial-island-before-minimum.png")
         pill.tap()
-        XCTAssertTrue(waitFor(leadReading(app), "label BEGINSWITH 'Minimum ebb,' AND label CONTAINS '0.0 kn'"))
+        XCTAssertTrue(waitFor(leadReading(app), "label BEGINSWITH 'Minimum ebb,' AND label CONTAINS '0.1 kn'"))
         save(app, "trial-island-minimum.png")
     }
 
