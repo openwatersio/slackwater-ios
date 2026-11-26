@@ -566,6 +566,14 @@ final class ChsQueueTests: XCTestCase {
                        "queueing it now would skip its backoff")
     }
 
+    func testIncompleteOtherDayDoesNotUseTodayRetryBudget() {
+        let tz = TimeZone(secondsFromGMT: 0)!
+        let today = dayLocal(t0, tz)
+        XCTAssertTrue(incompleteOnlineRequestIsForToday(anchor: nil, today: today, tz: tz))
+        XCTAssertTrue(incompleteOnlineRequestIsForToday(anchor: today.addingTimeInterval(3600), today: today, tz: tz))
+        XCTAssertFalse(incompleteOnlineRequestIsForToday(anchor: today.addingTimeInterval(86_400), today: today, tz: tz))
+    }
+
     @MainActor
     func testIncompleteCooldownPreventsRequeueAfterHold() throws {
         let service = ChsFitService.shared

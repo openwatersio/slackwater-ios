@@ -348,6 +348,7 @@ struct OfflineManagerList: View {
             if service.isFetchingOnline($0.id) { return true }
             let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
             return km <= ChsFitService.autoFitRadiusKm || ChsModelStore.loadOnline($0.id)?.blocks.isEmpty == false
+                || ChsModelStore.loadLegacyOnline($0.id)?.blocks.isEmpty == false
         }
     }
     private var downloads: [ManagedDownload] {
@@ -616,6 +617,7 @@ struct OfflineManagerList: View {
 
     private func onlineWindow(_ gate: ChsCurrentGateInfo) -> ChsOnlineWindow? {
         ChsModelStore.loadOnline(gate.id)?.reachBlock(today: todayLocal(gate.tz))
+            ?? ChsModelStore.loadLegacyOnline(gate.id)?.reachBlock(today: todayLocal(gate.tz))
     }
 
     private func remainingDays(_ gate: ChsCurrentGateInfo) -> Int? {
@@ -670,6 +672,11 @@ struct OfflineManagerList: View {
                     .font(.caption)
                     .foregroundStyle(SN.foam.opacity(0.55))
                     .lineLimit(1)
+                if onlineWindow(gate)?.hasVectors == false {
+                    Text("Approximate axis speed")
+                        .font(.caption)
+                        .foregroundStyle(SN.foam.opacity(0.7))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())

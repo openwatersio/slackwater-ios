@@ -325,6 +325,7 @@ struct ChsCurrentGateCardView: View {
     @ObservedObject private var net = Connectivity.shared
     /// Only ever read for an online gate — a fitted gate never touches this.
     @State private var onlineStore: ChsOnlineStore?
+    @State private var legacyOnlineStore: ChsOnlineStore?
     @Environment(\.cardRefreshTime) private var refreshTime
 
     var body: some View {
@@ -363,6 +364,7 @@ struct ChsCurrentGateCardView: View {
     private func refreshOnlineWindow() {
         guard gate.isOnline else { return }
         onlineStore = ChsModelStore.loadOnline(gate.id)
+        legacyOnlineStore = ChsModelStore.loadLegacyOnline(gate.id)
     }
 
     private func pending() -> ChsPendingCard {
@@ -380,6 +382,10 @@ struct ChsCurrentGateCardView: View {
         let today = dayLocal(cardCalculationTime(refreshTime), gate.tz)
         if let block = onlineStore?.block(covering: today) {
             OnlineGateCardView(gate: gate, window: block, km: km)
+        } else if let speed = legacyOnlineStore?.blocks.lazy.compactMap({ $0.signedSpeed(at: cardCalculationTime(refreshTime)) }).first {
+            StationCard(name: gate.name, region: gate.region, km: km) {
+                LegacyAxisReading(speed: speed)
+            }
         } else {
             let previous = onlineStore?.blocks.last
             let fetchState = service.onlineState(gate.id)
@@ -396,6 +402,24 @@ struct ChsCurrentGateCardView: View {
                            detail: onlineCardDownloadLabel(state: fetchState, position: position),
                            progress: listStatus == .downloading ? service.onlineProgress[gate.id] ?? 0 : nil)
         }
+    }
+}
+
+/// A legacy download contains only the speed projected onto the station axis.
+struct LegacyAxisReading: View {
+    let speed: Double
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("Approximate axis speed")
+                .font(.caption2)
+                .foregroundStyle(SN.foam)
+            Text("\(formatSpeed(abs(speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

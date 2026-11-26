@@ -8,6 +8,8 @@ The current iOS implementation is the reference implementation. Exact iOS values
 
 [`detail.md`](detail.md) owns everything after a station opens. [`scrubber.md`](scrubber.md) owns the detail timeline. [`alerts.md`](alerts.md) owns alerts.
 
+Online current downloads from older app versions can contain only the station-axis component. Until a full-vector refresh, the list labels that reading as an approximate axis speed and does not draw a comfort window or slack event from it.
+
 ## 1. Scope
 
 The list contract covers:

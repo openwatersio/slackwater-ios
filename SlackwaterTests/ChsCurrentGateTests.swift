@@ -438,12 +438,32 @@ final class ChsCurrentGateTests: XCTestCase {
         try ChsModelStore.saveOnline(window)
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertNil(ChsModelStore.loadOnline(id))
+        let legacy = try XCTUnwrap(ChsModelStore.loadLegacyOnline(id)?.blocks.first)
+        XCTAssertFalse(legacy.hasVectors)
+        XCTAssertEqual(legacy.signedSpeed(at: Date(timeIntervalSince1970: 450)), 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
         let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
                                      start: window.start, end: window.end, floodDirection: 0, ebbDirection: 180,
                                      times: [0, 900], speeds: [1, -1], magnitudes: [2, 2], directions: [60, 120])
         try ChsModelStore.saveOnline(vector)
         XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.magnitudes, [2, 2])
+    }
+
+    func testVectorRefreshPreservesAxisOnlySamplesOutsideItsRange() throws {
+        let id = "chs-axis-partial-\(UUID().uuidString)"
+        let legacy = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 5400),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600, 4500, 5400], speeds: [1, 1, 1, 1, 1, 1, 1])
+        let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 1800), end: Date(timeIntervalSince1970: 3600),
+                                     floodDirection: 0, ebbDirection: 180, times: [1800, 2700, 3600],
+                                     speeds: [1, 1, 1], magnitudes: [2, 2, 2], directions: [90, 90, 90])
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(legacy, retainingFrom: legacy.start)
+        try ChsModelStore.saveOnline(vector, retainingFrom: legacy.start)
+        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.times, vector.times)
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.map(\.times), [[0, 900], [4500, 5400]])
     }
 
     func testOnlineWindowStoreRoundTrip() throws {

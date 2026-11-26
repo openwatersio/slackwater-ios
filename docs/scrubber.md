@@ -8,6 +8,8 @@ The current iOS implementation is the reference implementation. Exact iOS values
 
 [`current-charts.md`](current-charts.md) defines the domain rules for a tidal-current chart. This document wins for the scrubber's composition, motion, and visible marks if an older design note disagrees with it.
 
+When an older online-current download contains only the station-axis component, the detail shows a labeled approximate axis speed while it waits for a full-vector refresh. It does not infer a comfort window or slack event from that legacy reading.
+
 ## 1. Scope
 
 The scrubber is the complete, time-linked composition containing:

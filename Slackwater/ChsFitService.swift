@@ -323,6 +323,10 @@ final class ChsFitService: ObservableObject {
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
+        for gate in ChsCurrentGateInfo.all where gate.isOnline && !cancelledDownloads.contains(gate.id)
+            && files.contains(gate.id + "-online.json") && ChsModelStore.loadLegacyOnline(gate.id) != nil {
+            onlineDesired[gate.id] = gate
+        }
         #if os(iOS)
         Self.invalidateCurrentCalendars(in: files)
         #endif

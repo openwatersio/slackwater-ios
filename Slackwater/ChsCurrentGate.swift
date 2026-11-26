@@ -111,6 +111,25 @@ extension ChsModelStore {
         return usable
     }
 
+    /// Older downloads contain only the signed station-axis component. They are
+    /// kept separate from full-vector predictions so they cannot create slack windows.
+    static func loadLegacyOnline(_ stationID: String) -> ChsOnlineStore? {
+        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
+        let decoder = JSONDecoder()
+        let store = (try? decoder.decode(ChsOnlineStore.self, from: data))
+            ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
+                ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
+            }
+        guard let store, store.stationID == stationID else { return nil }
+        let blocks = store.blocks.filter {
+            $0.stationID == stationID && !$0.hasVectors && $0.times.count > 1
+                && $0.times.count == $0.speeds.count
+                && $0.times.allSatisfy(\.isFinite) && $0.speeds.allSatisfy(\.isFinite)
+                && zip($0.times, $0.times.dropFirst()).allSatisfy { pair in pair.0 < pair.1 }
+        }
+        return blocks.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: blocks)
+    }
+
     // Every access holds onlineCacheLock, including decoding and replacement.
     nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore?)] = [:]
     private static let onlineCacheLock = NSLock()
@@ -207,6 +226,21 @@ struct ChsOnlineWindow: Codable, Sendable {
         return speeds[lo - 1] + fraction * (speeds[lo] - speeds[lo - 1])
     }
 
+    /// Keep older axis-only samples outside a replacement vector block.
+    func axisOnlyOutside(_ replacement: ChsOnlineWindow, prunedBefore cut: Date) -> [ChsOnlineWindow] {
+        guard !hasVectors, times.count == speeds.count else { return [] }
+        let groups = [times.indices.filter { times[$0] >= cut.timeIntervalSince1970 && times[$0] < replacement.start.timeIntervalSince1970 },
+                      times.indices.filter { times[$0] >= cut.timeIntervalSince1970 && times[$0] > replacement.end.timeIntervalSince1970 }]
+        return groups.compactMap { indices in
+            guard indices.count > 1, let first = indices.first, let last = indices.last else { return nil }
+            return ChsOnlineWindow(stationID: stationID, iwlsName: iwlsName, timezone: timezone,
+                                   fetchedAt: fetchedAt, start: Date(timeIntervalSince1970: times[first]),
+                                   end: Date(timeIntervalSince1970: times[last]), floodDirection: floodDirection,
+                                   ebbDirection: ebbDirection, times: indices.map { times[$0] },
+                                   speeds: indices.map { speeds[$0] })
+        }
+    }
+
     /// Union `other`'s samples into this window by timestamp and widen the
     /// bounds, dropping everything before `prunedBefore`.
     ///
@@ -292,7 +326,11 @@ struct ChsOnlineStore: Codable {
         for b in blocks.sorted(by: { $0.start < $1.start }) {
             if b.start <= merged.end.addingTimeInterval(slack),
                merged.start <= b.end.addingTimeInterval(slack) {
-                merged = b.merging(merged, prunedBefore: cut)
+                if merged.hasVectors && !b.hasVectors {
+                    rest.append(contentsOf: b.axisOnlyOutside(merged, prunedBefore: cut))
+                } else {
+                    merged = b.merging(merged, prunedBefore: cut)
+                }
             } else if let kept = b.pruned(before: cut) {
                 rest.append(kept)
             }

@@ -4,6 +4,10 @@
 import Foundation
 import SlackwaterKit
 
+func incompleteOnlineRequestIsForToday(anchor: Date?, today: Date, tz: TimeZone) -> Bool {
+    anchor.map { dayLocal($0, tz) == today } ?? true
+}
+
 extension ChsFitService {
     /// The span one fetch covers: `Timeline.window`'s start for the anchor —
     /// back-padded like every window (#67 item 1), never re-derived here — and
@@ -195,6 +199,10 @@ extension ChsFitService {
                 } else if automatic,
                           ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil {
                     noteOnlineRefreshFailure(gate.id)
+                } else if case .incomplete = error as? ChsError,
+                          !incompleteOnlineRequestIsForToday(anchor: anchor, today: todayLocal(gate.tz), tz: gate.tz) {
+                    // A missing different day must not stop today's automatic refresh.
+                    noteOnlineRefreshFailure(gate.id)
                 } else {
                     let incomplete: Bool
                     if case .incomplete = error as? ChsError { incomplete = true } else { incomplete = false }
@@ -301,8 +309,9 @@ extension ChsModelStore {
         let tz = TimeZone(identifier: window.timezone) ?? .current
         let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
                       retainingFrom ?? window.start)
-        let store = (loadOnline(window.stationID)
-                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
+        let blocks = (loadOnline(window.stationID)?.blocks ?? [])
+            + (loadLegacyOnline(window.stationID)?.blocks ?? [])
+        let store = ChsOnlineStore(stationID: window.stationID, blocks: blocks)
             .inserting(window, prunedBefore: cut)
         try Task.checkCancellation()
         let url = onlineUrl(window.stationID)
