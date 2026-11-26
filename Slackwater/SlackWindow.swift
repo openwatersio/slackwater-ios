@@ -50,15 +50,20 @@ func slackCoreThresholdKn(_ windowThreshold: Double) -> Double {
 }
 
 /// Keep sampled rotary axis crossings from being presented as true zero-current events.
-func currentEventsMatchingWater(_ points: [CurrentPoint], events: [CurrentEvent]) -> [CurrentEvent] {
-    guard let first = points.first?.time, let last = points.last?.time else { return events }
-    return events.filter { event in
-        guard event.kind == .slack, event.time >= first, event.time <= last else { return true }
+func currentEventsMatchingWater(_ points: [CurrentPoint], events: [CurrentEvent],
+                                station: (any CurrentPredicting)? = nil) -> [CurrentEvent] {
+    events.filter { event in
+        guard event.kind == .slack, !event.verifiedZero else { return true }
+        guard let first = points.first?.time, let last = points.last?.time,
+              event.time >= first, event.time <= last else {
+            guard let station else { return false }
+            return !currentEventsMatchingWater(station, events: [event]).isEmpty
+        }
         return readCurrent(at: event.time, timeline: points, events: [event], flood: nil, ebb: nil)?.state == .slack
     }
 }
 
-/// Check an event against the interpolated full current vector at its time.
+/// Check a predicted slack against the full water vector at the event time.
 func currentEventsMatchingWater(_ station: any CurrentPredicting, events: [CurrentEvent]) -> [CurrentEvent] {
     events.filter { event in
         guard event.kind == .slack, !event.verifiedZero else { return true }

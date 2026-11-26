@@ -303,11 +303,16 @@ struct ChsOnlineStore: Codable {
     }
 }
 
+// Preserve the stored phase convention for paired devices that still use this recipe.
+private let legacyCurrentFitStamp = "8f85912ce223"
+private let translatedCurrentFitStamp = "bb3c78ac6991"
+
 extension ChsCurrentGateInfo {
     func usableModel(_ model: ChsModel) -> ChsModel? {
         guard !isOnline, model.stationID == id,
-              let recipe, recipe == ChsCurrentFit.stamp,
-              model.recipe == recipe, let days = model.fitDays else { return nil }
+              let recipe, recipe == ChsCurrentFit.stamp, let days = model.fitDays else { return nil }
+        let knownLegacy = recipe == translatedCurrentFitStamp && model.recipe == legacyCurrentFitStamp
+        guard model.recipe == recipe || knownLegacy else { return nil }
         guard days == fitDays || (offersProvisional && days == Self.provisionalDays) else { return nil }
         return model
     }
@@ -342,7 +347,8 @@ extension ChsCurrentGateInfo {
             // tide-port side, which never reaches here (the store suffixes).
             floodDirection: model.floodDirection ?? 0, ebbDirection: model.ebbDirection ?? 0,
             meanFlow: model.offset, tideReference: tideReference,
-            constituents: model.constituents)
+            constituents: model.recipe == legacyCurrentFitStamp && ChsCurrentFit.stamp == translatedCurrentFitStamp
+                ? translatedLegacyFitPhases(model.constituents) : model.constituents)
     }
 }
 

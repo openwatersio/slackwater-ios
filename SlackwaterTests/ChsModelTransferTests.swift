@@ -43,6 +43,14 @@ final class ChsModelTransferTests: XCTestCase {
         let request = ChsModelRequest(stationID: gate.id, isCurrent: true)
         XCTAssertNil(request.decode(try JSONEncoder().encode(model(gate.id, days: 60))))
         XCTAssertNotNil(request.decode(try JSONEncoder().encode(model(gate.id, days: gate.fitDays))))
+        let legacy = ChsModel(stationID: gate.id, iwlsID: "test", iwlsName: "Test", fittedAt: .now,
+                              fitStartMs: 0, fitEndMs: 1, fitDays: gate.fitDays, recipe: "8f85912ce223",
+                              floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0,
+                              constituents: [.init(name: "M3", amplitude: 1, phase: 350)])
+        let transferred = try XCTUnwrap(request.decode(try JSONEncoder().encode(legacy)))
+        XCTAssertEqual(transferred.recipe, legacy.recipe)
+        XCTAssertEqual(transferred.constituents.first?.phase, 350)
+        XCTAssertEqual(gate.record(with: transferred).constituents.first?.phase, 170)
         var stale = model(gate.id, days: gate.fitDays)
         stale.recipe = "other"
         XCTAssertNil(request.decode(try JSONEncoder().encode(stale)))

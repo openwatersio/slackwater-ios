@@ -3,6 +3,42 @@ import XCTest
 @testable import Slackwater
 
 @MainActor final class AlertRuleTests: XCTestCase {
+    func testNewOnceWindowRuleSurvivesAnOlderBuild() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens,
+                             once: Date(timeIntervalSince1970: 1_800_000_000))
+        store.upsert(rule)
+        let data = try XCTUnwrap(defaults.data(forKey: AppGroup.alertRulesKey))
+        struct LegacyRule: Decodable { let trigger: AlertTrigger }
+        XCTAssertThrowsError(try JSONDecoder().decode([LegacyRule].self, from: data))
+        XCTAssertEqual(AlertRuleStore(defaults: defaults).rules.first?.once, rule.once)
+        let saved = try XCTUnwrap(store.rules.first)
+        store.markSlackNeedsReview([saved], ids: [saved.id])
+        XCTAssertTrue(try XCTUnwrap(store.rules.first).enabled)
+        XCTAssertNil(store.rules.first?.slackNeedsReview)
+    }
+
+    func testOnceRuleSavedWithWindowOffKeepsItsSlackMeaning() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        store.upsert(rule, windowWasOff: true)
+        let saved = try XCTUnwrap(AlertRuleStore(defaults: defaults).rules.first)
+        XCTAssertTrue(saved.currentWindowRule)
+        XCTAssertTrue(saved.currentWindowWasOff)
+        store.markSlackNeedsReview([saved], ids: [saved.id])
+        XCTAssertEqual(store.rules.first?.slackNeedsReview, true)
+        let marked = AlertRuleStore(defaults: defaults)
+        marked.upsert(AlertRule(stationID: "other", trigger: .slack))
+        let restored = try XCTUnwrap(AlertRuleStore(defaults: defaults).rules.first { $0.id == saved.id })
+        XCTAssertTrue(restored.currentWindowRule)
+        XCTAssertTrue(restored.currentWindowWasOff)
+        XCTAssertEqual(restored.slackNeedsReview, true)
+    }
+
     func testRulesRoundTripThroughTheStore() {
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }
@@ -22,6 +58,59 @@ import XCTest
         store.remove(rule.id)
         XCTAssertEqual(AlertRuleStore(defaults: defaults).rules, [])
         XCTAssertEqual(changes, 3)
+    }
+
+    func testSlackReviewSurvivesReloadAndExplicitEditClearsIt() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        defaults.set(try JSONEncoder().encode([rule]), forKey: AppGroup.alertRulesKey)
+        let store = AlertRuleStore(defaults: defaults)
+        XCTAssertEqual(store.markSlackNeedsReview([rule], ids: [rule.id]).map(\.id), [rule.id])
+        XCTAssertTrue(store.markSlackNeedsReview([rule], ids: [rule.id]).isEmpty,
+                      "a later scheduler pass must not notify again")
+        let reloaded = AlertRuleStore(defaults: defaults)
+        let marked = try XCTUnwrap(reloaded.rules.first)
+        XCTAssertEqual(marked.slackNeedsReview, true)
+        XCTAssertFalse(marked.enabled, "older builds must see the retained rule as off")
+        struct LegacyRule: Decodable { let enabled: Bool }
+        XCTAssertFalse(try JSONDecoder().decode(LegacyRule.self, from: JSONEncoder().encode(marked)).enabled)
+        XCTAssertEqual(expiredUnchangedRules([marked], current: [marked], now: .distantFuture, occurrences: []), [marked.id])
+        reloaded.upsert(marked)
+        XCTAssertNil(reloaded.rules.first?.slackNeedsReview)
+    }
+
+    func testReviewedSlackRuleSurvivesLegacyWrite() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        defaults.set(try JSONEncoder().encode([rule]), forKey: AppGroup.alertRulesKey)
+        let store = AlertRuleStore(defaults: defaults)
+        store.markSlackNeedsReview([rule], ids: [rule.id])
+        let data = try XCTUnwrap(defaults.data(forKey: AppGroup.alertRulesKey))
+        let items = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [Any])
+        let item = try XCTUnwrap(items.first)
+        let encoded = try JSONSerialization.data(withJSONObject: item)
+        struct LegacyRule: Decodable { let trigger: AlertTrigger }
+        XCTAssertThrowsError(try JSONDecoder().decode(LegacyRule.self, from: encoded))
+        defaults.set(try JSONSerialization.data(withJSONObject: items), forKey: AppGroup.alertRulesKey)
+        let restored = try XCTUnwrap(AlertRuleStore(defaults: defaults).rules.first)
+        XCTAssertEqual(restored.slackNeedsReview, true)
+        XCTAssertFalse(restored.enabled)
+    }
+
+    func testSlackReviewDoesNotOverwriteAConcurrentEdit() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens, once: .now)
+        defaults.set(try JSONEncoder().encode([rule]), forKey: AppGroup.alertRulesKey)
+        let store = AlertRuleStore(defaults: defaults)
+        var edited = rule
+        edited.lead = 300
+        store.upsert(edited)
+        store.markSlackNeedsReview([rule], ids: [rule.id])
+        edited.currentWindowRule = true
+        XCTAssertEqual(store.rules, [edited])
     }
 
     func testARuleThisBuildCannotReadSurvivesAnEdit() throws {

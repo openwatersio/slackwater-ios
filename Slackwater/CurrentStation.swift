@@ -302,7 +302,8 @@ extension CurrentStationRecord {
     func cardState(at now: Date, station: any CurrentPredicting) -> CurrentCardState {
         let point = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first ?? CurrentPoint(time: now, speed: 0)
         // 30h forward guarantees a "next" exists, like the tide cards.
-        let next = station.events(from: now, to: now.addingTimeInterval(30 * 3600)).first { $0.time > now }
+        let events = station.events(from: now, to: now.addingTimeInterval(30 * 3600))
+        let next = currentEventsMatchingWater(station, events: events).first { $0.time > now }
         return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }

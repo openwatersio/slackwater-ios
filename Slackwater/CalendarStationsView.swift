@@ -5,6 +5,7 @@ struct CalendarStationsView: View {
     @ObservedObject private var calendars = StationCalendarStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
     @ObservedObject private var premium = PremiumStore.shared
+    @ObservedObject private var scheduler = AlertScheduler.shared
     @State private var showPremium = false
     @State private var pending: PendingRemoval?
     @State private var denied = false
@@ -113,7 +114,7 @@ struct CalendarStationsView: View {
         let record = WidgetStationLoader.loadRecord(id: stationID)
         let subtitle: String = if let record {
             if on {
-                stationCalendarTitle(name: name(stationID), kind: record.calendarKind)
+                stationCalendarTitle(name: name(stationID), kind: record.calendarKind, stationID: stationID)
             } else {
                 switch record.calendarKind {
                 case .tide: String(localized: "Add high and low tides")
@@ -137,6 +138,11 @@ struct CalendarStationsView: View {
             }
             .disabled(record == nil)
             .accessibilityIdentifier("calendar-station-\(stationID)")
+            if on && !stopped && scheduler.status.calendarNoSlack.contains(stationID) {
+                Text("No slack in available predictions")
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+            }
             if stopped {
                 Button { showPremium = true } label: {
                     Label("Stopped — needs Premium", systemImage: "sparkles")
@@ -165,7 +171,7 @@ struct CalendarStationsView: View {
             // this toggle reads off. Tell the truth instead: drop the subscription, which is all
             // this device can actually do, and say so.
             guard AlertCalendar.authorized else {
-                calendars.unsubscribe(stationID)
+                calendars.unsubscribe(stationID, preserveInvalidation: true)
                 revokedName = name(stationID)
                 revoked = true
                 return
@@ -195,14 +201,11 @@ struct CalendarStationsView: View {
     /// drops the id for a station not yet subscribed. EventKit's writes in `AlertCalendar` are
     /// all `try?` with no logging, so a source that refuses new calendars — Google, Exchange —
     /// would otherwise leave the toggle on with a calendar that never arrives and no explanation.
-    /// ponytail: a station with zero occurrences in the 90-day horizon would read the same as a
-    /// creation failure (`AlertCalendar.apply` skips making an empty calendar) — not reachable
-    /// by any bundled tide or current station, which always has a next high/low or slack window
-    /// inside that window.
     private func subscribeAndVerify(_ stationID: String) async {
         calendars.subscribe(stationID, notify: false, freeDay: !premium.hasPurchased)
         await AlertScheduler.shared.reschedule()
-        guard calendars.calendarID(for: stationID) == nil else { return }
+        guard !calendarSubscriptionReady(calendarID: calendars.calendarID(for: stationID),
+                                         noEvents: AlertScheduler.shared.status.calendarEmpty.contains(stationID)) else { return }
         calendars.unsubscribe(stationID)
         failedName = name(stationID)
         failed = true

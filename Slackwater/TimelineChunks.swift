@@ -142,7 +142,7 @@ struct TimelineChunk {
             let padded = s.speeds(from: start.addingTimeInterval(-pad),
                                   to: end.addingTimeInterval(pad), step: 600)
             currentPoints = padded.filter { inSpan($0.time) }
-            let paddedEvents = currentEventsMatchingWater(padded, events: s.events(from: start.addingTimeInterval(-pad), to: end.addingTimeInterval(pad)))
+            let paddedEvents = currentEventsMatchingWater(padded, events: s.events(from: start.addingTimeInterval(-pad), to: end.addingTimeInterval(pad)), station: s)
             currentEvents = paddedEvents.filter { inSpan($0.time) }
             let measured = measureSlacks(padded, events: paddedEvents, threshold: threshold)
             windows = measured.windows.filter { $0.end >= start && $0.start < end }

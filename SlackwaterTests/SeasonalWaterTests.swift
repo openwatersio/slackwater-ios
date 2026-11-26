@@ -34,9 +34,9 @@ final class SeasonalWaterTests: XCTestCase {
     func testLeadsWhereTheAnnualCycleIsTheSignal() {
         // Kingston on Lake Ontario: a principal tide of millimetres under a
         // seasonal swing of roughly a third of a metre.
-        let cobourg = record("ticon/kingston_ontario-13988-can-meds")
-        XCTAssertEqual(cobourg.seasonalDominant, true)
-        let ratio = try! XCTUnwrap(cobourg.seasonalRatio)
+        let kingston = record("ticon/kingston_ontario-13988-can-meds")
+        XCTAssertEqual(kingston.seasonalDominant, true)
+        let ratio = try! XCTUnwrap(kingston.seasonalRatio)
         XCTAssertGreaterThan(ratio, 20)
         XCTAssertGreaterThanOrEqual(ratio, TideStationRecord.seasonalLeadRatio)
         XCTAssertEqual(seasonalTimes(ratio), "30")

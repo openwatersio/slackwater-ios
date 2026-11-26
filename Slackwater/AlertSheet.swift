@@ -19,8 +19,56 @@ func alertRuleRepeating(_ rule: AlertRule, _ repeats: Bool, boundMoment: Date?) 
 /// A once rule bound to a moment already past would be dropped by the reschedule its save
 /// triggers (§6) — the strip shows 48 hours back, so a press can land there. Repeating rules
 /// always save.
-func alertSheetCanSave(_ rule: AlertRule, now: Date) -> Bool {
-    rule.once.map { $0 >= now } ?? true
+func alertSheetCanSave(_ rule: AlertRule, now: Date, holding: Bool = false) -> Bool {
+    if holding, let once = rule.once { return once.addingTimeInterval(21_600) >= now }
+    return rule.once.map { $0 >= now } ?? true
+}
+
+func alertSheetWindowWasOff(_ rule: AlertRule, saved: AlertRule?, threshold: Double) -> Bool {
+    guard slackWindowIsOff(threshold) else { return false }
+    if let saved, saved.slackNeedsReview != true, saved.currentWindowRule,
+       saved.once == rule.once, saved.trigger == rule.trigger {
+        return saved.currentWindowWasOff
+    }
+    return slackWindowIsOff(threshold)
+}
+
+func alertSheetInitialRule(_ rule: AlertRule) -> AlertRule {
+    var initial = rule
+    if initial.slackNeedsReview == true { initial.enabled = true }
+    return initial
+}
+
+enum AlertOpeningAvailability: Equatable, Sendable {
+    case checking, available(Date), alreadyOpen, unavailable, waitingForStation, held
+}
+
+func alertSheetOpeningCanSave(_ availability: AlertOpeningAvailability, now: Date) -> Bool {
+    switch availability {
+    case .available(let opening): return opening >= now
+    case .waitingForStation, .held: return true
+    case .checking, .alreadyOpen, .unavailable: return false
+    }
+}
+
+func alertSheetOpeningAvailability(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
+                                   now: Date, threshold: Double) -> AlertOpeningAvailability {
+    guard rule.trigger == .slackWindowOpens, let once = rule.once else { return .available(.distantFuture) }
+    if rule.currentWindowRule && !rule.currentWindowWasOff && slackWindowIsOff(threshold) {
+        return .held
+    }
+    let from = max(now, once).addingTimeInterval(-26 * 3600)
+    let to = max(now, once).addingTimeInterval(6 * 3600)
+    guard let opening = alertOccurrences(rule, station: station, position: position,
+                                         from: from, to: to, threshold: threshold).first else { return .unavailable }
+    return opening.event < now ? .alreadyOpen : .available(opening.event)
+}
+
+func alertSheetReminderRule(_ rule: AlertRule, opening: AlertOpeningAvailability) -> AlertRule {
+    guard rule.trigger == .slackWindowOpens, rule.once != nil, case .available(let event) = opening else { return rule }
+    var resolved = rule
+    resolved.once = event
+    return resolved
 }
 
 /// A moment still ahead whose reminder time is already behind: with a lead short enough for a
@@ -75,10 +123,12 @@ struct AlertSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
     @State private var showPremium = false
+    @State private var openingAvailability: AlertOpeningAvailability = .checking
+    @State private var checkedOpeningRule: AlertRule?
 
     init(rule: AlertRule, stationName: String, boundMoment: Date?, isNew: Bool = false,
          focusSentence: Bool = false) {
-        _rule = State(initialValue: rule)
+        _rule = State(initialValue: alertSheetInitialRule(rule))
         self.stationName = stationName
         _boundMoment = State(initialValue: boundMoment)
         self.isNew = isNew
@@ -86,7 +136,20 @@ struct AlertSheet: View {
     }
 
     private var imperial: Bool { units == "imperial" }
-    private var canSave: Bool { alertSheetCanSave(rule, now: appNow()) }
+    private var checksOpening: Bool { rule.trigger == .slackWindowOpens && rule.once != nil }
+    private var openingHasPassed: Bool {
+        if case .available(let opening) = openingAvailability { return opening < appNow() }
+        return openingAvailability == .alreadyOpen
+    }
+    private var reminderRule: AlertRule {
+        alertSheetReminderRule(rule, opening: checkedOpeningRule == rule ? openingAvailability : .checking)
+    }
+    private var holdingWindow: Bool { checkedOpeningRule == rule && openingAvailability == .held }
+    private var canSave: Bool {
+        guard alertSheetCanSave(rule, now: appNow(), holding: holdingWindow || checksOpening) else { return false }
+        guard checksOpening else { return true }
+        return checkedOpeningRule == rule && alertSheetOpeningCanSave(openingAvailability, now: appNow())
+    }
 
     var body: some View {
         NavigationStack {
@@ -141,15 +204,31 @@ struct AlertSheet: View {
                         Text("Blue hour").tag(SunWindow?.some(.blueHour))
                     }
                     .accessibilityIdentifier("alert-sheet-sun")
-                    if !canSave {
+                    if !alertSheetCanSave(rule, now: appNow(), holding: holdingWindow || checksOpening) {
                         Text("This moment has passed", comment: "Under the alert sheet's When section, when the chosen moment is already behind us.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
-                    } else if alertSheetStartsNow(rule, now: appNow()) {
+                    } else if checksOpening && checkedOpeningRule == rule && openingHasPassed {
+                        Text("The reminder time has passed", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .waitingForStation {
+                        Text("Waiting for station data", comment: "Alert sheet status when the selected station's predictions are not available yet.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if checksOpening && checkedOpeningRule == rule && openingAvailability == .unavailable {
+                        Text("Slackwater can't alert on that here yet", comment: "Message when the requested alert is unavailable for this station or selected time.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if holdingWindow {
+                        Text("Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    } else if alertSheetStartsNow(reminderRule, now: appNow()) {
                         Text("The reminder time has passed; the countdown starts now", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
-                    } else if alertSheetReminderPassed(rule, now: appNow()) {
+                    } else if alertSheetReminderPassed(reminderRule, now: appNow()) {
                         Text("The reminder time has passed", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away and the lead is too long for a countdown.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
@@ -194,6 +273,25 @@ struct AlertSheet: View {
         .presentationDetents(hSize == .regular ? [.large] : [.medium, .large])
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPremium) { PremiumView(opening: .alerts) }
+        .task(id: rule) {
+            let snapshot = rule
+            guard snapshot.trigger == .slackWindowOpens, snapshot.once != nil else {
+                openingAvailability = .available(.distantFuture)
+                return
+            }
+            openingAvailability = .checking
+            let now = appNow(), threshold = slackThresholdKn
+            let availability = await Task.detached(priority: .utility) {
+                guard let record = WidgetStationLoader.loadRecord(id: snapshot.stationID, at: now) else {
+                    return AlertOpeningAvailability.waitingForStation
+                }
+                return alertSheetOpeningAvailability(snapshot, station: WidgetStationLoader.station(from: record),
+                                                     position: record.alertPosition, now: now, threshold: threshold)
+            }.value
+            guard !Task.isCancelled, rule == snapshot else { return }
+            checkedOpeningRule = snapshot
+            openingAvailability = availability
+        }
     }
 
     private func noteText(_ note: AlertSheetNote) -> String {
@@ -203,7 +301,7 @@ struct AlertSheet: View {
         case .nothingThatDay:
             return String(localized: "Nothing that day", comment: "Under the sentence field when the ask named a day that holds no such event.")
         case .notOffered:
-            return String(localized: "Slackwater can't alert on that here yet", comment: "Under the sentence field when the words ask for something this station cannot alert on.")
+            return String(localized: "Slackwater can't alert on that here yet", comment: "Message when the requested alert is unavailable for this station or selected time.")
         case .failed:
             return String(localized: "Couldn't read that. Try other words.", comment: "Under the sentence field when the on-device model could not answer.")
         }
@@ -245,8 +343,14 @@ struct AlertSheet: View {
     /// Notification permission is asked on the first save, never at launch; a denial still
     /// saves the rule, and the Alerts screen says why it is quiet.
     private func save() {
+        guard canSave else {
+            if checksOpening && openingHasPassed { openingAvailability = .alreadyOpen }
+            return
+        }
         guard premium.isPremium else { showPremium = true; return }
-        store.upsert(rule)
+        let saved = store.rules.first { $0.id == rule.id }
+        let windowWasOff = alertSheetWindowWasOff(rule, saved: saved, threshold: slackThresholdKn)
+        store.upsert(rule, windowWasOff: windowWasOff)
         dismiss()
         // After the close: a denial still saves (docs/alerts.md §7.2), and a prompt the system never answers must not hold the sheet.
         Task {
