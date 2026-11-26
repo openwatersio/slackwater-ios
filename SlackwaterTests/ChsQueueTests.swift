@@ -567,6 +567,20 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testIncompleteCooldownPreventsRequeueAfterHold() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        service.onlinePendingForTesting = [gate]
+        service.holdOnline(gate)
+        for _ in 0..<3 { service.noteOnlineFailure(gate.id, error: "incomplete", permanent: false, maxAttempts: 3) }
+        XCTAssertTrue(service.onlineCooldownActive(gate.id))
+        service.releaseOnline(gate.id)
+        XCTAssertTrue(service.onlinePendingForTesting.isEmpty)
+    }
+
+    @MainActor
     func testAGateThatWasNotQueuedStaysOutAfterItsHold() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()

@@ -8,6 +8,11 @@ import SwiftUI
 import Combine
 import SlackwaterKit
 
+func onlineLeadPoint(at time: Date, speed: Double, magnitude: Double?, direction: Double?) -> CurrentPoint {
+    CurrentPoint(time: time, speed: speed, magnitude: magnitude, direction: direction,
+                 magnitudeIsKnown: direction == nil && (magnitude ?? 0) > 0)
+}
+
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
@@ -79,10 +84,9 @@ struct OnlineGateDetailView: View {
     @State private var timeline: TimelineData?
 
     private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow, ink: Color = .white) -> CurrentLead {
-        // The fetched samples are one-axis, so the kit gives the published bearing by the speed's sign.
         let vector = tl.currentPoints.vector(at: scrubTime, flood: window.floodDirection, ebb: window.ebbDirection)
-        let point = CurrentPoint(time: scrubTime, speed: tl.velocityAt(scrubTime),
-                                 magnitude: vector?.magnitude, direction: vector?.direction)
+        let point = onlineLeadPoint(at: scrubTime, speed: tl.velocityAt(scrubTime),
+                                    magnitude: vector?.magnitude, direction: vector?.direction)
         return CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, point: point,
                     floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
                     speedUnit: speedUnit, tz: tz, ink: ink)

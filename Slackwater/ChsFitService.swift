@@ -807,7 +807,7 @@ final class ChsFitService: ObservableObject {
             return
         }
         onlineHolds[id] = nil
-        guard hold.requeue else { return }
+        guard hold.requeue, !onlineCooldownActive(id) else { return }
         switch onlineState(id) {
         case .idle, .failed: break
         case .fetching, .deferred: return

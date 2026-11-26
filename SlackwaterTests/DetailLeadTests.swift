@@ -419,6 +419,13 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: t0, point: max).reading.spoken, "Max flood 2.5 knots NNE")
     }
 
+    func testOnlineLeadKeepsUnknownDirectionWhenSpeedEqualsMagnitude() {
+        let point = onlineLeadPoint(at: at(1000), speed: 0.3, magnitude: 0.3, direction: nil)
+        let reading = lead(scrub: at(1000), point: point).reading
+        XCTAssertNil(reading.setDegrees)
+        XCTAssertEqual(reading.glyph, "arrow.triangle.2.circlepath")
+    }
+
     /// Moving rotary water with no known set uses a circular symbol; zero keeps the slack glyph.
     func testUnknownRotaryDirectionUsesCircularSymbol() {
         let unknown = CurrentPoint(time: at(1000), speed: 1.2, magnitude: 1.5, direction: nil)
