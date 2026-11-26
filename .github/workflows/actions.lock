@@ -12,7 +12,7 @@ workflows:
     '.github/workflows/cla-trigger.yml': []
     '.github/workflows/cla.yml':
         - 'actions/create-github-app-token@v3.4.0'
-        - 'openwatersio/cla-github-action@master'
+        - 'openwatersio/cla-github-action@f07dfd38224fde9ace8e7b8437ba318e0db042ea'
     '.github/workflows/closed-pr.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/nightly.yml':
@@ -65,7 +65,7 @@ dependencies:
         commit: 'sha1-5fa07d19c267d19e29f4341f10fdf7f516375038'
         owner_id: 9919
         repo_id: 1217640442
-    'openwatersio/cla-github-action@master':
+    'openwatersio/cla-github-action@f07dfd38224fde9ace8e7b8437ba318e0db042ea':
         ref: 'master'
         commit: 'sha1-f07dfd38224fde9ace8e7b8437ba318e0db042ea'
         owner_id: 240908630
