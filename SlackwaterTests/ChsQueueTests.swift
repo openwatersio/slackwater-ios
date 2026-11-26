@@ -435,6 +435,21 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testIncompleteOtherDayDoesNotResetTodaysRetryCount() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete", permanent: false, maxAttempts: 3)
+        }
+        service.noteOnlineRefreshFailure(gate.id, preserveIncompleteAttempts: true)
+        service.noteOnlineFailure(gate.id, error: "Incomplete", permanent: false, maxAttempts: 3)
+        XCTAssertTrue(service.onlineCooldownActive(gate.id))
+    }
+
+    @MainActor
     func testIncompleteOtherDayKeepsAnUncoveredRequestedDownload() throws {
         let markers = savedDownloadMarkers()
         defer { restoreDownloadMarkers(markers) }

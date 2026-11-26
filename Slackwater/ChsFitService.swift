@@ -913,7 +913,7 @@ final class ChsFitService: ObservableObject {
     /// An automatic refresh failed on a station whose copy still covers today:
     /// nothing is wrong that a person can act on, so no failure line and no
     /// retry. Tomorrow's refresh tries again.
-    func noteOnlineRefreshFailure(_ id: String) {
+    func noteOnlineRefreshFailure(_ id: String, preserveIncompleteAttempts: Bool = false) {
         onlineRetryTimers[id]?.cancel()
         onlineRetryTimers[id] = nil
         if let gate = ChsCurrentGateInfo.all.first(where: { $0.id == id }),
@@ -922,7 +922,7 @@ final class ChsFitService: ObservableObject {
         }
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
-        onlineIncompleteAttempts[id] = 0
+        if !preserveIncompleteAttempts { onlineIncompleteAttempts[id] = 0 }
     }
 
     /// Whether the queue should fetch this gate now: always when today is not

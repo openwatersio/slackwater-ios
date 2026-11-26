@@ -217,7 +217,7 @@ extension ChsFitService {
                 } else if case .incomplete = error as? ChsError,
                           !incompleteOnlineRequestIsForToday(anchor: anchor, today: todayLocal(gate.tz), tz: gate.tz) {
                     // A missing different day must not stop today's automatic refresh.
-                    noteOnlineRefreshFailure(gate.id)
+                    noteOnlineRefreshFailure(gate.id, preserveIncompleteAttempts: true)
                 } else {
                     let incomplete: Bool
                     if case .incomplete = error as? ChsError { incomplete = true } else { incomplete = false }
