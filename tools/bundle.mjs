@@ -306,11 +306,11 @@ export const NORTH_AMERICA = new Set(["US", "CA", "PR", "VI", "GU", "MP", "AS"])
  * to be labelled honestly — so worldwide they ship under the country this map
  * corrects them to, not as a seventh US territory.
  */
-const COUNTRY_FIX = new Map([
+export const COUNTRY_FIX = new Map([
   ["ticon/barbuda-9761115-usa-noaa", ["Antigua and Barbuda", "AG"]],
   ["ticon/bermuda-2695540-usa-noaa", ["Bermuda", "BM"]],
   ["ticon/bermuda_biological_station-2695535-usa-noaa", ["Bermuda", "BM"]],
-  ["ticon/chuuk-1840000-usa-noaa", ["Micronesia", "FM"]],
+  ["ticon/chuuk-1840000-usa-noaa", ["Federated States of Micronesia", "FM"]],
   ["ticon/cochino_pequeno-9653601-usa-noaa", ["Honduras", "HN"]],
   ["ticon/dakar-7691360-usa-noaa", ["Senegal", "SN"]],
   ["ticon/diego_garcia-2431000-usa-noaa", ["British Indian Ocean Territory", "IO"]],
@@ -321,7 +321,7 @@ const COUNTRY_FIX = new Map([
   ["ticon/kwajalein-1820000-usa-noaa", ["Marshall Islands", "MH"]],
   ["ticon/lagos-7641400-usa-noaa", ["Nigeria", "NG"]],
   ["ticon/madero-9500966-usa-noaa", ["Mexico", "MX"]],
-  ["ticon/settlement_point-9710441-usa-noaa", ["Bahamas", "BS"]],
+  ["ticon/settlement_point-9710441-usa-noaa", ["The Bahamas", "BS"]],
   ["ticon/suva-1910000-usa-noaa", ["Fiji", "FJ"]],
   ["ticon/valparaiso-9963950-usa-noaa", ["Chile", "CL"]],
 ]);

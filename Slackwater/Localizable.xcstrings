@@ -59106,97 +59106,192 @@
         }
       }
     },
-    "Station names and pairings: Slackwater database (MIT)." : {
-      "comment" : "Station discovery interface text.",
+    "Station regions and countries, derived and adapted from: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap contributors (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)." : {
+      "comment" : "Attribution for station location and context data. Keep source names, URLs and licenses exact.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stationsnavne og tilknytninger: Slackwater-databasen (MIT)."
+            "value" : "Stationsregioner og lande, afledt og tilpasset fra: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap-bidragydere (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stationsnamen und Zuordnungen: Slackwater-Datenbank (MIT)."
+            "value" : "Stationsregionen und Länder, abgeleitet und angepasst aus: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap-Mitwirkende (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombres y asociaciones de estaciones: base de datos de Slackwater (MIT)."
+            "value" : "Regiones y países de estaciones, derivados y adaptados de: GeoNames (geonames.org, CC BY 4.0); colaboradores de OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Asemien nimet ja parit: Slackwater-tietokanta (MIT)."
+            "value" : "Asemien alueet ja maat, johdettu ja muokattu lähteistä: GeoNames (geonames.org, CC BY 4.0); OpenStreetMapin avustajat (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Noms et appariements des stations : base de données Slackwater (MIT)."
+            "value" : "Régions et pays des stations, dérivés et adaptés de : GeoNames (geonames.org, CC BY 4.0); contributeurs OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "ga" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ainmneacha agus péireálacha stáisiún: bunachar sonraí Slackwater (MIT)."
+            "value" : "Réigiúin agus tíortha stáisiún, díorthaithe agus oiriúnaithe ó: GeoNames (geonames.org, CC BY 4.0); rannpháirtithe OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "gd" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ainmean is paidhrichean nan stèiseanan: stòr-dàta Slackwater (MIT)."
+            "value" : "Roinnean agus dùthchannan stèiseanan, stèidhichte agus atharraichte air: GeoNames (geonames.org, CC BY 4.0); com-pàirtichean OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nomi e associazioni delle stazioni: database Slackwater (MIT)."
+            "value" : "Regioni e paesi delle stazioni, derivati e adattati da: GeoNames (geonames.org, CC BY 4.0); contributori OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "観測所名と対応関係：Slackwaterデータベース（MIT）。"
+            "value" : "観測地点の地域・国情報の派生元と加工元：GeoNames（geonames.org、CC BY 4.0）、OpenStreetMapの貢献者（openstreetmap.org、ODbL 1.0）、Marine Regions、Flanders Marine Institute（marineregions.org、CC BY 4.0）、Wikidata（wikidata.org、CC0 1.0）。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "관측소 이름과 연결 정보: Slackwater 데이터베이스 (MIT)."
+            "value" : "관측소 지역 및 국가 정보의 파생 및 수정 출처: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap 기여자 (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stasjonsnavn og koblinger: Slackwater-databasen (MIT)."
+            "value" : "Stasjonsregioner og land, utledet og tilpasset fra: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap-bidragsytere (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stationsnamen en koppelingen: Slackwater-database (MIT)."
+            "value" : "Regio’s en landen van stations, afgeleid en aangepast uit: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap-bijdragers (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nomes e associações das estações: banco de dados Slackwater (MIT)."
+            "value" : "Regiões e países das estações, derivados e adaptados de: GeoNames (geonames.org, CC BY 4.0); colaboradores do OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nomes e associações das estações: base de dados Slackwater (MIT)."
+            "value" : "Regiões e países das estações, derivados e adaptados de: GeoNames (geonames.org, CC BY 4.0); colaboradores do OpenStreetMap (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stationsnamn och kopplingar: Slackwaters databas (MIT)."
+            "value" : "Stationsregioner och länder, härledda och bearbetade från: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap-bidragsgivare (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0)."
+          }
+        }
+      }
+    },
+    "Station registry and pairings: Slackwater database (MIT)." : {
+      "comment" : "Credit for the station registry and pairings.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stationsregister og tilknytninger: Slackwater-databasen (MIT)."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stationsregister und Zuordnungen: Slackwater-Datenbank (MIT)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro de estaciones y asociaciones: base de datos de Slackwater (MIT)."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asemarekisteri ja yhdistelmät: Slackwater-tietokanta (MIT)."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre et jumelage des stations : base de données Slackwater (MIT)."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clár agus péirí stáisiún: bunachar sonraí Slackwater (MIT)."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clàr agus paidhrichean stèiseanan: stòr-dàta Slackwater (MIT)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro e abbinamenti delle stazioni: database Slackwater (MIT)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "観測地点の登録情報と組み合わせ：Slackwaterデータベース（MIT）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "관측소 등록 정보 및 연결: Slackwater 데이터베이스 (MIT)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stasjonsregister og koblinger: Slackwater-databasen (MIT)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stationsregister en koppelingen: Slackwater-database (MIT)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadastro e associações de estações: banco de dados Slackwater (MIT)."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registo e associações de estações: base de dados Slackwater (MIT)."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stationsregister och kopplingar: Slackwater-databasen (MIT)."
           }
         }
       }

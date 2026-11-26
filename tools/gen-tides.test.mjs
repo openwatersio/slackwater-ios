@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { loadStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
-  undangle, countryOf, countryCodeOf, sourceCredits,
+  undangle, countryOf, countryCodeOf, COUNTRY_FIX, sourceCredits,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -79,6 +79,28 @@ test("every publisher that ships is credited in About", () => {
   const source = new Map(db.all.map((s) => [s.id, s.source?.name]));
   const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
   assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
+});
+
+test("station location data sources are credited in the app and notices", () => {
+  const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
+  const notices = readFileSync(join(here, "..", "THIRD-PARTY-NOTICES.md"), "utf8");
+  const locationCredit = about.match(/Text\("(Station regions and countries, derived and adapted from: [^"]+)"\)/)?.[1];
+  assert.ok(locationCredit);
+  for (const source of ["GeoNames", "OpenStreetMap", "Marine Regions", "Wikidata"]) {
+    assert.ok(locationCredit.includes(source), `About: ${source}`);
+    assert.ok(notices.includes(source), `notices: ${source}`);
+  }
+});
+
+test("corrected country names match the database registry", () => {
+  for (const id of COUNTRY_FIX.keys()) {
+    const station = db.all.find((s) => s.id === id);
+    assert.ok(station, id);
+    const code = countryCodeOf(station);
+    const names = new Set(db.all.filter((s) => s.country_code === code && s.id !== id).map((s) => s.country));
+    assert.equal(names.size, 1, code);
+    assert.equal(countryOf(station), [...names][0], id);
+  }
 });
 
 test("JMA About and detail credits keep the same full license and editing notice", () => {

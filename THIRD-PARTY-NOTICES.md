@@ -7,10 +7,11 @@ Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.m
 - [Slackwater](https://github.com/openwatersio/slackwater) — harmonic prediction and native least-squares fitting (`SlackwaterKit`), and on-device CHS IWLS fetching (`SlackwaterIWLS`). MIT. The fitter is ported from [chs-constituents](https://github.com/openwatersio/chs-constituents) (MIT, © 2026 Bryan Clark).
 - [MapLibre Native](https://github.com/maplibre/maplibre-native) — map rendering. BSD-2-Clause.
 - [Almanac](https://github.com/openwatersio/almanac) — sun and moon calculations. MIT, with algorithms translated from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, © Don Cross).
-- [@slackwater/database](https://github.com/openwatersio/slackwater-database) and [@slackwater/engine](https://github.com/openwatersio/slackwater) — build-time inputs for the bundled stations: tide stations, station names, regions, aliases, and tide/current pairings. MIT.
+- [@slackwater/database](https://github.com/openwatersio/slackwater-database) and [@slackwater/engine](https://github.com/openwatersio/slackwater) — build-time inputs for the bundled stations. Their code and the database registry and CHS station identities are MIT; other station data carries the source licenses below.
 
 ## Data
 
+- **Station regions and countries**, derived and adapted from: [GeoNames](https://www.geonames.org/) cities500 data, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); **OpenStreetMap contributors**, water bodies under [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/); [Marine Regions](https://www.marineregions.org/), Flanders Marine Institute maritime boundaries under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); and [Wikidata](https://www.wikidata.org/wiki/Wikidata:Licensing) country and continent metadata under CC0 1.0.
 - **NOAA CO-OPS** harmonic constituents and current predictions — United States government work, public domain.
 - **TICON-4** harmonic constants, [SEANOE](https://www.seanoe.org/data/00980/109129/) — CC BY 4.0.
 - **Kartverket** harmonic constants for Norwegian stations — © Kartverket / Norwegian Mapping Authority, Hydrographic Service, [kartverket.no](https://www.kartverket.no/en/api-and-data/tides-and-water-level-data). [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), under [Kartverket's terms of use](https://www.kartverket.no/en/api-and-data/terms-of-use).
