@@ -47,8 +47,8 @@ import SlackwaterKit
         XCTAssertEqual(r.glyph, "arrow.up.right")
         XCTAssertTrue(r.rising)
         XCTAssertFalse(r.atTurn)
-        XCTAssertEqual(r.value, "4.0")
-        XCTAssertEqual(r.spoken, "Rising 4.0 feet")
+        XCTAssertEqual(r.value, "4.1")
+        XCTAssertEqual(r.spoken, "Rising 4.1 feet")
         XCTAssertEqual(r.spoken, spokenReading("Rising", r.value, unit: "ft"))
     }
 
@@ -76,8 +76,8 @@ import SlackwaterKit
         XCTAssertEqual(r.glyph, "arrow.up.to.line")
         XCTAssertTrue(r.rising)
         XCTAssertTrue(r.atTurn)
-        XCTAssertEqual(r.value, "7.1")
-        XCTAssertEqual(r.spoken, "High 7.1 feet")
+        XCTAssertEqual(r.value, "7.2")
+        XCTAssertEqual(r.spoken, "High 7.2 feet")
     }
 
     func testAtALowReadsLow() throws {
@@ -89,8 +89,8 @@ import SlackwaterKit
         XCTAssertEqual(r.glyph, "arrow.down.to.line")
         XCTAssertFalse(r.rising)
         XCTAssertTrue(r.atTurn)
-        XCTAssertEqual(r.value, "0.6")
-        XCTAssertEqual(r.spoken, "Low 0.6 feet")
+        XCTAssertEqual(r.value, "0.7")
+        XCTAssertEqual(r.spoken, "Low 0.7 feet")
     }
 
     /// Snap targets land exactly on the extreme; the 1 s window forgives the rest.

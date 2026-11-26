@@ -58,7 +58,7 @@ test("a station with no published MHW/MLW is uncheckable, not failing", () => {
 // Keep the named UK calibration ports, alongside the NOAA controls above.
 test("corrected Southampton and Aberdeen pass the datum gate", () => {
   const pick = (name) => db.all.find(
-    (s) => s.name === name && s.country === "United Kingdom" && checkable(s));
+    (s) => s.name === name && s.country_code === "GB" && checkable(s));
   const soton = pick("Southampton");
   const aberdeen = pick("Aberdeen");
   assert.ok(soton && aberdeen, "the two calibration stations must both be in the database");

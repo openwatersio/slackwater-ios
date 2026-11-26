@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { loadStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
-  undangle, countryOf, sourceCredits,
+  undangle, countryOf, countryCodeOf, COUNTRY_FIX, sourceCredits,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -23,6 +23,37 @@ const db = await loadStations();
 
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "stations.json"), "utf8"));
+
+test("both distinct Maizuru gauges ship with the database's curated context", async () => {
+  const east = stations.find((s) => s.id === "jma/MZ");
+  const west = stations.find((s) => s.id === "ticon/maizuru-hd24-jpn-jodc_jcg");
+  assert.ok(east);
+  assert.ok(west);
+  assert.equal(west.region, "Nishimaizuru");
+  assert.notEqual(east.region, west.region);
+  // JODC's HD24 history puts the western gauge at 35°27′05″N, 135°19′04″E.
+  assert.ok(km(west, { latitude: 35 + 27 / 60 + 5 / 3600, longitude: 135 + 19 / 60 + 4 / 3600 }) < 0.1);
+  assert.ok(km(east, west) > 6 && km(east, west) < 8);
+  const routes = db.stationRoutes("tide");
+  const eastRoute = routes.find((r) => r.stationIds.includes(east.id))?.slug;
+  const westRoute = routes.find((r) => r.stationIds.includes(west.id))?.slug;
+  assert.ok(eastRoute);
+  assert.ok(westRoute);
+  assert.notEqual(eastRoute, westRoute);
+  const resources = join(here, "..", "Slackwater", "Resources");
+  const read = (name) => JSON.parse(readFileSync(join(resources, name), "utf8"));
+  const binary = await loadStations(new URL("../Slackwater/Resources/stations.tcdb", import.meta.url));
+  const index = read("station-index.json");
+  const slugs = read("slugs.json").tide;
+  const tombstones = read("station-tombstones.json");
+  for (const id of [east.id, west.id]) {
+    assert.ok(binary.byId(id), id);
+    assert.ok(index.tides.some((station) => station.id === id), id);
+    assert.ok(slugs[id], id);
+    assert.ok(!tombstones.some((station) => station.id === id), id);
+  }
+  assert.notEqual(slugs[east.id], slugs[west.id]);
+});
 
 // The one failure that is a legal problem rather than a quality one, checked
 // independently of the generator that is supposed to prevent it.
@@ -48,6 +79,28 @@ test("every publisher that ships is credited in About", () => {
   const source = new Map(db.all.map((s) => [s.id, s.source?.name]));
   const shipped = [...new Set(stations.map((s) => source.get(s.id)))];
   assert.deepEqual(shipped.filter((name) => !about.includes(credits[name])), []);
+});
+
+test("station location data sources are credited in the app and notices", () => {
+  const about = readFileSync(join(here, "..", "Slackwater", "AboutView.swift"), "utf8");
+  const notices = readFileSync(join(here, "..", "THIRD-PARTY-NOTICES.md"), "utf8");
+  const locationCredit = about.match(/Text\("(Station regions and countries, derived and adapted from: [^"]+)"\)/)?.[1];
+  assert.ok(locationCredit);
+  for (const source of ["GeoNames", "OpenStreetMap", "Marine Regions", "Wikidata"]) {
+    assert.ok(locationCredit.includes(source), `About: ${source}`);
+    assert.ok(notices.includes(source), `notices: ${source}`);
+  }
+});
+
+test("corrected country names match the database registry", () => {
+  for (const id of COUNTRY_FIX.keys()) {
+    const station = db.all.find((s) => s.id === id);
+    assert.ok(station, id);
+    const code = countryCodeOf(station);
+    const names = new Set(db.all.filter((s) => s.country_code === code && s.id !== id).map((s) => s.country));
+    assert.equal(names.size, 1, code);
+    assert.equal(countryOf(station), [...names][0], id);
+  }
 });
 
 test("JMA About and detail credits keep the same full license and editing notice", () => {
@@ -124,7 +177,7 @@ test("no station outside North America carries a derived region", () => {
   const borrowed = stations
     .filter((s) => {
       const d = byId.get(s.id);
-      if (!d?.country || NORTH_AMERICA.has(countryOf(d))) return false;
+      if (!d?.country || NORTH_AMERICA.has(countryCodeOf(d))) return false;
       return d.context_derived && s.region === undangle(d.context) &&
         s.region !== d.region && s.region !== countryOf(d);
     })
@@ -140,9 +193,17 @@ test("every station is named from its database record", () => {
     const d = byId.get(s.id);
     assert.ok(d.name.startsWith(s.name), `${s.id}: "${s.name}" is not "${d.name}"`);
     assert.deepEqual(s.aliases, d.aliases ?? [], s.id);
-    const na = NORTH_AMERICA.has(countryOf(d));
+    const na = NORTH_AMERICA.has(countryCodeOf(d));
     if (d.context && (na || !d.context_derived)) assert.equal(s.region, undangle(d.context), s.id);
   }
+});
+
+// The registry renamed "Virgin Islands" to "United States Virgin Islands",
+// which a rule keyed on the name silently stopped matching.
+test("a US territory keeps its North American region line through a country rename", () => {
+  const tutu = stations.find((s) => s.id === "noaa/9751583");
+  assert.ok(tutu);
+  assert.equal(tutu.region, "Tutu, VI");
 });
 
 test("every station has a region line and a usable model", () => {
@@ -214,9 +275,10 @@ test("every TICON row carries the datums the quality gate reads", () => {
 test("the bundle reaches beyond North America", () => {
   // stations.json carries no `country` field (see the map() in gen-tides.mjs)
   // — correlate back to the upstream row by id, same as the licence test above.
-  const country = new Map(db.all.map((s) => [s.id, s.country]));
+  // By ISO code: the database's country names follow its registry and change.
+  const country = new Map(db.all.map((s) => [s.id, s.country_code]));
   const countries = new Set(stations.map((s) => country.get(s.id)));
-  for (const expected of ["United Kingdom", "France", "Germany", "Netherlands"]) {
+  for (const expected of ["GB", "FR", "DE", "NL"]) {
     assert.ok(countries.has(expected), `${expected} is missing from the bundle`);
   }
 });
@@ -257,10 +319,12 @@ test("no two bundled stations share a name within sight of each other", () => {
     byName.set(key, [...(byName.get(key) ?? []), s]);
   }
   const collisions = [];
+  const maizuru = new Set(["jma/MZ", "ticon/maizuru-hd24-jpn-jodc_jcg"]);
   for (const [, group] of byName) {
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
         if (km(group[i], group[j]) < SAME_PLACE_KM &&
+            !(maizuru.has(group[i].id) && maizuru.has(group[j].id)) &&
             (group[i].id.startsWith("ticon/") || group[j].id.startsWith("ticon/"))) {
           collisions.push(`${group[i].name} (${group[i].id} / ${group[j].id})`);
         }
@@ -271,16 +335,18 @@ test("no two bundled stations share a name within sight of each other", () => {
 });
 
 // A NOAA row that FAILS the datum gate must still block the TICON refit of the
-// same gauge. The gate ran as a filter before the dedupe, so a failing NOAA row
-// left the pipeline and stopped blocking: Anchorage's `noaa/9455920` (120
-// constituents, 0.308) was rejected and `ticon/anchorage-9455920-usa-noaa` (50
-// constituents, scored 0.237 against TICON's OWN recomputed datums) shipped in
-// its place from the identical position — the gate PROMOTING the model it had
-// just rejected, in Upper Cook Inlet, where a linear harmonic model is at its
-// worst. "We cannot vouch for this water" has to yield no station.
+// same gauge. Applied as a filter before the dedupe, the gate let a failing
+// NOAA row leave the pipeline and stop blocking: Anchorage's `noaa/9455920`
+// (120 constituents, scoring 0.308 then) was rejected and
+// `ticon/anchorage-9455920-usa-noaa` (50 constituents, scored 0.237 against
+// TICON's OWN recomputed datums) shipped in its place from the identical
+// position — the gate PROMOTING the model it had just rejected, in Upper Cook
+// Inlet, where a linear harmonic model is at its worst. "We cannot vouch for
+// this water" has to yield no station.
 //
-// Proven red: run against the bundle generated before the fix and Anchorage
-// appears here at 0.0 km.
+// Anchorage now passes the gate, and no gate-failing NOAA row has a mirror
+// within 1 km (docs/validation/world-tide-stations.md), so this guards the
+// next one rather than a current case.
 test("nothing ships in the water a gate-failing NOAA row was rejected for", () => {
   const bundled = new Set(stations.map((s) => s.id));
   const rejectedNoaa = db.all.filter(
@@ -326,7 +392,7 @@ test("stations that fail the datum gate are not bundled", () => {
         && !passesDatumCheck(s) && bundled.has(s.id));
   assert.deepEqual(rejected.map((s) => s.id), []);
   const soton = db.all.find(
-    (s) => s.name === "Southampton" && s.country === "United Kingdom");
+    (s) => s.name === "Southampton" && s.country_code === "GB");
   assert.ok(passesDatumCheck(soton), "Southampton must still pass the datum gate");
   assert.ok(bundled.has(soton.id), "corrected Southampton is missing");
 });
@@ -383,11 +449,21 @@ test("a missing bound is absent, never zero", () => {
   // "we don't know", so the generator omits the keys instead.
   const atZero = stations.filter((s) => s.latDatum === 0);
   assert.ok(atZero.length > 100, `expected many chart-datum-is-LAT stations, got ${atZero.length}`);
+  const byId = new Map(db.all.map((s) => [s.id, s]));
   for (const s of atZero) {
     // Kartverket labels its chart datum "CD"; Norway defines chart datum as
     // LAT, so sitting exactly at 0 is that definition, not a missing bound.
     const label = s.id.startsWith("kartverket/") ? ["LAT", "CD"] : ["LAT"];
-    assert.ok(label.includes(s.chartDatum), `${s.id} sits at 0 but its chart datum is ${s.chartDatum}`);
+    if (label.includes(s.chartDatum)) continue;
+    // Another chart datum can still land on LAT to the millimetre: Gamebridge's
+    // LLWLT does, on a lake with a 1.4 cm tide. That is a published bound, so
+    // the source must carry both datums and put them within rounding.
+    const datums = byId.get(s.id)?.datums ?? {};
+    const zero = datums[s.chartDatum];
+    assert.ok(
+      zero != null && datums.LAT != null && Math.abs(datums.LAT - zero) < 0.0005,
+      `${s.id} sits at 0 but its chart datum is ${s.chartDatum}`,
+    );
   }
   // Absence is a missing key, not a null.
   assert.deepEqual(

@@ -38,7 +38,7 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// narrows the envelope instead of bounding it. That is every CHS on-device
     /// fit and about a fifth of NOAA's harmonic references. `nil` means the
     /// station cannot support an absolute claim; `0.0` means its floor IS chart
-    /// datum, which is true of 887 shipped stations — so nothing may read a
+    /// datum, which is true of hundreds of shipped stations — so nothing may read a
     /// missing value as zero.
     var latDatum: Double? = nil
     var hatDatum: Double? = nil

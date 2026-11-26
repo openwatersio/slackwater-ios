@@ -468,13 +468,13 @@ import SlackwaterKit
         let midRise = turns[j].time.addingTimeInterval(turns[j + 1].time.timeIntervalSince(turns[j].time) / 2)
 
         let atNow = record.cardState(at: now)
-        XCTAssertEqual(atNow.height, 0.2017763985283949, accuracy: 1e-9)
+        XCTAssertEqual(atNow.height, 0.22391628222278115, accuracy: 1e-9)
         XCTAssertFalse(atNow.rising)
         let falling = record.cardState(at: midFall)
-        XCTAssertEqual(falling.height, 1.903074422745883, accuracy: 1e-9)
+        XCTAssertEqual(falling.height, 1.8871727883826148, accuracy: 1e-9)
         XCTAssertFalse(falling.rising)
         let rising = record.cardState(at: midRise)
-        XCTAssertEqual(rising.height, 1.227190735338082, accuracy: 1e-9)
+        XCTAssertEqual(rising.height, 1.241705327886569, accuracy: 1e-9)
         XCTAssertTrue(rising.rising)
     }
 

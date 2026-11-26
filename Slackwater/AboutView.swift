@@ -66,7 +66,8 @@ struct AboutView: View {
                     Text(
                         "Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included."
                     )
-                    Text("Station names and pairings: Slackwater database (MIT).")
+                    Text("Station registry and pairings: Slackwater database (MIT).")
+                    Text("Station regions and countries, derived and adapted from: GeoNames (geonames.org, CC BY 4.0); OpenStreetMap contributors (openstreetmap.org, ODbL 1.0); Marine Regions, Flanders Marine Institute (marineregions.org, CC BY 4.0); Wikidata (wikidata.org, CC0 1.0).")
                     Text("Prediction engine: Slackwater (MIT).")
                 }
 
