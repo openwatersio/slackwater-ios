@@ -406,6 +406,14 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertTrue(sampleEvents(window.points).isEmpty)
     }
 
+    func testFasterUnknownCurrentSuppressesPeaksAcrossOpposingRuns() {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+            start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 5400), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800, 2700, 3600, 4500, 5400], speeds: [0.5, 2, 1, 0, -1, -2.5, -0.4],
+            magnitudes: [0.5, 2, 1, 3, 1, 2.5, 0.4], directions: [0, 0, 0, nil, 180, 180, 180])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
     func testUnknownFasterCurrentSuppressesPeakElsewhereInSameRun() {
         let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
                                      start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 4500),

@@ -87,7 +87,7 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
         let restarted = ChsFitService()
         defer { restarted.resetOnlineStateForTesting() }
-        restarted.prioritize(lat: gate.latitude, lon: gate.longitude, favorites: [gate.id])
+        restarted.prioritize(lat: -89, lon: 0, favorites: [])
         try await Task.sleep(for: .milliseconds(200))
         XCTAssertFalse(restarted.isFetchingOnline(gate.id))
         XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
@@ -326,6 +326,26 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testDifferentWeekSaveDoesNotClearTodaysCooldownAfterRestart() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        let today = todayLocal(gate.tz), span = Timeline.window(anchor: today.addingTimeInterval(60 * 86_400))
+        defer {
+            UserDefaults.standard.removeObject(forKey: "slackwater.onlineIncompleteRetryAfter")
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let due = Date.now.addingTimeInterval(3600)
+        UserDefaults.standard.set([gate.id: due], forKey: "slackwater.onlineIncompleteRetryAfter")
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true, stationID: gate.id, iwlsName: gate.name,
+            timezone: gate.timezone, fetchedAt: .now, start: span.start, end: span.end, floodDirection: 0, ebbDirection: 180,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]), retainingFrom: span.start)
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertTrue(restarted.onlineCooldownActive(gate.id))
+    }
+
+    @MainActor
     func testIncompleteRetryDeadlineSurvivesServiceRestart() throws {
         let original = ChsFitService()
         original.resetOnlineStateForTesting()
@@ -341,6 +361,60 @@ final class ChsQueueTests: XCTestCase {
             XCTFail("Relaunch must retain the incomplete-prediction cooldown")
         }
         XCTAssertEqual(restarted.onlineState(gate.id, at: now.addingTimeInterval(86_401)), .idle)
+    }
+
+    @MainActor
+    func testOpeningCancelledGateResumesItsRefresh() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.refreshOnline(gate)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testVisibleCancelledGateResumesItsDownload() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.captureCohort(ids: [gate.id], heroID: gate.id)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testFavoritedCancelledGateResumesItsDownload() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.prioritizeFavorites([gate.id], after: nil)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testAllCurrentsSelectionSurvivesOlderAppReselection() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(true, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
     }
 
     @MainActor

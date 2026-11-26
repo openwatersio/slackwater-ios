@@ -134,6 +134,7 @@ import Foundation
 }
 
 private func resetSeedDownloadChoices() {
+    UserDefaults.standard.removeObject(forKey: ChsFitService.incompleteRetryKey)
     for key in [AppGroup.downloadTierKey, AppGroup.downloadAllCurrentsKey,
                 AppGroup.cancelledDownloadsKey, AppGroup.requestedDownloadsKey] {
         AppGroup.defaults.removeObject(forKey: key)

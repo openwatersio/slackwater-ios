@@ -109,7 +109,7 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
     private var onlineIncompleteAttempts: [String: Int] = [:]
-    nonisolated fileprivate static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
+    nonisolated static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
     private var onlineIncompleteRetryAfter: [String: Date] = [:] {
         didSet { UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey) }
     }
@@ -319,6 +319,7 @@ final class ChsFitService: ObservableObject {
         let cancelled = AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey) ?? []
         let requested = AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey) ?? []
         cancelledDownloads = Set(StationSuccessors.remap(cancelled, in: StationSuccessors.bundled))
+        if allCurrentsSelected { cancelledDownloads.subtract(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id)) }
         requestedDownloads = Set(StationSuccessors.remap(requested, in: StationSuccessors.bundled))
         if cancelledDownloads != Set(cancelled) {
             AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
@@ -334,9 +335,7 @@ final class ChsFitService: ObservableObject {
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
         for (id, due) in onlineIncompleteRetryAfter {
-            let modified = [ChsModelStore.onlineUrl(id), ChsModelStore.legacyOnlineUrl(id)].compactMap { url in
-                (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
-            }.max()
+            let modified = (try? FileManager.default.attributesOfItem(atPath: ChsModelStore.legacyOnlineUrl(id).path))?[.modificationDate] as? Date
             if onlineCacheChangedAfterFailure(modified: modified, retryAfter: due) {
                 onlineIncompleteRetryAfter.removeValue(forKey: id)
                 onlineStates.removeValue(forKey: id)
@@ -530,6 +529,7 @@ final class ChsFitService: ObservableObject {
             remainingBeyondCohort = 0
         }
         pump()
+        prefetchOnlineGates(ChsCurrentGateInfo.all.filter { $0.isOnline && cohort.ids.contains($0.id) }, resumeCancelled: true)
         prefetchOnlineGates(tierOnlineGates[tier] ?? [])
     }
 
@@ -792,8 +792,9 @@ final class ChsFitService: ObservableObject {
         adopt(lat: lat, lon: lon)
         onlineOrigin = (lat, lon)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
-        prefetchOnlineGates(favoriteGates + (allCurrentsSelected
-            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? []))
+        prefetchOnlineGates(favoriteGates, resumeCancelled: true)
+        prefetchOnlineGates(allCurrentsSelected
+            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? [], resumeCancelled: allCurrentsSelected)
         resumeForForeground()
     }
 
@@ -802,7 +803,7 @@ final class ChsFitService: ObservableObject {
     func prioritizeFavorites(_ ids: [String], after visibleID: String?) {
         let online = applyFavorites(ids, after: visibleID)
         pump()
-        prefetchOnlineGates(online)
+        prefetchOnlineGates(online, resumeCancelled: true)
     }
 
     private func applyFavorites(_ ids: [String], after visibleID: String?) -> [ChsCurrentGateInfo] {
@@ -983,7 +984,7 @@ final class ChsFitService: ObservableObject {
 
     /// An opened station refreshes the way the download set does, even when
     /// nothing else would have queued it.
-    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate]) }
+    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate], resumeCancelled: true) }
 
     func fetchOnline(_ gate: ChsCurrentGateInfo) {
         guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
@@ -1238,11 +1239,12 @@ final class ChsFitService: ObservableObject {
             .filter { !$0 }
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    guard let self, let origin = self.onlineOrigin else { return }
-                    self.adopt(lat: origin.lat, lon: origin.lon)
+                    guard let self else { return }
+                    if let origin = self.onlineOrigin { self.adopt(lat: origin.lat, lon: origin.lon) }
                     self.pump()
-                    self.prefetchOnlineGates(self.allCurrentsSelected
-                        ? ChsCurrentGateInfo.all.filter(\.isOnline) : self.tierOnlineGates[self.tier] ?? [])
+                    let selected = self.allCurrentsSelected
+                        ? ChsCurrentGateInfo.all.filter(\.isOnline) : self.tierOnlineGates[self.tier] ?? []
+                    self.prefetchOnlineGates(Array(self.onlineDesired.values) + selected, resumeCancelled: self.allCurrentsSelected)
                 }
             }
     }

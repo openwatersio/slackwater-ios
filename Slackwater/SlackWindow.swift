@@ -154,7 +154,6 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
     let unknownIndices = samples.indices.filter {
         samples[$0].magnitudeIsKnown && samples[$0].direction == nil && samples[$0].magnitude > 0
     }
-    var unknownCursor = 0
     var events: [CurrentEvent] = []
     var runStart = 0
     var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
@@ -166,17 +165,19 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
         let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
         guard !nonzeroInRun.isEmpty else { return }
         let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
-        let start = points[runStart].time, finish = points[end].time
-        while unknownCursor < unknownIndices.count && samples[unknownIndices[unknownCursor]].time < start {
-            unknownCursor += 1
+        let start = runStart > 0 ? points[runStart - 1].time : samples[0].time
+        let finish = end + 1 < points.count ? points[end + 1].time : samples[samples.count - 1].time
+        var low = 0, high = unknownIndices.count
+        while low < high {
+            let middle = (low + high) / 2
+            if samples[unknownIndices[middle]].time < start { low = middle + 1 } else { high = middle }
         }
-        var cursor = unknownCursor
+        var cursor = low
         var uncertain = false
         while cursor < unknownIndices.count && samples[unknownIndices[cursor]].time <= finish {
             uncertain = uncertain || samples[unknownIndices[cursor]].magnitude > abs(peak.speed)
             cursor += 1
         }
-        unknownCursor = cursor
         guard !uncertain else { return }
         events.append(CurrentEvent(time: peak.time, speed: peak.speed,
                                    kind: peak.speed > 0 ? .maxFlood : .maxEbb))
