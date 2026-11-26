@@ -341,11 +341,29 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testRequestedIncompleteDownloadRemainsRequestedAfterRestart() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        for _ in 0..<3 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertTrue(restarted.isFetchingOnline(gate.id))
+    }
+
+    @MainActor
     func testRestartedIncompleteRetryResumesWhenDeadlineExpires() async throws {
         let original = ChsFitService()
         original.resetOnlineStateForTesting()
         defer { original.resetOnlineStateForTesting() }
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(original.prepareOnlineUpdate(gate))
         let failure = Date.now.addingTimeInterval(-86_397)
         for _ in 0..<3 {
             original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: failure)
@@ -353,7 +371,7 @@ final class ChsQueueTests: XCTestCase {
         let restarted = ChsFitService()
         defer { restarted.resetOnlineStateForTesting() }
         if case .failed = restarted.onlineStates[gate.id] {} else { XCTFail("Cooldown must be restored before the timer starts") }
-        restarted.refreshOnline(gate)
+        restarted.resumeForBackground()
         for _ in 0..<60 where restarted.onlineStates[gate.id] != .idle {
             try await Task.sleep(for: .milliseconds(100))
         }
@@ -747,6 +765,28 @@ final class ChsQueueTests: XCTestCase {
     /// One automatic try a day for a station that still works, and a failure
     /// of that try neither shows nor retries.
     @MainActor
+    func testRecentDirectionlessDownloadDoesNotRetryAfterRestart() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: appNow(), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0],
+            magnitudes: [1, 1], directions: [nil, nil]))
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertFalse(restarted.onlineRefreshDue(gate))
+    }
+
+    @MainActor
     func testDirectionlessDownloadRetriesEvenWhenItCoversTheMonth() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()
@@ -759,7 +799,7 @@ final class ChsQueueTests: XCTestCase {
         let start = Timeline.window(anchor: today).start
         let end = today.addingTimeInterval(60 * 86_400)
         try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
-            fetchedAt: appNow(), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            fetchedAt: today.addingTimeInterval(-86_400), start: start, end: end, floodDirection: 0, ebbDirection: 180,
             times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0],
             magnitudes: [1, 1], directions: [nil, nil]))
         XCTAssertTrue(service.onlineRefreshDue(gate))

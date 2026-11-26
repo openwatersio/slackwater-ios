@@ -322,6 +322,27 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertTrue(currentWindows(window.points, events: [], threshold: 0.5).isEmpty)
     }
 
+    func testNewerLegacyDownloadReplacesOverlappingOlderSamples() throws {
+        let id = "chs-legacy-overlap-\(UUID().uuidString)"
+        func legacy(_ times: [Double], speed: Double, fetched: Date) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: fetched,
+                            start: Date(timeIntervalSince1970: times.first!), end: Date(timeIntervalSince1970: times.last!),
+                            floodDirection: 0, ebbDirection: 180, times: times, speeds: times.map { _ in speed })
+        }
+        let currentURL = ChsModelStore.onlineUrl(id), oldURL = ChsModelStore.legacyOnlineUrl(id)
+        defer { try? FileManager.default.removeItem(at: currentURL); try? FileManager.default.removeItem(at: oldURL) }
+        try FileManager.default.createDirectory(at: currentURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let earlier = legacy([0, 900, 1800, 2700, 3600], speed: 1, fetched: Date(timeIntervalSince1970: 1))
+        let newer = legacy([1800, 2700, 3600, 4500, 5400], speed: 2, fetched: Date(timeIntervalSince1970: 2))
+        try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [earlier])).write(to: currentURL)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-60)], ofItemAtPath: currentURL.path)
+        try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [newer])).write(to: oldURL)
+        let blocks = try XCTUnwrap(ChsModelStore.loadLegacyOnline(id)?.blocks)
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertLessThan(try XCTUnwrap(blocks.first?.end), try XCTUnwrap(blocks.last?.start))
+        XCTAssertEqual(blocks.last?.speeds.first, 2)
+    }
+
     func testSavingVectorDataPreservesTheOlderAppDownload() throws {
         let id = "chs-rollback-\(UUID().uuidString)"
         let start = Date(timeIntervalSince1970: 1_767_225_600)

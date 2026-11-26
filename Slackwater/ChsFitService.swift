@@ -16,8 +16,10 @@ let networkKillSwitch: Bool = {
     return CommandLine.arguments.contains("-networkKillSwitch")
 }()
 
+private let onlineIncompleteCooldown: TimeInterval = 86_400
+
 func onlineCacheChangedAfterFailure(modified: Date?, retryAfter: Date) -> Bool {
-    modified.map { $0 > retryAfter.addingTimeInterval(-86_399) } ?? false
+    modified.map { $0 > retryAfter.addingTimeInterval(1 - onlineIncompleteCooldown) } ?? false
 }
 
 func legacyOnlineNeedsRefresh(vector: ChsOnlineStore?, legacy: ChsOnlineStore?, today: Date) -> Bool {
@@ -303,7 +305,7 @@ final class ChsFitService: ObservableObject {
         ChsModelStore.resetIfRequested()
         let now = appNow()
         onlineIncompleteRetryAfter = (UserDefaults.standard.dictionary(forKey: Self.incompleteRetryKey) as? [String: Date] ?? [:])
-            .filter { $0.value > now && $0.value <= now.addingTimeInterval(86_400) }
+            .filter { $0.value > now && $0.value <= now.addingTimeInterval(onlineIncompleteCooldown) }
         UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey)
         for id in onlineIncompleteRetryAfter.keys {
             onlineStates[id] = .failed("IWLS returned incomplete current vectors")
@@ -873,9 +875,8 @@ final class ChsFitService: ObservableObject {
         let attempts = (incomplete ? onlineIncompleteAttempts[id] ?? 0 : onlineAttempts[id] ?? 0) + 1
         if incomplete { onlineIncompleteAttempts[id] = attempts } else { onlineAttempts[id] = attempts }
         if let maxAttempts, attempts >= maxAttempts {
-            releaseRequest(id)
             onlineStates[id] = .failed(error)
-            let due = now.addingTimeInterval(86_400)
+            let due = now.addingTimeInterval(onlineIncompleteCooldown)
             onlineIncompleteRetryAfter[id] = due
             if let gate = onlineDesired[id] { scheduleIncompleteRetry(gate, due: due) }
             return
@@ -922,10 +923,12 @@ final class ChsFitService: ObservableObject {
     func onlineRefreshDue(_ gate: ChsCurrentGateInfo) -> Bool {
         let today = todayLocal(gate.tz)
         guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else { return true }
-        let missingBearings = block.directions?.allSatisfy { $0 == nil } == true
+        let constrained = Connectivity.shared.constrained
+        let missingBearings = !constrained && dayLocal(block.fetchedAt, gate.tz) < today
+            && block.directions?.allSatisfy { $0 == nil } == true
             && block.magnitudes?.contains { $0 > 0 } == true
         return onlineRefreshedOn[gate.id] != today
-            && (missingBearings || store.needsRefresh(today: today, lowData: Connectivity.shared.constrained))
+            && (missingBearings || store.needsRefresh(today: today, lowData: constrained))
     }
 
     func markOnlineRefresh(_ gate: ChsCurrentGateInfo) {

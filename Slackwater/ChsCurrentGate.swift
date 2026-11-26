@@ -129,19 +129,33 @@ extension ChsModelStore {
             return store.flatMap { $0.stationID == stationID ? $0 : nil }
         }
         let current = decode(currentURL, signature: currentSignature)
-        let old = decode(oldURL, signature: oldSignature)
+        let shouldReadOld = current == nil || (oldSignature != nil && currentSignature != nil
+            && oldSignature!.modified > currentSignature!.modified)
+        let old = shouldReadOld ? decode(oldURL, signature: oldSignature) : nil
         guard !readFailed else { return nil }
         let selected = current ?? old
         let vectors = selected?.blocks.filter(\.hasVectors) ?? []
         var legacy = selected?.blocks.filter { !$0.hasVectors } ?? []
         if current != nil, let oldSignature, let currentSignature, oldSignature.modified > currentSignature.modified {
-            legacy.insert(contentsOf: old?.blocks.filter { !$0.hasVectors } ?? [], at: 0)
+            legacy.append(contentsOf: old?.blocks.filter { !$0.hasVectors } ?? [])
         }
         legacy = legacy.filter {
             $0.stationID == stationID && $0.times.count > 1 && $0.times.count == $0.speeds.count
                 && $0.times.allSatisfy(\.isFinite) && $0.speeds.allSatisfy(\.isFinite)
                 && zip($0.times, $0.times.dropFirst()).allSatisfy { pair in pair.0 < pair.1 }
         }
+        var disjointLegacy: [ChsOnlineWindow] = []
+        let byAge = legacy.enumerated().sorted {
+            $0.element.fetchedAt == $1.element.fetchedAt ? $0.offset < $1.offset : $0.element.fetchedAt < $1.element.fetchedAt
+        }
+        for (_, block) in byAge {
+            disjointLegacy = disjointLegacy.flatMap { existing in
+                guard existing.start <= block.end && block.start <= existing.end else { return [existing] }
+                return existing.axisOnlyOutside(block, prunedBefore: .distantPast)
+            }
+            disjointLegacy.append(block)
+        }
+        legacy = disjointLegacy.sorted { $0.start < $1.start }
         let fullStore = vectors.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: vectors)
         let legacyStore = legacy.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: legacy)
         onlineCache[stationID] = (currentSignature, oldSignature, fullStore, legacyStore)
@@ -240,7 +254,7 @@ struct ChsOnlineWindow: Codable, Sendable {
         try c.encode(floodDirection, forKey: .floodDirection)
         try c.encode(ebbDirection, forKey: .ebbDirection)
         try c.encode(times, forKey: .times)
-        // A null axis prevents older readers from interpreting an unknown bearing as calm.
+        // Persist an unknown axis as null while retaining its measured magnitude.
         let axis: [Double?] = speeds.enumerated().map { index, speed in
             if let magnitudes, let directions, index < magnitudes.count, index < directions.count,
                magnitudes[index] > 0, directions[index] == nil { return nil }
