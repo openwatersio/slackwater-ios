@@ -203,6 +203,10 @@ extension ChsOnlineWindow: CurrentPredicting {
                         magnitude = magnitudes[index - 1]; direction = directions[index - 1]
                     } else if fraction == 1 {
                         magnitude = magnitudes[index]; direction = directions[index]
+                    } else if let a = directions[index - 1], magnitudes[index] == 0 {
+                        magnitude = magnitudes[index - 1] * (1 - fraction); direction = a
+                    } else if let b = directions[index], magnitudes[index - 1] == 0 {
+                        magnitude = magnitudes[index] * fraction; direction = b
                     } else if let a = directions[index - 1], let b = directions[index] {
                         let ar = a * .pi / 180, br = b * .pi / 180
                         let east = magnitudes[index - 1] * sin(ar) * (1 - fraction) + magnitudes[index] * sin(br) * fraction

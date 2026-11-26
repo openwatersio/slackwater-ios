@@ -308,7 +308,7 @@ final class ChsFitService: ObservableObject {
             .filter { $0.value > now && $0.value <= now.addingTimeInterval(onlineIncompleteCooldown) }
         UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey)
         for id in onlineIncompleteRetryAfter.keys {
-            onlineStates[id] = .failed("IWLS returned incomplete current vectors")
+            onlineStates[id] = .failed("IWLS returned incomplete current predictions")
         }
         // Before anything adopts: `adopt` reads `tier` to decide what the
         // queue may take, and the first call can arrive from the list's
@@ -475,7 +475,7 @@ final class ChsFitService: ObservableObject {
             // carries — read it before the file goes. Best effort: an
             // `-online.json` decodes as no model and keeps its chunks, and a
             // chunk cache is re-fetchable by definition.
-            if let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
+            if file.hasSuffix(".json"), let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
                 IwlsFetcher.chunkCache.purge(model.iwlsID, includingEmpty: true)
             }
             try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
@@ -924,9 +924,14 @@ final class ChsFitService: ObservableObject {
         let today = todayLocal(gate.tz)
         guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else { return true }
         let constrained = Connectivity.shared.constrained
+        let end = today.addingTimeInterval(Timeline.onlineFetchDays * 86_400).timeIntervalSince1970
         let missingBearings = !constrained && dayLocal(block.fetchedAt, gate.tz) < today
-            && block.directions?.allSatisfy { $0 == nil } == true
-            && block.magnitudes?.contains { $0 > 0 } == true
+            && block.times.indices.contains { index in
+                guard let magnitudes = block.magnitudes, let directions = block.directions,
+                      index < magnitudes.count, index < directions.count else { return false }
+                return block.times[index] >= today.timeIntervalSince1970 && block.times[index] <= end
+                    && magnitudes[index] > 0 && directions[index] == nil
+            }
         return onlineRefreshedOn[gate.id] != today
             && (missingBearings || store.needsRefresh(today: today, lowData: constrained))
     }

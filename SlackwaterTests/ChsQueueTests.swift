@@ -800,8 +800,29 @@ final class ChsQueueTests: XCTestCase {
         let end = today.addingTimeInterval(60 * 86_400)
         try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
             fetchedAt: today.addingTimeInterval(-86_400), start: start, end: end, floodDirection: 0, ebbDirection: 180,
-            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0],
-            magnitudes: [1, 1], directions: [nil, nil]))
+            times: [start.timeIntervalSince1970, today.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0, 0],
+            magnitudes: [1, 1, 1], directions: [nil, nil, nil]))
+        XCTAssertTrue(service.onlineRefreshDue(gate))
+        service.markOnlineRefresh(gate)
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+    }
+
+    @MainActor
+    func testPartiallyMissingBearingsRetryEvenWhenTheyCoverTheMonth() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: today.addingTimeInterval(-86_400), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, today.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, 0, 1],
+            magnitudes: [1, 1, 1], directions: [0, nil, 0]))
         XCTAssertTrue(service.onlineRefreshDue(gate))
         service.markOnlineRefresh(gate)
         XCTAssertFalse(service.onlineRefreshDue(gate))

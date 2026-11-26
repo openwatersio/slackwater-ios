@@ -322,6 +322,25 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertTrue(currentWindows(window.points, events: [], threshold: 0.5).isEmpty)
     }
 
+    func testUnreadableLegacyFileDoesNotHideReadableVectorDownload() throws {
+        let id = "chs-readable-vector-\(UUID().uuidString)"
+        let start = Date(timeIntervalSince1970: 1_767_225_600)
+        let window = ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: start, end: start.addingTimeInterval(900), floodDirection: 0, ebbDirection: 180,
+                                     times: [start.timeIntervalSince1970, start.timeIntervalSince1970 + 900], speeds: [1, 1])
+        let currentURL = ChsModelStore.onlineUrl(id), oldURL = ChsModelStore.legacyOnlineUrl(id)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: oldURL.path)
+            try? FileManager.default.removeItem(at: currentURL)
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+        try ChsModelStore.saveOnline(window, retainingFrom: start)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-60)], ofItemAtPath: currentURL.path)
+        try Data("unavailable".utf8).write(to: oldURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: oldURL.path)
+        XCTAssertNotNil(ChsModelStore.loadOnline(id))
+    }
+
     func testNewerLegacyDownloadReplacesOverlappingOlderSamples() throws {
         let id = "chs-legacy-overlap-\(UUID().uuidString)"
         func legacy(_ times: [Double], speed: Double, fetched: Date) -> ChsOnlineWindow {
@@ -364,6 +383,35 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: oldURL), original)
         XCTAssertFalse(ChsModelStore.onlineUrl(id).lastPathComponent.hasSuffix(".json"), "The previous release removes unknown JSON files during orphan cleanup")
         XCTAssertNotNil(ChsModelStore.loadOnline(id))
+    }
+
+    func testUnknownFasterCurrentDoesNotProduceAFalseAdjacentPeak() {
+        let values: [Double] = [1, 2, 0, 2, 1]
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 3600),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600], speeds: values,
+                                     magnitudes: [1, 2, 4, 2, 1], directions: [0, 0, nil, 0, 0])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
+    func testUnknownFasterCurrentSuppressesPeakElsewhereInSameRun() {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 4500),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600, 4500], speeds: [1, 5, 4, 0, 3, 1],
+                                     magnitudes: [1, 5, 4, 8, 3, 1], directions: [0, 0, 0, nil, 0, 0])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
+    func testInterpolationIntoMeasuredZeroKeepsKnownDirection() throws {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900], speeds: [1, 0], magnitudes: [2, 0], directions: [90, nil])
+        let point = try XCTUnwrap(window.speeds(from: Date(timeIntervalSince1970: 450), to: Date(timeIntervalSince1970: 450), step: 1).first)
+        XCTAssertEqual(point.direction, 90)
+        XCTAssertFalse(point.magnitudeIsKnown)
     }
 
     func testUnknownDirectionDoesNotCreateNewPeakAfterReload() throws {
@@ -429,7 +477,7 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertNotEqual(readCurrent(at: midpoint, timeline: loaded.points, events: [crossing], flood: 0, ebb: 180)?.state, .slack)
         XCTAssertTrue(currentWindows(loaded.points, events: [crossing], threshold: 0.5).isEmpty)
         XCTAssertFalse(sampleEvents(loaded.points).contains { $0.kind == .slack })
-        XCTAssertTrue(sampleEvents(loaded.points).contains { $0.time == start })
+        XCTAssertFalse(sampleEvents(loaded.points).contains { $0.time == start })
         let reading = currentLeadReading("Flooding", isSlack: false, point: point, floodDeg: 0, ebbDeg: 180, speedUnit: "kn", setFormat: "compass")
         XCTAssertEqual(reading.glyph, "arrow.triangle.2.circlepath")
         XCTAssertTrue(reading.state.isEmpty)

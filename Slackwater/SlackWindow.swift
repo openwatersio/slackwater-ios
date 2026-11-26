@@ -162,6 +162,9 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
         let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
         guard !nonzeroInRun.isEmpty else { return }
         let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
+        let start = points[runStart].time, finish = points[end].time
+        guard !samples.contains(where: { $0.time >= start && $0.time <= finish && $0.magnitudeIsKnown
+            && $0.direction == nil && $0.magnitude > abs(peak.speed) }) else { return }
         events.append(CurrentEvent(time: peak.time, speed: peak.speed,
                                    kind: peak.speed > 0 ? .maxFlood : .maxEbb))
     }
@@ -201,6 +204,13 @@ func sampleEvents(_ samples: [CurrentPoint]) -> [CurrentEvent] {
         guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > 0 else { return nil }
         return samples[max(0, index - 1)].time...samples[min(samples.count - 1, index + 1)].time
     }
-    return events.filter { event in !uncertainSpans.contains { $0.lowerBound < event.time && event.time < $0.upperBound } }
-        .sorted { $0.time < $1.time }
+    return events.filter { event in
+        guard !uncertainSpans.contains(where: { $0.lowerBound < event.time && event.time < $0.upperBound }) else { return false }
+        guard event.kind != .slack else { return true }
+        return !samples.indices.contains { index in
+            let point = samples[index]
+            guard point.magnitudeIsKnown && point.direction == nil && point.magnitude > abs(event.speed) else { return false }
+            return samples[max(0, index - 1)].time == event.time || samples[min(samples.count - 1, index + 1)].time == event.time
+        }
+    }.sorted { $0.time < $1.time }
 }

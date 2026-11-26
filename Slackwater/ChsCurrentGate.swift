@@ -132,7 +132,7 @@ extension ChsModelStore {
         let shouldReadOld = current == nil || (oldSignature != nil && currentSignature != nil
             && oldSignature!.modified > currentSignature!.modified)
         let old = shouldReadOld ? decode(oldURL, signature: oldSignature) : nil
-        guard !readFailed else { return nil }
+        guard !readFailed || current != nil else { return nil }
         let selected = current ?? old
         let vectors = selected?.blocks.filter(\.hasVectors) ?? []
         var legacy = selected?.blocks.filter { !$0.hasVectors } ?? []
@@ -158,7 +158,7 @@ extension ChsModelStore {
         legacy = disjointLegacy.sorted { $0.start < $1.start }
         let fullStore = vectors.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: vectors)
         let legacyStore = legacy.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: legacy)
-        onlineCache[stationID] = (currentSignature, oldSignature, fullStore, legacyStore)
+        if !readFailed { onlineCache[stationID] = (currentSignature, oldSignature, fullStore, legacyStore) }
         return (fullStore, legacyStore)
     }
 

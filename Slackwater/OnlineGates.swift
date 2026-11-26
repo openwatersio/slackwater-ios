@@ -103,7 +103,7 @@ extension ChsFitService {
 
     nonisolated static func onlineCoveredWindow(_ blocks: [ChsOnlineWindow], anchor: Date, name: String) throws -> ChsOnlineWindow {
         guard let window = blocks.first(where: { $0.covers(anchor: anchor) }) else {
-            throw ChsError.incomplete("\(name): IWLS returned incomplete current vectors")
+            throw ChsError.incomplete("\(name): IWLS returned incomplete current predictions")
         }
         return window
     }
@@ -263,9 +263,12 @@ extension ChsFitService {
         // Empty or unmatched IWLS series cannot establish coverage or a current vector.
         guard let rawVectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
             IwlsFetcher.chunkCache.purge(station.id)
-            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors")
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current predictions")
         }
         let vectors = Self.fillSingleOnlineGaps(projected: rawVectors.projected, magnitudes: rawVectors.magnitudes, directions: rawVectors.directions, measuredSpeeds: speeds, flood: flood)
+        if zip(vectors.magnitudes, vectors.directions).contains(where: { $0.0 > 0 && $0.1 == nil }) {
+            IwlsFetcher.chunkCache.purge(station.id)
+        }
         let projected = vectors.projected
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
@@ -284,7 +287,7 @@ extension ChsFitService {
         }
         guard !windows.isEmpty else {
             IwlsFetcher.chunkCache.purge(station.id)
-            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current vectors")
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current predictions")
         }
         var saved: [ChsOnlineWindow] = []
         for window in windows {
