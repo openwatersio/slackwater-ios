@@ -39,6 +39,14 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertNotNil(service.queue.job("chs-johnstone-strait-central"), "unchecking bulk work must keep the earlier automatic download")
     }
 
+    func testNewerCacheClearsStaleIncompleteCooldown() {
+        let failure = t0
+        let due = failure.addingTimeInterval(86_400)
+        XCTAssertFalse(onlineCacheChangedAfterFailure(modified: nil, retryAfter: due))
+        XCTAssertFalse(onlineCacheChangedAfterFailure(modified: failure, retryAfter: due))
+        XCTAssertTrue(onlineCacheChangedAfterFailure(modified: failure.addingTimeInterval(5), retryAfter: due))
+    }
+
     func testLegacyRefreshOnlyWhenCurrentVectorIsMissing() {
         let today = dayLocal(t0, TimeZone(secondsFromGMT: 0)!)
         let span = Timeline.window(anchor: today)
@@ -53,6 +61,33 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertTrue(legacyOnlineNeedsRefresh(vector: nil, legacy: legacy, today: today))
         XCTAssertFalse(legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: today))
         XCTAssertFalse(legacyOnlineNeedsRefresh(vector: nil, legacy: expired, today: today))
+    }
+
+    @MainActor
+    func testDeselectingLegacyGateStaysDeselectedAfterRestart() throws {
+        let markers = savedDownloadMarkers()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil && ChsModelStore.loadLegacyOnline($0.id) == nil
+        })
+        let today = todayLocal(gate.tz)
+        let span = Timeline.window(anchor: today)
+        let legacy = ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: today,
+                                     start: span.start, end: span.end, floodDirection: 0, ebbDirection: 180,
+                                     times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1])
+        defer {
+            restoreDownloadMarkers(markers)
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        try ChsModelStore.saveOnline(legacy, retainingFrom: span.start)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.accept(.inView)
+        service.setAllCurrents(true)
+        service.setAllCurrents(false)
+        XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertFalse(restarted.isFetchingOnline(gate.id))
     }
 
     @MainActor

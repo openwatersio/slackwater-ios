@@ -33,7 +33,7 @@ extension ChsFitService {
         let directionByTime = Dictionary(validDirections.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
         let uniqueDirections = directionByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
         let projected = project(speeds: uniqueSpeeds, dirs: uniqueDirections, floodDirection: flood)
-        guard !projected.isEmpty else { return nil }
+        if projected.isEmpty { return uniqueSpeeds.isEmpty ? nil : ([], [], []) }
         let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
         let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
         guard magnitudes.count == projected.count, directions.count == projected.count,
@@ -41,7 +41,7 @@ extension ChsFitService {
         return (projected, magnitudes, directions)
     }
 
-    /// Fill a single missing direction only when its speed was measured.
+    /// Retain measured speeds when one or more bearings are missing.
     nonisolated static func fillSingleOnlineGaps(
         projected: [ChsSample], magnitudes: [Double], directions: [Double],
         measuredSpeeds: [ChsSample], flood: Double
@@ -51,25 +51,46 @@ extension ChsFitService {
         }
         let validSpeeds = measuredSpeeds.filter { $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite && $0.v >= 0 }
         let byTime = Dictionary(validSpeeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { first, _ in first })
+        let measuredTimes = byTime.keys.sorted()
         var samples: [ChsSample] = [], speeds: [Double] = [], bearings: [Double?] = []
+        guard let first = projected.first, let last = projected.last else {
+            return (measuredTimes.map { ChsSample(t: Double($0), v: 0) },
+                    measuredTimes.compactMap { byTime[$0] }, measuredTimes.map { _ in nil })
+        }
+        for key in measuredTimes where Double(key) < first.t {
+            samples.append(ChsSample(t: Double(key), v: 0))
+            speeds.append(byTime[key]!)
+            bearings.append(nil)
+        }
         for i in projected.indices {
-            if i > 0, projected[i].t - projected[i - 1].t == 2 * ChsOnlineWindow.sampleInterval * 1000 {
-                let midpoint = (projected[i - 1].t + projected[i].t) / 2
-                if let magnitude = byTime[Int64(midpoint.rounded())] {
+            let step = ChsOnlineWindow.sampleInterval * 1000
+            if i > 0, projected[i].t - projected[i - 1].t > step {
+                let previous = projected[i - 1], next = projected[i]
+                for key in measuredTimes {
+                    let time = Double(key)
+                    let grid = (time - previous.t) / step
+                    guard time > previous.t, time < next.t, abs(grid - grid.rounded()) < 1e-6,
+                          let magnitude = byTime[key] else { continue }
+                    let fraction = (time - previous.t) / (next.t - previous.t)
                     let a = directions[i - 1] * .pi / 180, b = directions[i] * .pi / 180
-                    let east = (magnitudes[i - 1] * sin(a) + magnitudes[i] * sin(b)) / 2
-                    let north = (magnitudes[i - 1] * cos(a) + magnitudes[i] * cos(b)) / 2
-                    let bearing: Double? = cos(a - b) > 0 && hypot(east, north) > 1e-9
+                    let east = magnitudes[i - 1] * sin(a) * (1 - fraction) + magnitudes[i] * sin(b) * fraction
+                    let north = magnitudes[i - 1] * cos(a) * (1 - fraction) + magnitudes[i] * cos(b) * fraction
+                    let bearing: Double? = next.t - previous.t == 2 * step && cos(a - b) > 0 && hypot(east, north) > 1e-9
                         ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
-                    let estimate = (projected[i - 1].v + projected[i].v) / 2
+                    let estimate = previous.v + (next.v - previous.v) * fraction
                     let signed = bearing.map { magnitude * cos(($0 - flood) * .pi / 180) }
                         ?? max(-magnitude, min(magnitude, estimate))
-                    samples.append(ChsSample(t: midpoint, v: signed))
+                    samples.append(ChsSample(t: time, v: signed))
                     speeds.append(magnitude)
                     bearings.append(bearing)
                 }
             }
             samples.append(projected[i]); speeds.append(magnitudes[i]); bearings.append(directions[i])
+        }
+        for key in measuredTimes where Double(key) > last.t {
+            samples.append(ChsSample(t: Double(key), v: 0))
+            speeds.append(byTime[key]!)
+            bearings.append(nil)
         }
         return (samples, speeds, bearings)
     }

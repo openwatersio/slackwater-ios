@@ -96,8 +96,8 @@ struct OfflineStatusButton: View {
     }
 
     private var hasPermanentFailure: Bool {
-        service.queue.failed > 0 || service.onlineStates.values.contains {
-            if case .failed = $0 { return true }
+        service.queue.failed > 0 || service.onlineStates.keys.contains {
+            if case .failed = service.onlineState($0) { return true }
             return false
         }
     }

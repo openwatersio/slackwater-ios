@@ -4,8 +4,6 @@
 strip: press the moment you care about, or say what you want in a sentence. Both are Premium:
 reading the app is free, being told is not. Source comments cite this document by section number.*
 
-Online-current downloads saved by older app versions contain only the station-axis component. Alerts and Live Activities for those gates wait for a full-vector refresh; the legacy axis-only display does not establish a true slack or comfort window.
-
 ## 1. Goal
 
 Tell a boater when the water will do the thing they are planning around, without opening the

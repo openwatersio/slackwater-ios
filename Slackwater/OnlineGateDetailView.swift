@@ -174,8 +174,11 @@ struct OnlineGateDetailView: View {
                                 } else {
                                     if let speed = legacyOnlineStore?.blocks.lazy
                                         .compactMap({ $0.signedSpeed(at: live) }).first {
-                                        LegacyAxisReading(speed: speed)
-                                            .frame(maxWidth: .infinity, alignment: .center)
+                                        VStack(spacing: 4) {
+                                            Text("Now").font(.caption).foregroundStyle(SN.foam)
+                                            LegacyAxisReading(speed: speed)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .center)
                                     }
                                     honestyCard
                                     nearestGateLink

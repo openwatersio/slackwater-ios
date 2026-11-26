@@ -255,8 +255,9 @@ struct ChsOnlineWindow: Codable, Sendable {
         let cut = prunedBefore.timeIntervalSince1970
         guard hasVectors == other.hasVectors else { return other }
         var byTime: [Double: (Double, Double?, Double?)] = [:]
-        for point in points { byTime[point.time.timeIntervalSince1970] = (point.speed, hasVectors ? point.magnitude : nil, point.direction) }
-        for point in other.points { byTime[point.time.timeIntervalSince1970] = (point.speed, other.hasVectors ? point.magnitude : nil, point.direction) }
+        let vector = hasVectors
+        for point in points { byTime[point.time.timeIntervalSince1970] = (point.speed, vector ? point.magnitude : nil, point.direction) }
+        for point in other.points { byTime[point.time.timeIntervalSince1970] = (point.speed, vector ? point.magnitude : nil, point.direction) }
         let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
         return ChsOnlineWindow(
             stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,

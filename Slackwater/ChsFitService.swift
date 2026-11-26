@@ -16,6 +16,10 @@ let networkKillSwitch: Bool = {
     return CommandLine.arguments.contains("-networkKillSwitch")
 }()
 
+func onlineCacheChangedAfterFailure(modified: Date?, retryAfter: Date) -> Bool {
+    modified.map { $0 > retryAfter.addingTimeInterval(-86_399) } ?? false
+}
+
 func legacyOnlineNeedsRefresh(vector: ChsOnlineStore?, legacy: ChsOnlineStore?, today: Date) -> Bool {
     vector?.block(covering: today) == nil && legacy?.blocks.contains { $0.end >= today } == true
 }
@@ -327,6 +331,13 @@ final class ChsFitService: ObservableObject {
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
+        for (id, due) in onlineIncompleteRetryAfter {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: ChsModelStore.onlineUrl(id).path)
+            if onlineCacheChangedAfterFailure(modified: attrs?[.modificationDate] as? Date, retryAfter: due) {
+                onlineIncompleteRetryAfter.removeValue(forKey: id)
+                onlineStates.removeValue(forKey: id)
+            }
+        }
         for gate in ChsCurrentGateInfo.all where gate.isOnline && !cancelledDownloads.contains(gate.id)
             && files.contains(gate.id + "-online.json") {
             let today = todayLocal(gate.tz)
@@ -538,7 +549,10 @@ final class ChsFitService: ObservableObject {
         var online = Set((tierOnlineGates[tier] ?? []).map(\.id))
             .union(onlinePreferred).union(requestedDownloads)
         if allCurrentsSelected { online.formUnion(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id)) }
-        for id in Array(onlineDesired.keys) where !online.contains(id) {
+        let removedOnline = Set(onlineDesired.keys).subtracting(online)
+        cancelledDownloads.formUnion(removedOnline)
+        AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        for id in removedOnline {
             onlineDesired.removeValue(forKey: id)
             onlinePending.removeAll { $0.id == id }
             onlineRetryTimers.removeValue(forKey: id)?.cancel()
@@ -905,6 +919,9 @@ final class ChsFitService: ObservableObject {
         retainRequests([gate.id])
         guard onlineState(gate.id) != .fetching else { return false }
         onlineDesired[gate.id] = gate
+        if cancelledDownloads.remove(gate.id) != nil {
+            AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        }
         onlineRetryTimers[gate.id]?.cancel()
         onlineRetryTimers[gate.id] = nil
         onlinePending.removeAll { $0.id == gate.id }
@@ -1006,6 +1023,11 @@ final class ChsFitService: ObservableObject {
         // Guarded: every fix re-enters here with the same gates, and a
         // published write that changes nothing still redraws the list.
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
+        let resumed = cancelledDownloads.intersection(gates.map(\.id))
+        if !resumed.isEmpty {
+            cancelledDownloads.subtract(resumed)
+            AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        }
         for gate in gates {
             if let due = onlineIncompleteRetryAfter[gate.id], due > appNow() {
                 scheduleIncompleteRetry(gate, due: due)

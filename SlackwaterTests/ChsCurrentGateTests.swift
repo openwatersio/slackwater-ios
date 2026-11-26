@@ -284,6 +284,28 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(missingSpeed.projected.count, 2)
     }
 
+    func testMeasuredSpeedsSurviveWithoutAnyBearings() throws {
+        let measured = [ChsSample(t: 0, v: 1), ChsSample(t: 900_000, v: 0.8)]
+        let raw = try XCTUnwrap(ChsFitService.onlineVectors(speeds: measured, dirs: [], flood: 0))
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw.projected, magnitudes: raw.magnitudes,
+                                                         directions: raw.directions, measuredSpeeds: measured, flood: 0)
+        XCTAssertEqual(filled.magnitudes, [1, 0.8])
+        XCTAssertTrue(filled.directions.allSatisfy { $0 == nil })
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<2])
+    }
+
+    func testConsecutiveMissingBearingsKeepMeasuredSpeeds() {
+        let points = [ChsSample(t: 0, v: 1), ChsSample(t: 2_700_000, v: -1)]
+        let measured = [ChsSample(t: 900_000, v: 0.8), ChsSample(t: 1_800_000, v: 0.6)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: points, magnitudes: [1, 1],
+                                                         directions: [0, 180], measuredSpeeds: measured, flood: 0)
+        XCTAssertEqual(filled.projected.map(\.t), [0, 900_000, 1_800_000, 2_700_000])
+        XCTAssertEqual(filled.magnitudes, [1, 0.8, 0.6, 1])
+        XCTAssertNil(filled.directions[1])
+        XCTAssertNil(filled.directions[2])
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<4])
+    }
+
     func testMissingDirectionKeepsMeasuredCrossFlowInsteadOfInventingSlack() throws {
         let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
         let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 1_800_000, v: 120)]
