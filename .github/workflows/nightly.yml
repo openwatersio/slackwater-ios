@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -67,7 +67,7 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.sha }}
 
@@ -75,13 +75,13 @@ jobs:
         # The selected source can predate the release script's CI gate.
         run: cp scripts/nightly-validation.py "$RUNNER_TEMP/nightly-validation.py"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           # Archive the selected green commit, even when newer main CI is pending.
           ref: ${{ needs.authorize.outputs.sha }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: mise.toml
 
@@ -90,7 +90,7 @@ jobs:
         run: brew install xcodegen
 
       # Same MapLibre download cache as ci.yml, shared with its keys.
-      - uses: actions/cache@v6
+      - uses: actions/cache@v6.1.0
         with:
           path: build/SourcePackages
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
@@ -114,7 +114,7 @@ jobs:
       # detail is in these files.
       - name: Upload release logs on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: nightly-logs
           path: |
