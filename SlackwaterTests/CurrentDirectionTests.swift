@@ -85,20 +85,19 @@ final class CurrentDirectionTests: XCTestCase {
         let now = appNow(), t = now.timeIntervalSince1970
         let window = ChsOnlineWindow(stationID: id, iwlsName: "Dodd", timezone: "America/Vancouver",
                                      fetchedAt: now, start: now, end: now.addingTimeInterval(900),
-                                     // Dodd's IWLS metadata: the ebb is 20° off the flood's reciprocal.
-                                     floodDirection: 355, ebbDirection: 155,
-                                     times: [t, t + 900], speeds: [2, -6])
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [t, t + 900], speeds: [0, 0], magnitudes: [2, 2], directions: [90, 90])
         try ChsModelStore.saveOnline(window)
         let flow = try XCTUnwrap(DoddMapFlowProvider().flow(at: now.addingTimeInterval(450)))
         XCTAssertEqual(flow.speedKn, 2, accuracy: 1e-9)
-        XCTAssertEqual(flow.bearingDeg, 155)
+        XCTAssertEqual(flow.bearingDeg, 90, accuracy: 1e-9)
         XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(901)))
         XCTAssertNil(DoddMapFlowProvider().flow(at: now.addingTimeInterval(-1)))
     }
 
     func testOnlineMapReadingDoesNotBridgeAMissingSample() {
         let now = appNow(), t = now.timeIntervalSince1970
-        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC",
+        let window = ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC",
                                      fetchedAt: now, start: now, end: now.addingTimeInterval(1800),
                                      floodDirection: 0, ebbDirection: 180,
                                      times: [t, t + 1800], speeds: [2, -2])

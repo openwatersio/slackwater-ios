@@ -59,6 +59,53 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(requests, [future], "An existing today block must not be downloaded again")
     }
 
+    @MainActor
+    func testFailedFutureUpdateStillFetchesMissingToday() async throws {
+        let gate = ChsCurrentGateInfo(id: "chs-test-\(UUID().uuidString)", name: "Test", region: "Test",
+                                     aliases: [], latitude: 49, longitude: -123, timezone: "America/Vancouver",
+                                     tideReference: nil, fitDays: 0, provisionalSlackMinutes: nil, online: true)
+        let today = todayLocal(gate.tz)
+        let future = today.addingTimeInterval(60 * 86_400)
+        let span = Timeline.window(anchor: today)
+        let todayWindow = onlineWindow([span.start.timeIntervalSince1970, span.end.timeIntervalSince1970],
+                                       [1, 2], id: gate.id)
+        var requests: [Date] = []
+        do {
+            _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+                requests.append(anchor)
+                if anchor == future { throw ChsError.incomplete("Incomplete predictions") }
+                return todayWindow
+            }
+            XCTFail("The original future-date failure should be returned")
+        } catch ChsError.incomplete(let message) {
+            XCTAssertEqual(message, "Incomplete predictions")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requests, [future, today])
+    }
+
+    @MainActor
+    func testRateLimitedFutureUpdateDoesNotFetchToday() async throws {
+        let gate = ChsCurrentGateInfo(id: "chs-test-\(UUID().uuidString)", name: "Test", region: "Test",
+                                     aliases: [], latitude: 49, longitude: -123, timezone: "America/Vancouver",
+                                     tideReference: nil, fitDays: 0, provisionalSlackMinutes: nil, online: true)
+        let future = todayLocal(gate.tz).addingTimeInterval(60 * 86_400)
+        var requests: [Date] = []
+        do {
+            _ = try await ChsFitService.fetchOnlineUpdate(for: gate, from: future) { anchor in
+                requests.append(anchor)
+                throw ChsError.transient("HTTP 429")
+            }
+            XCTFail("The rate limit should be returned")
+        } catch ChsError.transient(let message) {
+            XCTAssertEqual(message, "HTTP 429")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requests, [future])
+    }
+
     // MARK: - Bundled identity (chs-current-gates.json, generated from the registry)
 
     func testBundledGatesAreRegistryKeysWithBundledPairings() {
@@ -195,8 +242,398 @@ final class ChsCurrentGateTests: XCTestCase {
 
     // MARK: - The fetched window (online gates: official CHS predictions, no fit)
 
+    func testOnlineVectorPairsDownloadedSpeedAndDirection() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 900_000, v: 90), ChsSample(t: 1_800_000, v: 120)]
+        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds + [speeds[1]], dirs: directions, flood: 0))
+        XCTAssertEqual(result.projected.count, 3)
+        XCTAssertEqual(result.projected[1].v, 0, accuracy: 1e-9)
+        XCTAssertEqual(result.magnitudes, [2, 2, 2])
+        XCTAssertEqual(result.directions, [60, 90, 120])
+    }
+
+    func testOnlineVectorsRejectMissingSamplesAndUseFirstDirection() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 0), ChsSample(t: 900_000.1, v: 60),
+                          ChsSample(t: 900_000, v: 240), ChsSample(t: 1_800_000, v: 180)]
+        let result = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        XCTAssertEqual(result.directions, [0, 60, 180])
+        XCTAssertEqual(result.projected[1].v, 1, accuracy: 1e-9)
+        let incomplete = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: [directions[0], directions[3]], flood: 0))
+        XCTAssertTrue(ChsFitService.onlineRuns(incomplete.projected).isEmpty)
+    }
+
+    func testSingleMissingOnlineBearingRemainsUnknownAcrossNorth() throws {
+        let samples = [ChsSample(t: 0, v: 1), ChsSample(t: 1_800_000, v: 1)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
+        XCTAssertEqual(filled.projected.map(\.t), [0, 900_000, 1_800_000])
+        XCTAssertEqual(filled.magnitudes[1], 2, accuracy: 1e-9)
+        XCTAssertNil(filled.directions[1])
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<3])
+        let wide = ChsFitService.fillSingleOnlineGaps(projected: [samples[0], ChsSample(t: 2_700_000, v: 1)],
+                                                        magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
+        XCTAssertEqual(wide.projected.count, 2)
+        let opposing = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [0, 180], measuredSpeeds: [ChsSample(t: 900_000, v: 2)], flood: 0)
+        XCTAssertEqual(opposing.projected.count, 3)
+        if opposing.projected.count == 3 {
+            XCTAssertEqual(opposing.magnitudes[1], 2)
+            XCTAssertNil(opposing.directions[1] as Double?)
+        }
+        let missingSpeed = ChsFitService.fillSingleOnlineGaps(projected: samples, magnitudes: [2, 2], directions: [350, 10], measuredSpeeds: [], flood: 0)
+        XCTAssertEqual(missingSpeed.projected.count, 2)
+    }
+
+    func testMeasuredSpeedsSurviveWithoutAnyBearings() throws {
+        let measured = [ChsSample(t: 0, v: 1), ChsSample(t: 900_000, v: 0.8)]
+        let raw = try XCTUnwrap(ChsFitService.onlineVectors(speeds: measured, dirs: [], flood: 0))
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw.projected, magnitudes: raw.magnitudes,
+                                                         directions: raw.directions, measuredSpeeds: measured, flood: 0)
+        XCTAssertEqual(filled.magnitudes, [1, 0.8])
+        XCTAssertTrue(filled.directions.allSatisfy { $0 == nil })
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<2])
+    }
+
+    func testConsecutiveMissingBearingsKeepMeasuredSpeeds() {
+        let points = [ChsSample(t: 0, v: 1), ChsSample(t: 2_700_000, v: -1)]
+        let measured = [ChsSample(t: 900_000, v: 0.8), ChsSample(t: 1_800_000, v: 0.6)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: points, magnitudes: [1, 1],
+                                                         directions: [0, 180], measuredSpeeds: measured, flood: 0)
+        XCTAssertEqual(filled.projected.map(\.t), [0, 900_000, 1_800_000, 2_700_000])
+        XCTAssertEqual(filled.magnitudes, [1, 0.8, 0.6, 1])
+        XCTAssertNil(filled.directions[1])
+        XCTAssertNil(filled.directions[2])
+        XCTAssertEqual(ChsFitService.onlineRuns(filled.projected), [0..<4])
+    }
+
+    func testMissingDirectionKeepsMeasuredCrossFlowInsteadOfInventingSlack() throws {
+        let speeds = [ChsSample(t: 0, v: 2), ChsSample(t: 900_000, v: 2), ChsSample(t: 1_800_000, v: 2)]
+        let directions = [ChsSample(t: 0, v: 60), ChsSample(t: 1_800_000, v: 120)]
+        let raw = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: directions, flood: 0))
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw.projected, magnitudes: raw.magnitudes,
+                                                         directions: raw.directions, measuredSpeeds: speeds, flood: 0)
+        XCTAssertEqual(filled.projected.count, 3)
+        XCTAssertEqual(filled.magnitudes[1], 2, accuracy: 1e-9)
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1800),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: filled.projected.map { $0.t / 1000 }, speeds: filled.projected.map(\.v),
+                                     magnitudes: filled.magnitudes, directions: filled.directions)
+        XCTAssertFalse(window.events(from: window.start, to: window.end).contains { $0.kind == .slack })
+        XCTAssertTrue(currentWindows(window.points, events: [], threshold: 0.5).isEmpty)
+    }
+
+    func testUnreadableLegacyFileDoesNotHideReadableVectorDownload() throws {
+        let id = "chs-readable-vector-\(UUID().uuidString)"
+        let start = Date(timeIntervalSince1970: 1_767_225_600)
+        let window = ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: start, end: start.addingTimeInterval(900), floodDirection: 0, ebbDirection: 180,
+                                     times: [start.timeIntervalSince1970, start.timeIntervalSince1970 + 900], speeds: [1, 1])
+        let currentURL = ChsModelStore.onlineUrl(id), oldURL = ChsModelStore.legacyOnlineUrl(id)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: oldURL.path)
+            try? FileManager.default.removeItem(at: currentURL)
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+        try ChsModelStore.saveOnline(window, retainingFrom: start)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-60)], ofItemAtPath: currentURL.path)
+        try Data("unavailable".utf8).write(to: oldURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: oldURL.path)
+        XCTAssertNotNil(ChsModelStore.loadOnline(id))
+    }
+
+    func testNewerLegacyDownloadReplacesOverlappingOlderSamples() throws {
+        let id = "chs-legacy-overlap-\(UUID().uuidString)"
+        func legacy(_ times: [Double], speed: Double, fetched: Date) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: fetched,
+                            start: Date(timeIntervalSince1970: times.first!), end: Date(timeIntervalSince1970: times.last!),
+                            floodDirection: 0, ebbDirection: 180, times: times, speeds: times.map { _ in speed })
+        }
+        let currentURL = ChsModelStore.onlineUrl(id), oldURL = ChsModelStore.legacyOnlineUrl(id)
+        defer { try? FileManager.default.removeItem(at: currentURL); try? FileManager.default.removeItem(at: oldURL) }
+        try FileManager.default.createDirectory(at: currentURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let earlier = legacy([0, 900, 1800, 2700, 3600], speed: 1, fetched: Date(timeIntervalSince1970: 1))
+        let newer = legacy([1800, 2700, 3600, 4500, 5400], speed: 2, fetched: Date(timeIntervalSince1970: 2))
+        try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [earlier])).write(to: currentURL)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-60)], ofItemAtPath: currentURL.path)
+        try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [newer])).write(to: oldURL)
+        let blocks = try XCTUnwrap(ChsModelStore.loadLegacyOnline(id)?.blocks)
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertLessThan(try XCTUnwrap(blocks.first?.end), try XCTUnwrap(blocks.last?.start))
+        XCTAssertEqual(blocks.last?.speeds.first, 2)
+    }
+
+    func testSavingVectorDataPreservesTheOlderAppDownload() throws {
+        let id = "chs-rollback-\(UUID().uuidString)"
+        let start = Date(timeIntervalSince1970: 1_767_225_600)
+        let old = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                  start: start, end: start.addingTimeInterval(900), floodDirection: 0, ebbDirection: 180,
+                                  times: [start.timeIntervalSince1970, start.timeIntervalSince1970 + 900], speeds: [1, 1])
+        let oldURL = ChsModelStore.url(id, suffix: "-online")
+        defer {
+            try? FileManager.default.removeItem(at: oldURL)
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id))
+        }
+        try FileManager.default.createDirectory(at: oldURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [old]))
+        try original.write(to: oldURL)
+        let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: start, end: start.addingTimeInterval(900), floodDirection: 0, ebbDirection: 180,
+                                     times: old.times, speeds: [0, 1], magnitudes: [2, 1], directions: [nil, 0])
+        try ChsModelStore.saveOnline(vector, retainingFrom: start)
+        XCTAssertEqual(try Data(contentsOf: oldURL), original)
+        XCTAssertFalse(ChsModelStore.onlineUrl(id).lastPathComponent.hasSuffix(".json"), "The previous release removes unknown JSON files during orphan cleanup")
+        XCTAssertNotNil(ChsModelStore.loadOnline(id))
+    }
+
+    func testEventDetectionPerformanceForAYearOfSamples() {
+        let points = (0..<35_040).map { index in
+            let speed = 3 * sin(Double(index) * .pi / 25)
+            let unknown = index % 97 == 0
+            return CurrentPoint(time: Date(timeIntervalSince1970: Double(index) * 900), speed: speed,
+                                magnitude: abs(speed), direction: unknown ? nil : (speed >= 0 ? 0 : 180),
+                                magnitudeIsKnown: unknown && speed != 0)
+        }
+        measure { XCTAssertFalse(sampleEvents(points).isEmpty) }
+    }
+
+    func testUnknownFasterCurrentDoesNotProduceAFalseAdjacentPeak() {
+        let values: [Double] = [1, 2, 0, 2, 1]
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 3600),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600], speeds: values,
+                                     magnitudes: [1, 2, 4, 2, 1], directions: [0, 0, nil, 0, 0])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
+    func testFasterUnknownCurrentSuppressesPeaksAcrossOpposingRuns() {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+            start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 5400), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800, 2700, 3600, 4500, 5400], speeds: [0.5, 2, 1, 0, -1, -2.5, -0.4],
+            magnitudes: [0.5, 2, 1, 3, 1, 2.5, 0.4], directions: [0, 0, 0, nil, 180, 180, 180])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
+    func testUnknownFasterCurrentSuppressesPeakElsewhereInSameRun() {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 4500),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600, 4500], speeds: [1, 5, 4, 0, 3, 1],
+                                     magnitudes: [1, 5, 4, 8, 3, 1], directions: [0, 0, 0, nil, 0, 0])
+        XCTAssertTrue(sampleEvents(window.points).isEmpty)
+    }
+
+    func testInterpolationIntoMeasuredZeroKeepsKnownDirection() throws {
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900], speeds: [1, 0], magnitudes: [2, 0], directions: [90, nil])
+        let point = try XCTUnwrap(window.speeds(from: Date(timeIntervalSince1970: 450), to: Date(timeIntervalSince1970: 450), step: 1).first)
+        XCTAssertEqual(point.direction, 90)
+        XCTAssertFalse(point.magnitudeIsKnown)
+    }
+
+    func testUnknownDirectionDoesNotCreateNewPeakAfterReload() throws {
+        let values: [Double] = [2, 3, 2.75, 2.5, 1]
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 3600),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600], speeds: values,
+                                     magnitudes: values, directions: [0, 0, nil, 0, 0])
+        let reloaded = try JSONDecoder().decode(ChsOnlineWindow.self, from: JSONEncoder().encode(window))
+        XCTAssertEqual(sampleEvents(window.points).map(\.time), sampleEvents(reloaded.points).map(\.time))
+    }
+
+    func testRefreshDoesNotOverwriteKnownDirectionWithUnknown() throws {
+        let start = Date(timeIntervalSince1970: 1000)
+        func window(_ bearing: Double?) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                            start: start, end: start.addingTimeInterval(900), floodDirection: 0, ebbDirection: 180,
+                            times: [1000, 1900], speeds: [1, 1], magnitudes: [1, 1], directions: [bearing, bearing])
+        }
+        let merged = window(90).merging(window(nil), prunedBefore: start)
+        XCTAssertEqual(merged.directions?.first!, 90)
+    }
+
+    func testUnknownAxisIsNotPersistedAsACalmReading() throws {
+        struct OldWindow: Decodable { let speeds: [Double] }
+        let window = ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: .now, end: .now, floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900], speeds: [0, 1], magnitudes: [2, 1], directions: [nil, 0])
+        let data = try JSONEncoder().encode(window)
+        XCTAssertThrowsError(try JSONDecoder().decode(OldWindow.self, from: data))
+        let decoded = try JSONDecoder().decode(ChsOnlineWindow.self, from: data)
+        XCTAssertEqual(decoded.magnitudes?[0], 2)
+        XCTAssertNil(decoded.directions?[0])
+    }
+
+    func testMissingDirectionAtReversalKeepsSpeedWithoutClaimingSlack() throws {
+        let start = Date(timeIntervalSince1970: 1_767_225_600)
+        let base = start.timeIntervalSince1970 * 1000
+        let raw = [ChsSample(t: base, v: -1), ChsSample(t: base + 1_800_000, v: 1)]
+        let filled = ChsFitService.fillSingleOnlineGaps(projected: raw, magnitudes: [2, 2], directions: [180, 0],
+                                                       measuredSpeeds: [ChsSample(t: base + 900_000, v: 2)], flood: 0)
+        let id = "chs-unknown-direction-\(UUID().uuidString)"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: start, end: start.addingTimeInterval(1800), floodDirection: 0, ebbDirection: 180,
+                                     times: filled.projected.map { $0.t / 1000 }, speeds: filled.projected.map(\.v),
+                                     magnitudes: filled.magnitudes, directions: filled.directions)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(window)
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline(id)?.blocks.first)
+        let midpoint = start.addingTimeInterval(900)
+        let point = try XCTUnwrap(loaded.speeds(from: midpoint, to: midpoint, step: 1).first)
+        XCTAssertEqual(point.magnitude, 2, accuracy: 1e-9)
+        XCTAssertNil(point.direction)
+        XCTAssertTrue(point.magnitudeIsKnown)
+        let card = loaded.cardState(at: midpoint)
+        XCTAssertTrue(card.directionUnknown)
+        XCTAssertFalse(currentCardFace(magnitude: card.magnitude, direction: card.direction, speed: card.signed, unit: "kn", inWindow: false, setFormat: "compass", directionUnknown: card.directionUnknown).spoken.contains("ebb"))
+        XCTAssertNil(loaded.signedSpeed(at: midpoint))
+        XCTAssertNil(loaded.signedSpeed(at: midpoint.addingTimeInterval(-450)))
+        XCTAssertEqual(loaded.signedSpeed(at: start), -1)
+        let crossing = CurrentEvent(time: midpoint, speed: 0, kind: .slack)
+        XCTAssertNotEqual(readCurrent(at: midpoint, timeline: loaded.points, events: [crossing], flood: 0, ebb: 180)?.state, .slack)
+        XCTAssertTrue(currentWindows(loaded.points, events: [crossing], threshold: 0.5).isEmpty)
+        XCTAssertFalse(sampleEvents(loaded.points).contains { $0.kind == .slack })
+        XCTAssertFalse(sampleEvents(loaded.points).contains { $0.time == start })
+        let reading = currentLeadReading("Flooding", isSlack: false, point: point, floodDeg: 0, ebbDeg: 180, speedUnit: "kn", setFormat: "compass")
+        XCTAssertEqual(reading.glyph, "arrow.triangle.2.circlepath")
+        XCTAssertTrue(reading.state.isEmpty)
+    }
+
+    func testOnlineRunsPreserveSamplesOnBothSidesOfGap() throws {
+        let speeds = (0..<5).map { ChsSample(t: Double($0) * 900_000, v: 2) }
+        let dirs = speeds.enumerated().filter { $0.offset != 2 }.map { ChsSample(t: $0.element.t, v: 90) }
+        let vectors = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: dirs, flood: 0))
+        XCTAssertEqual(ChsFitService.onlineRuns(vectors.projected), [0..<2, 2..<4])
+        XCTAssertEqual(vectors.magnitudes, [2, 2, 2, 2])
+        let invalid = speeds.map { ChsSample(t: $0.t, v: $0.t == 1_800_000 ? .nan : 90) }
+        let cleaned = try XCTUnwrap(ChsFitService.onlineVectors(speeds: speeds, dirs: invalid, flood: 0))
+        XCTAssertEqual(ChsFitService.onlineRuns(cleaned.projected), [0..<2, 2..<4])
+    }
+
+    func testIncompleteOnlineBlocksStopRetryingUnlessCachedBlockCoversStrip() throws {
+        let anchor = Date(timeIntervalSince1970: 1_767_225_600)
+        let span = Timeline.window(anchor: anchor)
+        func block(_ start: Date, _ end: Date) -> ChsOnlineWindow {
+            ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC",
+                            fetchedAt: .now, start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, -1])
+        }
+        let partial = [block(span.start, anchor), block(anchor.addingTimeInterval(900), span.end)]
+        XCTAssertThrowsError(try ChsFitService.onlineCoveredWindow(partial, anchor: anchor, name: "Test")) { error in
+            XCTAssertTrue(ChsError.isPermanent(error))
+        }
+        XCTAssertThrowsError(try ChsFitService.onlineCoveredWindow([], anchor: anchor, name: "Test")) { error in
+            XCTAssertTrue(ChsError.isPermanent(error))
+        }
+        let complete = block(span.start, span.end)
+        XCTAssertTrue(try ChsFitService.onlineCoveredWindow(partial + [complete], anchor: anchor, name: "Test").covers(anchor: anchor))
+    }
+
+    func testOnlineVectorSurvivesCacheAndDoesNotInventSlack() throws {
+        let id = "chs-vector-regression"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1800),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800], speeds: [1, 0, -1],
+                                     magnitudes: [2, 2, 2], directions: [60, 90, 120])
+        try ChsModelStore.saveOnline(window)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline(id)?.blocks.first)
+        let middle = try XCTUnwrap(loaded.speeds(from: Date(timeIntervalSince1970: 900),
+                                                 to: Date(timeIntervalSince1970: 900), step: 1).first)
+        XCTAssertEqual(middle.speed, 0, accuracy: 1e-9)
+        XCTAssertEqual(middle.magnitude, 2, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(middle.direction), 90, accuracy: 1e-9)
+        XCTAssertTrue(currentWindows(loaded.points, events: loaded.events(from: window.start, to: window.end),
+                                     threshold: 0.5).isEmpty)
+        XCTAssertFalse(loaded.events(from: window.start, to: window.end).contains { $0.kind == .slack })
+    }
+
+    func testOnlineVectorInterpolationCrossesNorthWithoutReversing() throws {
+        let window = ChsOnlineWindow(stationID: "vector", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, 1],
+                                     magnitudes: [1, 1], directions: [350, 10])
+        let point = try XCTUnwrap(window.speeds(from: Date(timeIntervalSince1970: 450),
+                                                 to: Date(timeIntervalSince1970: 450), step: 1).first)
+        let direction = try XCTUnwrap(point.direction)
+        XCTAssertLessThan(min(direction, 360 - direction), 0.001)
+        XCTAssertGreaterThan(point.magnitude, 0.98)
+    }
+
+    func testOnlineVectorSurvivesMergeAndPrune() throws {
+        func window(_ start: Double, _ speeds: [Double], _ magnitudes: [Double], _ directions: [Double]) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: "vector", iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                            start: Date(timeIntervalSince1970: start), end: Date(timeIntervalSince1970: start + 900),
+                            floodDirection: 0, ebbDirection: 180, times: [start, start + 900], speeds: speeds,
+                            magnitudes: magnitudes, directions: directions)
+        }
+        let a = window(0, [1, 0], [2, 2], [60, 90])
+        let b = window(900, [0, -1], [3, 2], [90, 120])
+        let merged = a.merging(b, prunedBefore: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(merged.magnitudes, [2, 3, 2])
+        XCTAssertEqual(merged.directions, [60, 90, 120])
+        let pruned = try XCTUnwrap(merged.pruned(before: Date(timeIntervalSince1970: 900)))
+        XCTAssertEqual(pruned.magnitudes, [3, 2])
+        XCTAssertEqual(pruned.directions, [90, 120])
+    }
+
+    func testSavingSplitHistoricalFetchRetainsBothRuns() throws {
+        let id = "chs-split-\(UUID().uuidString)"
+        let start = Date.now.addingTimeInterval(-90 * 86_400).timeIntervalSince1970
+        let first = onlineWindow([start, start + 900], [1, 1], id: id)
+        let second = onlineWindow([start + 2700, start + 3600], [1, 1], id: id)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(first, retainingFrom: first.start)
+        try ChsModelStore.saveOnline(second, retainingFrom: first.start)
+        let blocks = try XCTUnwrap(ChsModelStore.loadOnline(id)).blocks
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertTrue(blocks.contains { $0.start == first.start && $0.end == first.end })
+        XCTAssertTrue(blocks.contains { $0.start == second.start && $0.end == second.end })
+    }
+
+    func testAxisOnlyOnlineCacheIsNotUsedAsAFullVector() throws {
+        let id = "chs-axis-only-regression"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1])
+        let url = ChsModelStore.onlineUrl(id)
+        try ChsModelStore.saveOnline(window)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertNil(ChsModelStore.loadOnline(id))
+        let legacy = try XCTUnwrap(ChsModelStore.loadLegacyOnline(id)?.blocks.first)
+        XCTAssertFalse(legacy.hasVectors)
+        XCTAssertEqual(legacy.signedSpeed(at: Date(timeIntervalSince1970: 450)), 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: window.start, end: window.end, floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900], speeds: [1, -1], magnitudes: [2, 2], directions: [60, 120])
+        try ChsModelStore.saveOnline(vector)
+        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.magnitudes, [2, 2])
+    }
+
+    func testVectorRefreshPreservesAxisOnlySamplesOutsideItsRange() throws {
+        let id = "chs-axis-partial-\(UUID().uuidString)"
+        let legacy = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 5400),
+                                     floodDirection: 0, ebbDirection: 180,
+                                     times: [0, 900, 1800, 2700, 3600, 4500, 5400], speeds: [1, 1, 1, 1, 1, 1, 1])
+        let vector = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 1800), end: Date(timeIntervalSince1970: 3600),
+                                     floodDirection: 0, ebbDirection: 180, times: [1800, 2700, 3600],
+                                     speeds: [1, 1, 1], magnitudes: [2, 2, 2], directions: [90, 90, 90])
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(id)) }
+        try ChsModelStore.saveOnline(legacy, retainingFrom: legacy.start)
+        try ChsModelStore.saveOnline(vector, retainingFrom: legacy.start)
+        XCTAssertEqual(ChsModelStore.loadOnline(id)?.blocks.first?.times, vector.times)
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.map(\.times), [[0, 900], [4500, 5400]])
+    }
+
     func testOnlineWindowStoreRoundTrip() throws {
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-online", iwlsName: "Test Online Station",
             timezone: "America/Vancouver", fetchedAt: .now,
             start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
@@ -215,7 +652,7 @@ final class ChsCurrentGateTests: XCTestCase {
     }
 
     func testLoadOnlineCachesDecodedStore() throws {
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-cache", iwlsName: "Test Cache Station",
             timezone: "America/Vancouver", fetchedAt: .now,
             start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
@@ -252,6 +689,26 @@ final class ChsCurrentGateTests: XCTestCase {
                      "a deleted file is gone immediately, never served from the memo")
     }
 
+    func testLegacyOnlineReaderSharesTheFileCache() throws {
+        let id = "chs-legacy-cache-\(UUID().uuidString)"
+        let window = ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "UTC", fetchedAt: .now,
+                                     start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 900),
+                                     floodDirection: 0, ebbDirection: 180, times: [0, 900], speeds: [1, -1])
+        try ChsModelStore.saveOnline(window, retainingFrom: window.start)
+        let url = ChsModelStore.onlineUrl(id)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let stamp = Date(timeIntervalSince1970: 1_000_000)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadOnline(id))
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.first?.speeds, [1, -1])
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        try Data(repeating: 0x7B, count: size).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertEqual(ChsModelStore.loadLegacyOnline(id)?.blocks.first?.speeds, [1, -1])
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadLegacyOnline(id))
+    }
+
     func testOnlineWindowCoversStrip() throws {
         let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
         var cal = Calendar(identifier: .gregorian)
@@ -261,7 +718,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let need = Timeline.window(anchor: today0)
 
         func window(start: Date, end: Date) -> ChsOnlineWindow {
-            ChsOnlineWindow(stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
+            ChsOnlineWindow(axisOnly: true, stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
                             fetchedAt: .now, start: start, end: end,
                             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         }
@@ -288,7 +745,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let today = cal.startOfDay(for: Date())
         let w = Timeline.window(anchor: today)
-        let window = ChsOnlineWindow(
+        let window = ChsOnlineWindow(axisOnly: true,
             stationID: "test", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: Date(), start: w.start,
             end: today.addingTimeInterval(30 * 86_400),
@@ -345,7 +802,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let span = Timeline.window(anchor: today)
         let month = Timeline.onlineFetchDays * 86_400
         func block(_ start: Date, _ end: Date, fetchedAt: Date = appNow()) -> ChsOnlineWindow {
-            ChsOnlineWindow(stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
+            ChsOnlineWindow(axisOnly: true, stationID: "chs-test-refresh", iwlsName: "Test", timezone: tz.identifier,
                             fetchedAt: fetchedAt, start: start, end: end,
                             floodDirection: 0, ebbDirection: 180,
                             times: [start.timeIntervalSince1970, end.timeIntervalSince1970],
@@ -380,7 +837,7 @@ final class ChsCurrentGateTests: XCTestCase {
     /// clamps itself to, and the only shape these merge tests need.
     private func onlineWindow(_ times: [Double], _ speeds: [Double],
                               id: String = "chs-test-merge") -> ChsOnlineWindow {
-        ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "America/Vancouver",
+        ChsOnlineWindow(axisOnly: true, stationID: id, iwlsName: "Test", timezone: "America/Vancouver",
                         fetchedAt: .now,
                         start: Date(timeIntervalSince1970: times.first ?? 0),
                         end: Date(timeIntervalSince1970: times.last ?? 0),
@@ -520,11 +977,12 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(store.blocks[0].times, [t0, t0 + 900])
     }
 
-    /// A device that fetched under the single-window shape keeps its data: the
-    /// legacy file decodes as one block.
-    func testLoadOnlineMigratesALegacySingleWindowFile() throws {
+    /// A single-window file carrying vectors still decodes as one block.
+    func testLoadOnlineMigratesSingleWindowWithVectors() throws {
         let legacy = onlineWindow([0, 900], [1, 2], id: "chs-test-legacy")
-        try ChsModelStore.save(legacy, id: "chs-test-legacy", suffix: "-online")  // v1 bytes, straight to disk
+        let url = ChsModelStore.onlineUrl("chs-test-legacy")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(legacy).write(to: url)
         defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl("chs-test-legacy")) }
         let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-legacy"))
         XCTAssertEqual(store.blocks.count, 1)
@@ -561,7 +1019,7 @@ final class ChsCurrentGateTests: XCTestCase {
                                     "the newest chunk must reach the window end")
 
         // And the window that span produces covers the strip its own anchor draws.
-        let fetched = ChsOnlineWindow(
+        let fetched = ChsOnlineWindow(axisOnly: true,
             stationID: "chs-test-online", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: .now, start: paged.start, end: paged.end,
             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
@@ -578,7 +1036,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let today = cal.startOfDay(for: Date())
         let end = today.addingTimeInterval(30 * 86_400)
-        let w = ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+        let w = ChsOnlineWindow(axisOnly: true, stationID: "g", iwlsName: "G", timezone: tz.identifier,
                                 fetchedAt: Date(), start: today, end: end,
                                 floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         XCTAssertEqual(prefetchAnchor(after: w, tz: tz), cal.startOfDay(for: end))
@@ -621,7 +1079,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let today = cal.startOfDay(for: Date())
         func span(_ anchor: Date) -> ChsOnlineWindow {
             let w = Timeline.window(anchor: anchor)
-            return ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+            return ChsOnlineWindow(axisOnly: true, stationID: "g", iwlsName: "G", timezone: tz.identifier,
                                    fetchedAt: .now, start: w.start, end: w.end,
                                    floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         }

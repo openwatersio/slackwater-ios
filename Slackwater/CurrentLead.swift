@@ -123,13 +123,13 @@ struct CurrentLead: View {
 
     var body: some View {
         let reading = reading
-        let tint = (provisional || bounded) ? SN.amber : CurrentDetailView.phaseColor(reading.tint)
+        let tint = (provisional || bounded) ? SN.amber : reading.rotaryDirectionUnknown ? SN.foam : CurrentDetailView.phaseColor(reading.tint)
         LeadCard(value: "\(tilde)\(reading.value)",
                  unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),
                  valueColor: readingColor,
                  timeColor: ink) {
-            leadState(reading.state, ink: ink)
+            if !reading.state.isEmpty { leadState(reading.state, ink: ink) }
             // The set is the hero (#59), arrow and point together after the
             // word. With no set to claim, the slack glyph goes both ways.
             HStack(spacing: 4) {
@@ -160,7 +160,11 @@ struct CurrentLeadReading: Equatable {
     /// The lead in words: the state, the speed with its unit written out, then the set where one is shown.
     let spoken: String
 
-    var glyph: String { setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up" }
+    var rotaryDirectionUnknown = false
+    var glyph: String {
+        if rotaryDirectionUnknown { return "arrow.triangle.2.circlepath" }
+        return setDegrees == nil ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.up"
+    }
 }
 
 /// The value is the water's full speed and the set its direction. A one-axis point takes the published flood or ebb bearing for its sign through the kit, and a zero vector has no set. At `Slack` the lead points only at water still crossing the major axis fast enough to print above zero, in the go colour (`currentSet`); a one-axis station never crosses, so its slack keeps the slack glyph.
@@ -170,10 +174,12 @@ func currentLeadReading(_ state: String, isSlack: Bool, point: CurrentPoint, flo
     let setDegrees = currentSet(direction: direction, isSlack: isSlack, speed: point.speed,
                                 magnitude: point.magnitude, speedUnit: speedUnit)
     let set = setDegrees.map { formatSet($0, format: setFormat) }
-    let words = spokenReading(state, value, unit: speedUnitLabel(speedUnit))
-    return CurrentLeadReading(state: state, value: value, setDegrees: setDegrees, set: set,
-                              tint: isSlack || setDegrees == nil ? .slack : point.speed >= 0 ? .flood : .ebb,
-                              spoken: set.map { "\(words) \($0)" } ?? words)
+    let rotaryUnknown = !isSlack && direction == nil && point.magnitude > 0 &&
+        (point.magnitudeIsKnown || rotaryDirectionIsUnknown(speed: point.speed, magnitude: point.magnitude, direction: direction))
+    let words = rotaryUnknown ? spokenReading("", value, unit: speedUnitLabel(speedUnit)).trimmingCharacters(in: .whitespacesAndNewlines) : spokenReading(state, value, unit: speedUnitLabel(speedUnit))
+    return CurrentLeadReading(state: rotaryUnknown ? "" : state, value: value, setDegrees: setDegrees, set: set,
+                              tint: isSlack || (setDegrees == nil && !rotaryUnknown) ? .slack : point.speed >= 0 ? .flood : .ebb,
+                              spoken: set.map { "\(words) \($0)" } ?? words, rotaryDirectionUnknown: rotaryUnknown)
 }
 
 /// The scrub card both current details draw: the strip, the lead overlaid on

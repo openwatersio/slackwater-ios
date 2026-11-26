@@ -1199,25 +1199,43 @@ struct TimelineCanvas: View {
     private func runSegments(_ runs: [WindowRun], _ points: ArraySlice<CurrentPoint>,
                              _ t0: Date, _ t1: Date) -> [Path] {
         let reach = TimeInterval(CurveStyle.runWidth / 2 + CurveStyle.haloGap) / Timeline.pph * 3600
+        var groups: [[CurrentPoint]] = []
+        for p in points {
+            if p.magnitudeIsKnown && p.direction == nil && p.magnitude > 0 { groups.append([]); continue }
+            if groups.isEmpty { groups.append([]) }
+            groups[groups.count - 1].append(p)
+        }
         return runs.filter { $0.end >= t0.addingTimeInterval(-reach) && $0.start <= t1.addingTimeInterval(reach) }
-            .map { run -> Path in
-                var seg = Path()
-                seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-                for p in points where p.time > run.start && p.time < run.end {
-                    seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            .flatMap { run in
+                groups.compactMap { group -> Path? in
+                    guard let first = group.first, let last = group.last else { return nil }
+                    let start = max(run.start, first.time), end = min(run.end, last.time)
+                    guard start < end else { return nil }
+                    var seg = Path()
+                    seg.move(to: CGPoint(x: data.x(start), y: geo.curY(data.velocityAt(start))))
+                    for p in group where p.time > start && p.time < end {
+                        seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+                    }
+                    seg.addLine(to: CGPoint(x: data.x(end), y: geo.curY(data.velocityAt(end))))
+                    return seg
                 }
-                seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-                return seg
             }
     }
 
     private func drawCurrent(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
         let points = window(data.currentPoints, { $0.time }, t0, t1)
-        guard let first = points.first, let last = points.last else { return }
+        var groups: [[CurrentPoint]] = []
+        for p in points {
+            if p.magnitudeIsKnown && p.direction == nil && p.magnitude > 0 { groups.append([]); continue }
+            if groups.isEmpty { groups.append([]) }
+            groups[groups.count - 1].append(p)
+        }
+        groups = groups.filter { $0.count > 1 }
+        guard !groups.isEmpty else { return }
         var line = Path()
-        for (i, p) in points.enumerated() {
-            let pt = CGPoint(x: data.x(p.time), y: geo.curY(p.speed))
-            i == 0 ? line.move(to: pt) : line.addLine(to: pt)
+        for group in groups {
+            line.move(to: CGPoint(x: data.x(group[0].time), y: geo.curY(group[0].speed)))
+            for p in group.dropFirst() { line.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed))) }
         }
         // Merged over the whole window — runs join across a seam, and the
         // axis labels must see every one of them or they would disagree from
@@ -1229,15 +1247,20 @@ struct TimelineCanvas: View {
         let bare = data.speedsAreSchematic ? [] : data.bareSlackTimes.filter(data.contains)
         let coreSegs = runSegments(slackStrokes(cores: data.coreRuns, bare: bare, pointsPerHour: Timeline.pph),
                                    points, t0, t1)
-        let xa = data.x(first.time), xb = data.x(last.time)
-        seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
-
-        var area = line
-        area.addLine(to: CGPoint(x: xb, y: geo.zeroY))
-        area.addLine(to: CGPoint(x: xa, y: geo.zeroY))
-        area.closeSubpath()
-        CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
-        nightShade(ctx, under: line, from: xa, to: xb, t0, t1)
+        for group in groups {
+            guard let first = group.first, let last = group.last else { continue }
+            let xa = data.x(first.time), xb = data.x(last.time)
+            var part = Path()
+            part.move(to: CGPoint(x: xa, y: geo.curY(first.speed)))
+            for p in group.dropFirst() { part.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed))) }
+            seaBase(ctx, under: part, floor: geo.curBottom, from: xa, to: xb)
+            var area = part
+            area.addLine(to: CGPoint(x: xb, y: geo.zeroY))
+            area.addLine(to: CGPoint(x: xa, y: geo.zeroY))
+            area.closeSubpath()
+            CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
+            nightShade(ctx, under: part, from: xa, to: xb, t0, t1)
+        }
 
         if !data.speedsAreSchematic {
             CurveDrawing.referenceLine(ctx, at: geo.zeroY, width: data.totalWidth)
@@ -1296,7 +1319,7 @@ struct TimelineCanvas: View {
             }
         }
 
-        if now >= t0, now <= t1 {
+        if now >= t0, now <= t1, groups.contains(where: { $0.first!.time <= now && now <= $0.last!.time }) {
             drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.curY(data.velocityAt(now))))
         }
     }

@@ -69,7 +69,7 @@ final class CurrentCardRefreshTests: XCTestCase {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline })
         let now = appNow()
         let offsets = stride(from: -12.0 * 3600, through: 16 * 3600, by: 600).map { $0 }
-        let model = ChsOnlineWindow(
+        let model = ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: "UTC", fetchedAt: now,
             start: now.addingTimeInterval(offsets.first!), end: now.addingTimeInterval(offsets.last!),
             floodDirection: 90, ebbDirection: 270,

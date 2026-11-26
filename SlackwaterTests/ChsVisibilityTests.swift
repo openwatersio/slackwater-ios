@@ -81,8 +81,13 @@ final class ChsVisibilityTests: XCTestCase {
         for name in ["chs-07120.json", "chs-x-current.json", "chs-y-online.json", ".DS_Store"] {
             try Data().write(to: dir.appendingPathComponent(name))
         }
-        XCTAssertEqual(ChsModelStore.fittedIDs(in: dir),
-                       ["chs-07120", "chs-y-online"])
+        XCTAssertEqual(ChsModelStore.fittedIDs(in: dir), ["chs-07120"])
+        let window = ChsOnlineWindow(axisOnly: true, stationID: "chs-y", iwlsName: "Test", timezone: "UTC",
+                                     fetchedAt: .now, start: .now, end: .now, floodDirection: 0,
+                                     ebbDirection: 180, times: [0, 900], speeds: [1, -1])
+        try JSONEncoder().encode(ChsOnlineStore(stationID: "chs-y", blocks: [window]))
+            .write(to: dir.appendingPathComponent("chs-y-online.json"))
+        XCTAssertEqual(ChsModelStore.fittedIDs(in: dir), ["chs-07120", "chs-y-online"])
     }
 
     func testDiscoveryRejectsLegacyAndMismatchedCurrentModels() throws {

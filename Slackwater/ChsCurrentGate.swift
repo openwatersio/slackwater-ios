@@ -64,12 +64,18 @@ extension ChsModelStore {
 
     /// The online gate's fetched window lives beside the fitted models, under
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
-    static func onlineUrl(_ stationID: String) -> URL { url(stationID, suffix: "-online") }
+    static func onlineUrl(_ stationID: String) -> URL {
+        dir.appendingPathComponent("\(stationID)-online-v2")
+    }
+
+    static func legacyOnlineUrl(_ stationID: String) -> URL {
+        url(stationID, suffix: "-online")
+    }
 
     /// Store decode first, then the legacy single-window shape (schemaVersion 1,
     /// pre-#67): each fails cleanly on the other's bytes (`blocks` vs
     /// `times`/`speeds` are required keys), so the order is just preference.
-    /// The first save rewrites the file in the store shape.
+    /// New saves use a separate file so older app versions keep their downloads.
     ///
     /// Decoded stores are memoized because callers treat this as a cheap
     /// getter — the downloads manager reads it inside a sort comparator, per
@@ -77,37 +83,86 @@ extension ChsModelStore {
     /// (`saveOnline`'s no-forward-cap note). Uncached, one render was
     /// hundreds of main-thread decodes and the scene-update watchdog killed
     /// the app at 10s (0x8BADF00D, build 31). The entry is validated by the
-    /// file's mtime+size rather than invalidated at call sites, so every
+    /// files' mtime+size rather than invalidated at call sites, so every
     /// writer and deleter — `saveOnline`, the orphan prune, `-chsResetModels`,
     /// tests using raw FileManager — stays correct without knowing a cache
     /// exists. A file that fails both decodes is cached as nil, so a bad file
     /// (a newer schema after a downgrade) costs one decode until it changes.
     static func loadOnline(_ stationID: String) -> ChsOnlineStore? {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: onlineUrl(stationID).path),
-              let mtime = attrs[.modificationDate] as? Date,
-              let size = attrs[.size] as? Int else { return nil }
-        onlineCacheLock.lock()
-        defer { onlineCacheLock.unlock() }
-        if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size { return hit.store }
-        // A read can fail and then succeed with the file unchanged (data
-        // protection before first unlock, in the widget), so only a decode
-        // failure is cached.
-        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
-        let decoder = JSONDecoder()
-        let store: ChsOnlineStore?
-        if let s = try? decoder.decode(ChsOnlineStore.self, from: data) {
-            store = s
-        } else if let legacy = try? decoder.decode(ChsOnlineWindow.self, from: data) {
-            store = ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
-        } else {
-            store = nil
-        }
-        onlineCache[stationID] = (mtime, size, store)
-        return store
+        onlineParts(stationID)?.vector
     }
 
-    // Every access holds onlineCacheLock, including decoding and replacement.
-    nonisolated(unsafe) private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore?)] = [:]
+    /// Axis-only downloads stay separate from predictions that establish full speed.
+    static func loadLegacyOnline(_ stationID: String) -> ChsOnlineStore? {
+        onlineParts(stationID)?.legacy
+    }
+
+    private struct OnlineFileSignature: Equatable {
+        let modified: Date
+        let size: Int
+    }
+
+    private static func onlineSignature(_ url: URL) -> OnlineFileSignature? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modified = attrs[.modificationDate] as? Date, let size = attrs[.size] as? Int else { return nil }
+        return OnlineFileSignature(modified: modified, size: size)
+    }
+
+    private static func onlineParts(_ stationID: String) -> (vector: ChsOnlineStore?, legacy: ChsOnlineStore?)? {
+        let currentURL = onlineUrl(stationID), oldURL = legacyOnlineUrl(stationID)
+        let currentSignature = onlineSignature(currentURL), oldSignature = onlineSignature(oldURL)
+        guard currentSignature != nil || oldSignature != nil else { return nil }
+        onlineCacheLock.lock()
+        defer { onlineCacheLock.unlock() }
+        if let hit = onlineCache[stationID], hit.current == currentSignature, hit.old == oldSignature {
+            return (hit.vector, hit.legacy)
+        }
+        var readFailed = false
+        func decode(_ url: URL, signature: OnlineFileSignature?) -> ChsOnlineStore? {
+            guard signature != nil else { return nil }
+            guard let data = try? Data(contentsOf: url) else { readFailed = true; return nil }
+            let decoder = JSONDecoder()
+            let store = (try? decoder.decode(ChsOnlineStore.self, from: data))
+                ?? (try? decoder.decode(ChsOnlineWindow.self, from: data)).map {
+                    ChsOnlineStore(stationID: $0.stationID, blocks: [$0])
+                }
+            return store.flatMap { $0.stationID == stationID ? $0 : nil }
+        }
+        let current = decode(currentURL, signature: currentSignature)
+        let shouldReadOld = current == nil || (oldSignature != nil && currentSignature != nil
+            && oldSignature!.modified > currentSignature!.modified)
+        let old = shouldReadOld ? decode(oldURL, signature: oldSignature) : nil
+        guard !readFailed || current != nil else { return nil }
+        let selected = current ?? old
+        let vectors = selected?.blocks.filter(\.hasVectors) ?? []
+        var legacy = selected?.blocks.filter { !$0.hasVectors } ?? []
+        if current != nil, let oldSignature, let currentSignature, oldSignature.modified > currentSignature.modified {
+            legacy.append(contentsOf: old?.blocks.filter { !$0.hasVectors } ?? [])
+        }
+        legacy = legacy.filter {
+            $0.stationID == stationID && $0.times.count > 1 && $0.times.count == $0.speeds.count
+                && $0.times.allSatisfy(\.isFinite) && $0.speeds.allSatisfy(\.isFinite)
+                && zip($0.times, $0.times.dropFirst()).allSatisfy { pair in pair.0 < pair.1 }
+        }
+        var disjointLegacy: [ChsOnlineWindow] = []
+        let byAge = legacy.enumerated().sorted {
+            $0.element.fetchedAt == $1.element.fetchedAt ? $0.offset < $1.offset : $0.element.fetchedAt < $1.element.fetchedAt
+        }
+        for (_, block) in byAge {
+            disjointLegacy = disjointLegacy.flatMap { existing in
+                guard existing.start <= block.end && block.start <= existing.end else { return [existing] }
+                return existing.axisOnlyOutside(block, prunedBefore: .distantPast)
+            }
+            disjointLegacy.append(block)
+        }
+        legacy = disjointLegacy.sorted { $0.start < $1.start }
+        let fullStore = vectors.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: vectors)
+        let legacyStore = legacy.isEmpty ? nil : ChsOnlineStore(stationID: stationID, blocks: legacy)
+        if !readFailed { onlineCache[stationID] = (currentSignature, oldSignature, fullStore, legacyStore) }
+        return (fullStore, legacyStore)
+    }
+
+    nonisolated(unsafe) private static var onlineCache: [String: (current: OnlineFileSignature?, old: OnlineFileSignature?, vector: ChsOnlineStore?, legacy: ChsOnlineStore?)] = [:]
     private static let onlineCacheLock = NSLock()
 }
 
@@ -143,9 +198,88 @@ struct ChsOnlineWindow: Codable, Sendable {
     let ebbDirection: Double
     let times: [Double]        // epoch seconds, official samples on `ChsGrid`
     let speeds: [Double]       // signed kn along the flood axis (project())
+    // Optional for decoding older files; production readers refetch axis-only blocks.
+    var magnitudes: [Double]? = nil
+    var directions: [Double?]? = nil
+
+    init(axisOnly: Bool = false, stationID: String, iwlsName: String, timezone: String, fetchedAt: Date,
+         start: Date, end: Date, floodDirection: Double, ebbDirection: Double,
+         times: [Double], speeds: [Double], magnitudes: [Double]? = nil, directions: [Double?]? = nil) {
+        self.stationID = stationID; self.iwlsName = iwlsName; self.timezone = timezone
+        self.fetchedAt = fetchedAt; self.start = start; self.end = end
+        self.floodDirection = floodDirection; self.ebbDirection = ebbDirection
+        self.times = times; self.speeds = speeds
+        self.magnitudes = magnitudes ?? (axisOnly ? speeds.map { abs($0) } : nil)
+        self.directions = directions ?? (axisOnly ? speeds.map { $0 >= 0 ? floodDirection : ebbDirection } : nil)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, stationID, iwlsName, timezone, fetchedAt, start, end
+        case floodDirection, ebbDirection, times, speeds, magnitudes, directions
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        stationID = try c.decode(String.self, forKey: .stationID)
+        iwlsName = try c.decode(String.self, forKey: .iwlsName)
+        timezone = try c.decode(String.self, forKey: .timezone)
+        fetchedAt = try c.decode(Date.self, forKey: .fetchedAt)
+        start = try c.decode(Date.self, forKey: .start)
+        end = try c.decode(Date.self, forKey: .end)
+        floodDirection = try c.decode(Double.self, forKey: .floodDirection)
+        ebbDirection = try c.decode(Double.self, forKey: .ebbDirection)
+        times = try c.decode([Double].self, forKey: .times)
+        magnitudes = try c.decodeIfPresent([Double].self, forKey: .magnitudes)
+        directions = try c.decodeIfPresent([Double?].self, forKey: .directions)
+        let stored = try c.decode([Double?].self, forKey: .speeds)
+        for (index, value) in stored.enumerated() where value == nil {
+            guard let magnitudes, let directions, index < magnitudes.count, index < directions.count,
+                  magnitudes[index] > 0, directions[index] == nil else {
+                throw DecodingError.dataCorruptedError(forKey: .speeds, in: c, debugDescription: "Missing axis speed without a measured directionless current")
+            }
+        }
+        speeds = stored.map { $0 ?? 0 }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(stationID, forKey: .stationID)
+        try c.encode(iwlsName, forKey: .iwlsName)
+        try c.encode(timezone, forKey: .timezone)
+        try c.encode(fetchedAt, forKey: .fetchedAt)
+        try c.encode(start, forKey: .start)
+        try c.encode(end, forKey: .end)
+        try c.encode(floodDirection, forKey: .floodDirection)
+        try c.encode(ebbDirection, forKey: .ebbDirection)
+        try c.encode(times, forKey: .times)
+        // Persist an unknown axis as null while retaining its measured magnitude.
+        let axis: [Double?] = speeds.enumerated().map { index, speed in
+            if let magnitudes, let directions, index < magnitudes.count, index < directions.count,
+               magnitudes[index] > 0, directions[index] == nil { return nil }
+            return speed
+        }
+        try c.encode(axis, forKey: .speeds)
+        try c.encodeIfPresent(magnitudes, forKey: .magnitudes)
+        try c.encodeIfPresent(directions, forKey: .directions)
+    }
+
+    var hasVectors: Bool {
+        guard let magnitudes, let directions, magnitudes.count == times.count,
+              directions.count == times.count, speeds.count == times.count else { return false }
+        return magnitudes.allSatisfy { $0.isFinite && $0 >= 0 } && directions.allSatisfy { $0?.isFinite ?? true }
+    }
 
     var points: [CurrentPoint] {
-        zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
+        let vector = hasVectors
+        return zip(times.indices, zip(times, speeds)).map { index, pair in
+            let magnitude = vector ? magnitudes?[index] : nil
+            let direction = vector ? directions?[index] : nil
+            return CurrentPoint(time: Date(timeIntervalSince1970: pair.0), speed: pair.1,
+                                magnitude: magnitude, direction: direction,
+                                magnitudeIsKnown: vector && direction == nil && (magnitude ?? 0) > 0)
+        }
     }
 
     /// Stored online bounds are clamped to the last returned sample, so two
@@ -163,10 +297,31 @@ struct ChsOnlineWindow: Codable, Sendable {
             let mid = (lo + hi) / 2
             if times[mid] < t { lo = mid + 1 } else { hi = mid }
         }
-        if times[lo] == t { return speeds[lo] }
-        guard lo > 0, times[lo] - times[lo - 1] <= Self.sampleInterval else { return nil }
+        func directionKnown(_ index: Int) -> Bool {
+            guard let directions, let magnitudes, directions.count == times.count,
+                  magnitudes.count == times.count else { return true }
+            return directions[index] != nil || magnitudes[index] == 0
+        }
+        if times[lo] == t { return directionKnown(lo) ? speeds[lo] : nil }
+        guard lo > 0, times[lo] - times[lo - 1] <= Self.sampleInterval,
+              directionKnown(lo - 1), directionKnown(lo) else { return nil }
         let fraction = (t - times[lo - 1]) / (times[lo] - times[lo - 1])
         return speeds[lo - 1] + fraction * (speeds[lo] - speeds[lo - 1])
+    }
+
+    /// Keep older axis-only samples outside a replacement vector block.
+    func axisOnlyOutside(_ replacement: ChsOnlineWindow, prunedBefore cut: Date) -> [ChsOnlineWindow] {
+        guard !hasVectors, times.count == speeds.count else { return [] }
+        let groups = [times.indices.filter { times[$0] >= cut.timeIntervalSince1970 && times[$0] < replacement.start.timeIntervalSince1970 },
+                      times.indices.filter { times[$0] >= cut.timeIntervalSince1970 && times[$0] > replacement.end.timeIntervalSince1970 }]
+        return groups.compactMap { indices in
+            guard indices.count > 1, let first = indices.first, let last = indices.last else { return nil }
+            return ChsOnlineWindow(stationID: stationID, iwlsName: iwlsName, timezone: timezone,
+                                   fetchedAt: fetchedAt, start: Date(timeIntervalSince1970: times[first]),
+                                   end: Date(timeIntervalSince1970: times[last]), floodDirection: floodDirection,
+                                   ebbDirection: ebbDirection, times: indices.map { times[$0] },
+                                   speeds: indices.map { speeds[$0] })
+        }
     }
 
     /// Union `other`'s samples into this window by timestamp and widen the
@@ -188,8 +343,15 @@ struct ChsOnlineWindow: Codable, Sendable {
         guard start <= other.end.addingTimeInterval(slack),
               other.start <= end.addingTimeInterval(slack) else { return other }
         let cut = prunedBefore.timeIntervalSince1970
-        var byTime = Dictionary(zip(times, speeds), uniquingKeysWith: { _, b in b })
-        for (t, v) in zip(other.times, other.speeds) { byTime[t] = v }
+        guard hasVectors == other.hasVectors else { return other }
+        var byTime: [Double: (Double, Double?, Double?)] = [:]
+        let vector = hasVectors
+        for point in points { byTime[point.time.timeIntervalSince1970] = (point.speed, vector ? point.magnitude : nil, point.direction) }
+        for point in other.points {
+            let time = point.time.timeIntervalSince1970
+            if vector, point.direction == nil, point.magnitude > 0, byTime[time]?.2 != nil { continue }
+            byTime[time] = (point.speed, vector ? point.magnitude : nil, point.direction)
+        }
         let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
         return ChsOnlineWindow(
             stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,
@@ -197,7 +359,9 @@ struct ChsOnlineWindow: Codable, Sendable {
             start: max(min(start, other.start), prunedBefore),
             end: max(end, other.end),
             floodDirection: other.floodDirection, ebbDirection: other.ebbDirection,
-            times: kept.map(\.key), speeds: kept.map(\.value))
+            times: kept.map(\.key), speeds: kept.map { $0.value.0 },
+            magnitudes: hasVectors ? kept.map { $0.value.1! } : nil,
+            directions: hasVectors ? kept.map { $0.value.2 } : nil)
     }
 
     /// This window with everything before `cut` dropped — nil when nothing
@@ -207,11 +371,13 @@ struct ChsOnlineWindow: Codable, Sendable {
         guard start < cut else { return self }
         guard end > cut else { return nil }
         let c = cut.timeIntervalSince1970
-        let kept = zip(times, speeds).filter { $0.0 >= c }
+        let indices = times.indices.filter { times[$0] >= c }
         return ChsOnlineWindow(stationID: stationID, iwlsName: iwlsName, timezone: timezone,
                                fetchedAt: fetchedAt, start: cut, end: end,
                                floodDirection: floodDirection, ebbDirection: ebbDirection,
-                               times: kept.map { $0.0 }, speeds: kept.map { $0.1 })
+                               times: indices.map { times[$0] }, speeds: indices.map { speeds[$0] },
+                               magnitudes: hasVectors ? indices.map { magnitudes![$0] } : nil,
+                               directions: hasVectors ? indices.map { directions![$0] } : nil)
     }
 }
 
@@ -248,7 +414,11 @@ struct ChsOnlineStore: Codable {
         for b in blocks.sorted(by: { $0.start < $1.start }) {
             if b.start <= merged.end.addingTimeInterval(slack),
                merged.start <= b.end.addingTimeInterval(slack) {
-                merged = b.merging(merged, prunedBefore: cut)
+                if merged.hasVectors && !b.hasVectors {
+                    rest.append(contentsOf: b.axisOnlyOutside(merged, prunedBefore: cut))
+                } else {
+                    merged = b.merging(merged, prunedBefore: cut)
+                }
             } else if let kept = b.pruned(before: cut) {
                 rest.append(kept)
             }

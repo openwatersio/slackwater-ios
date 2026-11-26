@@ -419,12 +419,22 @@ import SlackwaterKit
         XCTAssertEqual(lead(scrub: t0, point: max).reading.spoken, "Max flood 2.5 knots NNE")
     }
 
-    /// Water with no known set claims none: the slack glyph in the go colour, whatever the word.
-    func testALeadWithNoSetShowsTheSlackGlyph() {
+    func testOnlineLeadKeepsUnknownDirectionWhenSpeedEqualsMagnitude() {
+        let point = onlineLeadPoint(at: at(1000), speed: 0.3, magnitude: 0.3, direction: nil)
+        let reading = lead(scrub: at(1000), point: point).reading
+        XCTAssertNil(reading.setDegrees)
+        XCTAssertEqual(reading.glyph, "arrow.triangle.2.circlepath")
+    }
+
+    /// Moving rotary water with no known set uses a circular symbol; zero keeps the slack glyph.
+    func testUnknownRotaryDirectionUsesCircularSymbol() {
         let unknown = CurrentPoint(time: at(1000), speed: 1.2, magnitude: 1.5, direction: nil)
-        XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading,
-                       reading("Flooding", "1.5", set: nil, nil, tint: .slack, spoken: "Flooding 1.5 knots"))
-        XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading.glyph, slackGlyph)
+        let unknownReading = lead(scrub: at(1000), point: unknown).reading
+        XCTAssertEqual(unknownReading.value, "1.5")
+        XCTAssertNil(unknownReading.setDegrees)
+        XCTAssertEqual(unknownReading.tint, .flood)
+        XCTAssertEqual(unknownReading.spoken, "1.5 knots")
+        XCTAssertEqual(lead(scrub: at(1000), point: unknown).reading.glyph, "arrow.triangle.2.circlepath")
         XCTAssertEqual(lead(scrub: at(1000), signed: 0).reading,
                        reading("Flooding", "0.0", set: nil, nil, tint: .slack, spoken: "Flooding 0.0 knots"),
                        "a zero vector has no set")

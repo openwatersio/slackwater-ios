@@ -16,6 +16,16 @@ let networkKillSwitch: Bool = {
     return CommandLine.arguments.contains("-networkKillSwitch")
 }()
 
+private let onlineIncompleteCooldown: TimeInterval = 86_400
+
+func onlineCacheChangedAfterFailure(modified: Date?, retryAfter: Date) -> Bool {
+    modified.map { $0 > retryAfter.addingTimeInterval(1 - onlineIncompleteCooldown) } ?? false
+}
+
+func legacyOnlineNeedsRefresh(vector: ChsOnlineStore?, legacy: ChsOnlineStore?, today: Date) -> Bool {
+    vector?.block(covering: today) == nil && legacy?.blocks.contains { $0.end >= today } == true
+}
+
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.
 enum ChsState {
@@ -98,6 +108,11 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
     @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
+    private var onlineIncompleteAttempts: [String: Int] = [:]
+    nonisolated static let incompleteRetryKey = "slackwater.onlineIncompleteRetryAfter"
+    private var onlineIncompleteRetryAfter: [String: Date] = [:] {
+        didSet { UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey) }
+    }
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
     /// The station-local day of each gate's last automatic fetch. A station
     /// that still covers today refreshes at most once on that day, so a
@@ -288,6 +303,13 @@ final class ChsFitService: ObservableObject {
 
     init() {
         ChsModelStore.resetIfRequested()
+        let now = appNow()
+        onlineIncompleteRetryAfter = (UserDefaults.standard.dictionary(forKey: Self.incompleteRetryKey) as? [String: Date] ?? [:])
+            .filter { $0.value > now && $0.value <= now.addingTimeInterval(onlineIncompleteCooldown) }
+        UserDefaults.standard.set(onlineIncompleteRetryAfter, forKey: Self.incompleteRetryKey)
+        for id in onlineIncompleteRetryAfter.keys {
+            onlineStates[id] = .failed("IWLS returned incomplete current predictions")
+        }
         // Before anything adopts: `adopt` reads `tier` to decide what the
         // queue may take, and the first call can arrive from the list's
         // `.task` a moment after this returns.
@@ -297,6 +319,7 @@ final class ChsFitService: ObservableObject {
         let cancelled = AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey) ?? []
         let requested = AppGroup.defaults.stringArray(forKey: AppGroup.requestedDownloadsKey) ?? []
         cancelledDownloads = Set(StationSuccessors.remap(cancelled, in: StationSuccessors.bundled))
+        if allCurrentsSelected { cancelledDownloads.subtract(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id)) }
         requestedDownloads = Set(StationSuccessors.remap(requested, in: StationSuccessors.bundled))
         if cancelledDownloads != Set(cancelled) {
             AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
@@ -311,6 +334,16 @@ final class ChsFitService: ObservableObject {
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
+        for (id, due) in onlineIncompleteRetryAfter {
+            let modified = (try? FileManager.default.attributesOfItem(atPath: ChsModelStore.legacyOnlineUrl(id).path))?[.modificationDate] as? Date
+            if onlineCacheChangedAfterFailure(modified: modified, retryAfter: due) {
+                onlineIncompleteRetryAfter.removeValue(forKey: id)
+                onlineStates.removeValue(forKey: id)
+            }
+        }
+        let legacyCandidates = ChsCurrentGateInfo.all.filter {
+            $0.isOnline && !cancelledDownloads.contains($0.id) && (files.contains($0.id + "-online.json") || files.contains($0.id + "-online-v2"))
+        }.map { (id: $0.id, today: todayLocal($0.tz)) }
         #if os(iOS)
         Self.invalidateCurrentCalendars(in: files)
         #endif
@@ -356,6 +389,22 @@ final class ChsFitService: ObservableObject {
         Self.sweepOrphans(files)
         observeConnectivity()
         observeDataMode()
+        Task { [weak self] in
+            let ids = await Task.detached(priority: .utility) {
+                legacyCandidates.compactMap { candidate in
+                    let vector = ChsModelStore.loadOnline(candidate.id)
+                    let legacy = ChsModelStore.loadLegacyOnline(candidate.id)
+                    return legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: candidate.today) ? candidate.id : nil
+                }
+            }.value
+            guard let self else { return }
+            let gates = ChsCurrentGateInfo.all.filter { gate in
+                ids.contains(gate.id) && !self.cancelledDownloads.contains(gate.id)
+                    && legacyOnlineNeedsRefresh(vector: ChsModelStore.loadOnline(gate.id),
+                                                legacy: ChsModelStore.loadLegacyOnline(gate.id), today: todayLocal(gate.tz))
+            }
+            self.prefetchOnlineGates(gates)
+        }
     }
 
     #if os(iOS)
@@ -383,14 +432,18 @@ final class ChsFitService: ObservableObject {
     nonisolated static func orphanFiles(in files: Set<String>,
                                         ports: Set<String>, gates: Set<String>, onlineGates: Set<String>) -> [String] {
         files.sorted().filter { file in
-            guard file.hasSuffix(".json") else { return false }
-            let stem = String(file.dropLast(5))
+            guard file.hasSuffix(".json") || file.hasSuffix("-online-v2") else { return false }
+            let stem = file.hasSuffix(".json") ? String(file.dropLast(5)) : file
             if stem.hasSuffix("-tide-preview") {
                 return !ports.contains(String(stem.dropLast("-tide-preview".count)))
             }
             if stem.hasSuffix("-current") {
                 let id = String(stem.dropLast("-current".count))
                 return !gates.contains(id) || onlineGates.contains(id)
+            }
+            if stem.hasSuffix("-online-v2") {
+                let id = String(stem.dropLast("-online-v2".count))
+                return !gates.contains(id) || !onlineGates.contains(id)
             }
             if stem.hasSuffix("-online") {
                 let id = String(stem.dropLast("-online".count))
@@ -421,11 +474,12 @@ final class ChsFitService: ObservableObject {
             // carries — read it before the file goes. Best effort: an
             // `-online.json` decodes as no model and keeps its chunks, and a
             // chunk cache is re-fetchable by definition.
-            if let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
+            if file.hasSuffix(".json"), let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
                 IwlsFetcher.chunkCache.purge(model.iwlsID, includingEmpty: true)
             }
             try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
         }
+
     }
 
     // Moving the origin keeps queued work; explicit deselection can narrow it.
@@ -475,6 +529,7 @@ final class ChsFitService: ObservableObject {
             remainingBeyondCohort = 0
         }
         pump()
+        prefetchOnlineGates(ChsCurrentGateInfo.all.filter { $0.isOnline && cohort.ids.contains($0.id) }, resumeCancelled: true)
         prefetchOnlineGates(tierOnlineGates[tier] ?? [])
     }
 
@@ -490,7 +545,7 @@ final class ChsFitService: ObservableObject {
             trimDownloads()
         }
         pump()
-        prefetchOnlineGates(tierOnlineGates[newTier] ?? [])
+        prefetchOnlineGates(tierOnlineGates[newTier] ?? [], resumeCancelled: widened)
 #if os(iOS)
         if widened { BackgroundDownloads.submitIfPossible() }
 #endif
@@ -512,13 +567,18 @@ final class ChsFitService: ObservableObject {
         var online = Set((tierOnlineGates[tier] ?? []).map(\.id))
             .union(onlinePreferred).union(requestedDownloads)
         if allCurrentsSelected { online.formUnion(ChsCurrentGateInfo.all.filter(\.isOnline).map(\.id)) }
-        for id in Array(onlineDesired.keys) where !online.contains(id) {
+        let removedOnline = Set(onlineDesired.keys).subtracting(online)
+        cancelledDownloads.formUnion(removedOnline)
+        AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        for id in removedOnline {
             onlineDesired.removeValue(forKey: id)
             onlinePending.removeAll { $0.id == id }
             onlineRetryTimers.removeValue(forKey: id)?.cancel()
             onlineFetches[id]?.cancel()
             if onlineFetches[id] == nil { onlineStates.removeValue(forKey: id) }
             onlineAttempts.removeValue(forKey: id)
+            onlineIncompleteAttempts.removeValue(forKey: id)
+            onlineIncompleteRetryAfter.removeValue(forKey: id)
         }
     }
 
@@ -712,7 +772,7 @@ final class ChsFitService: ObservableObject {
         }
         addDownloads(gatesToDownload)
         pump()
-        prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
+        prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline), resumeCancelled: true)
         #if os(iOS)
         BackgroundDownloads.submitIfPossible()
         #endif
@@ -729,11 +789,15 @@ final class ChsFitService: ObservableObject {
     /// download set, and re-order what is still queued closest-first.
     func prioritize(lat: Double, lon: Double, favorites: [String]? = nil,
                     visibleID: String? = nil) {
+        let previous = Set((tierOnlineGates[tier] ?? []).map(\.id))
         adopt(lat: lat, lon: lon)
         onlineOrigin = (lat, lon)
+        let entered = (tierOnlineGates[tier] ?? []).filter { !previous.contains($0.id) }
+        prefetchOnlineGates(entered, resumeCancelled: true)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
-        prefetchOnlineGates(favoriteGates + (allCurrentsSelected
-            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? []))
+        prefetchOnlineGates(favoriteGates, resumeCancelled: true)
+        prefetchOnlineGates(allCurrentsSelected
+            ? ChsCurrentGateInfo.all.filter(\.isOnline) : tierOnlineGates[tier] ?? [], resumeCancelled: allCurrentsSelected)
         resumeForForeground()
     }
 
@@ -742,7 +806,7 @@ final class ChsFitService: ObservableObject {
     func prioritizeFavorites(_ ids: [String], after visibleID: String?) {
         let online = applyFavorites(ids, after: visibleID)
         pump()
-        prefetchOnlineGates(online)
+        prefetchOnlineGates(online, resumeCancelled: true)
     }
 
     private func applyFavorites(_ ids: [String], after visibleID: String?) -> [ChsCurrentGateInfo] {
@@ -756,6 +820,7 @@ final class ChsFitService: ObservableObject {
     func onlineState(_ id: String, at now: Date = appNow()) -> OnlineFetchState {
         guard let state = onlineStates[id] else { return .idle }
         if case .deferred(let due) = state, due <= now { return .idle }
+        if case .failed = state, let due = onlineIncompleteRetryAfter[id], due <= now { return .idle }
         return state
     }
 
@@ -791,7 +856,7 @@ final class ChsFitService: ObservableObject {
             return
         }
         onlineHolds[id] = nil
-        guard hold.requeue else { return }
+        guard hold.requeue, !onlineCooldownActive(id) else { return }
         switch onlineState(id) {
         case .idle, .failed: break
         case .fetching, .deferred: return
@@ -801,15 +866,25 @@ final class ChsFitService: ObservableObject {
     }
 
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
-                           at now: Date = appNow()) {
+                           maxAttempts: Int? = nil, at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()
+        onlineRetryTimers[id] = nil
+        onlineIncompleteRetryAfter[id] = nil
         guard !permanent else {
             releaseRequest(id)
             onlineStates[id] = .failed(error)
             return
         }
-        let attempts = (onlineAttempts[id] ?? 0) + 1
-        onlineAttempts[id] = attempts
+        let incomplete = maxAttempts != nil
+        let attempts = (incomplete ? onlineIncompleteAttempts[id] ?? 0 : onlineAttempts[id] ?? 0) + 1
+        if incomplete { onlineIncompleteAttempts[id] = attempts } else { onlineAttempts[id] = attempts }
+        if let maxAttempts, attempts >= maxAttempts {
+            onlineStates[id] = .failed(error)
+            let due = now.addingTimeInterval(onlineIncompleteCooldown)
+            onlineIncompleteRetryAfter[id] = due
+            if let gate = onlineDesired[id] { scheduleIncompleteRetry(gate, due: due) }
+            return
+        }
         let due = now.addingTimeInterval(ChsQueue.backoff(attempts: attempts))
         onlineStates[id] = .deferred(due)
         guard let gate = onlineDesired[id] else { return }
@@ -821,24 +896,52 @@ final class ChsFitService: ObservableObject {
         }
     }
 
+    private func scheduleIncompleteRetry(_ gate: ChsCurrentGateInfo, due: Date) {
+        guard onlineRetryTimers[gate.id] == nil else { return }
+        onlineRetryTimers[gate.id] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(ChsQueue.retryWait(until: due)))
+            guard !Task.isCancelled else { return }
+            self?.onlineRetryTimers[gate.id] = nil
+            self?.onlineStates[gate.id] = .idle
+            self?.onlineAttempts[gate.id] = 0
+            self?.onlineIncompleteAttempts[gate.id] = 0
+            self?.onlineIncompleteRetryAfter[gate.id] = nil
+            self?.prefetchOnlineGates([gate])
+        }
+    }
+
     /// An automatic refresh failed on a station whose copy still covers today:
     /// nothing is wrong that a person can act on, so no failure line and no
     /// retry. Tomorrow's refresh tries again.
-    func noteOnlineRefreshFailure(_ id: String) {
+    func noteOnlineRefreshFailure(_ id: String, preserveIncompleteAttempts: Bool = false) {
         onlineRetryTimers[id]?.cancel()
         onlineRetryTimers[id] = nil
-        releaseRequest(id)
+        if let gate = ChsCurrentGateInfo.all.first(where: { $0.id == id }),
+           ChsModelStore.loadOnline(id)?.block(covering: todayLocal(gate.tz)) != nil {
+            releaseRequest(id)
+        }
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
+        if !preserveIncompleteAttempts { onlineIncompleteAttempts[id] = 0 }
     }
 
     /// Whether the queue should fetch this gate now: always when today is not
     /// covered, otherwise once a day while the copy reaches less than a month.
-    func onlineRefreshDue(_ gate: ChsCurrentGateInfo) -> Bool {
+    func onlineRefreshDue(_ gate: ChsCurrentGateInfo, constrained: Bool = Connectivity.shared.constrained) -> Bool {
         let today = todayLocal(gate.tz)
-        guard let store = ChsModelStore.loadOnline(gate.id), store.block(covering: today) != nil else { return true }
+        guard let store = ChsModelStore.loadOnline(gate.id), let block = store.block(covering: today) else {
+            return !(constrained && ChsModelStore.loadLegacyOnline(gate.id)?.blocks.contains { $0.end >= today } == true)
+        }
+        let end = today.addingTimeInterval(Timeline.onlineFetchDays * 86_400).timeIntervalSince1970
+        let missingBearings = !constrained && dayLocal(block.fetchedAt, gate.tz) < today
+            && block.times.indices.contains { index in
+                guard let magnitudes = block.magnitudes, let directions = block.directions,
+                      index < magnitudes.count, index < directions.count else { return false }
+                return block.times[index] >= today.timeIntervalSince1970 && block.times[index] <= end
+                    && magnitudes[index] > 0 && directions[index] == nil
+            }
         return onlineRefreshedOn[gate.id] != today
-            && store.needsRefresh(today: today, lowData: Connectivity.shared.constrained)
+            && (missingBearings || store.needsRefresh(today: today, lowData: constrained))
     }
 
     func markOnlineRefresh(_ gate: ChsCurrentGateInfo) {
@@ -850,10 +953,15 @@ final class ChsFitService: ObservableObject {
         retainRequests([gate.id])
         guard onlineState(gate.id) != .fetching else { return false }
         onlineDesired[gate.id] = gate
+        if cancelledDownloads.remove(gate.id) != nil {
+            AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        }
         onlineRetryTimers[gate.id]?.cancel()
         onlineRetryTimers[gate.id] = nil
         onlinePending.removeAll { $0.id == gate.id }
         onlineAttempts[gate.id] = 0
+        onlineIncompleteAttempts[gate.id] = 0
+        onlineIncompleteRetryAfter[gate.id] = nil
         return true
     }
 
@@ -873,9 +981,13 @@ final class ChsFitService: ObservableObject {
         if onlineDesired[gate.id] != nil { prefetchOnlineGates([gate]) }
     }
 
+    func onlineCooldownActive(_ id: String, at now: Date = appNow()) -> Bool {
+        onlineIncompleteRetryAfter[id].map { $0 > now } ?? false
+    }
+
     /// An opened station refreshes the way the download set does, even when
     /// nothing else would have queued it.
-    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate]) }
+    func refreshOnline(_ gate: ChsCurrentGateInfo) { prefetchOnlineGates([gate], resumeCancelled: true) }
 
     func fetchOnline(_ gate: ChsCurrentGateInfo) {
         guard Connectivity.shared.online, prepareOnlineUpdate(gate) else { return }
@@ -883,6 +995,10 @@ final class ChsFitService: ObservableObject {
     }
 
     func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
+        if onlineIncompleteRetryAfter.removeValue(forKey: gate.id) != nil {
+            onlineAttempts[gate.id] = 0
+            onlineIncompleteAttempts[gate.id] = 0
+        }
         onlineRetryTimers[gate.id]?.cancel()
         onlineRetryTimers[gate.id] = nil
         onlineDesired[gate.id] = gate
@@ -895,6 +1011,8 @@ final class ChsFitService: ObservableObject {
         onlineProgress[id] = 10
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
+        onlineIncompleteAttempts[id] = 0
+        onlineIncompleteRetryAfter[id] = nil
     }
 
     func setOnlineProgress(_ id: String, done: Int, total: Int) {
@@ -907,6 +1025,8 @@ final class ChsFitService: ObservableObject {
         onlineStates = [:]
         onlineProgress = [:]
         onlineAttempts = [:]
+        onlineIncompleteAttempts = [:]
+        onlineIncompleteRetryAfter = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]
         onlineRefreshedOn = [:]
@@ -929,14 +1049,25 @@ final class ChsFitService: ObservableObject {
 #endif
 
     /// Adds online gates to the serial prefetch queue; transient failures schedule themselves again.
-    private func prefetchOnlineGates(_ gates: [ChsCurrentGateInfo]) {
+    private func prefetchOnlineGates(_ candidates: [ChsCurrentGateInfo], resumeCancelled: Bool = false) {
 #if os(watchOS)
         // The watch detail requires harmonics; online gates have no fitted model.
         return
 #else
+        let gates = resumeCancelled ? candidates : candidates.filter { !cancelledDownloads.contains($0.id) }
         // Guarded: every fix re-enters here with the same gates, and a
         // published write that changes nothing still redraws the list.
         for gate in gates where onlineDesired[gate.id] == nil { onlineDesired[gate.id] = gate }
+        let resumed = cancelledDownloads.intersection(gates.map(\.id))
+        if !resumed.isEmpty {
+            cancelledDownloads.subtract(resumed)
+            AppGroup.defaults.set(cancelledDownloads.sorted(), forKey: AppGroup.cancelledDownloadsKey)
+        }
+        for gate in gates {
+            if let due = onlineIncompleteRetryAfter[gate.id], due > appNow() {
+                scheduleIncompleteRetry(gate, due: due)
+            }
+        }
         retainRequests(gates.filter { cohort.ids.contains($0.id) && onlineNeedsDownload($0) }.map(\.id))
         guard Connectivity.shared.online, !networkKillSwitch else { return }
         let due = onlineGatesDue(gates)
@@ -1009,8 +1140,11 @@ final class ChsFitService: ObservableObject {
         queue.retryNow()
         for id in Array(onlineStates.keys) where onlineState(id) != .fetching {
             onlineRetryTimers[id]?.cancel()
+            onlineRetryTimers[id] = nil
+            onlineIncompleteRetryAfter[id] = nil
             onlineStates[id] = .idle
             onlineAttempts[id] = 0
+            onlineIncompleteAttempts[id] = 0
         }
         pump()
         prefetchOnlineGates(Array(onlineDesired.values))
@@ -1092,6 +1226,7 @@ final class ChsFitService: ObservableObject {
                     }
                     for id in deferred {
                         self.onlineRetryTimers[id]?.cancel()
+                        self.onlineRetryTimers[id] = nil
                         self.onlineStates[id] = .idle
                         self.onlineAttempts[id] = 0
                     }
@@ -1107,11 +1242,12 @@ final class ChsFitService: ObservableObject {
             .filter { !$0 }
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    guard let self, let origin = self.onlineOrigin else { return }
-                    self.adopt(lat: origin.lat, lon: origin.lon)
+                    guard let self else { return }
+                    if let origin = self.onlineOrigin { self.adopt(lat: origin.lat, lon: origin.lon) }
                     self.pump()
-                    self.prefetchOnlineGates(self.allCurrentsSelected
-                        ? ChsCurrentGateInfo.all.filter(\.isOnline) : self.tierOnlineGates[self.tier] ?? [])
+                    let selected = self.allCurrentsSelected
+                        ? ChsCurrentGateInfo.all.filter(\.isOnline) : self.tierOnlineGates[self.tier] ?? []
+                    self.prefetchOnlineGates(Array(self.onlineDesired.values) + selected, resumeCancelled: self.allCurrentsSelected)
                 }
             }
     }
@@ -1288,7 +1424,7 @@ final class ChsFitService: ObservableObject {
         switch error {
         case let chs as ChsError:
             switch chs {
-            case .permanent(let reason), .transient(let reason): return reason
+            case .permanent(let reason), .transient(let reason), .incomplete(let reason): return reason
             case .networkDisabled: return "no connection"
             }
         case let iwls as IwlsError: return iwls.localizedDescription
@@ -1448,9 +1584,11 @@ enum ChsError: Error {
     case networkDisabled
     case permanent(String)
     case transient(String)
+    case incomplete(String)
 
     static func isPermanent(_ error: Error) -> Bool {
         if case .permanent = error as? ChsError { return true }
+        if case .incomplete = error as? ChsError { return true }
         if case .permanent = error as? IwlsError { return true }
         return false
     }
@@ -1485,6 +1623,7 @@ extension ChsModelStore {
         AppGroup.defaults.removeObject(forKey: AppGroup.downloadAllCurrentsKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.cancelledDownloadsKey)
         AppGroup.defaults.removeObject(forKey: AppGroup.requestedDownloadsKey)
+        UserDefaults.standard.removeObject(forKey: ChsFitService.incompleteRetryKey)
         try? FileManager.default.removeItem(at: dir)
         IwlsFetcher.chunkCache.reset()
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)

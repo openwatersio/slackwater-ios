@@ -4,6 +4,10 @@
 import Foundation
 import SlackwaterKit
 
+func incompleteOnlineRequestIsForToday(anchor: Date?, today: Date, tz: TimeZone) -> Bool {
+    anchor.map { dayLocal($0, tz) == today } ?? true
+}
+
 extension ChsFitService {
     /// The span one fetch covers: `Timeline.window`'s start for the anchor —
     /// back-padded like every window (#67 item 1), never re-derived here — and
@@ -17,6 +21,91 @@ extension ChsFitService {
         let from = anchor ?? today
         return (Timeline.window(anchor: from).start,
                 from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
+    }
+
+    /// Pair the original IWLS vectors with the signed projection at each timestamp.
+    nonisolated static func onlineVectors(speeds: [ChsSample], dirs: [ChsSample], flood: Double)
+        -> (projected: [ChsSample], magnitudes: [Double], directions: [Double])? {
+        let valid: (ChsSample) -> Bool = { $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite }
+        let validDirections = dirs.filter(valid)
+        let speedByTime = Dictionary(speeds.filter { valid($0) && $0.v >= 0 }.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let uniqueSpeeds = speedByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
+        let directionByTime = Dictionary(validDirections.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { a, _ in a })
+        let uniqueDirections = directionByTime.map { ChsSample(t: Double($0.key), v: $0.value) }.sorted { $0.t < $1.t }
+        let projected = project(speeds: uniqueSpeeds, dirs: uniqueDirections, floodDirection: flood)
+        if projected.isEmpty { return uniqueSpeeds.isEmpty ? nil : ([], [], []) }
+        let magnitudes = projected.compactMap { speedByTime[Int64($0.t.rounded())] }
+        let directions = projected.compactMap { directionByTime[Int64($0.t.rounded())] }
+        guard magnitudes.count == projected.count, directions.count == projected.count,
+              magnitudes.allSatisfy({ $0.isFinite && $0 >= 0 }), directions.allSatisfy(\.isFinite) else { return nil }
+        return (projected, magnitudes, directions)
+    }
+
+    /// Retain measured speeds when one or more bearings are missing.
+    nonisolated static func fillSingleOnlineGaps(
+        projected: [ChsSample], magnitudes: [Double], directions: [Double],
+        measuredSpeeds: [ChsSample], flood: Double
+    ) -> (projected: [ChsSample], magnitudes: [Double], directions: [Double?]) {
+        guard projected.count == magnitudes.count, projected.count == directions.count else {
+            return (projected, magnitudes, directions.map { Optional($0) })
+        }
+        let validSpeeds = measuredSpeeds.filter { $0.t.isFinite && abs($0.t) < Double(Int64.max) && $0.v.isFinite && $0.v >= 0 }
+        let byTime = Dictionary(validSpeeds.map { (Int64($0.t.rounded()), $0.v) }, uniquingKeysWith: { first, _ in first })
+        let measuredTimes = byTime.keys.sorted()
+        var samples: [ChsSample] = [], speeds: [Double] = [], bearings: [Double?] = []
+        guard let first = projected.first, let last = projected.last else {
+            return (measuredTimes.map { ChsSample(t: Double($0), v: 0) },
+                    measuredTimes.compactMap { byTime[$0] }, measuredTimes.map { _ in nil })
+        }
+        for key in measuredTimes where Double(key) < first.t {
+            samples.append(ChsSample(t: Double(key), v: 0))
+            speeds.append(byTime[key]!)
+            bearings.append(nil)
+        }
+        for i in projected.indices {
+            let step = ChsOnlineWindow.sampleInterval * 1000
+            if i > 0, projected[i].t - projected[i - 1].t > step {
+                let previous = projected[i - 1], next = projected[i]
+                for key in measuredTimes {
+                    let time = Double(key)
+                    let grid = (time - previous.t) / step
+                    guard time > previous.t, time < next.t, abs(grid - grid.rounded()) < 1e-6,
+                          let magnitude = byTime[key] else { continue }
+                    let fraction = (time - previous.t) / (next.t - previous.t)
+                    let estimate = previous.v + (next.v - previous.v) * fraction
+                    let signed = max(-magnitude, min(magnitude, estimate))
+                    samples.append(ChsSample(t: time, v: signed))
+                    speeds.append(magnitude)
+                    bearings.append(nil)
+                }
+            }
+            samples.append(projected[i]); speeds.append(magnitudes[i]); bearings.append(directions[i])
+        }
+        for key in measuredTimes where Double(key) > last.t {
+            samples.append(ChsSample(t: Double(key), v: 0))
+            speeds.append(byTime[key]!)
+            bearings.append(nil)
+        }
+        return (samples, speeds, bearings)
+    }
+
+    nonisolated static func onlineRuns(_ projected: [ChsSample]) -> [Range<Int>] {
+        guard !projected.isEmpty else { return [] }
+        var runs: [Range<Int>] = []
+        var start = 0
+        for i in 1..<projected.count where projected[i].t - projected[i - 1].t > ChsOnlineWindow.sampleInterval * 1000 {
+            if i - start > 1 { runs.append(start..<i) }
+            start = i
+        }
+        if projected.count - start > 1 { runs.append(start..<projected.count) }
+        return runs
+    }
+
+    nonisolated static func onlineCoveredWindow(_ blocks: [ChsOnlineWindow], anchor: Date, name: String) throws -> ChsOnlineWindow {
+        guard let window = blocks.first(where: { $0.covers(anchor: anchor) }) else {
+            throw ChsError.incomplete("\(name): IWLS returned incomplete current predictions")
+        }
+        return window
     }
 
     /// The fit-reject gates (`ChsCurrentGateInfo.isOnline`) get no on-device fit
@@ -84,13 +173,20 @@ extension ChsFitService {
                                   fetch: @MainActor (Date) async throws -> ChsOnlineWindow) async throws -> ChsOnlineWindow {
         shared.holdOnline(gate)
         defer { shared.releaseOnline(gate.id) }
-        let fetched = try await fetch(anchor)
+        let result: Result<ChsOnlineWindow, Error>
+        do {
+            result = .success(try await fetch(anchor))
+        } catch {
+            if error is CancellationError || Task.isCancelled { throw error }
+            guard case .incomplete = error as? ChsError else { throw error }
+            result = .failure(error)
+        }
         let today = todayLocal(gate.tz)
-        if anchor != today, !fetched.covers(anchor: today),
+        if anchor != today, (try? result.get().covers(anchor: today)) != true,
            ChsModelStore.loadOnline(gate.id)?.block(covering: today) == nil {
             _ = try? await fetch(today)
         }
-        return fetched
+        return try result.get()
     }
 
     /// The check-and-set, on the main actor so it is atomic: an existing handle
@@ -118,9 +214,16 @@ extension ChsFitService {
                 } else if automatic,
                           ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil {
                     noteOnlineRefreshFailure(gate.id)
+                } else if case .incomplete = error as? ChsError,
+                          !incompleteOnlineRequestIsForToday(anchor: anchor, today: todayLocal(gate.tz), tz: gate.tz) {
+                    // A missing different day must not stop today's automatic refresh.
+                    noteOnlineRefreshFailure(gate.id, preserveIncompleteAttempts: true)
                 } else {
+                    let incomplete: Bool
+                    if case .incomplete = error as? ChsError { incomplete = true } else { incomplete = false }
                     noteOnlineFailure(gate.id, error: Self.reason(error),
-                                      permanent: ChsError.isPermanent(error))
+                                      permanent: ChsError.isPermanent(error) && !incomplete,
+                                      maxAttempts: incomplete ? 3 : nil)
                 }
                 throw error
             }
@@ -157,40 +260,54 @@ extension ChsFitService {
             await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 3, total: total) }
         }
         try Task.checkCancellation()
-        let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
-        // IWLS can 200 with an empty series (a quiet chunk boundary, no error
-        // to catch). Saving anyway would fall through to the requested
-        // start/end below and stick forever — a zero-sample window that
-        // still reads as "covers the strip". Fail the fetch instead: the
-        // caller already turns any thrown error into the honesty card + retry.
-        guard !projected.isEmpty else { throw ChsError.permanent("\(gate.name): IWLS returned an empty series") }
+        // Empty or unmatched IWLS series cannot establish coverage or a current vector.
+        guard let rawVectors = Self.onlineVectors(speeds: speeds, dirs: dirs, flood: flood) else {
+            IwlsFetcher.chunkCache.purge(station.id)
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current predictions")
+        }
+        let vectors = Self.fillSingleOnlineGaps(projected: rawVectors.projected, magnitudes: rawVectors.magnitudes, directions: rawVectors.directions, measuredSpeeds: speeds, flood: flood)
+        if zip(vectors.magnitudes, vectors.directions).contains(where: { $0.0 > 0 && $0.1 == nil }) {
+            IwlsFetcher.chunkCache.purge(station.id)
+        }
+        let projected = vectors.projected
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
         // would make `covers` pass on a window with a hole in it and
         // render a strip with a dead zone. Clamp to what actually came back,
         // symmetrically, so a truncated fetch honestly fails coverage instead.
-        let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
-        let sampleEnd = projected.last.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? end
-        let window = ChsOnlineWindow(
-            stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
-            fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
-            floodDirection: flood, ebbDirection: ebb,
-            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
-        do {
-            // The MERGED window goes back to the caller, not `window`: the
-            // fetched block is only the part that was missing, and a caller
-            // rendering it alone would have less on screen than it has on disk
-            // (`saveOnline`'s doc comment).
-            let merged = try ChsModelStore.saveOnline(window)
-            await MainActor.run { shared.bumpOnlineFetchStamp() }
-            return merged
-        } catch {
-            // ponytail: a local disk-write failure on an already-fetched
-            // window isn't worth failing the whole fetch over — the caller
-            // still gets `window` to render; only the reload-elsewhere signal
-            // (the stamp) and next launch's offline copy are what's lost.
+        let windows = Self.onlineRuns(projected).compactMap { range -> ChsOnlineWindow? in
+            let first = Date(timeIntervalSince1970: projected[range.lowerBound].t / 1000)
+            let last = Date(timeIntervalSince1970: projected[range.upperBound - 1].t / 1000)
+            guard first <= end, last >= start else { return nil }
+            return ChsOnlineWindow(stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
+                                   fetchedAt: .now, start: max(start, first), end: min(end, last),
+                                   floodDirection: flood, ebbDirection: ebb,
+                                   times: range.map { projected[$0].t / 1000 }, speeds: range.map { projected[$0].v },
+                                   magnitudes: range.map { vectors.magnitudes[$0] }, directions: range.map { vectors.directions[$0] })
         }
-        return window
+        guard !windows.isEmpty else {
+            IwlsFetcher.chunkCache.purge(station.id)
+            throw ChsError.incomplete("\(gate.name): IWLS returned incomplete current predictions")
+        }
+        var saved: [ChsOnlineWindow] = []
+        for window in windows {
+            try Task.checkCancellation()
+            if let merged = try? ChsModelStore.saveOnline(window, retainingFrom: windows[0].start) {
+                saved.append(merged)
+                await MainActor.run { shared.bumpOnlineFetchStamp() }
+            } else {
+                saved.append(window)
+            }
+        }
+        try Task.checkCancellation()
+        let desired = anchor ?? todayLocal(gate.tz)
+        let blocks = (ChsModelStore.loadOnline(gate.id)?.blocks ?? []) + saved
+        do {
+            return try Self.onlineCoveredWindow(blocks, anchor: desired, name: gate.name)
+        } catch {
+            IwlsFetcher.chunkCache.purge(station.id)
+            throw error
+        }
     }
 }
 
@@ -206,14 +323,19 @@ extension ChsModelStore {
     // care about, and -chsResetModels already clears it. Add a cap when a real
     // file gets big.
     @discardableResult
-    static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
+    static func saveOnline(_ window: ChsOnlineWindow, retainingFrom: Date? = nil) throws -> ChsOnlineWindow {
         let tz = TimeZone(identifier: window.timezone) ?? .current
         let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
-                      window.start)
-        let store = (loadOnline(window.stationID)
-                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
+                      retainingFrom ?? window.start)
+        let blocks = (loadOnline(window.stationID)?.blocks ?? [])
+            + (loadLegacyOnline(window.stationID)?.blocks ?? [])
+        let store = ChsOnlineStore(stationID: window.stationID, blocks: blocks)
             .inserting(window, prunedBefore: cut)
-        try save(store, id: window.stationID, suffix: "-online")
+        try Task.checkCancellation()
+        let url = onlineUrl(window.stationID)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(store).write(to: url, options: .atomic)
+        WidgetReload.trigger()
         return store.block(spanning: window) ?? window
     }
 }
@@ -238,7 +360,9 @@ extension ChsOnlineWindow {
     func cardState(at now: Date) -> CurrentCardState {
         let point = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }
             ?? CurrentPoint(time: now, speed: 0)
-        let next = sampleEvents(points).first { $0.time > now }
+        let next = sampleEvents(points).lazy.filter { $0.time > now }.first { event in
+            !currentEventsMatchingWater(self, events: [event]).isEmpty
+        }
         return CurrentCardState(point: point, flood: floodDirection, ebb: ebbDirection, next: next)
     }
 }

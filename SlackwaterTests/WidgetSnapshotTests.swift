@@ -313,7 +313,7 @@ import SlackwaterKit
 
         let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
         let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
-        if case .current(_, _, _, _, _, let slack) = card.reading {
+        if case .current(_, _, _, _, _, let slack, _) = card.reading {
             XCTAssertFalse(slack, "an hour before the window closes the water is moving, though the countdown runs")
         } else {
             XCTFail("expected a .current reading")
@@ -414,7 +414,7 @@ import SlackwaterKit
 
     /// A current card's reading as it prints and speaks: the word, the value, the set it shows (`•` where the neutral mark stands) and the spoken label.
     private func face(_ reading: ConditionsItem.Reading) -> [String] {
-        guard case .current(let magnitude, let direction, let speed, let unit, _, let inWindow) = reading,
+        guard case .current(let magnitude, let direction, let speed, let unit, _, let inWindow, _) = reading,
               let phase = reading.currentWord else { return [] }
         let f = currentCardFace(magnitude: magnitude, direction: direction, speed: speed, unit: unit,
                                 inWindow: inWindow, setFormat: "compass")
@@ -632,9 +632,14 @@ import SlackwaterKit
     private var doddWindow: ChsOnlineWindow {
         let speeds = [1.0, 0.6, 0.2, -0.6, -1.2, -0.8]
         let times = speeds.indices.map { day.addingTimeInterval(Double($0) * 600).timeIntervalSince1970 }
-        return ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
+        return ChsOnlineWindow(axisOnly: true, stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: day,
                                start: day, end: Date(timeIntervalSince1970: times.last!),
                                floodDirection: 355, ebbDirection: 155, times: times, speeds: speeds)
+    }
+
+    func testOnlineNextEventRejectsCrossFlowAtAxisCrossing() throws {
+        let window = doddWindow
+        XCTAssertFalse(window.events(from: day, to: window.end).contains { $0.kind == .slack })
     }
 
     /// The online card reads its nearest sample's speed, and an ebb sample sets along the published ebb bearing.
@@ -648,8 +653,7 @@ import SlackwaterKit
         XCTAssertEqual(face(state), ["Ebbing", "1.2", "SSE", "1.2 kn, Ebbing, setting SSE"])
     }
 
-    /// Within a second of a slack the samples derive, the online card says Slack over its nearest sample's 0.2 kn. That water runs along the axis, so no crossing flow prints and the card shows the slack dot and speaks no set.
-    func testTheOnlineCardAtADerivedSlackShowsTheDot() throws {
+    func testTheOnlineCardAtAnAxisCrossingKeepsTheDirection() throws {
         let window = doddWindow
         let slack = try XCTUnwrap(sampleEvents(window.points).first { $0.kind == .slack }).time
         XCTAssertEqual(slack, day.addingTimeInterval(2 * 600 + 150))
@@ -657,8 +661,7 @@ import SlackwaterKit
         let state = window.cardState(at: now)
         XCTAssertEqual(state.signed, 0.2, "the nearest sample")
         let graph = window.cardGraph(at: now, unit: "kn")
-        XCTAssertTrue(graph.isSlack(at: now))
-        XCTAssertEqual(face(state, inWindow: graph.isSlack(at: now)), ["Slack", "0.2", "•", "0.2 kn, slack"])
+        XCTAssertFalse(graph.isSlack(at: now))
     }
 }
 

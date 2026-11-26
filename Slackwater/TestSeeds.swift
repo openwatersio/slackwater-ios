@@ -134,6 +134,7 @@ import Foundation
 }
 
 private func resetSeedDownloadChoices() {
+    UserDefaults.standard.removeObject(forKey: ChsFitService.incompleteRetryKey)
     for key in [AppGroup.downloadTierKey, AppGroup.downloadAllCurrentsKey,
                 AppGroup.cancelledDownloadsKey, AppGroup.requestedDownloadsKey] {
         AppGroup.defaults.removeObject(forKey: key)
@@ -197,7 +198,7 @@ private func seedCurrentModel(stationID: String, provisional: Bool) {
 /// gives the strip real slacks and maxima to assert against, not a flat line.
 ///
 /// `-chsResetModels` (ChsStation.swift) already clears this file too: it
-/// removes the whole `ChsModelStore.dir`, the same directory `-online.json`
+/// removes the whole `ChsModelStore.dir`, the same directory online downloads
 /// files live in beside the fitted `.json`/`-current.json` ones
 /// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
 private func seedOnlineWindow(stationID: String) {
@@ -242,7 +243,7 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
         t = t.addingTimeInterval(ChsGrid.seconds)  // the official-sample cadence
     }
     let window = ChsOnlineWindow(
-        stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
+        axisOnly: true, stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
         fetchedAt: appNow(), start: start, end: end,
         floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
     // `_ =` because `try?` re-wraps the merged window `saveOnline` returns,

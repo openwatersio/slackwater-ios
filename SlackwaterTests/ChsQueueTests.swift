@@ -39,6 +39,60 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertNotNil(service.queue.job("chs-johnstone-strait-central"), "unchecking bulk work must keep the earlier automatic download")
     }
 
+    func testNewerCacheClearsStaleIncompleteCooldown() {
+        let failure = t0
+        let due = failure.addingTimeInterval(86_400)
+        XCTAssertFalse(onlineCacheChangedAfterFailure(modified: nil, retryAfter: due))
+        XCTAssertFalse(onlineCacheChangedAfterFailure(modified: failure, retryAfter: due))
+        XCTAssertTrue(onlineCacheChangedAfterFailure(modified: failure.addingTimeInterval(5), retryAfter: due))
+    }
+
+    func testLegacyRefreshOnlyWhenCurrentVectorIsMissing() {
+        let today = dayLocal(t0, TimeZone(secondsFromGMT: 0)!)
+        let span = Timeline.window(anchor: today)
+        func window(start: Date, end: Date, vector: Bool) -> ChsOnlineWindow {
+            ChsOnlineWindow(axisOnly: vector, stationID: "test", iwlsName: "Test", timezone: "UTC", fetchedAt: today,
+                            start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, -1])
+        }
+        let legacy = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start, end: span.end, vector: false)])
+        let vector = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start, end: span.end, vector: true)])
+        let expired = ChsOnlineStore(stationID: "test", blocks: [window(start: span.start.addingTimeInterval(-86_400), end: today.addingTimeInterval(-1), vector: false)])
+        XCTAssertTrue(legacyOnlineNeedsRefresh(vector: nil, legacy: legacy, today: today))
+        XCTAssertFalse(legacyOnlineNeedsRefresh(vector: vector, legacy: legacy, today: today))
+        XCTAssertFalse(legacyOnlineNeedsRefresh(vector: nil, legacy: expired, today: today))
+    }
+
+    @MainActor
+    func testDeselectingLegacyGateStaysDeselectedAfterRestart() async throws {
+        let markers = savedDownloadMarkers()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first {
+            $0.isOnline && ChsModelStore.loadOnline($0.id) == nil && ChsModelStore.loadLegacyOnline($0.id) == nil
+        })
+        let today = todayLocal(gate.tz)
+        let span = Timeline.window(anchor: today)
+        let legacy = ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: today,
+                                     start: span.start, end: span.end, floodDirection: 0, ebbDirection: 180,
+                                     times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1])
+        defer {
+            restoreDownloadMarkers(markers)
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        try ChsModelStore.saveOnline(legacy, retainingFrom: span.start)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.accept(.inView)
+        service.setAllCurrents(true)
+        service.setAllCurrents(false)
+        XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        restarted.prioritize(lat: -89, lon: 0, favorites: [])
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(restarted.isFetchingOnline(gate.id))
+        XCTAssertTrue(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
     @MainActor
     func testCompletedOnlineRequestsDoNotBecomeRefreshSubscriptions() throws {
         let markers = savedDownloadMarkers()
@@ -51,7 +105,7 @@ final class ChsQueueTests: XCTestCase {
         }
         XCTAssertTrue(service.prepareOnlineUpdate(gate))
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -237,6 +291,248 @@ final class ChsQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testIncompleteOnlinePredictionsStopAfterThreeAttempts() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+            if case .deferred = service.onlineState(gate.id, at: t0) {} else { XCTFail("Should retry incomplete predictions") }
+        }
+        service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+        XCTAssertEqual(service.onlineState(gate.id, at: t0), .failed("Incomplete predictions"))
+        XCTAssertEqual(service.onlineState(gate.id, at: t0.addingTimeInterval(86_401)), .idle,
+                       "A later refresh must be able to recover when predictions are repaired")
+        XCTAssertTrue(service.prepareOnlineUpdate(gate), "Manual retry must remain available")
+    }
+
+    @MainActor
+    func testTransientFailuresDoNotUseTheIncompleteRetryBudget() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<2 { service.noteOnlineFailure(gate.id, error: "offline", permanent: false, at: t0) }
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+            if case .deferred = service.onlineState(gate.id, at: t0) {} else { XCTFail("Incomplete responses get their own retries") }
+        }
+        service.noteOnlineFailure(gate.id, error: "offline again", permanent: false, at: t0)
+        service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: t0)
+        XCTAssertTrue(service.onlineCooldownActive(gate.id, at: t0))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        XCTAssertFalse(service.onlineCooldownActive(gate.id, at: t0), "A manual retry clears the cooldown")
+    }
+
+    @MainActor
+    func testDifferentWeekSaveDoesNotClearTodaysCooldownAfterRestart() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        let today = todayLocal(gate.tz), span = Timeline.window(anchor: today.addingTimeInterval(60 * 86_400))
+        defer {
+            UserDefaults.standard.removeObject(forKey: "slackwater.onlineIncompleteRetryAfter")
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let due = Date.now.addingTimeInterval(3600)
+        UserDefaults.standard.set([gate.id: due], forKey: "slackwater.onlineIncompleteRetryAfter")
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true, stationID: gate.id, iwlsName: gate.name,
+            timezone: gate.timezone, fetchedAt: .now, start: span.start, end: span.end, floodDirection: 0, ebbDirection: 180,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]), retainingFrom: span.start)
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertTrue(restarted.onlineCooldownActive(gate.id))
+    }
+
+    @MainActor
+    func testIncompleteRetryDeadlineSurvivesServiceRestart() throws {
+        let original = ChsFitService()
+        original.resetOnlineStateForTesting()
+        defer { original.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let now = Date.now
+        for _ in 0..<3 {
+            original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: now)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        if case .failed = restarted.onlineState(gate.id, at: now) {} else {
+            XCTFail("Relaunch must retain the incomplete-prediction cooldown")
+        }
+        XCTAssertEqual(restarted.onlineState(gate.id, at: now.addingTimeInterval(86_401)), .idle)
+    }
+
+    @MainActor
+    func testOpeningCancelledGateResumesItsRefresh() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.refreshOnline(gate)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testCancelledGateResumesWhenItEntersNearbyTier() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        AppGroup.defaults.set(DownloadTier.nearby.rawValue, forKey: AppGroup.downloadTierKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.prioritize(lat: -89, lon: 0, favorites: [])
+        XCTAssertFalse(service.isFetchingOnline(gate.id))
+        service.prioritize(lat: gate.latitude, lon: gate.longitude, favorites: [])
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testVisibleCancelledGateResumesItsDownload() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.captureCohort(ids: [gate.id], heroID: gate.id)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testFavoritedCancelledGateResumesItsDownload() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(false, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        service.prioritizeFavorites([gate.id], after: nil)
+        XCTAssertTrue(service.isFetchingOnline(gate.id))
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testAllCurrentsSelectionSurvivesOlderAppReselection() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        AppGroup.defaults.set([gate.id], forKey: AppGroup.cancelledDownloadsKey)
+        AppGroup.defaults.set(true, forKey: AppGroup.downloadAllCurrentsKey)
+        let service = ChsFitService()
+        defer { service.resetOnlineStateForTesting() }
+        XCTAssertFalse(AppGroup.defaults.stringArray(forKey: AppGroup.cancelledDownloadsKey)?.contains(gate.id) == true)
+    }
+
+    @MainActor
+    func testIncompleteOtherDayDoesNotResetTodaysRetryCount() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        for _ in 0..<2 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete", permanent: false, maxAttempts: 3)
+        }
+        service.noteOnlineRefreshFailure(gate.id, preserveIncompleteAttempts: true)
+        service.noteOnlineFailure(gate.id, error: "Incomplete", permanent: false, maxAttempts: 3)
+        XCTAssertTrue(service.onlineCooldownActive(gate.id))
+    }
+
+    @MainActor
+    func testIncompleteOtherDayKeepsAnUncoveredRequestedDownload() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        service.noteOnlineRefreshFailure(gate.id)
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertTrue(restarted.isFetchingOnline(gate.id))
+    }
+
+    @MainActor
+    func testRequestedIncompleteDownloadRemainsRequestedAfterRestart() throws {
+        let markers = savedDownloadMarkers()
+        defer { restoreDownloadMarkers(markers) }
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        XCTAssertTrue(service.prepareOnlineUpdate(gate))
+        for _ in 0..<3 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertTrue(restarted.isFetchingOnline(gate.id))
+    }
+
+    @MainActor
+    func testRestartedIncompleteRetryResumesWhenDeadlineExpires() async throws {
+        let original = ChsFitService()
+        original.resetOnlineStateForTesting()
+        defer { original.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        XCTAssertTrue(original.prepareOnlineUpdate(gate))
+        let failure = Date.now.addingTimeInterval(-86_397)
+        for _ in 0..<3 {
+            original.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3, at: failure)
+        }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        if case .failed = restarted.onlineStates[gate.id] {} else { XCTFail("Cooldown must be restored before the timer starts") }
+        restarted.resumeForBackground()
+        for _ in 0..<60 where restarted.onlineStates[gate.id] != .idle {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        XCTAssertEqual(restarted.onlineStates[gate.id], .idle)
+        XCTAssertNil(UserDefaults.standard.dictionary(forKey: "slackwater.onlineIncompleteRetryAfter")?[gate.id])
+        let nextLaunch = ChsFitService()
+        defer { nextLaunch.resetOnlineStateForTesting() }
+        XCTAssertEqual(nextLaunch.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
+    func testRetryNowClearsSavedIncompleteDeadline() throws {
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        for _ in 0..<3 {
+            service.noteOnlineFailure(gate.id, error: "Incomplete predictions", permanent: false, maxAttempts: 3)
+        }
+        service.retryNow()
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
+    func testImplausiblyDistantSavedRetryDoesNotBlockAStation() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let key = "slackwater.onlineIncompleteRetryAfter"
+        UserDefaults.standard.set([gate.id: Date.now.addingTimeInterval(365 * 86_400)], forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertEqual(restarted.onlineState(gate.id), .idle)
+    }
+
+    @MainActor
     func testManualOnlineUpdateResetsRetryBackoff() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()
@@ -320,7 +616,7 @@ final class ChsQueueTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = stale.tz
         let span = Timeline.window(anchor: calendar.date(byAdding: .day, value: -60, to: todayLocal(stale.tz))!)
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: stale.id, iwlsName: stale.name, timezone: stale.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -463,6 +759,28 @@ final class ChsQueueTests: XCTestCase {
                        "queueing it now would skip its backoff")
     }
 
+    func testIncompleteOtherDayDoesNotUseTodayRetryBudget() {
+        let tz = TimeZone(secondsFromGMT: 0)!
+        let today = dayLocal(t0, tz)
+        XCTAssertTrue(incompleteOnlineRequestIsForToday(anchor: nil, today: today, tz: tz))
+        XCTAssertTrue(incompleteOnlineRequestIsForToday(anchor: today.addingTimeInterval(3600), today: today, tz: tz))
+        XCTAssertFalse(incompleteOnlineRequestIsForToday(anchor: today.addingTimeInterval(86_400), today: today, tz: tz))
+    }
+
+    @MainActor
+    func testIncompleteCooldownPreventsRequeueAfterHold() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        defer { service.resetOnlineStateForTesting() }
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        service.onlinePendingForTesting = [gate]
+        service.holdOnline(gate)
+        for _ in 0..<3 { service.noteOnlineFailure(gate.id, error: "incomplete", permanent: false, maxAttempts: 3) }
+        XCTAssertTrue(service.onlineCooldownActive(gate.id))
+        service.releaseOnline(gate.id)
+        XCTAssertTrue(service.onlinePendingForTesting.isEmpty)
+    }
+
     @MainActor
     func testAGateThatWasNotQueuedStaysOutAfterItsHold() throws {
         let service = ChsFitService.shared
@@ -497,7 +815,7 @@ final class ChsQueueTests: XCTestCase {
         let url = ChsModelStore.onlineUrl(gate.id)
         defer { try? FileManager.default.removeItem(at: url) }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -529,7 +847,7 @@ final class ChsQueueTests: XCTestCase {
             try? fm.removeItem(at: url)
         }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -556,7 +874,7 @@ final class ChsQueueTests: XCTestCase {
             try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
         }
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -571,6 +889,87 @@ final class ChsQueueTests: XCTestCase {
     /// One automatic try a day for a station that still works, and a failure
     /// of that try neither shows nor retries.
     @MainActor
+    func testLegacyRefreshWaitsForLowDataModeToEnd() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil && ChsModelStore.loadLegacyOnline($0.id) == nil })
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz), span = Timeline.window(anchor: today)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: appNow(), start: span.start, end: span.end, floodDirection: 0, ebbDirection: 180,
+            times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
+        XCTAssertFalse(service.onlineRefreshDue(gate, constrained: true))
+        XCTAssertTrue(service.onlineRefreshDue(gate, constrained: false))
+    }
+
+    @MainActor
+    func testRecentDirectionlessDownloadDoesNotRetryAfterRestart() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        let service = ChsFitService()
+        service.resetOnlineStateForTesting()
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: appNow(), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0],
+            magnitudes: [1, 1], directions: [nil, nil]))
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+        let restarted = ChsFitService()
+        defer { restarted.resetOnlineStateForTesting() }
+        XCTAssertFalse(restarted.onlineRefreshDue(gate))
+    }
+
+    @MainActor
+    func testDirectionlessDownloadRetriesEvenWhenItCoversTheMonth() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: today.addingTimeInterval(-86_400), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, today.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [0, 0, 0],
+            magnitudes: [1, 1, 1], directions: [nil, nil, nil]))
+        XCTAssertTrue(service.onlineRefreshDue(gate))
+        service.markOnlineRefresh(gate)
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+    }
+
+    @MainActor
+    func testPartiallyMissingBearingsRetryEvenWhenTheyCoverTheMonth() throws {
+        let service = ChsFitService.shared
+        service.resetOnlineStateForTesting()
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline && ChsModelStore.loadOnline($0.id) == nil })
+        defer {
+            service.resetOnlineStateForTesting()
+            try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(gate.id))
+        }
+        let today = todayLocal(gate.tz)
+        let start = Timeline.window(anchor: today).start
+        let end = today.addingTimeInterval(60 * 86_400)
+        try ChsModelStore.saveOnline(ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+            fetchedAt: today.addingTimeInterval(-86_400), start: start, end: end, floodDirection: 0, ebbDirection: 180,
+            times: [start.timeIntervalSince1970, today.timeIntervalSince1970, end.timeIntervalSince1970], speeds: [1, 0, 1],
+            magnitudes: [1, 1, 1], directions: [0, nil, 0]))
+        XCTAssertTrue(service.onlineRefreshDue(gate))
+        service.markOnlineRefresh(gate)
+        XCTAssertFalse(service.onlineRefreshDue(gate))
+    }
+
+    @MainActor
     func testACoveredStationRefreshesOnceADayAndFailsQuietly() throws {
         let service = ChsFitService.shared
         service.resetOnlineStateForTesting()
@@ -583,7 +982,7 @@ final class ChsQueueTests: XCTestCase {
         }
         XCTAssertTrue(service.onlineRefreshDue(gate), "a station with nothing stored downloads")
         let span = Timeline.window(anchor: todayLocal(gate.tz))
-        try ChsModelStore.saveOnline(ChsOnlineWindow(
+        try ChsModelStore.saveOnline(ChsOnlineWindow(axisOnly: true,
             stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone, fetchedAt: appNow(),
             start: span.start, end: span.end, floodDirection: 45, ebbDirection: 225,
             times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970], speeds: [1, -1]))
@@ -751,7 +1150,7 @@ final class ChsQueueTests: XCTestCase {
     /// The span a fetch for `anchor` would store, with two samples.
     private func onlineWindow(_ gate: ChsCurrentGateInfo, anchor: Date) -> ChsOnlineWindow {
         let span = Timeline.window(anchor: anchor)
-        return ChsOnlineWindow(stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
+        return ChsOnlineWindow(axisOnly: true, stationID: gate.id, iwlsName: gate.name, timezone: gate.timezone,
                                fetchedAt: appNow(), start: span.start, end: span.end,
                                floodDirection: 45, ebbDirection: 225,
                                times: [span.start.timeIntervalSince1970, span.end.timeIntervalSince1970],

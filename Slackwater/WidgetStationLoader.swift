@@ -184,6 +184,7 @@ extension ChsOnlineWindow: CurrentPredicting {
     func speeds(from start: Date, to end: Date, step: TimeInterval) -> [CurrentPoint] {
         guard step > 0, times.count > 1, times.count == speeds.count, let first = times.first,
               let last = times.last else { return [] }
+        let vectorAvailable = hasVectors
         var result: [CurrentPoint] = []
         var time = start.timeIntervalSince1970
         var index = 1
@@ -195,7 +196,33 @@ extension ChsOnlineWindow: CurrentPredicting {
                 // CHS samples are `ChsGrid` apart; widget readings also land between them.
                 let fraction = (time - times[index - 1]) / span
                 let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
-                result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
+                if vectorAvailable, let magnitudes, let directions {
+                    let magnitude: Double
+                    let direction: Double?
+                    if fraction == 0 {
+                        magnitude = magnitudes[index - 1]; direction = directions[index - 1]
+                    } else if fraction == 1 {
+                        magnitude = magnitudes[index]; direction = directions[index]
+                    } else if let a = directions[index - 1], magnitudes[index] == 0 {
+                        magnitude = magnitudes[index - 1] * (1 - fraction); direction = a
+                    } else if let b = directions[index], magnitudes[index - 1] == 0 {
+                        magnitude = magnitudes[index] * fraction; direction = b
+                    } else if let a = directions[index - 1], let b = directions[index] {
+                        let ar = a * .pi / 180, br = b * .pi / 180
+                        let east = magnitudes[index - 1] * sin(ar) * (1 - fraction) + magnitudes[index] * sin(br) * fraction
+                        let north = magnitudes[index - 1] * cos(ar) * (1 - fraction) + magnitudes[index] * cos(br) * fraction
+                        magnitude = hypot(east, north)
+                        direction = magnitude > 0 ? (atan2(east, north) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360) : nil
+                    } else {
+                        magnitude = magnitudes[index - 1] + (magnitudes[index] - magnitudes[index - 1]) * fraction
+                        direction = nil
+                    }
+                    result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value,
+                                               magnitude: magnitude, direction: direction,
+                                               magnitudeIsKnown: direction == nil && magnitude > 0))
+                } else {
+                    result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
+                }
             }
             time += step
         }
@@ -203,6 +230,7 @@ extension ChsOnlineWindow: CurrentPredicting {
     }
 
     func events(from start: Date, to end: Date) -> [CurrentEvent] {
-        sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        let candidates = sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        return currentEventsMatchingWater(self, events: candidates)
     }
 }

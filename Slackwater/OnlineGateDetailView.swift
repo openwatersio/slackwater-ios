@@ -8,6 +8,11 @@ import SwiftUI
 import Combine
 import SlackwaterKit
 
+func onlineLeadPoint(at time: Date, speed: Double, magnitude: Double?, direction: Double?) -> CurrentPoint {
+    CurrentPoint(time: time, speed: speed, magnitude: magnitude, direction: direction,
+                 magnitudeIsKnown: direction == nil && (magnitude ?? 0) > 0)
+}
+
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
@@ -24,6 +29,7 @@ struct OnlineGateDetailView: View {
     /// parked. Re-picked via `block(covering: anchor)` on `onAppear`,
     /// `.onReceive`, and `applyAnchor`.
     @State private var window: ChsOnlineWindow?
+    @State private var legacyOnlineStore: ChsOnlineStore?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
@@ -38,6 +44,7 @@ struct OnlineGateDetailView: View {
     /// downloads. The week on screen stays put until it lands (`extend`).
     @State private var pendingAnchor: Date?
     @State private var pendingFetchAnchor: Date?
+    @State private var failedAnchor: Date?
     /// The last day `fetchNow` actually fetched from, so a week it could not
     /// supply is never asked for again on its own.
     @State private var requestedFrom: Date?
@@ -79,10 +86,9 @@ struct OnlineGateDetailView: View {
     @State private var timeline: TimelineData?
 
     private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow, ink: Color = .white) -> CurrentLead {
-        // The fetched samples are one-axis, so the kit gives the published bearing by the speed's sign.
         let vector = tl.currentPoints.vector(at: scrubTime, flood: window.floodDirection, ebb: window.ebbDirection)
-        let point = CurrentPoint(time: scrubTime, speed: tl.velocityAt(scrubTime),
-                                 magnitude: vector?.magnitude, direction: vector?.direction)
+        let point = onlineLeadPoint(at: scrubTime, speed: tl.velocityAt(scrubTime),
+                                    magnitude: vector?.magnitude, direction: vector?.direction)
         return CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, point: point,
                     floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
                     speedUnit: speedUnit, tz: tz, ink: ink)
@@ -166,12 +172,21 @@ struct OnlineGateDetailView: View {
                                 if timeline != nil, let window {
                                     provenance(window)
                                 } else {
+                                    if let speed = legacyOnlineStore?.blocks.lazy
+                                        .compactMap({ $0.signedSpeed(at: live) }).first {
+                                        VStack(spacing: 4) {
+                                            Text("Now").font(.caption).foregroundStyle(SN.foam)
+                                            LegacyAxisReading(speed: speed)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                    }
                                     honestyCard
                                     nearestGateLink
                                 }
                                 stationDetails.padding(.top, 14)
                             })
             .onAppear {
+                legacyOnlineStore = ChsModelStore.loadLegacyOnline(gate.id)
                 ChsFitService.shared.retainOnline(gate)
                 let today = todayLocal(tz)
                 if anchor == .distantPast {
@@ -204,6 +219,7 @@ struct OnlineGateDetailView: View {
             // rather than @ObservedObject-ing the service keeps the fit
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
+                legacyOnlineStore = ChsModelStore.loadLegacyOnline(gate.id)
                 if let pendingAnchor { landIfCovered(pendingAnchor) }
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
                 rebuild()
@@ -277,7 +293,8 @@ struct OnlineGateDetailView: View {
     /// for that week yet, so there is nothing to apologise for. If they do
     /// land there and it is missing, `applyAnchor` below says so properly.
     private func prefetchNextBlock() {
-        guard let window, net.online, fetchState != .fetching else { return }
+        guard let window, net.online, fetchState != .fetching,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         let from = prefetchAnchor(after: window, tz: tz)
         ChsFitService.startOnlineWork(for: gate) { _ = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
     }
@@ -288,7 +305,10 @@ struct OnlineGateDetailView: View {
     private func applyAnchor() {
         if let block = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) { window = block }
         rebuild()
-        if timeline == nil, net.online { fetchNow(from: anchor) }
+        if timeline == nil, net.online {
+            if ChsFitService.shared.onlineCooldownActive(gate.id) { _ = ChsFitService.shared.prepareOnlineUpdate(gate) }
+            fetchNow(from: anchor)
+        }
     }
 
     /// A scrub settled at the strip's end. A stored block moves the window at
@@ -323,9 +343,11 @@ struct OnlineGateDetailView: View {
     /// Twice at most: the first call joins any fetch already in flight (the
     /// picker's prefetch), which may be for a different block.
     private func fetchPending() {
-        guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil else { return }
+        guard let next = pendingAnchor, net.online, pendingFetchAnchor == nil,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         if landIfCovered(next, fetched: window) { return }
         pendingFetchAnchor = next
+        failedAnchor = nil
         ChsFitService.startOnlineWork(for: gate) {
             defer {
                 pendingFetchAnchor = nil
@@ -333,10 +355,16 @@ struct OnlineGateDetailView: View {
                 if let pendingAnchor, pendingAnchor != next { fetchPending() }
             }
             for _ in 0..<2 {
-                guard let fetched = try? await ChsFitService.fetchOnlineWindow(for: gate, from: next),
-                      pendingAnchor == next else { return }
-                if landIfCovered(next, fetched: fetched) { return }
+                do {
+                    let fetched = try await ChsFitService.fetchOnlineWindow(for: gate, from: next)
+                    guard pendingAnchor == next else { return }
+                    if landIfCovered(next, fetched: fetched) { return }
+                } catch {
+                    if !Task.isCancelled { failedAnchor = next }
+                    return
+                }
             }
+            failedAnchor = next
         }
     }
 
@@ -347,10 +375,13 @@ struct OnlineGateDetailView: View {
     /// identical card, with no way out but the back button. (Named `from`, not
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
-        guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
+        guard ChsFitService.shared.onlineState(gate.id) != .fetching,
+              !ChsFitService.shared.onlineCooldownActive(gate.id) else { return }
         requestedFrom = from
+        failedAnchor = nil
         ChsFitService.startOnlineWork(for: gate) {
-            if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {
+            do {
+                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: from)
                 window = fresh
                 rebuild()
                 // The anchor moved while this was in flight (a shared link
@@ -358,6 +389,8 @@ struct OnlineGateDetailView: View {
                 // its fetch. Ask for it now. `from != anchor` stops a week the
                 // service cannot supply from refetching forever.
                 if timeline == nil, from != anchor, net.online { fetchNow(from: anchor) }
+            } catch {
+                if !Task.isCancelled { failedAnchor = from }
             }
         }
     }
@@ -461,7 +494,9 @@ struct OnlineGateDetailView: View {
     }
 
     private var downloadStatus: CardStatus {
-        onlineGateStatus(window, online: net.online, state: fetchState)
+        if net.online, fetchState == .idle,
+           failedAnchor == (pendingAnchor ?? anchor) { return .failed }
+        return onlineGateStatus(window, online: net.online, state: fetchState)
     }
 
     private var downloadTitle: String {
