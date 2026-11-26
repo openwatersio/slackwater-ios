@@ -53,17 +53,19 @@ final class ComplicationReadingTests: XCTestCase {
         XCTAssertLessThan(lo, hi)
     }
 
-    /// At Kemi Ajos, a micro-tidal gauge, at 17:20 the last turn was a low an
-    /// hour earlier and the next is a high more than a day out. The
+    /// At Kemi Ajos, a micro-tidal gauge, at 2026-07-06 22:00 UTC the last
+    /// turn was a low and the next is a high about 27 hours out. The
     /// complication still draws its gauge between them, and its word follows
     /// the card. Two turns of one kind draw none
     /// (`testGaugeBoundsNeedALowAndAHighAgreeingWithTheDirection`).
     func testAMicroTidalGaugeSpansAFarTurnAndTheWordFollowsTheCard() throws {
         let record = try XCTUnwrap(TideStationRecord.all.first { $0.id == "ticon/kemi_ajos-100539-fin-fmi" })
-        let now = Date(timeIntervalSince1970: 1_785_777_600)
+        let now = Date(timeIntervalSince1970: 1_783_375_200)
         let station = WidgetStation.tide(record.engineStation, tz: utc, name: record.name)
         let r = try XCTUnwrap(ComplicationReading.build(station, now: now))
         let next = try XCTUnwrap(record.cardState(at: now).next)
+        XCTAssertEqual(next.kind, .high, "the next turn is a high")
+        XCTAssertTrue(record.cardState(at: now).rising, "rising from the last low")
         XCTAssertGreaterThan(next.time.timeIntervalSince(now), 24 * 3600, "the next turn is more than a day out")
         XCTAssertNotNil(r.gauge)
         XCTAssertEqual(r.word, record.cardState(at: now).rising ? "Rising" : "Falling")

@@ -234,7 +234,7 @@ import SlackwaterKit
         XCTAssertFalse(spoken.contains { $0.text.contains("ever") })
     }
 
-    /// A station whose chart datum IS LAT ships latDatum exactly 0.0, and 887
+    /// A station whose chart datum IS LAT ships latDatum exactly 0.0, and hundreds
     /// of them do. Zero is a real floor, so the gap must still be stated.
     func testAZeroFloorIsAFloorNotAMissingValue() {
         let spoken = facts(standings().marked, lat: 0.0, hat: 5.4)

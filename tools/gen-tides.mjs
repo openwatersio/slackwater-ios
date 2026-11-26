@@ -79,7 +79,7 @@ import { join } from "node:path";
 import { buildDatabase, loadStations } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
-  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
+  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf, countryCodeOf,
   sourceCredits,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
@@ -197,7 +197,7 @@ const untrail = (name, ...regions) => {
 const trailingCode = (region) => region.match(/\b([A-Z]{2})$/)?.[1];
 
 const regionOf = (s) => {
-  const r = (countryOf(s) === "Canada" && CA_PROVINCE[s.region]) || s.region;
+  const r = (countryCodeOf(s) === "CA" && CA_PROVINCE[s.region]) || s.region;
   // A GeoNames code that survived the map is a cross-border mislabel — five
   // Great Lakes gauges carry Ontario's "08" on the US shore. "Algonac · 08"
   // is worse than "Algonac · United States", so let it fall through.
@@ -281,8 +281,11 @@ const collides = (s) => {
 // and untrail() have run. Matching on the raw name missed those pairs
 // entirely; this is why the dedupe below runs AFTER naming, not before.
 const byName = new Map();
+// HD24 moved west in 1981: https://www.jodc.go.jp/data/tide/new_attrib/tide_attrib_HD24_e.htm
+const maizuruGauges = new Set(["jma/MZ", "ticon/maizuru-hd24-jpn-jodc_jcg"]);
 const samePlace = (s) =>
-  (byName.get(s.name.toLowerCase()) ?? []).some((k) => km(s, k) < SAME_PLACE_KM);
+  (byName.get(s.name.toLowerCase()) ?? []).some((k) =>
+    km(s, k) < SAME_PLACE_KM && !(maizuruGauges.has(s.id) && maizuruGauges.has(k.id)));
 // IDENTITY, not proximity — the one duplicate class neither rule above can
 // see. UHSLC publishes each gauge through two feeds, fast-delivery and
 // research-quality, and they disagree on POSITION by more than SAME_PLACE_KM:
@@ -334,7 +337,7 @@ const remember = (s) => {
 let cededToChs = 0;
 const servedByChs = (s) =>
   s.source?.name !== NOAA &&
-  countryOf(s) === "Canada" &&
+  countryCodeOf(s) === "CA" &&
   chs.some((c) => km(s, c) <= CHS_COVERAGE_KM);
 
 /**
@@ -414,9 +417,9 @@ const kept = shippable
   .filter((s) => isSubordinate(s) || s.harmonic_constituents?.some((c) => c.amplitude > 0))
   // The datum gate is decided HERE and applied at the dedupe below, not as a
   // filter of its own. A FAILING NOAA ROW STILL HAS TO REACH THE DEDUPE AND
-  // CLAIM ITS WATER. Filtering it out here made the gate promote the mirror it
-  // had just rejected: Anchorage's `noaa/9455920` (120 constituents, 0.308)
-  // dropped out, stopped blocking `ticon/anchorage-9455920-usa-noaa` (50
+  // CLAIM ITS WATER. Filtering it out here would promote the mirror the gate
+  // had just rejected: when Anchorage's `noaa/9455920` (120 constituents) scored
+  // 0.308, dropping it stopped it blocking `ticon/anchorage-9455920-usa-noaa` (50
   // constituents, 0.237) 0.0 km away — the SAME gauge refitted — and the app
   // shipped the worse model of Upper Cook Inlet, ~9 m of range and extreme
   // shallow-water distortion, which is exactly why NOAA publishes 120
@@ -468,8 +471,8 @@ function buildStation(s) {
     // The state/province code. Not always the region line any more — a derived
     // context outranks it — but still its own fact, and `untrail` needs it
     // whatever gets displayed (see below).
-    const code = ((countryOf(s) === "United States" || countryOf(s) === "Canada") && regionOf(s)) || "";
-    const na = NORTH_AMERICA.has(countryOf(s));
+    const code = ((countryCodeOf(s) === "US" || countryCodeOf(s) === "CA") && regionOf(s)) || "";
+    const na = NORTH_AMERICA.has(countryCodeOf(s));
     // Fallback chain: the database's context, then state/province or the
     // upstream region field, then country — the unincorporated Pacific
     // islands (Midway, Wake, Johnston Atoll) carry no region at all.
@@ -560,7 +563,7 @@ if (db.all.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)) {
 // province code. The line stopped being a reliable carrier of that the moment
 // a derived context could win it ("Sidney, BC"), and this guard failing open
 // is how two Victorias reach the map — so it reads the fact, not the label.
-const canadianIds = new Set(db.all.filter((s) => countryOf(s) === "Canada").map((s) => s.id));
+const canadianIds = new Set(db.all.filter((s) => countryCodeOf(s) === "CA").map((s) => s.id));
 const canadian = stations.filter((s) => canadianIds.has(s.id));
 const contested = canadian.filter((s) =>
   s.id.startsWith("ticon/") && chs.some((c) => km(s, c) <= CHS_COVERAGE_KM));

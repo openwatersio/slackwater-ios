@@ -204,15 +204,17 @@ noise floor, and that argument is sound; it is not the same as saying the five s
 between 0.30 and 0.35 are unusable. It says we cannot vouch for them, and this branch
 chose silence over an unvouched number.
 
-**Anchorage is the one that took a fix, not just a measurement.** The gate ran before the
-dedupe, so dropping `noaa/9455920` also stopped it blocking `ticon/anchorage-9455920-usa-noaa`
+**Anchorage was the one that took a fix, not just a measurement.** With the earlier database
+Anchorage failed the gate, and the generator then ran the gate before the dedupe, so dropping `noaa/9455920` also stopped it blocking `ticon/anchorage-9455920-usa-noaa`
 — a 50-constituent TICON refit of the *same gauge*, 0.0 km away, which then shipped in
 its place. Its better-looking 0.237 m is scored against TICON's own recomputed datums,
 which drift 0.2–0.4 m off an adopted chart datum (see `CHS_COVERAGE_KM` in
 `gen-tides.mjs` — the CHS cede rule exists for exactly this, and nothing protected US
 water). A gate-failing NOAA row now still claims its position in the dedupe grid and then
-leaves, so Anchorage yields **no** station. "We cannot vouch for this water" has to mean
+leaves, so Anchorage then yielded **no** station. "We cannot vouch for this water" has to mean
 no pin, not a worse pin.
+
+The Anchorage record in database `1.0.4-beta.20261126`, whose datums are recomputed, passes the unchanged 0.30 m gate with a maximum deviation of 0.256 m, so `noaa/9455920` ships with NOAA's 120 constituents and is the tide reference for the two Anchorage current stations in Knik Arm. Point Possession, Fire Island, Port MacKenzie, Goose Creek and Snag Point still fail it. None of the five has another source's copy within 1 km, so the dedupe rule above has nothing to block today and stays as the guard for the next one.
 
 ### The other 14 stations this branch stopped shipping
 

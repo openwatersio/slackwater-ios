@@ -42,7 +42,7 @@
       "kind": "remote",
       "repository": "https://github.com/openwatersio/slackwater-database",
       "version": {
-        "version": "1.0.2-beta.20261123",
+        "version": "1.0.4-beta.20261126",
       },
     }, {
       "kind": "remote",

@@ -164,7 +164,7 @@ struct StandingFact: Equatable {
 /// The figure carries the comparison; these put numbers and names on it. Two
 /// tiers, and the second is absent rather than zeroed at a station whose
 /// constituents cannot bound a year — which is every CHS fit and about a fifth
-/// of NOAA's references. `latDatum` of exactly 0.0 is a floor, not a gap: 887
+/// of NOAA's references. `latDatum` of exactly 0.0 is a floor, not a gap: hundreds of
 /// shipped stations have one, because their chart datum IS LAT.
 func standingFacts(_ standing: TideStanding, latDatum: Double?, hatDatum: Double?,
                    imperial: Bool, unit: String, tz: TimeZone, now: Date,
