@@ -424,6 +424,8 @@ import XCTest
         let still = record(speedKn: 0)
         XCTAssertEqual(currentPinState(still, at: refTime, speedUnit: "kn").state,
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
+        XCTAssertNil(currentPinState(still, at: refTime, speedUnit: "kn").bearing,
+                     "a zero-current pin has no set direction")
         let slow = record(speedKn: 0.01)
         XCTAssertEqual(currentPinState(slow, at: refTime, speedUnit: "kn").state,
                        pinRampHex(forSpeedKn: 0.01), "nonzero water is never slack")
@@ -436,6 +438,35 @@ import XCTest
         XCTAssertNotEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                           mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
                           "a moving pin must never read go")
+    }
+
+    func testCurrentPinWithoutAReferenceIsUnknown() {
+        var station = record(speedKn: 0)
+        station.reference = "noaa/missing-reference"
+        let pin = currentPinState(station, at: refTime, speedUnit: "kn")
+        XCTAssertEqual(pin.state, "unknown")
+        XCTAssertNil(pin.reading)
+        XCTAssertNil(pin.bearing)
+    }
+
+    func testRotatingCurrentPinShowsFullSpeedAndDirectionAtAxisCrossing() {
+        var station = record(speedKn: 0)
+        station.minorConstituents = [.init(name: "M2", amplitude: 0, phase: 0)]
+        station.minorMeanFlow = 1
+        station.azimuth = 0
+        let pin = currentPinState(station, at: refTime, speedUnit: "kn")
+        XCTAssertEqual(pin.reading, "1.0")
+        XCTAssertEqual(pin.state, pinRampHex(forSpeedKn: 1))
+        XCTAssertEqual(pin.bearing ?? -1, 90, accuracy: 0.001)
+    }
+
+    func testRotatingCurrentPinKeepsVectorDirectionAtFractionalSecond() {
+        var station = record(speedKn: 0)
+        station.minorConstituents = [.init(name: "M2", amplitude: 0, phase: 0)]
+        station.minorMeanFlow = 1
+        station.azimuth = 0
+        let pin = currentPinState(station, at: refTime.addingTimeInterval(0.4), speedUnit: "kn")
+        XCTAssertEqual(pin.bearing ?? -1, 90, accuracy: 0.001)
     }
 
     /// The pin ramp must never read green at any speed it can actually render

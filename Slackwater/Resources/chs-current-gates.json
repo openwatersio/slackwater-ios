@@ -9,7 +9,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-fulford-harbour",
   "fitDays": 60,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-arran-rapids",
@@ -20,7 +20,7 @@
   "longitude": -125.14,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -40,7 +40,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-owen-bay",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -58,7 +58,7 @@
   "timezone": "America/Vancouver",
   "fitDays": 210,
   "slackBoundMinutes": 45,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-dent-rapids",
@@ -69,7 +69,7 @@
   "longitude": -125.2117,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -86,7 +86,7 @@
   "longitude": -123.81735084108287,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -105,7 +105,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-vancouver",
   "fitDays": 60,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-gabriola-passage",
@@ -116,7 +116,7 @@
   "longitude": -123.7043,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "invented_slack",
@@ -135,7 +135,7 @@
   "timezone": "America/Vancouver",
   "fitDays": 210,
   "slackBoundMinutes": 40,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-great-bras-dor",
@@ -151,7 +151,7 @@
   "longitude": -60.4247,
   "timezone": "America/Glace_Bay",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -168,7 +168,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-owen-bay",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -185,7 +185,7 @@
   "timezone": "America/Vancouver",
   "fitDays": 210,
   "provisionalSlackMinutes": 35,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-juan-de-fuca-east",
@@ -196,11 +196,11 @@
   "longitude": -123.53,
   "timezone": "America/Los_Angeles",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "invented_slack",
-   "value": 24
+   "value": 22
   },
   "missContext": "slow_reversal"
  },
@@ -218,7 +218,7 @@
   "longitude": -132.1543,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -239,7 +239,7 @@
   "longitude": -127.5033,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -258,7 +258,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-fulford-harbour",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",
@@ -277,8 +277,8 @@
   "longitude": -127.5574,
   "timezone": "America/Vancouver",
   "fitDays": 210,
-  "slackBoundMinutes": 40,
-  "recipe": "8f85912ce223"
+  "slackBoundMinutes": 45,
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-race-passage",
@@ -289,7 +289,7 @@
   "longitude": -123.5367,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "invented_slack",
@@ -308,11 +308,11 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-point-atkinson",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "invented_slack",
-   "value": 16
+   "value": 18
   },
   "missContext": "rapids",
   "magnitudeNote": "16.5 kn flood · 16 kn ebb"
@@ -327,11 +327,11 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
-   "clause": "invented_slack",
-   "value": 2
+   "clause": "slack_worst",
+   "value": 80.6
   }
  },
  {
@@ -344,7 +344,7 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-campbell-river",
   "fitDays": 60,
-  "recipe": "8f85912ce223"
+  "recipe": "bb3c78ac6991"
  },
  {
   "id": "chs-tillicum-bridge",
@@ -356,11 +356,11 @@
   "timezone": "America/Vancouver",
   "tideReference": "chs-victoria",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "invented_slack",
-   "value": 42
+   "value": 45
   },
   "missContext": "tidal_falls"
  },
@@ -373,7 +373,7 @@
   "longitude": -126.8117,
   "timezone": "America/Vancouver",
   "fitDays": 0,
-  "recipe": "8f85912ce223",
+  "recipe": "bb3c78ac6991",
   "online": true,
   "onlineMiss": {
    "clause": "slack_worst",

@@ -10458,7 +10458,7 @@
       }
     },
     "Slackwater can't alert on that here yet" : {
-      "comment" : "Under the sentence field when the words ask for something this station cannot alert on.",
+      "comment" : "Message when the requested alert is unavailable for this station or selected time.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -16946,7 +16946,7 @@
       }
     },
     "Your slack window is off. Set a comfort current in Slackwater's settings to turn it on." : {
-      "comment" : "Spoken Siri answer when the comfort current is set to Off.",
+      "comment" : "Message when the comfort current is set to Off, shown in Siri and alert settings.",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -44932,6 +44932,101 @@
         }
       }
     },
+    "No slack in available predictions" : {
+      "comment" : "Status when the available current predictions contain no true slack for an alert or calendar.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingen strømstille i de tilgængelige prognoser"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Stillwasser in den verfügbaren Vorhersagen"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay estoa en las predicciones disponibles"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saatavilla olevissa ennusteissa ei ole virratonta hetkeä"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune étale dans les prévisions disponibles"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Níl aon uisce bog sna réamhaisnéisí atá ar fáil"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chan eil uisge marbh anns na ro-innsean a tha rim faighinn"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna stanca nelle previsioni disponibili"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用可能な予測に転流時はありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용 가능한 예측에 정조가 없습니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingen strømstille i tilgjengelige prognoser"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen stroomkentering in de beschikbare voorspellingen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma estofa nas previsões disponíveis"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma estofa nas previsões disponíveis"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingen strömstilla i tillgängliga prognoser"
+          }
+        }
+      }
+    },
     "No speed" : {
       "comment" : "Derived-current summary value.",
       "localizations" : {
@@ -53464,6 +53559,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tillbaka till nu"
+          }
+        }
+      }
+    },
+    "Review or delete this alert." : {
+      "comment" : "Status for an alert paused until the user reviews or deletes it.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gennemgå eller slet denne påmindelse."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überprüfe oder lösche diesen Hinweis."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisa o elimina este aviso."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarkista tai poista tämä hälytys."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez ou supprimez cette alerte."
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Athbhreithnigh nó scrios an foláireamh seo."
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoir sùil air an rabhadh seo no sguab às e."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla o elimina questo avviso."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この通知を確認または削除してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 알림을 확인하거나 삭제하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontroller eller slett dette varselet."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controleer of verwijder deze melding."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revise ou exclua este alerta."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveja ou elimine este alerta."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Granska eller ta bort den här aviseringen."
           }
         }
       }
@@ -65568,6 +65758,101 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Väntar på signal"
+          }
+        }
+      }
+    },
+    "Waiting for station data" : {
+      "comment" : "Alert sheet status when the selected station's predictions are not available yet.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Venter på stationsdata"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warten auf Stationsdaten"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando datos de la estación"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odotetaan aseman tietoja"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente des données de la station"
+          }
+        },
+        "ga" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ag fanacht le sonraí an stáisiúin"
+          }
+        },
+        "gd" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A’ feitheamh ri dàta na stèisein"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In attesa dei dati della stazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "観測地点のデータを待機中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "관측소 데이터를 기다리는 중"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Venter på stasjonsdata"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten op stationsgegevens"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aguardando dados da estação"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A aguardar dados da estação"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Väntar på stationsdata"
           }
         }
       }

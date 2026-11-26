@@ -9,6 +9,46 @@ final class CalendarInvalidationTests: XCTestCase {
         return UserDefaults(suiteName: name)!
     }
 
+    @MainActor func testMissingLegacyCalendarIsRetriedAfterItAppears() {
+        let d = defaults()
+        CurrentCalendarInvalidations.recordDeferred(stationID: "gate", calendarIDs: ["legacy"], in: d)
+        CurrentCalendarInvalidations.retryDeferred(in: d) { _, _ in false }
+        XCTAssertEqual(CurrentCalendarInvalidations.deferred(in: d)["gate"], ["legacy"])
+        CurrentCalendarInvalidations.retryDeferred(in: d) { station, calendar in
+            station == "gate" && calendar == "legacy"
+        }
+        XCTAssertTrue(CurrentCalendarInvalidations.deferred(in: d).isEmpty)
+    }
+
+    @MainActor func testUnsubscribeCancelsDeferredEventRemoval() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.subscribe("gate")
+        CurrentCalendarInvalidations.record(["gate"], in: d)
+        CurrentCalendarInvalidations.recordDeferred(stationID: "gate", calendarIDs: ["legacy"], in: d)
+        store.unsubscribe("gate")
+        XCTAssertTrue(CurrentCalendarInvalidations.pending(in: d).isEmpty)
+        XCTAssertTrue(CurrentCalendarInvalidations.deferred(in: d).isEmpty)
+    }
+
+    @MainActor func testUnsubscribeWithoutAccessKeepsPendingCleanup() {
+        let d = defaults()
+        let store = StationCalendarStore(defaults: d, successors: [:])
+        store.subscribe("current:test")
+        store.setCalendarID("new", for: "current:test")
+        CurrentCalendarInvalidations.record(["current:test"], in: d)
+        store.unsubscribe("current:test", preserveInvalidation: true)
+        XCTAssertEqual(CurrentCalendarInvalidations.pending(in: d), ["current:test"])
+        XCTAssertEqual(CurrentCalendarInvalidations.deferred(in: d)["current:test"], ["new"])
+        XCTAssertTrue(store.subscriptions.isEmpty)
+    }
+
+    func testMissingLegacyCalendarDoesNotBlockInvalidatingCurrentCalendar() {
+        XCTAssertTrue(calendarInvalidationCanProceed(windowID: "current", found: ["current"]))
+        XCTAssertFalse(calendarInvalidationCanProceed(windowID: "current", found: ["legacy"]))
+        XCTAssertTrue(calendarInvalidationCanProceed(windowID: nil, found: []))
+    }
+
     func testOnlyFutureEventsWithTheAffectedStationsMintedURLAreRemoved() throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000), id = "chs-dodd-narrows"
         let own = deepLink(forStationID: id)

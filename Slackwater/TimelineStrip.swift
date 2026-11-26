@@ -562,7 +562,7 @@ struct TimelineData {
         let start = chrome.start, end = chrome.end
 
         let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
-        let currentEvents = sampleEvents(onlinePoints).filter {
+        let currentEvents = currentEventsMatchingWater(onlinePoints, events: sampleEvents(onlinePoints)).filter {
             $0.time >= start.addingTimeInterval(-eventPad) && $0.time <= end.addingTimeInterval(eventPad)
         }
 
@@ -573,8 +573,7 @@ struct TimelineData {
         // downloaded rather than computed — so the window means exactly what it
         // means at a harmonic station. Same computation, same series the strip
         // draws.
-        let (windows, cores) = measureSlacks(currentPoints, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
-                                             threshold: threshold)
+        let (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
 
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
@@ -645,10 +644,9 @@ struct TimelineData {
         if let current {
             let s = current.engineStation
             currentPoints = s.speeds(from: start, to: end, step: 600)
-            currentEvents = s.events(from: start.addingTimeInterval(-pad),
-                                     to: end.addingTimeInterval(pad))
-            (windows, cores) = measureSlacks(currentPoints, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
-                                             threshold: threshold)
+            currentEvents = currentEventsMatchingWater(currentPoints, events: s.events(from: start.addingTimeInterval(-pad),
+                                     to: end.addingTimeInterval(pad)), station: s)
+            (windows, cores) = measureSlacks(currentPoints, events: currentEvents, threshold: threshold)
         }
         if let gate {
             let g = gate.engineGate

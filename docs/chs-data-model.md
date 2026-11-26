@@ -123,9 +123,9 @@ terms are worse than "no" — silence is not permission.
 
 ### The other sources, and why they behave differently
 
-- **NOAA** — public domain. 3,263 tide stations and 2,572 current stations (harmonic or
+- **NOAA** — public domain. 3,264 tide stations and 2,572 current stations (harmonic or
   subordinate-offset) ship with full constituents, offline from first launch.
-- **TICON-4** — the CC BY 4.0 half ships, 1,381 stations; the ones in Canadian water CHS does
+- **TICON-4** — the CC BY 4.0 half ships, 1,379 stations; the ones in Canadian water CHS does
   not gauge are the gap-fills `tools/gen-tides.mjs` counts in its census line. Attribution is in
   Settings. **This is the precedent for bundling third-party harmonic constants** — see
   `tools/gen-tides.mjs`.
@@ -161,7 +161,7 @@ Malibu Rapids derives slack timing from a reference tide port and fixed high/low
 
 Final fits pass quarterly median limits of 15 minutes for slack, 20 minutes for extremum timing and 0.5 knots for peak speed, with no missed or invented slack or reversed axis, and a year-round worst slack error at most 30 minutes. Bounded fits meet the same clauses with worst slack error over 30 and at most 45 minutes, rounded up to five minutes for display. Other gates use official online predictions. Demotions follow the first failing grid point; promotions require the published margin on two consecutive grid points.
 
-A stored current model is usable only when its recipe stamp matches the gate's evidence and its window is the full measured window, or the 60-day answer that gate explicitly offers. Unstamped models and models without a recorded fit window are never reused: they refit once (`usableModel`). The pinned stamp is checked against the measured recipe fixture by test, not inferred. A changed bound on the same recipe needs no refit. Moving online removes the fitted model and its chunk cache; moving back to fitted removes downloaded online windows.
+A stored current model is usable when its window is the full measured window, or the 60-day answer that gate explicitly offers, and its recipe either matches the gate's evidence or is the explicitly supported predecessor whose phase convention is translated on read. Unstamped models and models without a recorded fit window are never reused: they refit once (`usableModel`). The pinned stamp is checked against the measured recipe fixture by test, not inferred. A changed bound on the same recipe needs no refit. Moving online removes the fitted model and its chunk cache; moving back to fitted removes downloaded online windows.
 
 ---
 
@@ -235,7 +235,7 @@ The practical list. Each of these has cost someone time.
 | Identity for stations that may NEVER ship (109) | `Slackwater/Resources/unavailable-stations.json` |
 | CHS current gates (23: 7 fitted, 16 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
-| Bundled tide stations (5,028: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.tcdb` (reviewable copy `stations.json`) |
+| Bundled tide stations (5,027: NOAA, TICON-4, DMI, JMA, JHOD, LINZ, Kartverket) | `Slackwater/Resources/stations.tcdb` (reviewable copy `stations.json`) |
 | NOAA current stations (2,572) | `Slackwater/Resources/currents.tcdb` (reviewable copy `currents.json`) |
 | Fitted models, online blocks and tide previews | App Group container, `ChsModels/{id}.json`, `-current.json`, `-online.json`, `-tide-preview.json` (moved once from Application Support) |
 | Chunk cache and the 7-day IWLS station list cache | Application Support, `ChsChunks/` and `IwlsStations.json` (backup-excluded) |

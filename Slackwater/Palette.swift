@@ -44,8 +44,8 @@ enum SN {
     static let flood = Color(hex: floodHex)
     static let ebb = Color(hex: ebbHex)
     static let go = Color(hex: goHex)
-    /// A measured current's line outside every slack window, weak water that
-    /// never turns included (current-charts §6.1). The speed ramp's first stop,
+    /// A measured current's line outside every comfort-current window
+    /// (current-charts §6.1). The speed ramp's first stop,
     /// so the water beyond the window reads warm on the same scale (#821).
     static let beyondWindowHex: UInt32 = 0xF5C96B
     static let beyondWindow = Color(hex: beyondWindowHex)

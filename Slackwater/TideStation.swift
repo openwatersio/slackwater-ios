@@ -51,8 +51,8 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// Above this, the yearly swing is not merely comparable to the tide, it is
     /// the signal — so the detail view leads with it rather than footnoting it.
     ///
-    /// 3 is where the bundle turns into rivers, lakes and lagoons: Rochester on
-    /// Lake Ontario at 147x, Algonac on the St Clair at 55x. Below it are Gulf,
+    /// 3 is where the bundle turns into rivers, lakes and lagoons: Kingston on
+    /// Lake Ontario at 30x, Algonac on the St Clair at 55x. Below it are Gulf,
     /// Carolina and Baltic water with a real tide and a comparable seasonal
     /// swing, such as Cedar Island at 1.8, where "mostly seasonal" would be
     /// false in effect while true in arithmetic. slackwater.xyz splits at the

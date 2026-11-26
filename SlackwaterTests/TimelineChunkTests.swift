@@ -36,11 +36,11 @@ import SlackwaterKit
     // MARK: - Golden equivalence with the monolithic builders
 
     func testHasteShoalKeepsTimesWhenTheComfortWindowSpansSeveralSlacks() throws {
-        let station = try XCTUnwrap(CurrentStationRecord.all.first { $0.name.hasPrefix("Haste Shoal") })
+        let station = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = station.tz
         let anchor = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 10, day: 27)))
-        let data = merged(.current(station, threshold: 1), origin: anchor, indices: -1...1,
+        let data = merged(.current(station, threshold: 10), origin: anchor, indices: -1...1,
                           anchor: anchor, today: anchor)
         let tomorrow = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: anchor))
         let slacks = data.currentEvents.filter { $0.kind == .slack && $0.time >= anchor && $0.time < tomorrow }.map(\.time)
@@ -95,6 +95,32 @@ import SlackwaterKit
         }
     }
 
+    func testOverlappingChunkWindowsKeepBothPaddedEnds() {
+        let seam = Date(timeIntervalSince1970: 1_700_000_000)
+        let first = (slack: seam, start: seam.addingTimeInterval(-30_000), end: seam.addingTimeInterval(21_600))
+        let second = (slack: seam, start: seam.addingTimeInterval(-21_600), end: seam.addingTimeInterval(30_000))
+        let merged = mergeChunkWindows([first, second])
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].start, first.start)
+        XCTAssertEqual(merged[0].end, second.end)
+    }
+
+    func testMergedCurrentChunksKeepRealZeroInstants() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.record(id: "noaa/ACT1616"))
+        let anchor = vancouverMidnight(2026, 8, 11)
+        let mono = TimelineData.build(tide: nil, current: station,
+                                      now: anchor.addingTimeInterval(15 * 3600), anchor: anchor)
+        let chunks = merged(.current(station, threshold: defaultSlackThresholdKn),
+                            origin: anchor, indices: -1...1, anchor: anchor, today: anchor)
+        let expected = mono.bareSlackTimes.filter { mono.contains($0) }
+        let actual = chunks.bareSlackTimes.filter { mono.contains($0) }
+        XCTAssertFalse(expected.isEmpty, "the comparison must include true slack instants")
+        XCTAssertEqual(actual.count, expected.count)
+        for (a, b) in zip(actual, expected) {
+            XCTAssertEqual(a.timeIntervalSince(b), 0, accuracy: 2)
+        }
+    }
+
     func testMergedCurrentChunksMatchMonolithicBuild() {
         let anchor = vancouverMidnight(2026, 8, 11)
         let now = anchor.addingTimeInterval(15 * 3600)
@@ -133,7 +159,6 @@ import SlackwaterKit
         XCTAssertTrue(m.slackCores.isEmpty)
         let monoZeros = mono.bareSlackTimes.filter { mono.contains($0) }
         let mergedZeros = m.bareSlackTimes.filter { mono.contains($0) }
-        XCTAssertFalse(monoZeros.isEmpty, "zero instants still need green marks")
         XCTAssertEqual(mergedZeros.count, monoZeros.count)
         for (a, b) in zip(mergedZeros, monoZeros) {
             XCTAssertEqual(a.timeIntervalSince(b), 0, accuracy: 2)

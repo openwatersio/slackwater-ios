@@ -193,17 +193,17 @@ import CoreLocation
         XCTAssertEqual(Set(result.windows.map(\.start)).count, result.windows.count)
     }
 
-    func testNoWindowNamesTheNearestPlaceWithoutTryingAFartherOne() throws {
+    func testNearestPlaceReturnsWindowWithoutSlack() throws {
         let record = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/KOD0926" })
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let nearest = try XCTUnwrap(LocalStationQuery.nearest(.current,
             to: (record.latitude, record.longitude), at: now))
         guard case .current(let selected, _) = nearest else { return XCTFail("expected current") }
         XCTAssertEqual(selected.id, record.id)
-        XCTAssertNil(SlackWindowShortcutQuery.next(at: nearest, after: now))
-        let answer = SlackWindowShortcutQuery.noWindow(at: nearest)
-        XCTAssertTrue(answer.contains(record.name), answer)
-        XCTAssertTrue(answer.contains("48 hours"), answer)
+        let window = try XCTUnwrap(SlackWindowShortcutQuery.next(at: nearest, after: now))
+        XCTAssertEqual(window.stationName, record.name)
+        XCTAssertNil(window.slack)
+        XCTAssertLessThan(window.start, window.end)
     }
 
     func testQueryReturnsTheRequestedTideKind() throws {
@@ -255,10 +255,9 @@ import CoreLocation
         let station = WidgetRecord.current(record, station: record.engineStation)
         let next = try XCTUnwrap(SlackWindowShortcutQuery.next(at: station,
             after: Date(timeIntervalSince1970: 1_755_800_000)))
-        let inside = next.slack.time.addingTimeInterval(next.end.timeIntervalSince(next.slack.time) / 2)
+        let inside = next.start.addingTimeInterval(next.end.timeIntervalSince(next.start) / 2)
         let active = try XCTUnwrap(SlackWindowShortcutQuery.next(at: station, after: inside))
-        XCTAssertEqual(active.slack.time.timeIntervalSince1970,
-                       next.slack.time.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(active.end.timeIntervalSince1970, next.end.timeIntervalSince1970, accuracy: 1)
         XCTAssertTrue(active.spoken.contains("is open now"), active.spoken)
     }
 
@@ -352,7 +351,7 @@ import CoreLocation
         let selected = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701"))
         let next = try XCTUnwrap(SlackWindowShortcutQuery.next(at: selected,
             after: Date(timeIntervalSince1970: 1_755_800_000)))
-        let now = next.slack.time.addingTimeInterval(60)
+        let now = next.start.addingTimeInterval(next.end.timeIntervalSince(next.start) / 2)
         let active = try XCTUnwrap(SlackWindowShortcutQuery.next(at: selected, after: now))
         XCTAssertLessThan(active.end.timeIntervalSince(now), 7_200)
         XCTAssertEqual(active.card.countdownEnd, active.end)
@@ -405,6 +404,64 @@ import CoreLocation
         XCTAssertEqual(try XCTUnwrap(result.card.graph?.highlight).lowerBound, result.start)
         XCTAssertLessThanOrEqual(try XCTUnwrap(result.card.graph).forward,
                                  online.end.timeIntervalSince(now))
+    }
+
+    func testOnlineWindowUsesOriginalSampleCorners() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+            fetchedAt: start, start: start, end: start.addingTimeInterval(2700), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800, 2700].map { start.addingTimeInterval(Double($0)).timeIntervalSince1970 },
+            speeds: [0, 0.4, 1, 1.2])
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(
+            DateInterval(start: start, end: start.addingTimeInterval(2700)), at: .current(record, station: online)))
+        let spokenWindow = try XCTUnwrap(result.windows.first)
+        let cardWindow = try XCTUnwrap(result.card.graph?.windows.first)
+        XCTAssertEqual(spokenWindow.end.timeIntervalSince(cardWindow.end), 0, accuracy: 1)
+        XCTAssertEqual(spokenWindow.end.timeIntervalSince(start), 1050, accuracy: 1)
+    }
+
+    func testOnlineWindowRetainsPeaksBetweenResampledPoints() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.8, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+            fetchedAt: start, start: start, end: start.addingTimeInterval(1800), floodDirection: 0, ebbDirection: 180,
+            times: [0, 900, 1800].map { start.addingTimeInterval(Double($0)).timeIntervalSince1970 }, speeds: [0, 1, 0])
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(
+            DateInterval(start: start, end: start.addingTimeInterval(1800)), at: .current(record, station: online)))
+        XCTAssertEqual(result.windows.count, 2)
+        XCTAssertEqual(result.card.graph?.windows.count, 2)
+        XCTAssertEqual(result.windows[0].end.timeIntervalSince(start), 720, accuracy: 1)
+        XCTAssertEqual(result.windows[1].start.timeIntervalSince(start), 1080, accuracy: 1)
+    }
+
+    func testDatedWindowWithUnobservedCloseHighlightsItsOpening() throws {
+        let saved = AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey)
+        defer { AppGroup.defaults.set(saved, forKey: AppGroup.slackWindowSpeedKey) }
+        AppGroup.defaults.set(0.5, forKey: AppGroup.slackWindowSpeedKey)
+        guard case .current(let record, _) = try XCTUnwrap(
+            WidgetStationLoader.loadRecord(id: "current:noaa/PUG1701")) else { return XCTFail("expected current") }
+        let start = Date(timeIntervalSince1970: 1_755_800_000)
+        let end = start.addingTimeInterval(12 * 3600)
+        let times = stride(from: 0.0, through: 12 * 3600, by: 600).map { start.addingTimeInterval($0).timeIntervalSince1970 }
+        let speeds = times.map { $0 < start.addingTimeInterval(4 * 3600).timeIntervalSince1970 ? 1.0 : 0.1 }
+        let online = ChsOnlineWindow(stationID: record.id, iwlsName: record.name, timezone: record.tz.identifier,
+                                     fetchedAt: start, start: start, end: end, floodDirection: 0, ebbDirection: 180,
+                                     times: times, speeds: speeds)
+        let day = DateInterval(start: start, end: start.addingTimeInterval(86_400))
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.on(day, at: .current(record, station: online)))
+        let window = try XCTUnwrap(result.windows.first)
+        XCTAssertTrue(window.hasOpeningBoundary)
+        XCTAssertFalse(window.hasClosingBoundary)
+        XCTAssertEqual(result.card.graph?.highlight?.lowerBound, window.start)
     }
 
     func testWaitsRoundToMinutesWithoutSpeakingZero() {
@@ -558,8 +615,7 @@ import CoreLocation
 
         let result = try XCTUnwrap(SlackWindowShortcutQuery.next(at: station, after: now))
 
-        XCTAssertLessThan(result.start, result.slack.time)
-        XCTAssertGreaterThan(result.end, result.slack.time)
+        XCTAssertLessThan(result.start, result.end)
         XCTAssertTrue(result.spoken.contains("slack window at \(record.name)"))
         XCTAssertTrue(result.spoken.contains("starts in about"))
         XCTAssertTrue(result.spoken.contains("lasts about"))

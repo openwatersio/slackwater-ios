@@ -10,9 +10,12 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
     return wait > 0 ? wait : nil
 }
 
+func pendingSlackReviewNotices(_ rules: [AlertRule], notified: Set<String>) -> [AlertRule] {
+    rules.filter { $0.slackNeedsReview == true && !notified.contains($0.id.uuidString) }
+}
+
 @MainActor enum AlertNotifications {
-    /// Every request this writer owns. Nothing else in the app schedules notifications, but
-    /// the prefix keeps a replace from ever touching one that isn't ours.
+    /// Limit replacement to scheduled alert requests.
     static let prefix = "alert."
 
     static func authorized() async -> Bool {
@@ -22,6 +25,38 @@ func notificationWait(for entry: AlertEntry, from now: Date) -> TimeInterval? {
     /// Never provisional: provisional delivery never reaches the Lock Screen.
     static func requestAccess() async -> Bool {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
+    }
+
+    /// Tell people when an older one-time selection needs their attention after migration.
+    static func notifySlackReview(_ rules: [AlertRule], places: [String: AlertPlace], premium: Bool,
+                                  defaults: UserDefaults = AppGroup.defaults) async {
+        let key = "slackwater.sentSlackReviewNotices"
+        let reviewIDs = Set(rules.filter { $0.slackNeedsReview == true }.map { $0.id.uuidString })
+        let previous = Set(defaults.stringArray(forKey: key) ?? [])
+        var notified = previous.intersection(reviewIDs)
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: previous.subtracting(reviewIDs).map { "review." + $0 })
+        defaults.set(Array(notified).sorted(), forKey: key)
+        let pending = pendingSlackReviewNotices(rules, notified: notified)
+        guard premium, !pending.isEmpty, await authorized() else { return }
+        for rule in pending {
+            let content = UNMutableNotificationContent()
+            content.title = places[rule.stationID]?.name
+                ?? WidgetStationLoader.loadRecord(id: rule.stationID)?.alertPlace.name ?? "Slackwater"
+            content.body = String(localized: "Review or delete this alert.")
+            content.sound = .default
+            if let url = deepLink(forStationID: rule.stationID) {
+                content.userInfo = [AlertTap.urlKey: url.absoluteString]
+            }
+            do {
+                try await center.add(UNNotificationRequest(identifier: "review." + rule.id.uuidString,
+                                                           content: content, trigger: nil))
+                notified.insert(rule.id.uuidString)
+                defaults.set(Array(notified).sorted(), forKey: key)
+            } catch {
+                continue
+            }
+        }
     }
 
     /// Replaces every pending alert request with `entries`.

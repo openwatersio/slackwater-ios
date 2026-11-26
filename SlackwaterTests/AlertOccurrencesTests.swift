@@ -113,15 +113,30 @@ import SlackwaterKit
 
     func testAnOffWindowAlertsAtEachSlack() throws {
         // Off has no window to open, so the rule fires at the slack itself, named Slack (#821).
-        let (station, position) = try load(deception)
+        let (station, position) = try load("current:noaa/ACT1616")
         guard case .current(let engine, _, _) = station else { return XCTFail("expected a current station") }
-        let rule = AlertRule(stationID: deception, trigger: .slackWindowOpens)
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
         let found = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0)
         let slacks = engine.events(from: now, to: week).filter { $0.kind == .slack && $0.time >= now && $0.time <= week }
 
         XCTAssertFalse(found.isEmpty)
         XCTAssertTrue(found.allSatisfy { $0.noWindow && $0.end == nil })
         XCTAssertEqual(found.map(\.event), slacks.map { alertMinute($0.time) })
+    }
+
+    func testTemporarilyTurningOffAOnceWindowDoesNotRetargetItToSlack() throws {
+        let id = "current:noaa/ACT1616"
+        let (station, position) = try load(id)
+        let every = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let slack = try XCTUnwrap(alertOccurrences(every, station: station, position: position,
+                                                   from: now, to: week, threshold: 0).first)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: slack.event)
+        once.currentWindowRule = true
+        XCTAssertTrue(alertOccurrences(once, station: station, position: position,
+                                       from: now, to: week, threshold: 0).isEmpty)
+        once.currentWindowWasOff = true
+        XCTAssertEqual(alertOccurrences(once, station: station, position: position,
+                                        from: now, to: week, threshold: 0).map(\.event), [slack.event])
     }
 
     // MARK: a once rule takes the occurrence nearest the pressed minute
@@ -371,6 +386,41 @@ import SlackwaterKit
 
         XCTAssertEqual(alertOccurrences(only, station: station, position: position,
                                         from: now, to: week, threshold: 0.5), [])
+    }
+
+    func testUnresolvedLegacyWindowExpiresAfterReach() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let rule = AlertRule(stationID: "current:missing", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-21_601))
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now,
+                                             occurrences: [], unresolved: [rule.id]), [rule.id])
+    }
+
+    func testUnresolvedOnceRuleIsKeptWhileItsEventCouldStillBeAhead() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
+                                           occurrences: [], unresolved: [rule.id]).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(21_600),
+                                             occurrences: [], unresolved: [rule.id]), [rule.id])
+    }
+
+    func testExpiredSnapshotDoesNotDeleteAnEditedRule() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let old = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        var edited = old
+        edited.once = nil
+        XCTAssertTrue(expiredUnchangedRules([old], current: [edited], now: now, occurrences: []).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([old], current: [old], now: now, occurrences: []), [old.id])
+    }
+
+    func testOnceRuleDoesNotExpireBeforeItsResolvedEvent() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        let future = AlertOccurrence(ruleID: rule.id, event: now.addingTimeInterval(3600),
+                                     fire: now.addingTimeInterval(1800))
+        XCTAssertTrue(expiredRules([rule], now: now, occurrences: [future]).isEmpty)
+        XCTAssertEqual(expiredRules([rule], now: now.addingTimeInterval(7200), occurrences: [future]), [rule.id])
     }
 
     func testExpiryTakesOnlyOnceRulesWhoseMomentHasPassed() {

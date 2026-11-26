@@ -76,8 +76,7 @@ struct PinState: Equatable {
     var reading: String?
     var unit: String?
     /// True bearing the water flows toward — the arrow every current pin
-    /// wears, slack included: near slack the sign still names the set, and
-    /// the go-green fill is what says "slack".
+    /// wears, including at a major-axis crossing with water still moving.
     var bearing: Double?
     /// Tide gauge fill, bucketed 0...PIN_GAUGE_BUCKETS: where the current
     /// height sits between the surrounding low and high. nil when either
@@ -165,37 +164,37 @@ func pinSortRank(_ item: StationItem) -> Double {
     }
 }
 
-/// A speed-bearing current pin's state IS a colour (#13): green exactly when
-/// the water is slack — |v| under the same `slackCoreThresholdKn` that
-/// defines the strip's green — and the darkened #97 ramp at the current speed
-/// otherwise. The pin is the instantaneous speed on that ramp, not the strip's window, so it can be yellow where the strip is blue (current-charts §5). Hue no longer says
-/// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
-/// card's arrow + cardinal) carries direction.
+/// A current pin is green at zero full speed and otherwise uses the darkened
+/// speed ramp. Its colour is instantaneous, so it can differ from the strip
+/// window (current-charts §6.1). The flow arrow carries the set direction.
 func currentPinState(_ station: CurrentStationRecord, at now: Date,
                      speedUnit: String, detailed: Bool = true) -> PinState {
-    let signed = station.isSubordinate
-        ? subordinateCurrentPinSpeed(station, at: now)
-        : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
-    let slack = abs(signed) <= slackCoreThresholdKn(slackThresholdKn)
+    let point = station.isSubordinate ? nil
+        : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first
+    guard let signed = station.isSubordinate ? subordinateCurrentPinSpeed(station, at: now) : point?.speed else {
+        return PinState(state: "unknown")
+    }
+    let magnitude = point?.magnitude ?? abs(signed)
+    let direction = point.flatMap { [$0].vector(at: $0.time, flood: station.floodDirection, ebb: station.ebbDirection)?.direction }
+    let slack = magnitude <= slackCoreThresholdKn(slackThresholdKn)
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
-                     : pinRampHex(forSpeedKn: abs(signed)),
-        reading: detailed ? formatSpeed(abs(signed), unit: speedUnit) : nil,
+                     : pinRampHex(forSpeedKn: magnitude),
+        reading: detailed ? formatSpeed(magnitude, unit: speedUnit) : nil,
         unit: detailed ? speedUnitLabel(speedUnit) : nil,
-        // Pins keep the major axis: the published bearing for the sign, as React's do.
-        bearing: signed >= 0 ? station.floodDirection : station.ebbDirection)
+        bearing: slack ? nil : direction ?? (signed >= 0 ? station.floodDirection : station.ebbDirection))
 }
 
 /// Most current pins are subordinates hanging off a few dozen references, so the reference is
 /// searched once per build and each pin only reduces — the engine's own
 /// `reduce` and `speed(at:along:)`, so the math has one owner. The engine
-/// extracts reference events per UTC day (`eventsByDay`), so the held list
+/// extracts reference events per UTC day (`axisEventsForReduction`), so the held list
 /// and the one the detail view's `speeds` searches are the same events, and
 /// the pin's colour is the detail's speed at that instant.
-private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double {
+private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double? {
     // One read of the reference for both: each `referenceRecord` decodes it.
     guard let ref = station.referenceRecord,
-          case let sub as SubordinateStation = station.engineStation(referenceRecord: ref) else { return 0 }
+          case let sub as SubordinateStation = station.engineStation(referenceRecord: ref) else { return nil }
     return SubordinateStation.speed(at: now, along: sub.reduce(ReferenceCurrentEvents.shared.events(of: ref, at: now)))
 }
 
@@ -216,7 +215,7 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
         if b != bucket { bucket = b; events = [:] }
         if let cached = events[reference.id] { return cached }
         let start = Date(timeIntervalSince1970: Double(b) * PIN_TIDE_DIFF_DT)
-        let found = reference.harmonicStation.eventsByDay(from: start.addingTimeInterval(-Self.pad),
+        let found = reference.harmonicStation.axisEventsForReduction(from: start.addingTimeInterval(-Self.pad),
                                                           to: start.addingTimeInterval(PIN_TIDE_DIFF_DT + Self.pad))
         events[reference.id] = found
         return found

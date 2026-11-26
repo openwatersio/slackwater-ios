@@ -1,9 +1,33 @@
 // Slackwater — GPL v3. The alert sheet's repeat menu (docs/alerts.md §7.2).
 import XCTest
+import SlackwaterKit
 @testable import Slackwater
 
 final class AlertSheetTests: XCTestCase {
     private let moment = Date(timeIntervalSince1970: 1_700_000_040)
+
+    func testReviewSheetStartsEnabledWithoutChangingOrdinaryOffRules() {
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens)
+        rule.enabled = false
+        XCTAssertFalse(alertSheetInitialRule(rule).enabled)
+        rule.slackNeedsReview = true
+        XCTAssertTrue(alertSheetInitialRule(rule).enabled)
+    }
+
+    func testEditingWindowSelectionUpdatesItsOffOrigin() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        var saved = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: date)
+        saved.currentWindowRule = true
+        saved.currentWindowWasOff = true
+        XCTAssertTrue(alertSheetWindowWasOff(saved, saved: saved, threshold: 0))
+        XCTAssertFalse(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5),
+                       "confirming the displayed comfort window resolves the old Off selection")
+        var edited = saved
+        edited.once = date.addingTimeInterval(3600)
+        XCTAssertFalse(alertSheetWindowWasOff(edited, saved: saved, threshold: 0.5))
+        saved.slackNeedsReview = true
+        XCTAssertFalse(alertSheetWindowWasOff(saved, saved: saved, threshold: 0.5))
+    }
 
     func testAMomentOffersBothChoicesAndNoMomentOffersOnlyEvery() {
         XCTAssertEqual(alertRepeatChoices(boundMoment: moment), [false, true])
@@ -57,6 +81,75 @@ final class AlertSheetTests: XCTestCase {
         // Review Focus 4: a throw mid-parse leaves the sheet usable.
         let c = alertSheetApply(.failed, to: draft, boundMoment: moment)
         XCTAssertEqual(c.rule, draft); XCTAssertEqual(c.note, .failed)
+    }
+
+    private struct WindowCurrent: CurrentPredicting {
+        let points: [CurrentPoint]
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] { points }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    private final class RangeRecordingCurrent: CurrentPredicting, @unchecked Sendable {
+        var queriedDuration: TimeInterval = 0
+        func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+            queriedDuration = to.timeIntervalSince(from)
+            return []
+        }
+        func events(from: Date, to: Date) -> [CurrentEvent] { [] }
+    }
+
+    func testFarFutureOpeningCheckDoesNotScanTheInterveningMonths() {
+        let current = RangeRecordingCurrent()
+        let station = WidgetStation.current(current, tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: moment.addingTimeInterval(300 * 86_400))
+        _ = alertSheetOpeningAvailability(rule, station: station, position: (0, 0), now: moment, threshold: 0.5)
+        XCTAssertLessThanOrEqual(current.queriedDuration, 48 * 3600)
+    }
+
+    func testOpeningAlertCannotSaveAfterItsWindowOpened() {
+        let points = [1.0, 0.1, 0.1, 1.0].enumerated().map {
+            CurrentPoint(time: moment.addingTimeInterval(Double($0.offset - 1) * 3600), speed: $0.element)
+        }
+        let station = WidgetStation.current(WindowCurrent(points: points), tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let once = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: moment.addingTimeInterval(1800))
+        XCTAssertEqual(alertSheetOpeningAvailability(once, station: station, position: (0, 0),
+                                                     now: moment, threshold: 0.5), .alreadyOpen)
+        let before = moment.addingTimeInterval(-3600)
+        XCTAssertEqual(alertSheetOpeningAvailability(once, station: station, position: (0, 0),
+                                                     now: before, threshold: 0.5), .available(alertMinute(moment.addingTimeInterval(-1600))))
+    }
+
+    func testOpeningAlertCanWaitForMissingStationData() {
+        XCTAssertTrue(alertSheetOpeningCanSave(.waitingForStation, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.checking, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.unavailable, now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.alreadyOpen, now: moment))
+        XCTAssertTrue(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(60)), now: moment))
+        XCTAssertFalse(alertSheetOpeningCanSave(.available(moment.addingTimeInterval(-60)), now: moment))
+    }
+
+    func testHeldWindowCanStillBeEditedWhileOff() {
+        let station = WidgetStation.current(WindowCurrent(points: []), tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let selected = moment.addingTimeInterval(3600)
+        var rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: selected)
+        rule.currentWindowRule = true
+        XCTAssertEqual(alertSheetOpeningAvailability(rule, station: station, position: (0, 0),
+                                                     now: moment, threshold: 0), .held)
+        XCTAssertTrue(alertSheetOpeningCanSave(.held, now: moment))
+        XCTAssertTrue(alertSheetCanSave(rule, now: selected.addingTimeInterval(60), holding: true))
+        XCTAssertFalse(alertSheetCanSave(rule, now: selected.addingTimeInterval(21_601), holding: true))
+    }
+
+    func testReminderUsesTheResolvedWindowOpening() {
+        let press = moment.addingTimeInterval(3600)
+        let opening = moment.addingTimeInterval(600)
+        let rule = AlertRule(stationID: "a", trigger: .slackWindowOpens, once: press, lead: 1800)
+        let resolved = alertSheetReminderRule(rule, opening: .available(opening))
+        XCTAssertEqual(resolved.once, opening)
+        XCTAssertTrue(alertSheetStartsNow(resolved, now: moment))
+        XCTAssertFalse(alertSheetStartsNow(rule, now: moment))
     }
 
     func testSaveIsOfferedOnlyForAMomentStillAhead() {

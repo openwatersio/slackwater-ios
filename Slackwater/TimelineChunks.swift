@@ -142,10 +142,11 @@ struct TimelineChunk {
             let padded = s.speeds(from: start.addingTimeInterval(-pad),
                                   to: end.addingTimeInterval(pad), step: 600)
             currentPoints = padded.filter { inSpan($0.time) }
-            currentEvents = s.events(from: start.addingTimeInterval(-pad),
-                                     to: end.addingTimeInterval(pad)).filter { inSpan($0.time) }
-            (windows, cores) = measureSlacks(padded, slacks: currentEvents.filter { $0.kind == .slack }.map(\.time),
-                                             threshold: threshold)
+            let paddedEvents = currentEventsMatchingWater(padded, events: s.events(from: start.addingTimeInterval(-pad), to: end.addingTimeInterval(pad)), station: s)
+            currentEvents = paddedEvents.filter { inSpan($0.time) }
+            let measured = measureSlacks(padded, events: paddedEvents, threshold: threshold)
+            windows = measured.windows.filter { $0.end >= start && $0.start < end }
+            cores = measured.cores.filter { $0.end >= start && $0.start < end }
         case .gate(let record):
             let g = record.engineGate
             let slacks = g.slacks(from: start.addingTimeInterval(-Self.gateSlackPad),
@@ -221,14 +222,8 @@ extension TimelineData {
         let tideExtremes = dedupeExtremes(chunks.flatMap(\.tideExtremes))
         let currentPoints = chunks.flatMap(\.currentPoints)
         let currentEvents = dedupeEvents(chunks.flatMap(\.currentEvents))
-        // A boundary slack caught by both neighbouring chunks is measured twice.
-        func dedupeWindows(_ all: [(slack: Date, start: Date, end: Date)]) -> [(slack: Date, start: Date, end: Date)] {
-            all.enumerated().filter { i, w in
-                i == 0 || w.slack.timeIntervalSince(all[i - 1].slack) >= 2
-            }.map(\.element)
-        }
-        let windows = dedupeWindows(chunks.flatMap(\.slackWindows))
-        let cores = dedupeWindows(chunks.flatMap(\.slackCores))
+        let windows = mergeChunkWindows(chunks.flatMap(\.slackWindows))
+        let cores = mergeChunkWindows(chunks.flatMap(\.slackCores))
         var eclipseSeen = Set<Date>()
         let eclipses = chunks.flatMap(\.eclipses).filter { eclipseSeen.insert($0.peak).inserted }
         var solarEclipseSeen = Set<Date>()
@@ -655,4 +650,10 @@ final class ScrollGate {
         }
         return sorted[lo..<lo2]
     }
+}
+
+/// Combine overlapping padded measurements, retaining both ends across chunk seams.
+func mergeChunkWindows(_ windows: [(slack: Date, start: Date, end: Date)]) -> [(slack: Date, start: Date, end: Date)] {
+    mergeWindows(windows.map { SlackWindow(start: $0.start, end: $0.end) }.sorted { $0.start < $1.start })
+        .map { (slack: $0.start, start: $0.start, end: $0.end) }
 }

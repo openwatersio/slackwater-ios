@@ -13,7 +13,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadStations } from "@slackwater/database";
+import { createTidePredictor } from "@slackwater/engine";
 import { datumDeviation, passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
+
+// S3 at this epoch distinguishes the current engine convention from beta.0.
+test("datum checks use the current S3 phase convention", () => {
+  const predictor = createTidePredictor([{ name: "S3", amplitude: 1, phase: 0 }]);
+  const point = predictor.getWaterLevelAtTime({ time: new Date("2026-01-01T00:00:00Z") });
+  assert.ok(Math.abs(point.level + 1) < 1e-9, `S3 prediction ${point.level} uses the wrong phase convention`);
+});
 
 const db = await loadStations();
 

@@ -1,9 +1,90 @@
 // Slackwater — GPL v3. resolveAlerts: rules → occurrences and places, with unknown stations reported rather than dropped.
 import XCTest
 @testable import Slackwater
+import SlackwaterKit
+
+private struct CurrentWithLaterSlack: CurrentPredicting {
+    let slack: Date
+    func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint] {
+        [CurrentPoint(time: from, speed: 1), CurrentPoint(time: to, speed: 1)]
+    }
+    func events(from: Date, to: Date) -> [CurrentEvent] {
+        from <= slack && slack <= to ? [CurrentEvent(time: slack, speed: 0, kind: .slack, verifiedZero: true)] : []
+    }
+}
 
 final class AlertResolveTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_755_800_000)
+
+    func testDeliveryUsesOnlyRulesUnchangedDuringResolution() {
+        let kept = AlertRule(stationID: "kept", trigger: .slack)
+        let deleted = AlertRule(stationID: "deleted", trigger: .slack)
+        let edited = AlertRule(stationID: "edited", trigger: .slack)
+        var disabled = edited
+        disabled.enabled = false
+        let added = AlertRule(stationID: "added", trigger: .slack)
+        XCTAssertEqual(unchangedResolvedRules([kept, deleted, edited], current: [kept, disabled, added]), [kept])
+    }
+
+    func testEditedEnabledRuleKeepsItsActiveCountdown() {
+        let snapshot = AlertRule(stationID: "current:test", trigger: .slack)
+        var edited = snapshot
+        edited.lead = 1800
+        let active = LiveActivityRecord(key: "open", ruleID: snapshot.id, pending: false,
+                                        event: now.addingTimeInterval(-600), end: now.addingTimeInterval(600))
+        XCTAssertTrue(unchangedResolvedRules([snapshot], current: [edited]).isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([active], liveRuleIDs: activeRuleIDs([edited]), now: now).isEmpty)
+        edited.enabled = false
+        XCTAssertEqual(liveActivitiesToEnd([active], liveRuleIDs: activeRuleIDs([edited]), now: now), ["open"])
+    }
+
+    func testRunningWindowProtectsLegacyRuleUntilItCloses() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(1800))
+        let open = LiveActivityRecord(key: "open", ruleID: rule.id, pending: false,
+                                      event: now.addingTimeInterval(-600), end: now.addingTimeInterval(3600))
+        let running = liveWindowRuleIDs([open], now: now)
+        XCTAssertEqual(running, [rule.id])
+        let policy = alertActivityPolicy(rules: [rule], reviewCandidates: [rule.id], measuredWindows: [],
+                                         runningActivities: running, runningWindows: running, heldWindows: [], threshold: 0.5)
+        XCTAssertTrue(policy.reviewIDs.isEmpty, "an active alert is not sent for review")
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(2400),
+                                            occurrences: [], activeWindows: policy.expiryProtected).isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([open], liveRuleIDs: policy.liveRuleIDs, now: now).isEmpty)
+        let off = alertActivityPolicy(rules: [rule], reviewCandidates: [], measuredWindows: [],
+                                      runningActivities: running, runningWindows: running, heldWindows: [], threshold: 0)
+        XCTAssertEqual(liveActivitiesToEnd([open], liveRuleIDs: off.liveRuleIDs, now: now),
+                       ["open"], "turning the comfort window off ends its activity")
+        XCTAssertTrue(liveWindowRuleIDs([open], now: now.addingTimeInterval(3601)).isEmpty)
+        let pending = LiveActivityRecord(key: "pending", ruleID: rule.id, pending: true,
+                                         event: open.event, end: open.end)
+        XCTAssertTrue(liveWindowRuleIDs([pending], now: now).isEmpty)
+    }
+
+    func testStartedCountdownSurvivesMigrationWithoutConfusingInstantSlack() {
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3000))
+        let countdown = LiveActivityRecord(key: "countdown", ruleID: rule.id, pending: false,
+                                           event: now.addingTimeInterval(1200), end: now.addingTimeInterval(7200))
+        let activities = liveActivityRuleIDs([countdown], now: now)
+        let windows = liveWindowRuleIDs([countdown], now: now)
+        XCTAssertEqual(activities, [rule.id])
+        XCTAssertEqual(windows, [rule.id])
+        let policy = alertActivityPolicy(rules: [rule], reviewCandidates: [rule.id], measuredWindows: [],
+                                         runningActivities: activities, runningWindows: windows,
+                                         heldWindows: [], threshold: 0.5)
+        XCTAssertTrue(policy.reviewIDs.isEmpty)
+        XCTAssertTrue(liveActivitiesToEnd([countdown], liveRuleIDs: policy.liveRuleIDs, now: now).isEmpty)
+        let instant = LiveActivityRecord(key: "slack", ruleID: rule.id, pending: false,
+                                        event: countdown.event, end: nil)
+        let instantPolicy = alertActivityPolicy(rules: [rule], reviewCandidates: [], measuredWindows: [],
+            runningActivities: liveActivityRuleIDs([instant], now: now),
+            runningWindows: liveWindowRuleIDs([instant], now: now), heldWindows: [], threshold: 0)
+        XCTAssertTrue(liveActivitiesToEnd([instant], liveRuleIDs: instantPolicy.liveRuleIDs, now: now).isEmpty)
+        let pending = LiveActivityRecord(key: "pending", ruleID: rule.id, pending: true,
+                                        event: countdown.event, end: countdown.end)
+        XCTAssertTrue(liveActivityRuleIDs([pending], now: now).isEmpty)
+    }
 
     func testResolveNamesPlacesAndReportsUnknownStations() {
         let good = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideExtreme(high: true))
@@ -18,6 +99,173 @@ final class AlertResolveTests: XCTestCase {
         XCTAssertFalse(resolved.occurrences.isEmpty)
         XCTAssertTrue(resolved.occurrences.allSatisfy { $0.ruleID == good.id })
         XCTAssertTrue(resolved.occurrences.allSatisfy { $0.event.timeIntervalSince(self.now) <= AlertHorizon.calendar })
+    }
+
+    func testReviewNoticesRetryUntilSentAndIgnoreOtherRules() {
+        var needsReview = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
+        needsReview.slackNeedsReview = true
+        let normal = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens)
+        XCTAssertEqual(pendingSlackReviewNotices([needsReview, normal], notified: []).map(\.id), [needsReview.id])
+        XCTAssertTrue(pendingSlackReviewNotices([needsReview, normal], notified: [needsReview.id.uuidString]).isEmpty)
+    }
+
+    func testOffModeRotaryRuleReportsNoPredictedSlack() {
+        let rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens)
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertTrue(resolved.occurrences.isEmpty)
+        XCTAssertTrue(resolved.noSlack.contains(rule.id))
+        XCTAssertFalse(resolved.unresolved.contains(rule.id))
+    }
+
+    func testOnceSavedWithWindowOffResumesIfSettingReturnsBeforeItsMoment() {
+        var rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3600))
+        rule.currentWindowRule = true
+        rule.currentWindowWasOff = true
+        let held = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(held.heldWindows.contains(rule.id))
+        XCTAssertFalse(held.legacyReview.contains(rule.id))
+        let resumed = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertFalse(resumed.heldWindows.contains(rule.id))
+        let due = resolveAlerts([rule], subscriptions: [], now: now.addingTimeInterval(3600), threshold: 0.5)
+        XCTAssertTrue(due.legacyReview.contains(rule.id))
+    }
+
+    func testPastLegacyWindowRequiresReviewWhileItsEventMayStillBeAhead() {
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-3600))
+        let result = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(result.legacyReview.contains(rule.id))
+        XCTAssertTrue(result.occurrences.isEmpty)
+    }
+
+    func testDisabledWindowSelectionRemainsAvailableForItsUpcomingEvent() {
+        var rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-3600))
+        rule.currentWindowRule = true
+        rule.enabled = false
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now, occurrences: []).isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: now.addingTimeInterval(21_600),
+                                             occurrences: []), [rule.id])
+    }
+
+    func testPastLegacyWindowDoesNotRequireReview() {
+        let rule = AlertRule(stationID: "current:noaa/ACT1616", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-21_601))
+        let result = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertFalse(result.legacyReview.contains(rule.id))
+    }
+
+    func testLegacyOnceWindowRequiresReviewEvenWhenCurrentSelectionMatches() throws {
+        let id = "current:noaa/ACT1616"
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id, at: now))
+        let station = WidgetStationLoader.station(from: record)
+        let every = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let opening = try XCTUnwrap(alertOccurrences(every, station: station, position: record.alertPosition,
+                                                     from: now, to: now.addingTimeInterval(86_400), threshold: 0.5).first)
+        let old = AlertRule(stationID: id, trigger: .slackWindowOpens, once: opening.event)
+        let resolved = resolveAlerts([old], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(resolved.occurrences.isEmpty)
+        XCTAssertTrue(resolved.legacyReview.contains(old.id))
+    }
+
+    func testLegacySelectedSlackIsCheckedEvenWhenLaterSlackExists() {
+        let station = WidgetStation.current(CurrentWithLaterSlack(slack: now.addingTimeInterval(86_400)),
+                                            tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3600))
+        XCTAssertTrue(offModeHasNoSlack(rule, station: station, position: (0, 0), now: now,
+                                        until: now.addingTimeInterval(2 * 86_400), occurrences: []))
+    }
+
+    func testLegacySelectedSlackDoesNotMoveToAnotherNearbySlack() {
+        let station = WidgetStation.current(CurrentWithLaterSlack(slack: now.addingTimeInterval(4 * 3600)),
+                                            tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3600))
+        XCTAssertTrue(offModeHasNoSlack(rule, station: station, position: (0, 0), now: now,
+                                        until: now.addingTimeInterval(2 * 86_400), occurrences: []))
+    }
+
+    func testLegacySelectedSlackAllowsSmallPredictionShift() {
+        let selected = now.addingTimeInterval(3600)
+        let station = WidgetStation.current(CurrentWithLaterSlack(slack: selected.addingTimeInterval(120)),
+                                            tz: TimeZone(secondsFromGMT: 0)!, name: "Test")
+        let rule = AlertRule(stationID: "current:test", trigger: .slackWindowOpens, once: selected)
+        XCTAssertFalse(offModeHasNoSlack(rule, station: station, position: (0, 0), now: now,
+                                         until: now.addingTimeInterval(2 * 86_400), occurrences: []))
+    }
+
+    func testOnceWindowStaysActiveUntilItsSelectedWindowCloses() throws {
+        let id = "current:noaa/ACT1616"
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id, at: now))
+        let station = WidgetStationLoader.station(from: record)
+        let repeating = AlertRule(stationID: id, trigger: .slackWindowOpens)
+        let window = try XCTUnwrap(alertOccurrences(repeating, station: station, position: record.alertPosition,
+            from: now, to: now.addingTimeInterval(86_400), threshold: 0.5).first { $0.end != nil })
+        let end = try XCTUnwrap(window.end)
+        let selected = window.event.addingTimeInterval(end.timeIntervalSince(window.event) / 3)
+        let during = window.event.addingTimeInterval(end.timeIntervalSince(window.event) * 2 / 3)
+        var once = AlertRule(stationID: id, trigger: .slackWindowOpens, once: selected)
+        once.currentWindowRule = true
+        let resolved = resolveAlerts([once], subscriptions: [], now: during, threshold: 0.5)
+        XCTAssertTrue(resolved.occurrences.isEmpty, "an open window must not schedule a second opening")
+        XCTAssertTrue(resolved.activeWindows.contains(once.id))
+        var before = once
+        before.once = window.event.addingTimeInterval(-30 * 60)
+        let beforeResolved = resolveAlerts([before], subscriptions: [], now: during, threshold: 0.5)
+        XCTAssertTrue(beforeResolved.activeWindows.contains(before.id), "the next selected opening is still active")
+        XCTAssertTrue(expiredUnchangedRules([before], current: [before], now: during,
+            occurrences: beforeResolved.occurrences, activeWindows: beforeResolved.activeWindows).isEmpty)
+        XCTAssertTrue(expiredUnchangedRules([once], current: [once], now: during,
+            occurrences: resolved.occurrences, activeWindows: resolved.activeWindows).isEmpty)
+        let closed = resolveAlerts([once], subscriptions: [], now: end.addingTimeInterval(120), threshold: 0.5)
+        XCTAssertFalse(closed.activeWindows.contains(once.id))
+        XCTAssertEqual(expiredUnchangedRules([once], current: [once], now: end.addingTimeInterval(120),
+            occurrences: closed.occurrences, activeWindows: closed.activeWindows), [once.id])
+    }
+
+    func testTemporaryOffKeepsSavedWindowUntilItCanBeResolvedAgain() {
+        var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(-60))
+        rule.currentWindowRule = true
+        let off = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertEqual(off.heldWindows, [rule.id])
+        XCTAssertTrue(off.occurrences.isEmpty)
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
+                                            occurrences: off.occurrences, heldWindows: off.heldWindows).isEmpty)
+        let later = now.addingTimeInterval(7 * 3600)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: later,
+                                             occurrences: [], heldWindows: off.heldWindows), [rule.id])
+        XCTAssertTrue(resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5).heldWindows.isEmpty)
+    }
+
+    func testOffModeRotaryOnceRuleNeedsReviewInsteadOfExpiringSilently() {
+        var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens)
+        rule.once = now.addingTimeInterval(-60)
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0)
+        XCTAssertTrue(resolved.noSlack.contains(rule.id))
+        XCTAssertTrue(expiredUnchangedRules([rule], current: [rule], now: now,
+                                            occurrences: resolved.occurrences,
+                                            noSlack: resolved.noSlack).isEmpty)
+    }
+
+    func testMarkedRuleDoesNotResumeWhenComfortSettingChanges() {
+        var rule = AlertRule(stationID: "current:noaa/KOD0901", trigger: .slackWindowOpens,
+                             once: now.addingTimeInterval(3600))
+        rule.slackNeedsReview = true
+        let resolved = resolveAlerts([rule], subscriptions: [], now: now, threshold: 0.5)
+        XCTAssertTrue(resolved.occurrences.isEmpty)
+        XCTAssertEqual(expiredUnchangedRules([rule], current: [rule], now: .distantFuture, occurrences: []), [rule.id])
+        XCTAssertEqual(alertStatusText(rule, AlertStatusSnapshot(), premium: true),
+                       "Review or delete this alert.")
+    }
+
+    func testOffModeRotaryCalendarReportsNoPredictedSlack() {
+        let stationID = "current:noaa/KOD0901"
+        let resolved = resolveAlerts([], subscriptions: [stationID], now: now, threshold: 0)
+        XCTAssertTrue(resolved.calendarNoSlack.contains(stationID))
+        XCTAssertFalse(resolved.unresolvedStations.contains(stationID))
     }
 
     func testASubscribedStationResolvesItsOwnTriggersAndNoRules() {

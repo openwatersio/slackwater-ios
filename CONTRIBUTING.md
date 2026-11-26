@@ -239,7 +239,7 @@ The `CI_STUDIO` repository variable is the off switch. The Studio takes the lane
 | Data generators | GitHub-hosted | Regenerates the bundles, checks committed copies, and runs CI/release tooling checks |
 | TestFlight intake | GitHub-hosted | Tests and type-checks the TestFlight feedback service (`services/testflight-feedback`) |
 | Lockfile        | GitHub-hosted | Checks that each `package-lock.json` regenerates unchanged and resolves only from the npm registry |
-| App tests · iPhone (Studio), App tests · iPad (Studio) | Mac Studio | One job per device that builds for testing and runs `scripts/test.sh` on the same machine: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main`. The iPhone job also runs the runner-script and nightly release fixtures, the localization check, and the fitting validator build |
+| App tests · iPhone (Studio), App tests · iPad (Studio) | Mac Studio | One job per device that builds for testing and runs `scripts/test.sh` on the same machine: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main`. The iPhone job also runs the runner-script and nightly release fixtures, the localization check, and the fitting validator tests |
 | Build for testing | GitHub-hosted | The fork and fallback path: runs the runner-script and nightly release fixtures, builds the app and its test bundles once, and uploads them |
 | App tests       | GitHub-hosted | The fork and fallback path: runs `scripts/test.sh` against that upload in six shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
 

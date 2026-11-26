@@ -34,6 +34,11 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// a tide height is then a number on the wrong datum, so the rule is off
     /// until the user sets it again. Nil otherwise, never false.
     var heightNeedsReview: Bool?
+    /// A one-time alert held for review until it is edited, deleted, or expires.
+    var slackNeedsReview: Bool?
+    /// A one-time window selected with the current window semantics.
+    var currentWindowRule = false
+    var currentWindowWasOff = false
 
     init(id: UUID = UUID(), stationID: String, trigger: AlertTrigger, once: Date? = nil,
          lead: TimeInterval = 0, sun: SunWindow? = nil, enabled: Bool = true, heightNeedsReview: Bool? = nil) {
@@ -42,7 +47,11 @@ struct AlertRule: Codable, Identifiable, Equatable {
         self.heightNeedsReview = heightNeedsReview
     }
 
-    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview }
+    // An older build preserves unknown triggers verbatim rather than expiring them.
+    // TODO(#944): Review this encoding when older builds and rollback are no longer supported.
+    private enum ReviewTrigger: Codable { case slackWindowReview, slackWindowOnce, slackWindowOnceReview }
+
+    private enum CodingKeys: String, CodingKey { case id, stationID, trigger, once, lead, sun, daylightOnly, enabled, heightNeedsReview, slackNeedsReview, currentWindowWasOff }
 
     // `daylightOnly` is the field builds before the sun window wrote and the only one they read.
     // It is still read as a fallback, and written for the two windows it can say; a golden- or
@@ -52,20 +61,31 @@ struct AlertRule: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         stationID = try c.decode(String.self, forKey: .stationID)
-        trigger = try c.decode(AlertTrigger.self, forKey: .trigger)
+        let specialTrigger = try? c.decode(ReviewTrigger.self, forKey: .trigger)
+        trigger = specialTrigger != nil ? .slackWindowOpens : try c.decode(AlertTrigger.self, forKey: .trigger)
+        currentWindowRule = specialTrigger == .slackWindowOnce || specialTrigger == .slackWindowOnceReview
+        currentWindowWasOff = try c.decodeIfPresent(Bool.self, forKey: .currentWindowWasOff) ?? false
         once = try c.decodeIfPresent(Date.self, forKey: .once)
         lead = try c.decode(TimeInterval.self, forKey: .lead)
         sun = try c.decodeIfPresent(SunWindow.self, forKey: .sun)
             ?? (try c.decodeIfPresent(Bool.self, forKey: .daylightOnly) == true ? .daylight : nil)
         enabled = try c.decode(Bool.self, forKey: .enabled)
         heightNeedsReview = try c.decodeIfPresent(Bool.self, forKey: .heightNeedsReview)
+        slackNeedsReview = specialTrigger == .slackWindowReview || specialTrigger == .slackWindowOnceReview
+            ? true : try c.decodeIfPresent(Bool.self, forKey: .slackNeedsReview)
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(stationID, forKey: .stationID)
-        try c.encode(trigger, forKey: .trigger)
+        if slackNeedsReview == true {
+            try c.encode(currentWindowRule ? ReviewTrigger.slackWindowOnceReview : .slackWindowReview, forKey: .trigger)
+        } else if currentWindowRule, trigger == .slackWindowOpens, once != nil {
+            try c.encode(ReviewTrigger.slackWindowOnce, forKey: .trigger)
+        } else {
+            try c.encode(trigger, forKey: .trigger)
+        }
         try c.encodeIfPresent(once, forKey: .once)
         try c.encode(lead, forKey: .lead)
         try c.encodeIfPresent(sun, forKey: .sun)
@@ -75,6 +95,8 @@ struct AlertRule: Codable, Identifiable, Equatable {
         }
         try c.encode(enabled, forKey: .enabled)
         try c.encodeIfPresent(heightNeedsReview, forKey: .heightNeedsReview)
+        try c.encodeIfPresent(slackNeedsReview, forKey: .slackNeedsReview)
+        if currentWindowRule && currentWindowWasOff { try c.encode(true, forKey: .currentWindowWasOff) }
     }
 }
 
@@ -129,15 +151,32 @@ struct AlertRule: Codable, Identifiable, Equatable {
     }
 
     /// Saving a rule is the user setting it, which settles a pending height review.
-    func upsert(_ rule: AlertRule) {
+    func upsert(_ rule: AlertRule, windowWasOff: Bool = false) {
         var rule = rule
         rule.heightNeedsReview = nil
+        rule.slackNeedsReview = nil
+        rule.currentWindowRule = rule.trigger == .slackWindowOpens && rule.once != nil
+        rule.currentWindowWasOff = rule.currentWindowRule && windowWasOff
         if let i = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[i] = rule
         } else {
             rules.append(rule)
         }
         persist()
+    }
+
+    /// Record only unchanged one-time rules from a completed resolution.
+    @discardableResult func markSlackNeedsReview(_ snapshot: [AlertRule], ids: Set<UUID>) -> [AlertRule] {
+        var marked: [AlertRule] = []
+        for rule in snapshot where ids.contains(rule.id) && rule.trigger == .slackWindowOpens
+            && rule.once != nil && rule.enabled && (!rule.currentWindowRule || rule.currentWindowWasOff) {
+            guard let index = rules.firstIndex(of: rule), rules[index].slackNeedsReview != true else { continue }
+            rules[index].slackNeedsReview = true
+            rules[index].enabled = false
+            marked.append(rules[index])
+        }
+        if !marked.isEmpty { persist() }
+        return marked
     }
 
     func remove(_ id: UUID) {
