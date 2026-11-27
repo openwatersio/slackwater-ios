@@ -50,7 +50,7 @@ function fixture(t) {
     if (args[1] === 'create') {
       beforePublish();
       if (failCreate) { failCreate = false; throw new Error('GitHub unavailable'); }
-      releases.push({ tag_name: args[2], draft: false, prerelease: false });
+      releases.push({ tag_name: args[2], draft: false, prerelease: false, body: args[args.indexOf("--notes") + 1] });
       if (!remoteTags.has(args[2])) remoteTags.set(args[2], args[args.indexOf('--target') + 1]);
       if (!git('tag', '--list', args[2])) git('tag', args[2], remoteTags.get(`${args[2]}^{}`) ?? remoteTags.get(args[2]));
       if (!args.includes('--latest=false')) latest = args[2];
@@ -179,11 +179,11 @@ test('creating historical releases never replaces an already newer Latest', (t) 
   assert.ok(f.writes.filter((a) => a[1] === 'create').every((a) => a.includes('--latest=false')));
 });
 
-test('rejects malformed or duplicate Apple records and unshipped versions', (t) => {
+test('rejects malformed or duplicate Apple records and versions outside the review pipeline', (t) => {
   const f = fixture(t);
   for (const rows of [[{ version: '../oops', build: '86', state: 'READY_FOR_DISTRIBUTION' }],
-    [f.rows[0], f.rows[0]], [{ ...f.rows[0], state: 'IN_REVIEW' }]]) {
-    assert.throws(() => f.sync({ rows }), /invalid|duplicate|shipped/);
+    [f.rows[0], f.rows[0]], [{ ...f.rows[0], state: 'REJECTED' }]]) {
+    assert.throws(() => f.sync({ rows }), /invalid|duplicate|not eligible/);
   }
   assert.equal(f.writes.length, 0);
 });
@@ -200,4 +200,34 @@ test('resolves annotated stable remote tags to their peeled commit', (t) => {
   f.remoteTags.set('v1.15.0^{}', f.old);
   f.sync();
   assert.equal(f.releases[0].tag_name, 'v1.15.0');
+});
+
+test('publishes a submitted version at the exact Nightly commit', (t) => {
+  const f = fixture(t);
+  f.sync({ rows: [{ ...f.rows[0], state: 'WAITING_FOR_REVIEW' }] });
+  assert.equal(f.remoteTags.get('v1.16.0'), f.newest);
+  assert.equal(f.releases[0].tag_name, 'v1.16.0');
+});
+
+test('keeps the published submission when Apple gets a replacement build', (t) => {
+  const f = fixture(t);
+  const submitted = { ...f.rows[0], state: 'WAITING_FOR_REVIEW' };
+  f.sync({ rows: [submitted] });
+  f.git('tag', 'nightly-1.16.0-87', f.old);
+  const messages = [];
+  f.sync({ rows: [{ ...submitted, build: '87', state: 'READY_FOR_DISTRIBUTION' }, f.rows[1]],
+    log: (message) => messages.push(message) });
+  assert.ok(messages.some((message) => message.startsWith('::warning::') && message.includes('build 87')));
+  assert.ok(!messages.some((message) => message.includes('v1.16.0 (87): already matches')));
+  assert.equal(f.remoteTags.get('v1.16.0'), f.newest);
+  assert.equal(f.remoteTags.get('v1.15.0'), f.old);
+});
+
+test('a mismatched submission marker cannot override a tag conflict', (t) => {
+  const f = fixture(t);
+  const submitted = { ...f.rows[0], state: 'WAITING_FOR_REVIEW' };
+  f.sync({ rows: [submitted] });
+  f.releases[0].body = `<!-- app-review-submission: ${f.old} -->`;
+  f.git('tag', 'nightly-1.16.0-87', f.old);
+  assert.throws(() => f.sync({ rows: [{ ...submitted, build: '87' }] }), /conflict/);
 });
