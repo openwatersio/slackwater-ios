@@ -103,6 +103,21 @@ test('a keyed prepare dry run plans app info for the version it would create', a
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
 
+test('localization sends each translated release note to its matching locale', async () => {
+  const { calls } = await run(['localization', '1.17.0'], (c) => {
+    if (c.path.endsWith('/appStoreVersions')) return { data: [
+      { id: 'live', attributes: { versionString: '1.16.0', appVersionState: 'READY_FOR_DISTRIBUTION' } },
+      { id: 'version', attributes: { versionString: '1.17.0', appVersionState: 'PREPARE_FOR_SUBMISSION' } },
+    ] };
+    if (c.path.endsWith('/appStoreVersionLocalizations')) return { data: [] };
+    if (c.path === '/v1/appStoreVersionLocalizations' && c.method === 'POST') return { data: { id: 'locale' } };
+  });
+  const writes = calls.filter((c) => c.method === 'POST').map((c) => c.body.data.attributes);
+  assert.match(writes.find((x) => x.locale === 'fr-CA').whatsNew, /^Les fenêtres d’étale/);
+  assert.match(writes.find((x) => x.locale === 'es-MX').whatsNew, /^Las ventanas de estoa/);
+  assert.match(writes.find((x) => x.locale === 'en-US').whatsNew, /^Slack windows/);
+});
+
 test('release can be retried after Apple starts or completes distribution', async () => {
   for (const state of ['PROCESSING_FOR_DISTRIBUTION', 'READY_FOR_DISTRIBUTION']) {
     const { calls } = await run(['release', '1.15.0', '--yes'], (c) => {
