@@ -171,6 +171,8 @@ The mapping and its inverse must round-trip. During direct manipulation, the rea
 
 These are the current iOS logical-unit values. Preserve them on phone-sized surfaces. A wider surface may reveal more time; it must not stretch the time scale or move the selected time away from centre.
 
+The strip and its sky span the full width of the viewport. Neither is inset from the page's side edges or drawn as a card, and the sky also runs up under the status bar to the top of the screen ([detail §4](detail.md#4-page-composition)). The centreline is the centre of that full width.
+
 | Token | Value | Purpose |
 |---|---:|---|
 | `pointsPerHour` | 18 | Horizontal time scale |
