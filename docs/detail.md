@@ -75,6 +75,8 @@ An online gate with no scrubber shows the week-range bar alone, but only when so
 
 Reference spacing: links 12 units below the scrubber card, the schedule 14 below the links, the footer 14 below the schedule, Nearby 28 below the footer, and 42 at the end. Cards are inset 16 units, filled white at 5% with a 0.5-unit stroke in go green at 16%, and rounded to 24 units.
 
+The scrubber card is the exception. Despite its name it has no fill, stroke, or rounding, and it is not inset: the strip runs to both edges of the viewport, and the page is its frame. The alert line and station links beneath it keep the 16-unit inset. The page also scrolls under the status bar, so the strip's sky ([scrubber §1](scrubber.md#1-scope)) starts at the top of the screen, behind the header, and spans the same full width. Where a device has a safe-area inset on a side edge, the header and cards stay inside it, and the strip and sky run on under it.
+
 ## 5. Header
 
 ```text
