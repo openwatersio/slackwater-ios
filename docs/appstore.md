@@ -91,7 +91,7 @@ Neither the API nor `asc.mjs` covers these. Answer them before the first submiss
 - **App Privacy.** The API has no endpoint for the privacy questionnaire. The answers and the host check that justifies them are in [App Store metadata](appstore-metadata.md#privacy-app-store-connect-app-privacy-answers).
 - **Age rating.** The questionnaire has an API, but `asc.mjs` doesn't cover it. Nothing in the app rates above 4+.
 - **Pricing and availability.** Free, in the territories the data licences allow.
-- **Translated release notes.** Every locale receives the English What's New until per-locale notes are added. Check the copy in every listing locale against the selected build.
+- **Translated release notes.** A matching `<version>.<locale>.md` supplies What's New; otherwise the English notes are used. Check each listing locale against the selected build.
 - **Mac and iPhone Duo screenshots.** Capture and upload them through the UI using [the metadata guide](appstore-metadata.md#before-submission). The uploader handles iPhone, iPad and Watch only.
 - **In-app purchases.** Attaching one to a version is a UI decision, and `submit` refuses a submission that holds one.
 - **Phased release** for updates after the first.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs, { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,7 +8,7 @@ import test from 'node:test';
 
 import {
   body, categoryRels, chunks, loadListing, pngSize, reviewDetailAttributes,
-  screenshotFiles, SCREENSHOT_SETS, versionLocalizationAttributes, whatsNew,
+  screenshotFiles, SCREENSHOT_SETS, versionLocalizationAttributes, whatsNew, localizedWhatsNew,
 } from './appstore.mjs';
 
 const listingFile = new URL('../docs/appstore-listing.json', import.meta.url);
@@ -71,6 +72,22 @@ test('What’s New is the notes between the version line and Worth testing', () 
   assert.throws(() => whatsNew('1.15.01 (60)\n\nFaster maps.\n\nWorth testing: x', '1.15.0'), /version line/);
   assert.throws(() => whatsNew('1.15.0\n\nFaster maps.\n', '1.15.0'), /no "Worth testing:"/);
   assert.throws(() => whatsNew('1.15.0\n\nWorth testing: x', '1.15.0'), /nothing above/);
+});
+
+test('localized What’s New uses its translation and falls back to English', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'notes-'));
+  writeFileSync(join(dir, '1.17.0.md'), '1.17.0\n\nEnglish.\n\nWorth testing: private\n');
+  const digest = crypto.createHash('sha256').update('English.').digest('hex');
+  writeFileSync(join(dir, '1.17.0.fr-CA.md'), `1.17.0\n\nFrançais.\n\nWorth testing: private\nSource-SHA256: ${digest}\n`);
+  assert.equal(localizedWhatsNew('1.17.0', 'fr-CA', dir), 'Français.');
+  assert.equal(localizedWhatsNew('1.17.0', 'es-MX', dir), 'English.');
+  writeFileSync(join(dir, '1.17.0.fr-CA.md'), `1.17.0\n\nFrançais.\nSource-SHA256: ${digest}\n\nWorth testing: private\n`);
+  assert.throws(() => localizedWhatsNew('1.17.0', 'fr-CA', dir), /source.*digest/i);
+  writeFileSync(join(dir, '1.17.0.fr-CA.md'), `1.17.0\n\nFrançais.\n\nWorth testing: private\nSource-SHA256: ${digest}\n`);
+  writeFileSync(join(dir, '1.17.0.md'), '1.17.0\n\nChanged.\n\nWorth testing: private\n');
+  assert.throws(() => localizedWhatsNew('1.17.0', 'fr-CA', dir), /source.*changed/i);
+  writeFileSync(join(dir, '1.17.0.fr-CA.md'), 'bad');
+  assert.throws(() => localizedWhatsNew('1.17.0', 'fr-CA', dir), /version line/);
 });
 
 test('What’s New extraction matches the sed line in release-notes/README.md', () => {
