@@ -102,7 +102,7 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 
 ## Spanish (Mexico) and French (Canada)
 
-`localizations` in the listing file, keyed by App Store Connect locale. Each locale writes its own `name`, `subtitle`, `promotionalText`, `description` and `keywords`, and `scripts/appstore.mjs` refuses one that leaves any out. The privacy policy, support and marketing URLs come from `en-US`. `asc.mjs app-info` and `asc.mjs localization` push every locale. Screenshots go to `en-US` only, and the other locales show that set. What's New is the English notes in every locale.
+`localizations` in the listing file, keyed by App Store Connect locale. Each locale writes its own `name`, `subtitle`, `promotionalText`, `description` and `keywords`, and `scripts/appstore.mjs` refuses one that leaves any out. The privacy policy, support and marketing URLs come from `en-US`. `asc.mjs app-info` and `asc.mjs localization` push every locale. Screenshots go to `en-US` only, and the other locales show that set. What's New uses a matching locale's release notes when present and the English notes otherwise.
 
 A listing locale is independent of the app's string catalogs, so `es-MX` needs no `es-MX` translation of the app. ASO tools report that the US store indexes Spanish (Mexico) alongside English (US), and the Canadian store French (Canada) alongside English (Canada); Apple does not document this. With no English (Canada) listing, the Canadian store shows English (US).
 

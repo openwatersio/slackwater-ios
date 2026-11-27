@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
   body, categoryRels, chunks, loadListing, reviewDetailAttributes, SCREENSHOT_SETS,
-  screenshotFiles, versionLocalizationAttributes, whatsNew,
+  screenshotFiles, versionLocalizationAttributes, localizedWhatsNew,
 } from './appstore.mjs';
 
 // Credentials come from the environment: repo secrets in the Nightly
@@ -206,21 +206,17 @@ async function pushAppInfo(l) {
 
 async function pushVersionLocalization(v, l) {
   const version = v.attributes.versionString;
-  let notes;
+  const notes = new Map();
   if (v.first) {
     console.log(`version ${version}: the app's first version has no What's New, skipping it`);
   } else {
-    const file = new URL(`../docs/release-notes/${version}.md`, import.meta.url);
-    if (!fs.existsSync(file)) fail(`no docs/release-notes/${version}.md; What's New comes from it`);
-    notes = whatsNew(fs.readFileSync(file, 'utf8'), version);
+    for (const loc of l.locales) notes.set(loc.locale, localizedWhatsNew(version, loc.locale));
   }
-  // ponytail: every locale gets the English What's New; read
-  // release-notes/<version>.<locale>.md first once a version's notes are translated.
   const pushed = [];
   for (const loc of l.locales) {
     pushed.push(await upsertLocalization('appStoreVersionLocalizations', `/v1/appStoreVersions/${v.id}/appStoreVersionLocalizations`,
-      { appStoreVersion: ['appStoreVersions', v.id] }, loc.locale, versionLocalizationAttributes(loc, notes)));
-    console.log(`version ${version}: ${loc.locale} description, keywords, promotional text, URLs${notes ? ', What\'s New' : ''}`);
+      { appStoreVersion: ['appStoreVersions', v.id] }, loc.locale, versionLocalizationAttributes(loc, notes.get(loc.locale))));
+    console.log(`version ${version}: ${loc.locale} description, keywords, promotional text, URLs${notes.has(loc.locale) ? ', What\'s New' : ''}`);
   }
   // Screenshots go on the primary; the other locales show its set.
   return pushed[0];

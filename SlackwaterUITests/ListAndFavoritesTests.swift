@@ -241,6 +241,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let honesty = app.descendants(matching: .any)["online-honesty-card"].firstMatch
         XCTAssert(honesty.appears(within: 5),
                   "an online gate with no window must show the honesty card, never a dead end")
+        XCTAssertTrue(app.staticTexts["Predictions — not for navigation"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["detail-report"].firstMatch.appears(within: 5))
         // Cold open: nothing downloaded, so no week the picker could reach is
         // any better than this one — the bar stays down (#172). The recovery
         // case, a stored window paged off, keeps it: OfflineCoverageTests

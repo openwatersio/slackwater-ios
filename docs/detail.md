@@ -65,7 +65,7 @@ Sections, top to bottom:
 | 4 | Summary tiles | Range, Moon | Next max, Moon | Shape only, Moon | Next max, Moon |
 | 5 | Station links (§7) | Nearby current | Tide at port, or nearby tide | Tide at port | Tide at port, or nearby tide |
 | 6 | Schedule card | ✓ | ✓ | ✓ | when a window is downloaded |
-| 7 | Footer | ✓ | ✓ | ✓ | when downloaded; otherwise the honesty card |
+| 7 | Footer | ✓ | ✓ | ✓ | ✓ |
 | 8 | Station details | ✓ | ✓ | ✓ | ✓ |
 | 9 | Nearby | ✓ | ✓ | ✓ | ✓ |
 
@@ -418,7 +418,7 @@ A bounded full model keeps the same bound sentence after downloading completes, 
 
 ### 12.3 Online honesty card
 
-An online gate whose downloaded windows do not cover the week shows this card in place of its footer, then the link "Try <nearest gate with a model> instead".
+An online gate whose downloaded windows do not cover the week shows this card, then the link "Try <nearest gate with a model> instead" and the footer disclaimer and report menu without a provenance note. Reports use the time sent because there is no selected moment.
 
 A gate that still covers the week on screen but is downloading the next block for an edge re-anchor (§8, scrubber §4.2) keeps its scrubber and footer and shows an amber *extending* card in the download-notice slot above the tiles (`online-extending-card`), titled by the same download state as the table below with the headline "Downloads cover about a month and can be refreshed at any time." and the same action.
 
@@ -495,7 +495,7 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 
 1. **Tide page:** shows header, scrubber, Range and Moon, the nearby-current link when a current lies within 20 km, the schedule, the footer, collapsed Station details, and Nearby, in that order.
 2. **Derived gate:** shows "Shape only / No speed", links its reference port, and lists only slacks with no values.
-3. **Online gate, never downloaded:** shows the honesty card, no scrubber, no week bar, and the "Try … instead" link; the star still works.
+3. **Online gate, never downloaded:** shows the honesty card, no scrubber, no week bar, the "Try … instead" link, and the footer disclaimer and report menu; the star still works.
 4. **Unavailable station:** has no star, no schedule, no tiles, and gives no reason.
 
 ### Schedule
@@ -551,7 +551,6 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 These are implementation gaps, not behavior to copy:
 
 - The share link compares the selection with the device clock rather than the page's reference now. On an untouched page left open for more than 200 seconds, Share includes an instant while the Now pill stays hidden.
-- The online gate's honesty path has no "Predictions — not for navigation" line and no report menu.
 
 Fixing one of these should update this section and add or amend a conformance scenario.
 

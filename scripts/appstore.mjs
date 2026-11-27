@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Apple's field limits (developer.apple.com/help/app-store-connect →
 // Reference → App information). Keywords count bytes, the rest characters.
@@ -58,6 +59,23 @@ export function whatsNew(notes, version) {
   if (!s) throw new Error(`release notes for ${version} have nothing above "Worth testing:"`);
   if ([...s].length > LIMITS.whatsNew) throw new Error(`What's New is ${[...s].length} characters, limit ${LIMITS.whatsNew}`);
   return s;
+}
+
+export function localizedWhatsNew(version, locale, dir = fileURLToPath(new URL('../docs/release-notes/', import.meta.url))) {
+  const primary = path.join(dir, `${version}.md`);
+  const translated = path.join(dir, `${version}.${locale}.md`);
+  if (!fs.existsSync(primary)) throw new Error(`no docs/release-notes/${version}.md; What's New comes from it`);
+  const english = whatsNew(fs.readFileSync(primary, 'utf8'), version);
+  if (!fs.existsSync(translated)) return english;
+  const translatedNotes = fs.readFileSync(translated, 'utf8');
+  const result = whatsNew(translatedNotes, version);
+  const digest = crypto.createHash('sha256').update(english).digest('hex');
+  const lines = translatedNotes.split('\n');
+  const end = lines.findIndex((line) => line.startsWith('Worth testing:'));
+  if (!lines.slice(end + 1).includes(`Source-SHA256: ${digest}`)) {
+    throw new Error(`${path.basename(translated)}: English source changed or source digest missing; expected ${digest}`);
+  }
+  return result;
 }
 
 // A JSON:API request body. rels maps each relationship name to [type, id].

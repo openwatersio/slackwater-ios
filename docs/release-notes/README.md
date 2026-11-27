@@ -9,6 +9,8 @@ One file per version, named for its `MARKETING_VERSION`. Nightly posts the versi
 3. What the version is about — one sentence and highlight bullets opening with `·` for an update, an introduction for a first release.
 4. A closing paragraph starting `Worth testing:`.
 
+Translations for the App Store live beside the English notes as `<version>.<locale>.md` (for example `1.17.0.fr-CA.md`). They use the same version line and `Worth testing:` delimiter; the latter is not published. A `Source-SHA256:` line after that delimiter holds the SHA-256 of the English highlights, so a changed source requires the translations to be reviewed and their digest updated. A digest checks the source, not the quality of the translation; the publishing error prints the expected value. When a locale has no file, the listing uses the English highlights.
+
 ## The App Store takes the highlights only
 
 App Store Connect's "What's New" wants the highlights without the beta instructions. Everything between the version line and `Worth testing:` is that text, and `scripts/asc.mjs localization` pushes it ([App Store releases](../appstore.md)). An app's first version has no What's New field, so 1.14.0's notes stop at TestFlight and the GitHub release:
@@ -21,4 +23,4 @@ So `Worth testing:` starts its own line and stays last, and anything a beta test
 
 The hourly [App Store release sync](../appstore.md#automatic-github-releases) publishes missing stable releases from these reviewed notes. Its headline is the one-line summary without closing punctuation. Merge the notes before the App Store release; an existing GitHub release's wording is preserved on subsequent runs.
 
-The listing reads What's New from this file rather than holding a second copy, so the listing and the build's notes cannot drift apart.
+The English listing reads What's New from the version file. Translations live beside it and are checked against its source digest before publishing.

@@ -182,6 +182,7 @@ struct OnlineGateDetailView: View {
                                     }
                                     honestyCard
                                     nearestGateLink
+                                    DetailFooter(stationID: gate.id, tz: tz) { EmptyView() }
                                 }
                                 stationDetails.padding(.top, 14)
                             })
