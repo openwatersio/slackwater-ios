@@ -6,6 +6,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const publishableAppStoreStates = new Set([
+  'WAITING_FOR_REVIEW', 'IN_REVIEW', 'PENDING_DEVELOPER_RELEASE',
+  'PENDING_APPLE_RELEASE', 'PROCESSING_FOR_APP_STORE', 'PROCESSING_FOR_DISTRIBUTION',
+  'READY_FOR_DISTRIBUTION', 'READY_FOR_SALE', 'REPLACED_WITH_NEW_VERSION',
+]);
+
 // Apple's field limits (developer.apple.com/help/app-store-connect →
 // Reference → App information). Keywords count bytes, the rest characters.
 const LIMITS = {

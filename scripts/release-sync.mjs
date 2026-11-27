@@ -2,10 +2,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { whatsNew } from './appstore.mjs';
+import { publishableAppStoreStates, whatsNew } from './appstore.mjs';
 
 const fail = (message) => { throw new Error(message); };
-const shipped = new Set(['READY_FOR_DISTRIBUTION', 'READY_FOR_SALE', 'REPLACED_WITH_NEW_VERSION']);
 const compare = (a, b) => a.localeCompare(b, 'en', { numeric: true });
 const versionPattern = /^\d+\.\d+(?:\.\d+)?$/;
 const minimumVersion = '1.15.0';
@@ -15,7 +14,7 @@ export function syncReleases({ rows, root, repo, run, dryRun = false, log = cons
   const seen = new Set();
   for (const row of rows) {
     if (!versionPattern.test(row.version) || !/^\d+$/.test(row.build)) fail('invalid App Store version/build');
-    if (!shipped.has(row.state)) fail(`version ${row.version} has not shipped`);
+    if (!publishableAppStoreStates.has(row.state)) fail(`version ${row.version} is not eligible for publication`);
     if (seen.has(row.version)) fail(`duplicate App Store version ${row.version}`);
     seen.add(row.version);
   }
@@ -29,7 +28,7 @@ export function syncReleases({ rows, root, repo, run, dryRun = false, log = cons
     const tag = ref.replace(/^refs\/tags\//, '').replace(/\^\{\}$/, '');
     if (ref.endsWith('^{}') || !remoteTags.has(tag)) remoteTags.set(tag, sha);
   }
-  const plan = versions.map(({ version, build }) => {
+  const plan = versions.map(({ version, build, state }) => {
     const tag = `v${version}`, nightly = `nightly-${version}-${build}`;
     let commit;
     try {
@@ -37,10 +36,16 @@ export function syncReleases({ rows, root, repo, run, dryRun = false, log = cons
       run('git', ['merge-base', '--is-ancestor', commit, 'refs/remotes/origin/main']);
     } catch (error) { fail(`Cannot verify ${nightly} on origin/main: ${error.message}`); }
     const hasTag = remoteTags.has(tag);
+    const release = releases.find((r) => r.tag_name === tag);
     if (hasTag && remoteTags.get(tag) !== commit) {
+      const original = remoteTags.get(tag);
+      if (release && !release.draft && !release.prerelease
+          && release.body?.includes(`<!-- app-review-submission: ${original} -->`)) {
+        log(`::warning::${tag} remains at the original submission commit ${original}. Apple lists build ${build} at ${commit}.`);
+        return { tag, version, build, commit: original, exists: true, retained: true };
+      }
       fail(`${tag} conflict: does not point to ${nightly} (${commit}); refusing to move it`);
     }
-    const release = releases.find((r) => r.tag_name === tag);
     if (release && (!hasTag || release.draft || release.prerelease)) fail(`${tag} conflict: expected a stable release at ${commit}`);
     if (release) return { tag, version, build, commit, exists: true };
     const notes = fs.readFileSync(path.join(root, `docs/release-notes/${version}.md`), 'utf8');
@@ -48,10 +53,13 @@ export function syncReleases({ rows, root, repo, run, dryRun = false, log = cons
     if (header !== version && header !== `${version} (${build})`) fail(`release notes for ${version} must name build ${build} or omit the build`);
     const body = whatsNew(notes, version);
     const title = body.split('\n')[0].replace(/[.!?]+$/, '');
-    return { tag, version, build, commit, hasTag, body, title };
+    const publishedBody = ['READY_FOR_DISTRIBUTION', 'READY_FOR_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(state)
+      ? body : `${body}\n\n<!-- app-review-submission: ${commit} -->`;
+    return { tag, version, build, commit, hasTag, body: publishedBody, title };
   });
   // Validate the entire plan before publishing any part of it.
   for (const item of plan) {
+    if (item.retained) continue;
     if (item.exists) { log(`${item.tag} (${item.build}): already matches ${item.commit}`); continue; }
     log(`${dryRun ? 'Would publish' : 'Publishing'} ${item.tag} (${item.build}) at ${item.commit}`);
     if (!dryRun) {

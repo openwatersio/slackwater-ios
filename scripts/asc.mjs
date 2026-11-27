@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
   body, categoryRels, chunks, loadListing, reviewDetailAttributes, SCREENSHOT_SETS,
-  screenshotFiles, versionLocalizationAttributes, localizedWhatsNew,
+  screenshotFiles, versionLocalizationAttributes, localizedWhatsNew, publishableAppStoreStates,
 } from './appstore.mjs';
 
 // Credentials come from the environment: repo secrets in the Nightly
@@ -377,7 +377,7 @@ if (cmd === 'create-cert') {
     const page = await api('GET', next);
     for (const v of page.data) {
       const state = versionState(v);
-      if (!['READY_FOR_DISTRIBUTION', 'READY_FOR_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(state)) continue;
+      if (!publishableAppStoreStates.has(state)) continue;
       if (minimum && v.attributes.versionString.localeCompare(minimum, 'en', { numeric: true }) < 0) continue;
       const build = (await api('GET', `/v1/appStoreVersions/${v.id}/build`)).data?.attributes?.version;
       if (!/^\d+$/.test(build ?? '')) fail(`version ${v.attributes.versionString} has no attached build`);

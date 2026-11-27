@@ -21,6 +21,6 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 
 So `Worth testing:` starts its own line and stays last, and anything a beta tester needs but an App Store reader does not belongs inside it — build numbers, simulator caveats, what to watch for in a specific lane.
 
-The hourly [App Store release sync](../appstore.md#automatic-github-releases) publishes missing stable releases from these reviewed notes. Its headline is the one-line summary without closing punctuation. Merge the notes before the App Store release; an existing GitHub release's wording is preserved on subsequent runs.
+The hourly [App Store release sync](../appstore.md#automatic-github-releases) publishes missing stable releases from these reviewed notes. Its headline is the one-line summary without closing punctuation. Merge the notes before App Review submission; an existing GitHub release's wording is preserved on subsequent runs.
 
 The English listing reads What's New from the version file. Translations live beside it and are checked against its source digest before publishing.
