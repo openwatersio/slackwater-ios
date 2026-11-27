@@ -71,10 +71,8 @@ func alertSheetReminderRule(_ rule: AlertRule, opening: AlertOpeningAvailability
     return resolved
 }
 
-/// A moment still ahead whose reminder time is already behind: with a lead short enough for a
-/// Live Activity the countdown starts on save; with a longer one there is nothing left to send.
-func alertSheetStartsNow(_ rule: AlertRule, now: Date) -> Bool {
-    alertSheetReminderPassed(rule, now: now) && rule.lead <= AlertHorizon.liveActivityLead
+func alertSheetStartsNow(_ rule: AlertRule, now: Date, isNew: Bool = true) -> Bool {
+    isNew && alertSheetReminderPassed(rule, now: now) && rule.lead <= AlertHorizon.liveActivityLead
 }
 
 func alertSheetReminderPassed(_ rule: AlertRule, now: Date) -> Bool {
@@ -224,7 +222,7 @@ struct AlertSheet: View {
                         Text("Your slack window is off. Set a comfort current in Slackwater's settings to turn it on.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
-                    } else if alertSheetStartsNow(reminderRule, now: appNow()) {
+                    } else if alertSheetStartsNow(reminderRule, now: appNow(), isNew: isNew) {
                         Text("The reminder time has passed; the countdown starts now", comment: "Under the alert sheet's When section, when the moment is ahead but less than the lead away.")
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))

@@ -33,6 +33,7 @@ struct AlertLiveActivityAttributes: ActivityAttributes, Sendable {
     /// Six hours around the event in the engine's units; nil on a derived gate, which has no series.
     let curve: AlertLiveActivityCurve?
     let url: URL?
+    var scheduledStart: Date? = nil
 }
 
 /// The stale face of a moment with no window: its time in the station's zone and, for a tide,

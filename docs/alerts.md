@@ -236,11 +236,15 @@ A saved CHS current fit from the immediately preceding phase convention remains 
   means regenerating the Manual-signed Release profiles.
 - An interval trigger on the occurrence's absolute fire time, so it stays right when the phone
   changes time zone.
-- Request identifier `alert.<key>`. Reschedule removes pending `alert.*` requests and adds the
-  soonest 64 across all rules. iOS holds only the soonest 64 pending requests per app, so 64 is
-  the platform's ceiling, not a tuning value.
+- Request identifier `alert.<key>`. Reschedule replaces pending `alert.*` requests with the
+  soonest 64 across all rules, retaining an immediate request already handed to iOS. iOS holds only the soonest 64 pending requests per app, so 64 is
+  the platform's ceiling, not a tuning value. A saved or changed rule whose reminder time has
+  passed can send once while its event is ahead. The app records the edit and the accepted
+  occurrence locally, and drops the record for a pending request it cancels. Rules from older
+  builds without an edit record do not produce a second overdue notification on upgrade.
 - Title "Race Passage - Slack window": the place, then the event in as few words as it takes.
-  Body "14:32–15:10, under 0.5 kn · in 30 min", in the station's time zone. With `noWindow`:
+  Body "14:32–15:10, under 0.5 kn · in 30 min", in the station's time zone. An immediate
+  reminder omits the lead, since the remaining time is shorter. With `noWindow`:
   "Race Passage - Slack", "14:32, no window under 0.5 kn". With the comfort current Off every
   occurrence is `noWindow` and the body is the time alone.
 - Never provisional: provisional delivery does not reach the Lock Screen.
@@ -331,9 +335,8 @@ struct DeliveryPlan: Equatable {
 }
 
 func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
-                  calendarOccurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan
-
-func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOccurrence]
+                  calendarOccurrences: [AlertOccurrence], now: Date, premium: Bool,
+                  premiumEnds: Date? = nil, immediateEligible: Set<String>? = nil) -> DeliveryPlan
 
 @MainActor final class AlertScheduler {
     nonisolated static func requestReschedule()
@@ -343,7 +346,7 @@ func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOc
 `deliveryPlan` is pure. A reschedule loads rules and subscriptions, resolves stations through
 `WidgetStationLoader.loadRecord(id:at:)` at the pass's `now`, builds rule and subscription occurrences from now out to the
 90-day calendar horizon off the main thread (`resolveAlerts`), plans — the 14-day notification cut
-happens inside `deliveryPlan` — and hands the plan to thin writers. Besides its own triggers, a
+happens inside `deliveryPlan` — and hands the plan to thin writers. The notification writer considers overflow after skipped or placed entries and caps accepted requests at 64. Immediate reminders are limited to one occurrence per rule edit. Besides its own triggers, a
 reschedule also rides the widget-reload hook: the comfort speed slider settling, a CHS fit
 finishing and the entitlement changing all call `WidgetReload.trigger()`, which the app wires to
 `requestReschedule()`.
@@ -363,7 +366,7 @@ finishing and the entitlement changing all call `WidgetReload.trigger()`, which 
   again, so an activity never costs a notification slot — the 65th-eligible occurrence moves up
   from `overflow`. One the writer cannot place stays a notification. Both writers filter by the
   clock at write time, not the pass start, so a slow resolve never requests an activity whose
-  event has passed or a notification whose fire time has. The notification writer measures each
+  event has passed; an overdue notification is sent only for a qualifying saved edit. The notification writer measures each
   interval on the app clock, which a test launch can pin or shift; the Live Activity writer uses
   the real clock, because the dates it hands ActivityKit are absolute and read on that one.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
@@ -668,7 +671,7 @@ The engine pin is updated with this change; the Almanac version is unchanged.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
   free plan keeps every subscribed calendar and no notifications. The activity candidates are
   the notification list's short-lead subset in fire order, none without Premium; the sweep ends
-  a pending, closed, passed or orphaned activity and keeps an active one in its window; the face
+  future pending, closed, passed or orphaned activities and keeps activities whose scheduled start has arrived while their rule and window remain current; the face
   counts down, opens a window, or names a moment, never "Open" for `noWindow`.
 - Station calendars — the trigger list per station kind; a tide station's day holds its highs and
   lows and nothing else; the tier gate on turning a station on; the turn-off's event count.

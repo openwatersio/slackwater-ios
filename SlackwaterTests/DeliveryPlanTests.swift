@@ -41,6 +41,24 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertEqual(plan.calendar, [o])
     }
 
+    func testAnInsideLeadRepeatingRuleDoesNotSendABurst() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 86_400)
+        let first = occurrence(rule, eventIn: 3_600)
+        let second = occurrence(rule, eventIn: 7_200)
+        let plan = deliveryPlan(rules: [rule], occurrences: [first, second],
+                                calendarOccurrences: [], now: now, premium: true)
+        XCTAssertEqual(plan.notifications.map(\.event), [first.event])
+    }
+
+    func testOldOverdueRemindersDoNotCrowdOutFutureNotifications() {
+        let old = (0..<64).map { AlertRule(stationID: String($0), trigger: .slack, lead: 86_400) }
+        let future = AlertRule(stationID: "future", trigger: .slack)
+        let occurrences = old.map { occurrence($0, eventIn: 3_600) } + [occurrence(future, eventIn: 7_200)]
+        let plan = deliveryPlan(rules: old + [future], occurrences: occurrences, calendarOccurrences: [],
+                                now: now, premium: true, immediateEligible: [])
+        XCTAssertEqual(plan.notifications.map(\.ruleID), [future.id])
+    }
+
     func testWithoutPremiumTheCalendarIsPlannedAndNothingElseIs() {
         let rule = AlertRule(stationID: "a", trigger: .slack)
         let o = occurrence(rule, eventIn: 3_600)
@@ -150,6 +168,12 @@ final class DeliveryPlanTests: XCTestCase {
 
         XCTAssertEqual(through[tide.id], now.addingTimeInterval(40 * 86_400 - 600))
         XCTAssertEqual(through[pass.id], now.addingTimeInterval(7_200))
+    }
+
+    func testHandledOnceReminderRemainsVisibleInStatus() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(900), lead: 1_800)
+        let handled = occurrence(rule, eventIn: 900).firing(at: now)
+        XCTAssertEqual(scheduledThrough(DeliveryPlan(), also: [handled])[rule.id], now)
     }
 
     func testLiveActivityCandidatesAreTheNotificationsWithAShortLeadInFireOrder() {

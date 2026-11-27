@@ -39,6 +39,24 @@ import XCTest
         XCTAssertEqual(restored.slackNeedsReview, true)
     }
 
+    func testOnlyTheSavedRuleKeepsItsImmediateReminderIntent() throws {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let store = AlertRuleStore(defaults: defaults)
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 1_800)
+        store.upsert(rule)
+        let saved = try XCTUnwrap(store.editTimes[rule.id.uuidString])
+        store.upsert(rule)
+        XCTAssertEqual(store.editTimes[rule.id.uuidString], saved)
+        var editedByOlderBuild = rule
+        editedByOlderBuild.lead = 3_600
+        defaults.set(try JSONEncoder().encode([editedByOlderBuild]), forKey: AppGroup.alertRulesKey)
+        let reloaded = AlertRuleStore(defaults: defaults, successors: [:])
+        XCTAssertNil(reloaded.editTimes[rule.id.uuidString])
+        reloaded.remove(rule.id)
+        XCTAssertTrue(reloaded.editTimes.isEmpty)
+    }
+
     func testRulesRoundTripThroughTheStore() {
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }

@@ -237,6 +237,9 @@ struct AlertStatusSnapshot: Equatable {
     private func runPass(now: Date) async -> Bool {
         _ = ChsFitService.shared
         let storedRules = AlertRuleStore.shared.rules
+        let editTimes = AlertRuleStore.shared.editTimes
+        let previousRules = AlertRuleStore.shared.previousRules
+        let revisions = AlertRuleStore.shared.revisions
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium
         let premiumEnds = PremiumStore.shared.hasPurchased ? nil : FreeDayStore.shared.current?.end
@@ -270,12 +273,24 @@ struct AlertStatusSnapshot: Equatable {
         await AlertNotifications.notifySlackReview(AlertRuleStore.shared.rules, places: resolved.places, premium: premium)
         let rules = unchangedResolvedRules(storedRules, current: AlertRuleStore.shared.rules)
             .filter { !expired.contains($0.id) }
-        let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
-                                calendarOccurrences: resolved.calendarOccurrences,
-                                now: now, premium: premium, premiumEnds: premiumEnds)
         // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
         let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             .merging(resolved.calendarRules) { mine, _ in mine }
+        let immediateCandidates = Dictionary(resolved.occurrences.compactMap { occurrence -> (String, String)? in
+            guard premium, occurrence.event > now, let rule = byID[occurrence.ruleID], rule.enabled,
+                  let key = immediateAlertKey(occurrence, rule: rule, editTimes: editTimes,
+                                              previous: previousRules[rule.id.uuidString],
+                                              history: revisions[rule.id.uuidString] ?? []) else { return nil }
+            return (occurrence.key, key)
+        }, uniquingKeysWith: { first, _ in first })
+        let immediate = AlertNotifications.selectImmediate(resolved.occurrences, immediate: immediateCandidates,
+                                                            editTimes: editTimes)
+        let handled = AlertNotifications.handledImmediateKeys(now: now)
+        let outstanding = Set(immediate.filter { !handled.contains($0.value) }.keys)
+        let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
+                                calendarOccurrences: resolved.calendarOccurrences,
+                                now: now, premium: premium, premiumEnds: premiumEnds,
+                                immediateEligible: outstanding)
 
         func entries(_ list: [AlertOccurrence], includeLead: Bool, includePlace: Bool) -> [AlertEntry] {
             list.compactMap { o in
@@ -309,10 +324,21 @@ struct AlertStatusSnapshot: Equatable {
             water: { kinds[$0] == .tide ? .tide : .current },
             curve: { entry in stations[entry.stationID].flatMap { liveActivityCurve($0, around: entry.occurrence.event) } },
             liveRuleIDs: livePolicy.liveRuleIDs, imperial: imperial)
-        await AlertNotifications.apply(entries(plannedNotifications(plan, placed: placed),
-                                               includeLead: true, includePlace: true))
+        let currentIDs = Set(unchangedResolvedRules(rules, current: AlertRuleStore.shared.rules).map(\.id))
+        let eligible = (plan.notifications + plan.overflow).filter { currentIDs.contains($0.ruleID) }
+        let currentImmediate = immediate.filter { key, _ in
+            resolved.occurrences.contains { $0.key == key && currentIDs.contains($0.ruleID) }
+        }
+        await AlertNotifications.apply(entries(eligible.filter { !placed.contains($0.key) },
+                                               includeLead: true, includePlace: true), immediate: currentImmediate)
+        AlertNotifications.recordActivities(eligible, placed: placed, immediate: currentImmediate)
 
-        status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
+        let overdueOnce = resolved.occurrences.filter { occurrence in
+            guard let rule = byID[occurrence.ruleID] else { return false }
+            return premium && rule.enabled && rule.once != nil && currentIDs.contains(rule.id)
+                && occurrence.fire <= now && occurrence.event > now
+        }
+        status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan, also: overdueOnce),
                                      unresolved: resolved.unresolved.intersection(Set(rules.map(\.id))),
                                      noSlack: resolved.noSlack.intersection(Set(rules.map(\.id))),
                                      heldWindows: resolved.heldWindows.intersection(Set(rules.map(\.id))),

@@ -38,7 +38,8 @@ func plannedNotifications(_ plan: DeliveryPlan, placed: Set<String>) -> [AlertOc
 /// whose event lands after it, since iOS would deliver them with the app closed and Premium over.
 func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
                   calendarOccurrences: [AlertOccurrence],
-                  now: Date, premium: Bool, premiumEnds: Date? = nil) -> DeliveryPlan {
+                  now: Date, premium: Bool, premiumEnds: Date? = nil,
+                  immediateEligible: Set<String>? = nil) -> DeliveryPlan {
     let calendar = calendarOccurrences
         .filter { $0.event > now && $0.event <= now.addingTimeInterval(AlertHorizon.calendar) }
         .sorted { $0.event < $1.event }
@@ -59,8 +60,11 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
     var seen = Set<Perceived>()
     // Set inside its own lead — 15 minutes before a low with the 30-minute lead — the reminder
     // time is behind us but the moment is not: it is delivered now, not never.
-    let deliverable: [AlertOccurrence] = occurrences.map { o in
-        o.fire < now && o.event > now ? o.firing(at: now) : o
+    var immediateRules = Set<UUID>()
+    let deliverable: [AlertOccurrence] = occurrences.sorted { $0.event < $1.event }.compactMap { o in
+        guard o.fire < now && o.event > now else { return o }
+        guard immediateEligible?.contains(o.key) ?? true, immediateRules.insert(o.ruleID).inserted else { return nil }
+        return o.firing(at: now)
     }
     let notifications = deliverable
         // Same fire time: the `once` rule keeps it. That rule has exactly one occurrence, so
@@ -88,9 +92,9 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
 }
 
 /// Each rule's last scheduled notification, for the Alerts screen's "Scheduled through".
-func scheduledThrough(_ plan: DeliveryPlan) -> [UUID: Date] {
+func scheduledThrough(_ plan: DeliveryPlan, also: [AlertOccurrence] = []) -> [UUID: Date] {
     var through: [UUID: Date] = [:]
-    for o in plan.notifications {
+    for o in plan.notifications + also {
         through[o.ruleID] = max(through[o.ruleID] ?? o.fire, o.fire)
     }
     return through
@@ -139,7 +143,7 @@ func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imper
     case .slack, .currentPeak, .tideCrossing, .eclipse:
         body = time
     }
-    if includeLead, rule.lead > 0 { body += " · in \(leadAmount(rule.lead))" }
+    if includeLead, rule.lead > 0, o.event.timeIntervalSince(o.fire) >= rule.lead { body += " · in \(leadAmount(rule.lead))" }
 
     let event = alertEventName(rule.trigger, noWindow: o.noWindow, imperial: imperial)
     if includePlace { return AlertCopy(title: "\(place.name) - \(event)", body: body) }

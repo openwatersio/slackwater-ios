@@ -166,6 +166,7 @@ final class AlertSheetTests: XCTestCase {
         let inside = AlertRule(stationID: "a", trigger: .slack, once: moment.addingTimeInterval(900), lead: 1_800)
         XCTAssertTrue(alertSheetCanSave(inside, now: moment))
         XCTAssertTrue(alertSheetStartsNow(inside, now: moment))
+        XCTAssertFalse(alertSheetStartsNow(inside, now: moment, isNew: false))
         XCTAssertFalse(alertSheetStartsNow(ahead, now: moment))
         XCTAssertFalse(alertSheetStartsNow(every, now: moment))
         XCTAssertFalse(alertSheetStartsNow(past, now: moment), "a past moment is the other note")

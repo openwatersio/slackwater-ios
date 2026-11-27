@@ -10,14 +10,14 @@ struct LiveActivityRecord: Equatable, Sendable {
     let pending: Bool
     let event: Date
     let end: Date?
+    var scheduledStart: Date? = nil
 }
 
-/// Which activities a run ends before requesting the plan's: every pending one, since the
-/// plan re-requests what it still wants; one whose window has closed or whose moment has
-/// passed; and one whose rule is gone. An active one still inside its window stays.
+/// Replace future pending activities. Once their scheduled start arrives, leave the request
+/// intact so ActivityKit can deliver its start alert even if it still reports pending.
 func liveActivitiesToEnd(_ records: [LiveActivityRecord], liveRuleIDs: Set<UUID>, now: Date) -> [String] {
     records.filter { r in
-        r.pending || (r.end ?? r.event) < now || !liveRuleIDs.contains(r.ruleID)
+        (r.pending && (r.scheduledStart.map { $0 > now } ?? true)) || (r.end ?? r.event) < now || !liveRuleIDs.contains(r.ruleID)
     }.map(\.key)
 }
 
@@ -77,7 +77,7 @@ enum AlertLiveActivities {
         let records = ours.map { a in
             LiveActivityRecord(key: a.attributes.key, ruleID: a.attributes.ruleID,
                                pending: a.activityState == .pending,
-                               event: a.attributes.event, end: a.attributes.end)
+                               event: a.attributes.event, end: a.attributes.end, scheduledStart: a.attributes.scheduledStart)
         }
         let ending = Set(liveActivitiesToEnd(records, liveRuleIDs: liveRuleIDs, now: Date()))
         for a in ours where ending.contains(a.attributes.key) {
@@ -95,7 +95,8 @@ enum AlertLiveActivities {
                 key: o.key, ruleID: o.ruleID, water: water(entry.stationID),
                 title: entry.copy.title, line: entry.copy.body,
                 event: o.event, end: o.end, noWindow: o.noWindow, heightM: o.heightM,
-                imperial: imperial, tz: entry.place.tz, curve: curve(entry), url: entry.url)
+                imperial: imperial, tz: entry.place.tz, curve: curve(entry), url: entry.url,
+                scheduledStart: o.fire > clock ? o.fire : nil)
             let content = ActivityContent(state: AlertLiveActivityAttributes.ContentState(), staleDate: o.event)
             let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: entry.copy.title),
                                            body: LocalizedStringResource(stringLiteral: entry.copy.body), sound: .default)

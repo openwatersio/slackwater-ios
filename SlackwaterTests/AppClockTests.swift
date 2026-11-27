@@ -17,9 +17,7 @@ final class AppClockTests: XCTestCase {
     }
 
     /// A notification's wait is measured from the clock it is handed. A fire
-    /// time already behind yields no wait: nothing records what iOS has
-    /// delivered, and the plan moves such a reminder to now on every pass, so
-    /// requesting it would buzz again on each one.
+    /// time already behind waits one second while the event is ahead.
     func testNotificationWaitIsMeasuredFromTheClockHandedIn() {
         func entry(fireIn seconds: TimeInterval) -> AlertEntry {
             let fire = now.addingTimeInterval(seconds)
@@ -29,8 +27,45 @@ final class AppClockTests: XCTestCase {
                               place: AlertPlace(name: "a", tz: .current))
         }
         XCTAssertEqual(notificationWait(for: entry(fireIn: 60), from: now), 60)
-        XCTAssertNil(notificationWait(for: entry(fireIn: 0), from: now), "on the tie it is behind")
-        XCTAssertNil(notificationWait(for: entry(fireIn: -1), from: now))
+        XCTAssertEqual(notificationWait(for: entry(fireIn: 0), from: now), 1)
+        XCTAssertEqual(notificationWait(for: entry(fireIn: -1), from: now), 1)
+    }
+
+    func testOnlyAnEditInsideTheLeadAuthorizesAnImmediateReminder() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 1_800)
+        let event = now.addingTimeInterval(900)
+        let occurrence = AlertOccurrence(ruleID: rule.id, event: event, fire: now)
+        XCTAssertNil(immediateAlertKey(occurrence, rule: rule, editTimes: [:]))
+        XCTAssertNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: now.addingTimeInterval(-1_000).timeIntervalSince1970]))
+        XCTAssertNotNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: now.timeIntervalSince1970]))
+        XCTAssertNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: now.timeIntervalSince1970], previous: rule))
+        var shorter = rule
+        shorter.lead = 300
+        XCTAssertNotNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: now.timeIntervalSince1970], previous: shorter))
+        var disabled = rule
+        disabled.enabled = false
+        let earlier = AlertRuleRevision(rule: rule, ended: now.addingTimeInterval(-300))
+        XCTAssertNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: now.timeIntervalSince1970], previous: disabled, history: [earlier]))
+        XCTAssertNil(immediateAlertKey(occurrence, rule: rule, editTimes: [rule.id.uuidString: event.timeIntervalSince1970]))
+    }
+
+    func testARepeatingRuleKeepsItsFirstImmediateSelectionAcrossPasses() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, lead: 86_400)
+        let first = AlertOccurrence(ruleID: rule.id, event: now.addingTimeInterval(3_600), fire: now)
+        let second = AlertOccurrence(ruleID: rule.id, event: now.addingTimeInterval(7_200), fire: now)
+        let edits = [rule.id.uuidString: now.timeIntervalSince1970]
+        let immediate = [first.key: "first", second.key: "second"]
+        var selected: [String: String] = [:]
+        XCTAssertEqual(selectImmediateReminders([second, first], immediate: immediate, editTimes: edits, selected: &selected),
+                       [first.key: "first"])
+        XCTAssertTrue(selectImmediateReminders([second], immediate: immediate, editTimes: edits, selected: &selected).isEmpty)
+    }
+
+    func testImmediateReminderIsSentOnceAndPendingIsKept() {
+        XCTAssertEqual(immediateReminderAction(hasEdit: false, handled: false, pending: false), .skip)
+        XCTAssertEqual(immediateReminderAction(hasEdit: true, handled: false, pending: false), .send)
+        XCTAssertEqual(immediateReminderAction(hasEdit: true, handled: true, pending: true), .keep)
+        XCTAssertEqual(immediateReminderAction(hasEdit: true, handled: true, pending: false), .skip)
     }
 
     /// `timeIntervalSinceNow` is always the real clock; a sleep or a filter in
