@@ -100,6 +100,11 @@ struct AlertRule: Codable, Identifiable, Equatable {
     }
 }
 
+struct AlertRuleRevision: Codable {
+    let rule: AlertRule
+    let ended: Date
+}
+
 @MainActor final class AlertRuleStore: ObservableObject {
     static let shared = AlertRuleStore(defaults: AppGroup.defaults)
 
@@ -108,6 +113,34 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// so a store built in a test never reaches the system.
     var onChange: () -> Void = {}
     private let defaults: UserDefaults
+    private let editTimesKey = "slackwater.alertRuleEditTimes"
+
+    private let editSnapshotsKey = "slackwater.alertRuleEditSnapshots"
+    private let previousRulesKey = "slackwater.alertRulePreviousSnapshots"
+    private let revisionsKey = "slackwater.alertRuleRevisions"
+
+    var revisions: [String: [AlertRuleRevision]] {
+        defaults.data(forKey: revisionsKey).flatMap { try? JSONDecoder().decode([String: [AlertRuleRevision]].self, from: $0) } ?? [:]
+    }
+
+    private func snapshot(_ rule: AlertRule) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(rule))?.base64EncodedString()
+    }
+
+    var editTimes: [String: Double] {
+        let times = defaults.dictionary(forKey: editTimesKey) as? [String: Double] ?? [:]
+        let snapshots = defaults.dictionary(forKey: editSnapshotsKey) as? [String: String] ?? [:]
+        return times.filter { id, _ in
+            rules.first(where: { $0.id.uuidString == id }).flatMap(snapshot) == snapshots[id] && snapshots[id] != nil
+        }
+    }
+    var previousRules: [String: AlertRule] {
+        let snapshots = defaults.dictionary(forKey: previousRulesKey) as? [String: String] ?? [:]
+        return snapshots.compactMapValues { Data(base64Encoded: $0).flatMap { try? JSONDecoder().decode(AlertRule.self, from: $0) } }
+    }
+
     /// Rules this build can't read — written by a newer one — kept exactly as stored and
     /// written back, so moving between builds never loses them.
     private var unreadable: [Any] = []
@@ -157,10 +190,29 @@ struct AlertRule: Codable, Identifiable, Equatable {
         rule.slackNeedsReview = nil
         rule.currentWindowRule = rule.trigger == .slackWindowOpens && rule.once != nil
         rule.currentWindowWasOff = rule.currentWindowRule && windowWasOff
+        let previous = rules.first { $0.id == rule.id }
         if let i = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[i] = rule
         } else {
             rules.append(rule)
+        }
+        if previous != rule {
+            let edited = appNow()
+            var history = revisions
+            history = history.mapValues { $0.filter { $0.ended >= edited.addingTimeInterval(-86_400) } }
+            if let previous, previous.enabled {
+                history[rule.id.uuidString, default: []].append(AlertRuleRevision(rule: previous, ended: edited))
+            }
+            if let data = try? JSONEncoder().encode(history) { defaults.set(data, forKey: revisionsKey) }
+            var times = defaults.dictionary(forKey: editTimesKey) as? [String: Double] ?? [:]
+            times[rule.id.uuidString] = edited.timeIntervalSince1970
+            defaults.set(times, forKey: editTimesKey)
+            var snapshots = defaults.dictionary(forKey: editSnapshotsKey) as? [String: String] ?? [:]
+            snapshots[rule.id.uuidString] = snapshot(rule)
+            defaults.set(snapshots, forKey: editSnapshotsKey)
+            var previousRules = defaults.dictionary(forKey: previousRulesKey) as? [String: String] ?? [:]
+            previousRules[rule.id.uuidString] = previous.flatMap(snapshot) ?? ""
+            defaults.set(previousRules, forKey: previousRulesKey)
         }
         persist()
     }
@@ -181,6 +233,18 @@ struct AlertRule: Codable, Identifiable, Equatable {
 
     func remove(_ id: UUID) {
         rules.removeAll { $0.id == id }
+        var times = defaults.dictionary(forKey: editTimesKey) as? [String: Double] ?? [:]
+        times.removeValue(forKey: id.uuidString)
+        defaults.set(times, forKey: editTimesKey)
+        var snapshots = defaults.dictionary(forKey: editSnapshotsKey) as? [String: String] ?? [:]
+        snapshots.removeValue(forKey: id.uuidString)
+        defaults.set(snapshots, forKey: editSnapshotsKey)
+        var previousRules = defaults.dictionary(forKey: previousRulesKey) as? [String: String] ?? [:]
+        previousRules.removeValue(forKey: id.uuidString)
+        defaults.set(previousRules, forKey: previousRulesKey)
+        var history = revisions
+        history.removeValue(forKey: id.uuidString)
+        if let data = try? JSONEncoder().encode(history) { defaults.set(data, forKey: revisionsKey) }
         persist()
     }
 

@@ -23,6 +23,14 @@ final class AlertCopyTests: XCTestCase {
                                  body: "14:32–15:10, under 0.5 kn · in 30 min"))
     }
 
+    func testAnImmediateReminderDoesNotClaimTheOriginalLead() {
+        let rule = AlertRule(stationID: "x", trigger: .slack, lead: 1_800)
+        let occurrence = AlertOccurrence(ruleID: rule.id, event: event, fire: event.addingTimeInterval(-900))
+        let result = alertCopy(rule, occurrence, place: place, imperial: true, threshold: 0.5,
+                               includeLead: true, includePlace: true, locale: gb)
+        XCTAssertEqual(result.body, "14:32")
+    }
+
     func testAHairlineSlackSaysThereIsNoWindow() {
         XCTAssertEqual(copy(.slackWindowOpens, noWindow: true),
                        AlertCopy(title: "Race Passage - Slack", body: "14:32, no window under 0.5 kn"))

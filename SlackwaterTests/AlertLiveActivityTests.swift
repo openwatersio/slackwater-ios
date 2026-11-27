@@ -82,6 +82,15 @@ final class AlertLiveActivityTests: XCTestCase {
                        ["pending", "closed", "moment-passed", "orphan"])
     }
 
+    func testSweepKeepsPendingActivityAtItsScheduledStart() {
+        let now = Date(timeIntervalSince1970: 1000)
+        let id = UUID()
+        let pending = LiveActivityRecord(key: "due", ruleID: id, pending: true,
+                                         event: now.addingTimeInterval(900), end: nil, scheduledStart: now)
+        XCTAssertEqual(liveActivitiesToEnd([pending], liveRuleIDs: [id], now: now), [])
+        XCTAssertEqual(liveActivitiesToEnd([pending], liveRuleIDs: [], now: now), ["due"])
+    }
+
     func testLosingEveryRuleEndsEverything() {
         // Review Focus 3: every pending activity is ended whatever the rules, so losing Premium
         // (an empty plan) clears them; an active one in its window is the sweep's only keeper.
