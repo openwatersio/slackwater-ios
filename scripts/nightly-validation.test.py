@@ -74,6 +74,11 @@ with tempfile.TemporaryDirectory() as directory:
     git("config", "user.email", "nightly@example.test")
     commits = []
     for i in range(10):
+        if i == 1:
+            project = Path(directory) / "Slackwater.xcodeproj" / "project.xcproj"
+            project.parent.mkdir()
+            project.write_text("{}")
+            git("add", str(project))
         git("commit", "-q", "--allow-empty", "-m", f"Commit {i}")
         commits.append(git("rev-parse", "HEAD"))
 
@@ -100,10 +105,11 @@ with tempfile.TemporaryDirectory() as directory:
     assert select([candidates[:5], candidates[5:]], app_jobs) == commits[2]
     assert select([[{**candidates[-1], "id": 20, "head_branch": "feature"}, candidates[-2]]], app_jobs) == commits[1]
     assert select([[{**candidates[-1], "id": 20, "event": "pull_request"}, candidates[-2]]], app_jobs) == commits[1]
+    assert select([[{**candidates[-1], "id": 20}, candidates[-2]]], {**app_jobs, 20: jobs}) == commits[1]
     # A failed newer run for the same SHA supersedes an old success.
     assert select([[{**run, "id": 20, "head_sha": commits[2], "conclusion": "failure"},
                     candidates[-3], candidates[-2]]], app_jobs) == commits[1]
-    for pages in ([], [candidates[:5]]):
+    for pages in ([], [candidates[:5]], [[candidates[-1]]]):
         try:
             select(pages, app_jobs)
         except ValueError:

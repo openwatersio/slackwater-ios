@@ -45,6 +45,12 @@ def select(anchor, repository):
         seen.add(sha)
         if run["status"] != "completed" or run["conclusion"] != "success":
             continue
+        project = subprocess.run(
+            ["git", "cat-file", "-t", f"{sha}:Slackwater.xcodeproj/project.xcproj"],
+            capture_output=True, text=True, check=False)
+        if project.returncode != 0 or project.stdout.strip() != "blob":
+            print(f"Skipping CI run {run['id']} ({sha}): no native Xcode project", file=sys.stderr)
+            continue
         try:
             validate_jobs(run, repository)
         except ValueError as error:
@@ -52,7 +58,7 @@ def select(anchor, repository):
             continue
         print(f"Selected {sha} from full main CI run {run['id']} (attempt {run['run_attempt']}).", file=sys.stderr)
         return sha
-    raise ValueError("no completed successful main CI run with full app validation in the trigger history")
+    raise ValueError("no native Xcode project commit with successful full main CI in the trigger history")
 
 
 def validate_jobs(run, repository):

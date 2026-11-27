@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Select the latest fully validated main commit
+      - name: Select the latest fully validated main commit with a native Xcode project
         id: select
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,15 +85,11 @@ jobs:
         with:
           node-version-file: mise.toml
 
-      # A selected green commit may predate the committed native project.
-      - if: hashFiles('project.yml') != ''
-        run: brew install xcodegen
-
       # Same MapLibre download cache as ci.yml, shared with its keys.
       - uses: actions/cache@v6.1.0
         with:
           path: build/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Slackwater.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       - name: Release the validated commit to Nightly
