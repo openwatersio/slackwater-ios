@@ -67,3 +67,32 @@ test("corrected Southampton and Aberdeen pass the datum gate", () => {
   assert.ok(datumDeviation(aberdeen) <= DATUM_TOLERANCE_M,
             `Aberdeen deviation ${datumDeviation(aberdeen).toFixed(3)} m now exceeds the gate`);
 });
+
+test("the observed datum gate keeps Bournemouth's double tide", () => {
+  // https://github.com/openwatersio/slackwater-database/blob/0e6e02552d9f55dee0bdd8487e04e684b2ef5dea/data/ticon/bournemouth-bou-gbr-bodc.json#L20-L33
+  const bournemouth = db.byId("ticon/bournemouth-bou-gbr-bodc");
+  const station = {
+    ...bournemouth,
+    disclaimers: "Datums use the shared Slackwater calculator.",
+    datums: { ...bournemouth.datums, MHW: 2.002, MLW: 0.829 },
+  };
+  assert.ok(passesDatumCheck(station));
+  assert.equal(passesDatumCheck({
+    ...station,
+    disclaimers: "Datums use the shared Slackwater calculator. Harmonic datums retain every predicted turning point without prominence filtering.",
+  }), false);
+  assert.equal(passesDatumCheck({
+    ...station,
+    datums: { ...station.datums, MLW: 0.2 },
+  }), false);
+});
+
+test("the observed datum gate still excludes Castlepoint's inconsistent low", () => {
+  // https://github.com/openwatersio/slackwater-database/blob/0e6e02552d9f55dee0bdd8487e04e684b2ef5dea/data/ticon/castlepoint-cpit-nzl-ttw.json#L20-L33
+  const castlepoint = db.byId("ticon/castlepoint-cpit-nzl-ttw");
+  assert.equal(passesDatumCheck({
+    ...castlepoint,
+    disclaimers: "Datums use the shared Slackwater calculator.",
+    datums: { ...castlepoint.datums, MHW: 4.581, MLW: 3.286 },
+  }), false);
+});

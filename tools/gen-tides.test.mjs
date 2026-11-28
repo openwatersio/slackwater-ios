@@ -291,6 +291,7 @@ test("the Solent is in the bundle", () => {
     (s) => want.includes(s.name) && s.latitude > 50 && s.latitude < 51
            && s.longitude > -2.5 && s.longitude < -0.5);
   assert.deepEqual(solent.map((s) => s.name).sort(), want.sort());
+  assert.equal(solent.find((s) => s.name === "Bournemouth")?.id, "ticon/bournemouth-bou-gbr-bodc");
 });
 
 // Freshwater instrumentation is still the thing being excluded — 328 Louisiana
@@ -389,7 +390,7 @@ test("stations that fail the datum gate are not bundled", () => {
   // Subordinates never run the gate: their constituents are the reference's copy.
   const rejected = db.all.filter(
     (s) => s.license?.commercial_use === true && s.type !== "subordinate"
-        && !passesDatumCheck(s) && bundled.has(s.id));
+        && bundled.has(s.id) && !passesDatumCheck(s));
   assert.deepEqual(rejected.map((s) => s.id), []);
   const soton = db.all.find(
     (s) => s.name === "Southampton" && s.country_code === "GB");

@@ -14,11 +14,11 @@ to ship that station's numbers as fact.
 
 ## The method
 
-For every checkable station: predict a year of tidal extremes (2026-01-01 –
-2027-01-01 UTC) from its harmonic constituents, take the mean of the predicted highs and
-the mean of the predicted lows, and compare each to the station's published `MHW`/`MLW`.
-The worse of the two deviations is the station's score. A station with no published
-`MHW`/`MLW`, or no usable constituents, is `null` — unjudgeable, not failing.
+Predict one year (2026-01-01 through 2027-01-01 UTC) from the station's harmonic constituents. Compare the predicted mean high and mean low to the published `MHW` and `MLW`. The larger difference is the station's score. A score requires both published means and usable constituents.
+
+For TICON observed datums produced by the shared Slackwater calculator, tabulate the model's six-minute samples with the same NOAA Tidal Analysis Datum Calculator method. Use the station's constituent definitions and nodal corrections for that prediction. Matching the turning-point selection matters at double-tide ports such as Bournemouth and Southampton. The gate averages the model's extrema for other datum sources and when the shared calculator cannot produce both means.
+
+The 0.30 m gate applies to both reductions. The NOAA calibration and historical measurements below quantify the extrema-based check.
 
 **Both sides are reduced to chart datum first, and that reduction is the whole trick.**
 Different national authorities publish datums against different references:
