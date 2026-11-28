@@ -19,6 +19,18 @@ final class CurrentStationDatabaseTests: XCTestCase {
         XCTAssertEqual(CurrentStationRecord.all.count, Self.json.count)
     }
 
+    func testEveryBundledRecordBuildsAPredictor() {
+        let records = CurrentStationRecord.all
+        let byID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+        for record in records {
+            let reference = record.reference.flatMap { byID[$0] }
+            if let id = record.reference {
+                XCTAssertNotNil(reference, "\(record.id) missing reference \(id)")
+            }
+            XCTAssertNoThrow(try record.checkedEngineStation(referenceRecord: reference), record.id)
+        }
+    }
+
     func testRecordsMatchTheGeneratedJSON() {
         for var json in Self.json {
             let tcdb = CurrentStationRecord.record(id: json.id)
@@ -101,6 +113,10 @@ final class CurrentStationDatabaseTests: XCTestCase {
         XCTAssertEqual(actualPoints.map(\.speed), expectedPoints.map(\.speed))
         XCTAssertEqual(actualPoints.map(\.magnitude), expectedPoints.map(\.magnitude))
         XCTAssertEqual(actualPoints.map(\.direction), expectedPoints.map(\.direction))
+        // The TypeScript Schureman predictor for these harmonics at 03:30 UTC.
+        let first = try XCTUnwrap(actualPoints.first)
+        XCTAssertEqual(first.speed, -0.9168442612697614, accuracy: 1e-6)
+        XCTAssertEqual(first.magnitude, 1.0639310556448098, accuracy: 1e-6)
     }
 
     func testRejectsBytesThatAreNotAStationDatabase() throws {

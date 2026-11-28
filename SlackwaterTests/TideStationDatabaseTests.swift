@@ -6,9 +6,8 @@ import SlackwaterKit
 /// stations.tcdb and stations.json come out of the same gen-tides run (#459).
 /// The app reads the database; the JSON stays in the repository as the
 /// reviewable record of what it holds and as input to the other generators.
-/// These hold the two to the same stations and the same predictions. The
-/// database stores values as float32, so numbers agree to float32 precision
-/// rather than exactly.
+/// These compare station data and predictions under the same model. The
+/// database stores numeric harmonics as float32.
 final class TideStationDatabaseTests: XCTestCase {
     private static let json: [TideStationRecord] = {
         let url = repoRoot.appendingPathComponent("Slackwater/Resources/stations.json")
@@ -18,6 +17,18 @@ final class TideStationDatabaseTests: XCTestCase {
     func testHoldsExactlyTheGeneratedStations() {
         XCTAssertEqual(TideStationRecord.database.map(\.id), Self.json.map(\.id).sorted())
         XCTAssertEqual(TideStationRecord.all.count, Self.json.count)
+    }
+
+    func testEveryBundledRecordBuildsAPredictor() {
+        let records = TideStationRecord.all
+        let byID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+        for record in records {
+            let reference = record.reference.flatMap { byID[$0] }
+            if let id = record.reference {
+                XCTAssertNotNil(reference, "\(record.id) missing reference \(id)")
+            }
+            XCTAssertNoThrow(try record.checkedEngineStation(referenceRecord: reference), record.id)
+        }
     }
 
     func testRecordsMatchTheGeneratedJSON() {
@@ -150,6 +161,8 @@ final class TideStationDatabaseTests: XCTestCase {
         let heights = actual.extremes(from: day, to: end).map(\.height)
         XCTAssertEqual(heights, expected.extremes(from: day, to: end).map(\.height))
         XCTAssertNotEqual(heights, atSubordinate.extremes(from: day, to: end).map(\.height))
+        // The TypeScript predictor at 53° with the same O1 harmonic.
+        XCTAssertEqual(try XCTUnwrap(heights.first), 1.1708258555948337, accuracy: 1e-6)
     }
 
     func testRejectsBytesThatAreNotAStationDatabase() throws {
