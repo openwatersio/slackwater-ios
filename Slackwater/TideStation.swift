@@ -45,6 +45,7 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// The publisher of the constants, named as the database names it. Read
     /// from the tcdb only; stations.json does not carry it.
     var source: String? = nil
+    var predictionModel: StationPredictionModel? = nil
 
     var isSubordinate: Bool { reference != nil }
 
@@ -93,10 +94,15 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     }
 
     func engineStation(referenceRecord: TideStationRecord?) -> any TidePredicting {
-        guard let offsets, let ref = referenceRecord else { return harmonicStation }
+        do { return try checkedEngineStation(referenceRecord: referenceRecord) }
+        catch { preconditionFailure("Invalid tide prediction model for \(id): \(error)") }
+    }
+
+    func checkedEngineStation(referenceRecord: TideStationRecord?) throws -> any TidePredicting {
+        guard let offsets, let ref = referenceRecord else { return try checkedHarmonicStation() }
         let h = offsets.height
         return SubordinateTideStation(
-            reference: ref.harmonicStation,
+            reference: try ref.checkedHarmonicStation(),
             highTimeOffset: offsets.time.high * 60, lowTimeOffset: offsets.time.low * 60,
             height: h.type == "fixed" ? .fixed(high: h.high, low: h.low) : .ratio(high: h.high, low: h.low))
     }
@@ -104,8 +110,15 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// The constituent model itself. A CHS-fitted port is always harmonic, and
     /// a derived gate lags its extremes directly.
     var harmonicStation: Station {
-        Station(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                offset: datumOffset)
+        do { return try checkedHarmonicStation() }
+        catch { preconditionFailure("Invalid tide prediction model for \(id): \(error)") }
+    }
+
+    func checkedHarmonicStation() throws -> Station {
+        let harmonics = constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) }
+        guard let predictionModel else { return Station(constituents: harmonics, offset: datumOffset) }
+        return try Station(constituents: harmonics, offset: datumOffset, definitions: predictionModel.engineDefinitions,
+                           nodeCorrections: predictionModel.engineCorrections())
     }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }

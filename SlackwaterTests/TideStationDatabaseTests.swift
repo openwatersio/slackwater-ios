@@ -1,5 +1,6 @@
 import XCTest
 import SlackwaterDatabase
+import SlackwaterKit
 @testable import Slackwater
 
 /// stations.tcdb and stations.json come out of the same gen-tides run (#459).
@@ -94,9 +95,12 @@ final class TideStationDatabaseTests: XCTestCase {
         let sample = stride(from: 0, to: Self.json.count, by: 20).map { Self.json[$0] }
         XCTAssertTrue(sample.contains { $0.offsets?.height.type == "ratio" })
         XCTAssertTrue(sample.contains { $0.offsets?.height.type == "fixed" })
-        for json in sample {
+        for var json in sample {
             guard let tcdb = TideStationRecord.record(id: json.id) else { return XCTFail("\(json.id) missing") }
-            let expected = json.engineStation(referenceRecord: json.reference.flatMap { byID[$0] })
+            json.predictionModel = tcdb.predictionModel
+            var reference = json.reference.flatMap { byID[$0] }
+            reference?.predictionModel = tcdb.referenceRecord?.predictionModel
+            let expected = json.engineStation(referenceRecord: reference)
                 .extremes(from: day, to: end)
             let actual = tcdb.engineStation.extremes(from: day, to: end)
             XCTAssertEqual(actual.count, expected.count, json.id)
@@ -113,6 +117,39 @@ final class TideStationDatabaseTests: XCTestCase {
         XCTAssertEqual(try tideRecord(id: TideStationRecord.fridayHarborID, directory: bundle)?.id,
                        TideStationRecord.fridayHarborID)
         XCTAssertNil(try tideRecord(id: "noaa/missing", directory: bundle))
+    }
+
+    func testSubordinatePredictsWithForemanAtTheReferenceLatitude() throws {
+        let constituent = SlackwaterDatabase.Station.Constituent(name: "O1", amplitude: 1, phase: 0)
+        let definition = SlackwaterDatabase.Station.ConstituentDefinition(
+            name: "O1", speed: 13.9430356, coefficients: [1, -1, 0, 0, 0, 0, 1])
+        let source = StationSource(name: "Foreman", id: "foreman", url: nil,
+                                   publishedHarmonics: true, nodeCorrections: .foreman)
+        let license = StationLicense(type: "public domain", url: nil, commercialUse: true)
+        let reference = StationInput(id: "test/reference", name: "Reference", latitude: 53, longitude: -130,
+                                     timezone: "America/Vancouver", country: "Canada", countryCode: "CA",
+                                     continent: "North America", source: source, license: license,
+                                     constituents: [constituent])
+        let subordinate = StationInput(
+            id: "test/subordinate", name: "Subordinate", latitude: 35, longitude: -121,
+            timezone: "America/Los_Angeles", country: "United States", countryCode: "US",
+            continent: "North America", source: source, license: license,
+            tideOffsets: .init(reference: reference.id, timeHigh: 0, timeLow: 0,
+                               heightType: .ratio, heightHigh: 1, heightLow: 1))
+        let database = try StationDatabase(data: StationDatabase.build(
+            [reference, subordinate], credits: ["Foreman": nil], constituentDefinitions: [definition]))
+        let referenceRecord = TideStationRecord(try XCTUnwrap(database.station(id: reference.id)))
+        let subordinateRecord = TideStationRecord(try XCTUnwrap(database.station(id: subordinate.id)))
+        let actual = try subordinateRecord.checkedEngineStation(referenceRecord: referenceRecord)
+
+        let constituents = [HarmonicConstituent(name: "O1", amplitude: 1, phase: 0)]
+        let expected = try SlackwaterKit.Station(constituents: constituents, nodeCorrections: .foreman(latitude: 53))
+        let atSubordinate = try SlackwaterKit.Station(constituents: constituents, nodeCorrections: .foreman(latitude: 35))
+        let day = Date(timeIntervalSince1970: 1_784_000_000)
+        let end = day.addingTimeInterval(86_400)
+        let heights = actual.extremes(from: day, to: end).map(\.height)
+        XCTAssertEqual(heights, expected.extremes(from: day, to: end).map(\.height))
+        XCTAssertNotEqual(heights, atSubordinate.extremes(from: day, to: end).map(\.height))
     }
 
     func testRejectsBytesThatAreNotAStationDatabase() throws {

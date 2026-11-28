@@ -53,12 +53,12 @@ enum WidgetStationLoader {
             let database = try tideDatabase(directory: directory)
             guard let r = database.station(id: info.id).map(TideStationRecord.init) else { return nil }
             let reference = r.reference.flatMap { database.station(id: $0) }.map(TideStationRecord.init)
-            record = .tide(r, station: r.engineStation(referenceRecord: reference))
+            record = .tide(r, station: try r.checkedEngineStation(referenceRecord: reference))
         case .current(let info):
             let database = try currentDatabase(directory: directory)
             guard let r = database.station(id: info.id).map(CurrentStationRecord.init) else { return nil }
             let reference = r.reference.flatMap { database.station(id: $0) }.map(CurrentStationRecord.init)
-            record = .current(r, station: r.engineStation(referenceRecord: reference))
+            record = .current(r, station: try r.checkedEngineStation(referenceRecord: reference))
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }
             let r = info.record(with: model)

@@ -2,6 +2,61 @@
 // stations.tcdb that tools/gen-tides.mjs writes (#459).
 import Foundation
 import SlackwaterDatabase
+import SlackwaterKit
+
+/// Prediction metadata stored on a harmonic station. Subordinates use the reference record.
+struct StationPredictionModel: Codable, Hashable, Sendable {
+    private enum Corrections: String, Codable, Sendable { case iho, schureman, foreman }
+
+    private struct Definition: Codable, Hashable, Sendable {
+        struct Member: Codable, Hashable, Sendable {
+            let name: String
+            let factor: Double
+        }
+        let name: String
+        let speed: Double
+        let coefficients: [Int]?
+        let aliases: [String]
+        let members: [Member]
+
+        var engineDefinition: SlackwaterKit.ConstituentDefinition {
+            .init(name: name, speed: speed, coefficients: coefficients, aliases: aliases,
+                  members: members.map { .init(name: $0.name, factor: $0.factor) })
+        }
+    }
+
+    private let corrections: Corrections
+    private let latitude: Double?
+    private let definitions: [Definition]
+
+    init?(_ station: SlackwaterDatabase.Station) {
+        let mode = station.nodeCorrections
+        let lines = station.constituentDefinitions ?? []
+        if lines.isEmpty, mode == .iho { return nil }
+        corrections = switch mode {
+        case .iho: .iho
+        case .schureman: .schureman
+        case .foreman: .foreman
+        }
+        latitude = station.nodeCorrectionsLatitude
+        definitions = lines.map { line in
+            .init(name: line.name, speed: line.speed, coefficients: line.coefficients, aliases: line.aliases,
+                  members: line.members.map { .init(name: $0.name, factor: $0.factor) })
+        }
+    }
+
+    var engineDefinitions: [SlackwaterKit.ConstituentDefinition] { definitions.map(\.engineDefinition) }
+
+    func engineCorrections() throws -> SlackwaterKit.NodeCorrections {
+        switch corrections {
+        case .iho: return .iho
+        case .schureman: return .schureman
+        case .foreman:
+            guard let latitude else { throw NodeCorrectionsError.invalidLatitude }
+            return .foreman(latitude: latitude)
+        }
+    }
+}
 
 /// Opens one of a catalog generation's station databases, `<resource>.tcdb`.
 /// Mapping the file reads nothing but its 8-byte header; each lookup is a
@@ -96,6 +151,7 @@ extension TideStationRecord {
             // holds the two implementations to each other.
             latDatum: station.astronomicalBounds?.lat,
             hatDatum: station.astronomicalBounds?.hat,
-            source: station.source?.name)
+            source: station.source?.name,
+            predictionModel: offsets == nil ? StationPredictionModel(station) : nil)
     }
 }

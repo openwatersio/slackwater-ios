@@ -69,7 +69,8 @@ extension CurrentStationRecord {
             minorConstituents: current?.minorConstituents.map { $0.map(Con.init) }
                 ?? (current?.minorMeanFlow == nil ? nil : []),
             minorMeanFlow: current?.minorMeanFlow.map(thousandths),
-            azimuth: current?.azimuth.map(thousandths))
+            azimuth: current?.azimuth.map(thousandths),
+            predictionModel: offsets == nil ? StationPredictionModel(station) : nil)
     }
 }
 

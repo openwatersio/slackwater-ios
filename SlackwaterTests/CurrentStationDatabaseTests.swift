@@ -1,12 +1,13 @@
 import XCTest
 import SlackwaterDatabase
+import SlackwaterKit
 @testable import Slackwater
 
 /// currents.tcdb and currents.json come out of the same gen-noaa-currents run
 /// (#902). The app reads the database; the JSON stays in the repository as
 /// the reviewable record of what it holds and as input to the other
 /// generators. The reader rounds the database's float32 values back to the
-/// generator's three places, so the records are equal exactly.
+/// generator's three places, so the fields common to both formats match exactly.
 final class CurrentStationDatabaseTests: XCTestCase {
     private static let json: [CurrentStationRecord] = {
         let url = repoRoot.appendingPathComponent("Slackwater/Resources/currents.json")
@@ -19,8 +20,10 @@ final class CurrentStationDatabaseTests: XCTestCase {
     }
 
     func testRecordsMatchTheGeneratedJSON() {
-        for json in Self.json {
-            XCTAssertEqual(CurrentStationRecord.record(id: json.id), json, json.id)
+        for var json in Self.json {
+            let tcdb = CurrentStationRecord.record(id: json.id)
+            json.predictionModel = tcdb?.predictionModel
+            XCTAssertEqual(tcdb, json, json.id)
         }
     }
 
@@ -43,9 +46,12 @@ final class CurrentStationDatabaseTests: XCTestCase {
         let sample = stride(from: 0, to: Self.json.count, by: 20).map { Self.json[$0] }
         XCTAssertTrue(sample.contains { $0.isSubordinate })
         XCTAssertTrue(sample.contains { $0.minorConstituents != nil })
-        for json in sample {
+        for var json in sample {
             guard let tcdb = CurrentStationRecord.record(id: json.id) else { return XCTFail("\(json.id) missing") }
-            let expected = json.engineStation(referenceRecord: json.reference.flatMap { byID[$0] })
+            json.predictionModel = tcdb.predictionModel
+            var reference = json.reference.flatMap { byID[$0] }
+            reference?.predictionModel = tcdb.referenceRecord?.predictionModel
+            let expected = json.engineStation(referenceRecord: reference)
             let actual = tcdb.engineStation
             let events = { (s: any CurrentPredicting) in
                 s.events(from: day, to: end).map { "\($0.kind) \($0.time.timeIntervalSince1970) \($0.speed)" }
@@ -61,6 +67,40 @@ final class CurrentStationDatabaseTests: XCTestCase {
         let id = try XCTUnwrap(Self.json.first?.id)
         XCTAssertEqual(try currentRecord(id: id, directory: bundle)?.id, id)
         XCTAssertNil(try currentRecord(id: "noaa/missing", directory: bundle))
+    }
+
+    func testCurrentPredictsBothAxesWithSchuremanAndSourceDefinitions() throws {
+        let major = SlackwaterDatabase.Station.Constituent(name: "O1", amplitude: 1, phase: 0)
+        let minor = SlackwaterDatabase.Station.Constituent(name: "FixtureK1", amplitude: 0.5, phase: 90)
+        let shared = SlackwaterDatabase.Station.ConstituentDefinition(
+            name: "O1", speed: 13.9430356, coefficients: [1, -1, 0, 0, 0, 0, 1])
+        let sourceDefinition = SlackwaterDatabase.Station.ConstituentDefinition(
+            name: "K1", speed: 15.0410686, coefficients: [1, 1, 0, 0, 0, 0, -1], aliases: [minor.name])
+        let source = StationSource(name: "Schureman", id: "schureman", url: nil, publishedHarmonics: true,
+                                   constituentDefinitions: [sourceDefinition], nodeCorrections: .schureman)
+        let license = StationLicense(type: "public domain", url: nil, commercialUse: true)
+        let input = StationInput(id: "test/current", name: "Current", latitude: 47, longitude: -123,
+                                 timezone: "America/Los_Angeles", country: "United States", countryCode: "US",
+                                 continent: "North America", source: source, license: license, constituents: [major],
+                                 current: .init(floodDirection: 0, ebbDirection: 180, minorConstituents: [minor], azimuth: 0))
+        let database = try StationDatabase(data: StationDatabase.build(
+            [input], credits: ["Schureman": nil], constituentDefinitions: [shared]))
+        let record = CurrentStationRecord(try XCTUnwrap(database.station(id: input.id)))
+        let actual = try record.checkedEngineStation(referenceRecord: nil)
+
+        let expected = try CurrentStation(
+            constituents: [.init(name: major.name, amplitude: major.amplitude, phase: major.phase)],
+            floodDirection: 0, ebbDirection: 180,
+            minorConstituents: [.init(name: "K1", amplitude: minor.amplitude, phase: minor.phase)],
+            azimuth: 0, nodeCorrections: .schureman)
+        let day = Date(timeIntervalSince1970: 1_784_000_000)
+        let end = day.addingTimeInterval(86_400)
+        let actualPoints = actual.speeds(from: day, to: end, step: 600)
+        let expectedPoints = expected.speeds(from: day, to: end, step: 600)
+        XCTAssertTrue(actualPoints.contains { $0.magnitude > abs($0.speed) })
+        XCTAssertEqual(actualPoints.map(\.speed), expectedPoints.map(\.speed))
+        XCTAssertEqual(actualPoints.map(\.magnitude), expectedPoints.map(\.magnitude))
+        XCTAssertEqual(actualPoints.map(\.direction), expectedPoints.map(\.direction))
     }
 
     func testRejectsBytesThatAreNotAStationDatabase() throws {
