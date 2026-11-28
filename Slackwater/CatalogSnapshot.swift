@@ -88,6 +88,9 @@ struct CatalogSnapshot {
                 }
             } else if !Self.validConstituents(tide.constituents) {
                 throw Self.invalid("stations", "unusable constituents for \(tide.id)")
+            } else if tide.predictionModel != nil {
+                do { _ = try tide.checkedHarmonicStation() }
+                catch { throw Self.invalid("stations", "unusable prediction model for \(tide.id): \(error)") }
             }
         }
         for current in currents {
@@ -102,6 +105,9 @@ struct CatalogSnapshot {
                 }
             } else if !Self.validConstituents(current.constituents) {
                 throw Self.invalid("currents", "unusable constituents for \(current.id)")
+            } else if current.predictionModel != nil {
+                do { _ = try current.checkedHarmonicStation() }
+                catch { throw Self.invalid("currents", "unusable prediction model for \(current.id): \(error)") }
             }
             if let reference = current.tideReference, tideByID[reference] == nil {
                 throw Self.invalid("currents", "unresolved tideReference for \(current.id)")

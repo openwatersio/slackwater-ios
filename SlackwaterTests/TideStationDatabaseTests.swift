@@ -1,13 +1,13 @@
 import XCTest
 import SlackwaterDatabase
+import SlackwaterKit
 @testable import Slackwater
 
 /// stations.tcdb and stations.json come out of the same gen-tides run (#459).
 /// The app reads the database; the JSON stays in the repository as the
 /// reviewable record of what it holds and as input to the other generators.
-/// These hold the two to the same stations and the same predictions. The
-/// database stores values as float32, so numbers agree to float32 precision
-/// rather than exactly.
+/// These compare station data and predictions under the same model. The
+/// database stores numeric harmonics as float32.
 final class TideStationDatabaseTests: XCTestCase {
     private static let json: [TideStationRecord] = {
         let url = repoRoot.appendingPathComponent("Slackwater/Resources/stations.json")
@@ -17,6 +17,18 @@ final class TideStationDatabaseTests: XCTestCase {
     func testHoldsExactlyTheGeneratedStations() {
         XCTAssertEqual(TideStationRecord.database.map(\.id), Self.json.map(\.id).sorted())
         XCTAssertEqual(TideStationRecord.all.count, Self.json.count)
+    }
+
+    func testEveryBundledRecordBuildsAPredictor() {
+        let records = TideStationRecord.all
+        let byID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+        for record in records {
+            let reference = record.reference.flatMap { byID[$0] }
+            if let id = record.reference {
+                XCTAssertNotNil(reference, "\(record.id) missing reference \(id)")
+            }
+            XCTAssertNoThrow(try record.checkedEngineStation(referenceRecord: reference), record.id)
+        }
     }
 
     func testRecordsMatchTheGeneratedJSON() {
@@ -94,9 +106,12 @@ final class TideStationDatabaseTests: XCTestCase {
         let sample = stride(from: 0, to: Self.json.count, by: 20).map { Self.json[$0] }
         XCTAssertTrue(sample.contains { $0.offsets?.height.type == "ratio" })
         XCTAssertTrue(sample.contains { $0.offsets?.height.type == "fixed" })
-        for json in sample {
+        for var json in sample {
             guard let tcdb = TideStationRecord.record(id: json.id) else { return XCTFail("\(json.id) missing") }
-            let expected = json.engineStation(referenceRecord: json.reference.flatMap { byID[$0] })
+            json.predictionModel = tcdb.predictionModel
+            var reference = json.reference.flatMap { byID[$0] }
+            reference?.predictionModel = tcdb.referenceRecord?.predictionModel
+            let expected = json.engineStation(referenceRecord: reference)
                 .extremes(from: day, to: end)
             let actual = tcdb.engineStation.extremes(from: day, to: end)
             XCTAssertEqual(actual.count, expected.count, json.id)
@@ -113,6 +128,41 @@ final class TideStationDatabaseTests: XCTestCase {
         XCTAssertEqual(try tideRecord(id: TideStationRecord.fridayHarborID, directory: bundle)?.id,
                        TideStationRecord.fridayHarborID)
         XCTAssertNil(try tideRecord(id: "noaa/missing", directory: bundle))
+    }
+
+    func testSubordinatePredictsWithForemanAtTheReferenceLatitude() throws {
+        let constituent = SlackwaterDatabase.Station.Constituent(name: "O1", amplitude: 1, phase: 0)
+        let definition = SlackwaterDatabase.Station.ConstituentDefinition(
+            name: "O1", speed: 13.9430356, coefficients: [1, -1, 0, 0, 0, 0, 1])
+        let source = StationSource(name: "Foreman", id: "foreman", url: nil,
+                                   publishedHarmonics: true, nodeCorrections: .foreman)
+        let license = StationLicense(type: "public domain", url: nil, commercialUse: true)
+        let reference = StationInput(id: "test/reference", name: "Reference", latitude: 53, longitude: -130,
+                                     timezone: "America/Vancouver", country: "Canada", countryCode: "CA",
+                                     continent: "North America", source: source, license: license,
+                                     constituents: [constituent])
+        let subordinate = StationInput(
+            id: "test/subordinate", name: "Subordinate", latitude: 35, longitude: -121,
+            timezone: "America/Los_Angeles", country: "United States", countryCode: "US",
+            continent: "North America", source: source, license: license,
+            tideOffsets: .init(reference: reference.id, timeHigh: 0, timeLow: 0,
+                               heightType: .ratio, heightHigh: 1, heightLow: 1))
+        let database = try StationDatabase(data: StationDatabase.build(
+            [reference, subordinate], credits: ["Foreman": nil], constituentDefinitions: [definition]))
+        let referenceRecord = TideStationRecord(try XCTUnwrap(database.station(id: reference.id)))
+        let subordinateRecord = TideStationRecord(try XCTUnwrap(database.station(id: subordinate.id)))
+        let actual = try subordinateRecord.checkedEngineStation(referenceRecord: referenceRecord)
+
+        let constituents = [HarmonicConstituent(name: "O1", amplitude: 1, phase: 0)]
+        let expected = try SlackwaterKit.Station(constituents: constituents, nodeCorrections: .foreman(latitude: 53))
+        let atSubordinate = try SlackwaterKit.Station(constituents: constituents, nodeCorrections: .foreman(latitude: 35))
+        let day = Date(timeIntervalSince1970: 1_784_000_000)
+        let end = day.addingTimeInterval(86_400)
+        let heights = actual.extremes(from: day, to: end).map(\.height)
+        XCTAssertEqual(heights, expected.extremes(from: day, to: end).map(\.height))
+        XCTAssertNotEqual(heights, atSubordinate.extremes(from: day, to: end).map(\.height))
+        // The TypeScript predictor at 53° with the same O1 harmonic.
+        XCTAssertEqual(try XCTUnwrap(heights.first), 1.1708258555948337, accuracy: 1e-6)
     }
 
     func testRejectsBytesThatAreNotAStationDatabase() throws {

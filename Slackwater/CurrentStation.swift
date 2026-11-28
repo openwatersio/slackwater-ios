@@ -144,6 +144,7 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var minorConstituents: [Con]? = nil
     var minorMeanFlow: Double? = nil
     var azimuth: Double? = nil
+    var predictionModel: StationPredictionModel? = nil
 
     var isSubordinate: Bool { reference != nil }
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.record(id: $0) } }
@@ -153,9 +154,14 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     }
 
     func engineStation(referenceRecord: CurrentStationRecord?) -> any CurrentPredicting {
-        guard reference != nil, let ref = referenceRecord else { return harmonicStation }
+        do { return try checkedEngineStation(referenceRecord: referenceRecord) }
+        catch { preconditionFailure("Invalid current prediction model for \(id): \(error)") }
+    }
+
+    func checkedEngineStation(referenceRecord: CurrentStationRecord?) throws -> any CurrentPredicting {
+        guard reference != nil, let ref = referenceRecord else { return try checkedHarmonicStation() }
         return SubordinateStation(
-            reference: ref.harmonicStation,
+            reference: try ref.checkedHarmonicStation(),
             slackBeforeFloodOffset: slackBeforeFloodOffset ?? 0, slackBeforeEbbOffset: slackBeforeEbbOffset ?? 0,
             floodTimeOffset: floodTimeOffset ?? 0, ebbTimeOffset: ebbTimeOffset ?? 0,
             floodSpeedRatio: floodSpeedRatio ?? 1, ebbSpeedRatio: ebbSpeedRatio ?? 1,
@@ -164,10 +170,20 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
 
     /// The constituent model itself; a CHS-fitted gate is always harmonic.
     var harmonicStation: CurrentStation {
-        CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                       floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow,
-                       minorConstituents: minorConstituents?.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                       minorMeanFlow: minorMeanFlow ?? 0, azimuth: azimuth)
+        do { return try checkedHarmonicStation() }
+        catch { preconditionFailure("Invalid current prediction model for \(id): \(error)") }
+    }
+
+    func checkedHarmonicStation() throws -> CurrentStation {
+        let major = constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) }
+        let minor = minorConstituents?.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) }
+        guard let predictionModel else {
+            return CurrentStation(constituents: major, floodDirection: floodDirection, ebbDirection: ebbDirection,
+                                  offset: meanFlow, minorConstituents: minor, minorMeanFlow: minorMeanFlow ?? 0, azimuth: azimuth)
+        }
+        return try CurrentStation(constituents: major, floodDirection: floodDirection, ebbDirection: ebbDirection,
+                                  offset: meanFlow, minorConstituents: minor, minorMeanFlow: minorMeanFlow ?? 0, azimuth: azimuth,
+                                  definitions: predictionModel.engineDefinitions, nodeCorrections: predictionModel.engineCorrections())
     }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }

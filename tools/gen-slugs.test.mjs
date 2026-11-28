@@ -238,7 +238,10 @@ test("a saved New Zealand TICON station moves to LINZ's record of the same gauge
   // Not on LINZ's route, but the database rejects LINZ's Auckland record as its duplicate.
   assert.deepEqual(successors["ticon/auckland-070a-nzl-uhslc_rq"], { id: "linz/070", datumShiftM: 0.097 });
   const stones = read("station-tombstones.json").map((t) => t.id).filter(id => id.includes("-nzl-"));
-  assert.deepEqual(stones.sort(), ["ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw"]);
+  const expected = ["ticon/jackson_bay-65180-nzl-bom", "ticon/sumner-sumt-nzl-ttw"];
+  const castlepoint = db.byId("ticon/castlepoint-cpit-nzl-ttw");
+  if (castlepoint.datums.MLW < castlepoint.datums.LAT) expected.push(castlepoint.id);
+  assert.deepEqual(stones.sort(), expected.sort());
 });
 
 test("no station is tombstoned while the bundle carries another record of its gauge", () => {

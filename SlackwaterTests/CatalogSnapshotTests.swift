@@ -50,8 +50,7 @@ import SlackwaterKit
         return try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
     }()
 
-    /// The bundled current records as rows, from the currents.json that
-    /// CurrentStationDatabaseTests holds equal to the database.
+    /// The bundled current records as rows, from the review copy in currents.json.
     private static let currentRows: [[String: Any]] = {
         let url = repoRoot.appendingPathComponent("Slackwater/Resources/currents.json")
         return try! JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [[String: Any]]
@@ -111,6 +110,15 @@ import SlackwaterKit
         let corrected = try CatalogSnapshot(directory: directory, active: original)
         XCTAssertEqual(corrected.byID[correctedID]?.name, "Corrected name")
         XCTAssertNotEqual(original.byID[correctedID]?.name, "Corrected name")
+    }
+
+    func testRejectsAnInvalidPredictionModel() {
+        let invalidate: (inout [[String: Any]]) -> Void = { rows in
+            let i = rows.firstIndex { $0["reference"] == nil }!
+            rows[i]["predictionModel"] = ["corrections": "foreman", "definitions": []]
+        }
+        rejectedTides(invalidate)
+        rejectedCurrents(invalidate)
     }
 
     func testMissingMalformedAndEmptyFilesAreNamedErrors() throws {

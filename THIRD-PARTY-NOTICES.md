@@ -8,6 +8,7 @@ Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.m
 - [MapLibre Native](https://github.com/maplibre/maplibre-native) — map rendering. BSD-2-Clause.
 - [Almanac](https://github.com/openwatersio/almanac) — sun and moon calculations. MIT, with algorithms translated from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, © Don Cross).
 - [@slackwater/database](https://github.com/openwatersio/slackwater-database) and [@slackwater/engine](https://github.com/openwatersio/slackwater) — build-time inputs for the bundled stations. Their code and the database registry and CHS station identities are MIT; other station data carries the source licenses below.
+- `@slackwater/datums` checks tidal datums at build time. The package contains MIT-licensed code and a port of the NOAA CO-OPS Tidal Analysis Datum Calculator under the NOAA notice. [Package license](https://github.com/openwatersio/slackwater/blob/main/packages/datums/LICENSE).
 
 ## Data
 

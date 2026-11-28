@@ -69,7 +69,8 @@ extension CurrentStationRecord {
             minorConstituents: current?.minorConstituents.map { $0.map(Con.init) }
                 ?? (current?.minorMeanFlow == nil ? nil : []),
             minorMeanFlow: current?.minorMeanFlow.map(thousandths),
-            azimuth: current?.azimuth.map(thousandths))
+            azimuth: current?.azimuth.map(thousandths),
+            predictionModel: offsets == nil ? StationPredictionModel(station) : nil)
     }
 }
 
@@ -81,6 +82,6 @@ private extension Con {
 
 /// gen-noaa-currents writes every value to three places and the file stores
 /// them float32, so rounding back recovers the generator's value exactly
-/// (0.79 reads 0.7900000214576721). The records then equal currents.json's,
-/// which the catalog validation and the tests compare against.
+/// (0.79 reads 0.7900000214576721). The fields present in both formats then
+/// match currents.json exactly.
 private func thousandths(_ v: Double) -> Double { (v * 1000).rounded() / 1000 }
