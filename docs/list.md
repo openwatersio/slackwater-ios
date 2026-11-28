@@ -66,14 +66,18 @@ The slot shows exactly one of four states. It cross-fades (0.25 s ease on iOS) w
 
 | State | Slot content | Near Me heading and count |
 |---|---|---|
-| Authorized, with a fix | My Location tile and one or two hero cards | "Near Me", 4 cards |
-| Authorized, no fix yet; or the launch prompt is up | My Location tile with a spinner and "Finding your location…", at least 96 units tall | 5 cards |
+| Authorized, with a fix | My Location heading row carrying the fix, then one or two hero cards | "Near Me", 4 cards |
+| Authorized, no fix yet; or the launch prompt is up | My Location heading row, then a card with a spinner and "Finding your location…", at least 96 units tall | 5 cards |
 | Denied or restricted | My Location heading and attention-amber card: title "Location unavailable", action "Go to Settings" opening the app's system settings | 5 cards |
 | Not determined | My Location heading and go-green card: title "Location unavailable", action "Find tides near me" raising the system prompt | 5 cards |
 
 Without a fix the My Location slot says "Showing places near [last-opened place]", or "Showing places near Chesapeake Bay" on a first launch. This names the origin of the displayed distances. The Near Me heading reads "Near Me", except on a launch where nothing has ever been opened, when it names the fallback anchor's region, "Chesapeake Bay". Keep that proper name unchanged in every language.
 
-The My Location tile has the eyebrow "My Location", a location arrow, and the fix as degrees to three decimals with hemisphere letters ("48.423°N, 123.371°W"), monospaced. The coordinate wraps rather than truncating. When iOS supplies reduced accuracy, "Approximate location" replaces the precise-looking coordinate. If an authorized location request fails, the slot says "Location unavailable" and names the fallback origin instead of continuing to spin.
+With a fix, the slot is one heading row and then the hero cards. The fix has no card and no line of its own. The row holds, from the leading edge, a location arrow and the heading "My Location"; at the trailing edge of the same row sits the fix as degrees to three decimals with hemisphere letters ("48.423°N, 123.371°W"), monospaced, at the heading's size and dimmer. The first hero card follows at the spacing any section's first card has from its heading. A coordinate too wide for the row wraps within it rather than truncating, and the row grows.
+
+In the two authorized states the arrow and the heading take the foreground colour, not the go colour of the other section headings (§3). The denied and not-determined headings have no arrow and keep the go colour.
+
+When iOS supplies reduced accuracy, "Approximate location" replaces the precise-looking coordinate. If an authorized location request fails, the slot says "Location unavailable" and names the fallback origin instead of continuing to spin.
 
 A fix counts only while location is authorized. A cached fix is usable when it is no more than 600 seconds old and has a valid accuracy. The reference requests 100 m accuracy and refreshes the fix whenever the list appears and whenever the app returns to the foreground.
 
